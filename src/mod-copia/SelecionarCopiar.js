@@ -254,6 +254,7 @@
     let corFlashBorder = '#0d9488';
     let timerFlashBorder = null;
     let aguardandoDesselecaoFlash = false;
+    let flashExclusivoSemSelecao = false;
     let timestampCriacaoFlash = 0;
     const LIMITE_MAXIMO_CONTADOR_OPERACIONAL = 900000000;
     let converterCabecalhoPjeAtivo = true;
@@ -603,7 +604,7 @@
             'BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
             'SUMMARY', 'DETAILS', 'LABEL', 'AUDIO', 'VIDEO', 'CANVAS', 'DIALOG',
             'EMBED', 'OBJECT', 'SVG', 'PATH', 'G', 'CIRCLE', 'RECT', 'POLYGON',
-            'LINE', 'USE', 'SYMBOL', 'MAT-ICON', 'G-ICON', 'MD-ICON'
+            'LINE', 'USE', 'SYMBOL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU', 'DATALIST'
         ]);
 
         const ROLES_INTERATIVOS = new Set([
@@ -631,6 +632,27 @@
                 const tagUpper = (atual.tagName || '').toUpperCase();
 
                 if (TAGS_INTERATIVAS.has(tagUpper)) {
+                    return true;
+                }
+
+                /* Inspecao de Modais, Dialogos, Popovers e Menus Suspensos WAI-ARIA */
+                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') {
+                    return true;
+                }
+
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (cls && (
+                    cls.includes('modal') ||
+                    cls.includes('dialog') ||
+                    cls.includes('dropdown') ||
+                    cls.includes('popover') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('context-menu') ||
+                    cls.includes('mat-dialog') ||
+                    cls.includes('p-dialog') ||
+                    cls.includes('pje-modal')
+                )) {
                     return true;
                 }
 
@@ -695,6 +717,17 @@
         }
 
         return false;
+    }
+
+    /*
+     * FUNCAO: isContextoDeSistemaOuUi
+     * DIRETRIZ ROOT 2.17: Identifica se um elemento ou qualquer de seus ancestrais pertence
+     * a telas de sistema / controles (modais, caixas de dialogo, dropdowns, menus contextuais,
+     * listas de selecao tipo select/option, botoes e formulários de controle).
+     */
+    function isContextoDeSistemaOuUi(el) {
+        if (!el) return false;
+        return isElementoInterativoOuUi(el);
     }
 
     /*
@@ -888,17 +921,28 @@
 
     function obterObjetoInterativoParaSelecaoCompleta(alvo) {
         /* Passo 4.0.0: Identificar se o alvo clicado com Alt pertence a um objeto interativo
-         * (link <a>, botao <button>/<input type="button|submit|reset">, menu, aba ou item clicavel)
-         * para que Alt + Clique selecione imediatamente o texto inteiro do objeto. */
+         * (link <a>, botao <button>/<input type="button|submit|reset">, menu, aba, select, option ou item clicavel)
+         * para que Alt + Clique copie imediatamente o texto inteiro do objeto com Flash Verde sem selecao residual. */
         if (!alvo) return null;
         const elBase = alvo.nodeType === Node.ELEMENT_NODE ? alvo : alvo.parentElement;
         if (!elBase || typeof elBase.closest !== 'function') return null;
 
         const elSemantico = elBase.closest(
-            'a[href], a, button, input[type="button"], input[type="submit"], input[type="reset"], summary, [role="button"], [role="menuitem"], [role="tab"], [role="option"], [role="switch"], [role="link"], [role="treeitem"], [role="combobox"], [aria-haspopup], [aria-expanded]'
+            'a[href], a, button, input[type="button"], input[type="submit"], input[type="reset"], summary, option, select, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="tab"], [role="option"], [role="switch"], [role="link"], [role="treeitem"], [role="combobox"], [aria-haspopup], [aria-expanded], [class*="menu-item"], [class*="menuitem"], [class*="dropdown-item"], [class*="ui-selectonemenu-item"], [class*="select2-results__option"], li'
         );
         if (elSemantico) {
-            return elSemantico;
+            if (elSemantico.tagName === 'LI') {
+                const parenteLista = elSemantico.closest('[role="listbox"], [role="menu"], ul, ol');
+                const ehItemInterativo = parenteLista && (
+                    isElementoInterativoOuUi(parenteLista) ||
+                    (elSemantico.className && (elSemantico.className.includes('item') || elSemantico.className.includes('option')))
+                );
+                if (ehItemInterativo) {
+                    return elSemantico;
+                }
+            } else {
+                return elSemantico;
+            }
         }
 
         const TAGS_CONTAINERS_GRANDES = new Set([
@@ -972,12 +1016,12 @@
         const elSobPonto = (typeof document.elementFromPoint === 'function')
             ? document.elementFromPoint(x, y)
             : null;
-        const containerBotaoOuAba = (elSobPonto && typeof elSobPonto.closest === 'function')
-            ? elSobPonto.closest('button, summary, [role="tab"], [role="button"]')
+        const containerInterativo = (elSobPonto && typeof elSobPonto.closest === 'function')
+            ? elSobPonto.closest('a, button, summary, select, option, li, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
             : null;
-        if (containerBotaoOuAba) {
-            const ptBotao = localizarPontoTextoDentroDeElemento(containerBotaoOuAba, x, y);
-            if (ptBotao) return ptBotao;
+        if (containerInterativo) {
+            const pt = localizarPontoTextoDentroDeElemento(containerInterativo, x, y);
+            if (pt) return pt;
         }
 
         let no = null;
@@ -2733,6 +2777,7 @@
             timerFlashBorder = null;
         }
         aguardandoDesselecaoFlash = false;
+        flashExclusivoSemSelecao = false;
         try {
             const container = document.getElementById('jusgov-flash-contour-container');
             if (container && container.parentNode) {
@@ -4636,19 +4681,28 @@
             e.stopPropagation();
         }
 
-        /* Em links, botoes e elementos de interface interativa (LINK_CLICAVEL):
-         * - DIRETRIZ ROOT IMUTAVEL: Se for clique sem tecla modificadora (Alt, Ctrl, Shift),
-         *   retorna imediatamente para permitir que a navegacao e interacao nativa da pagina
-         *   e do navegador funcione sem nenhuma interferencia ou delay.
-         * - Se houver tecla modificadora mantida (ex: Alt para copiar texto do botao/link,
-         *   Ctrl+Alt para acumular, Shift para copiar numeros): aplica selecao forcada e ignora o clique nativo! */
-        if (tipoContexto === 'LINK_CLICAVEL') {
-            if (!temModificadorTeclado) {
-                ignorarProximoClick = false;
-                houveArrastoMouse = false;
+        /* DIRETRIZ ROOT 2.17: Modo Acumulador (Ctrl+Alt) e estritamente desabilitado em qualquer controle, interface ou formulario */
+        if (e.ctrlKey && e.altKey) {
+            if (isContextoDeSistemaOuUi(e.target) || tipoContexto !== 'LEITURA_COMUM') {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
                 return;
             }
-            garantirSelecaoForcadaEmElemento(e.target);
+        }
+
+        /* Em links, botoes e elementos de interface interativa (LINK_CLICAVEL ou Contexto de Sistema):
+         * - DIRETRIZ ROOT IMUTAVEL: Se for clique sem tecla modificadora (Alt, Ctrl, Shift),
+         *   retorna imediatamente para permitir que a navegacao e interacao nativa da pagina
+         *   e do navegador funcione sem nenhuma interferencia ou delay (coordsMouseDown continua ativo para checar arrasto).
+         * - Se houver Alt mantido: cancela o evento padrao (preventDefault) para evitar cliques ou acoes indesejadas,
+         *   mas NUNCA forca selecao visual antecipada, permitindo que arrasto parcial ou clique unico copie limpo em mouseup! */
+        const ehSistemaOuUiMousedown = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target);
+        if (ehSistemaOuUiMousedown) {
+            if (!temModificadorTeclado) {
+                ignorarProximoClick = false;
+                return;
+            }
             ignorarProximoClick = true;
             if (e.ctrlKey || e.altKey) {
                 e.preventDefault();
@@ -4847,6 +4901,16 @@
 
         const modoAcumulador = Boolean(e.ctrlKey && e.altKey);
 
+        /* DIRETRIZ ROOT 2.17: Modo Acumulador (Ctrl+Alt) e estritamente desabilitado em qualquer controle, interface ou formulario */
+        if (modoAcumulador) {
+            if (isContextoDeSistemaOuUi(e.target) || tipoContexto !== 'LEITURA_COMUM') {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
+
         /* Passo 9.4: Shift + Arrasto linear (inicio do arrasto ate final do arrasto) */
         if (e.shiftKey && !modoAcumulador && houveArrastoMouse) {
             houveArrastoMouse = false;
@@ -4861,8 +4925,8 @@
         }
 
         /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou com Acumulador (Ctrl+Alt)
-         * Preservacao integral da selecao por arrasto em qualquer elemento (inclusive Gemini, links ou botoes),
-         * copiando e mantendo o texto selecionado na tela sem qualquer desselecao. */
+         * Preservacao integral da selecao por arrasto em texto comum. Em telas de sistema/interface: copia e
+         * remove a selecao visual da tela (removeAllRanges) imediatamente para evitar poluicao visual! */
         if (houveArrastoMouse) {
             houveArrastoMouse = false;
             pontoAncoraArrastoAlt = null;
@@ -4870,26 +4934,21 @@
             if (sel && !sel.isCollapsed && sel.rangeCount > 0 && sel.toString().trim().length > 0) {
                 ignorarProximoClick = true;
                 const rangeArrastado = sel.getRangeAt(0).cloneRange();
+                const ehSistema = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target) || (rangeArrastado && isContextoDeSistemaOuUi(rangeArrastado.commonAncestorContainer));
                 await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador);
+                if (ehSistema) {
+                    /* Em tela de sistema/interface: NUNCA manter selecao visual residual */
+                    const selAtual = window.getSelection();
+                    if (selAtual) selAtual.removeAllRanges();
+                    flashExclusivoSemSelecao = true;
+                }
                 return;
             }
         }
 
         pontoAncoraArrastoAlt = null;
 
-        /* Passo 9.6: Regra da Maozinha (cursor: pointer), Links e Botoes (LINK_CLICAVEL):
-         * Cliques comuns em botoes e links de interface tem navegacao e acoes nativas preservadas
-         * sem delay quando nao ha teclas modificadoras ativas. Havendo tecla modificadora mantida (ex: Alt ou Ctrl),
-         * a selecao forcada e ativada permitindo copiar normalmente. */
         const temModificadorTeclado = temModificadorTecladoAtivo(e);
-        if (tipoContexto === 'LINK_CLICAVEL') {
-            if (!temModificadorTeclado) {
-                ignorarProximoClick = false;
-                return;
-            }
-            garantirSelecaoForcadaEmElemento(e.target);
-            ignorarProximoClick = true;
-        }
 
         /* Passo 9.7: Shift + Clique e Solta (Filtro de Digitos/Alfanumericos Corridos c/ Zero-Pad CNJ OU Cursor Inicial -> Final) */
         if (e.shiftKey && !modoAcumulador) {
@@ -4973,36 +5032,105 @@
             return;
         }
 
-        /* Passo 9.7.1: Alt + Clique (sem arrasto) sobre links, botoes, menus, abas ou itens clicaveis:
-         * inicia nova selecao e seleciona/copia imediatamente o texto inteiro do objeto clicado! */
+        /* Passo 9.7.1: Alt + Clique (sem arrasto) sobre links, botoes, menus, abas ou controles de interface:
+         * DIRETRIZ ROOT 2.17: Copia o texto integral do elemento com Flash Verde temporizado,
+         * mas NUNCA forca nem mantem selecao visual azul residual na interface! */
         if (e.altKey && !e.ctrlKey && !e.shiftKey && e.detail === 1) {
+            let textoParaCopiar = '';
+            let rangeParaFlash = null;
             const elInterativo = obterObjetoInterativoParaSelecaoCompleta(e.target);
+
             if (elInterativo) {
                 ignorarProximoClick = true;
                 e.preventDefault();
                 e.stopPropagation();
-                garantirSelecaoForcadaEmElemento(elInterativo);
 
                 if (elInterativo.tagName === 'INPUT') {
-                    const textoBotaoInput = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
-                    if (textoBotaoInput.length > 0) {
-                        const rangeInput = document.createRange();
-                        rangeInput.selectNode(elInterativo);
-                        await aplicarSelecaoECopiar(rangeInput, false, textoBotaoInput);
-                        return;
-                    }
+                    textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
+                } else if (elInterativo.tagName === 'OPTION') {
+                    textoParaCopiar = (elInterativo.text || elInterativo.innerText || elInterativo.textContent || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
                 } else {
-                    const textoObjeto = (elInterativo.innerText || elInterativo.textContent || '')
+                    textoParaCopiar = (elInterativo.innerText || elInterativo.textContent || '')
                         .replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ')
                         .trim();
-                    if (textoObjeto.length > 0) {
-                        const rangeObjeto = document.createRange();
-                        rangeObjeto.selectNodeContents(elInterativo);
-                        await aplicarSelecaoECopiar(rangeObjeto, false, textoObjeto);
-                        return;
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNodeContents(elInterativo);
+                }
+            } else if (isContextoDeSistemaOuUi(e.target) || tipoContexto === 'LINK_CLICAVEL') {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
+                const ponto = obterPontoDoClique(e.clientX, e.clientY);
+                if (ponto) {
+                    const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                    if (mapa) {
+                        const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
+                        if (resComposto) {
+                            rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
+                        } else {
+                            const resAtomica = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
+                            if (resAtomica) {
+                                rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resAtomica.inicio, resAtomica.fim);
+                            }
+                        }
+                        if (rangeParaFlash) {
+                            textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
+                        }
                     }
                 }
             }
+
+            if (textoParaCopiar && textoParaCopiar.length > 0) {
+                await gravarNaAreaDeTransferencia(textoParaCopiar, rangeParaFlash);
+                await cederControleAoCompositorBlink();
+                if (tempoFlashBorderMs > 0 && rangeParaFlash) {
+                    flashExclusivoSemSelecao = true;
+                    dispararFlashBorderVisual(rangeParaFlash);
+                }
+                const sel = window.getSelection();
+                if (sel) sel.removeAllRanges();
+                return;
+            }
+        }
+
+        /* Passo 9.7.1b: Clique Simples sem Modificadores em Tela de Sistema / Interface:
+         * DIRETRIZ ROOT 2.17:
+         * - Se for mascara util / bloco estruturado (data/hora completa, processo CNJ, CPF, CNPJ, moedas):
+         *   COPIA para a Area de Transferencia e exibe Flash Verde temporizado, SEM manter selecao na tela.
+         * - Se for palavra avulsa ou rotulo de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
+        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target);
+        if (ehSistemaOuUi && !temModificadorTeclado && e.detail === 1) {
+            const ponto = obterPontoDoClique(e.clientX, e.clientY);
+            if (ponto) {
+                const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                if (mapa) {
+                    const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
+                    if (resComposto) {
+                        const rangeComposto = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
+                        if (rangeComposto) {
+                            const textoLimpo = extrairTextoPuroSanitizado(rangeComposto) || rangeComposto.toString().trim();
+                            if (textoLimpo && textoLimpo.length > 0) {
+                                await gravarNaAreaDeTransferencia(textoLimpo, rangeComposto);
+                                await cederControleAoCompositorBlink();
+                                if (tempoFlashBorderMs > 0) {
+                                    flashExclusivoSemSelecao = true;
+                                    dispararFlashBorderVisual(rangeComposto);
+                                }
+                                const sel = window.getSelection();
+                                if (sel) sel.removeAllRanges();
+                                ignorarProximoClick = false;
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            ignorarProximoClick = false;
+            return;
         }
 
         const ponto = obterPontoDoClique(e.clientX, e.clientY);
@@ -5816,6 +5944,7 @@
         window.addEventListener('keyup', aoSoltarTecla, { capture: true, passive: true, signal });
         document.addEventListener('selectionchange', () => {
             if (!aguardandoDesselecaoFlash) return;
+            if (flashExclusivoSemSelecao) return;
             if ((performance.now() - timestampCriacaoFlash) < 40) return;
             const selAtual = window.getSelection();
             if (!selAtual || selAtual.rangeCount === 0 || selAtual.isCollapsed || selAtual.toString().trim().length === 0) {
@@ -6371,6 +6500,7 @@
         },
         classificarContextoElementoAlvo,
         isElementoInterativoOuUi,
+        isContextoDeSistemaOuUi,
         dispararFlashBorderVisual,
         limparFlashBorderImediatamente,
         localizarCampoSimbolosSobCursor,
