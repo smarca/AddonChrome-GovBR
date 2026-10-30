@@ -439,6 +439,17 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
     2. **Passo 2 (Aplicação da Regra Geral de Textos):** Havendo bloco sob o cursor, segue-se estritamente a regra geral de textos com base nas máscaras e regras tradicionais (clique no número isola o número; clique no hífen ou separador expande o bloco completo; clique no espaço seleciona conforme as regras consolidadas do motor).
     3. **Passo 3 (Fallback para o Link Inteiro):** Somente se NÃO for identificado nenhum bloco/máscara no ponto clicado, o motor realiza a cópia de todo o texto visível do link.
 
+### 6.8 Correção de Sobrescrita e Acúmulo de Retângulos / Cor do Flash Verde (Ex.: CNPJ com Múltiplas Bordas)
+- **Comportamento Estranho Observado:**
+  * Em números formatados como CNPJ (`41.522.194/0001-72`), ao selecionar partes ou o bloco, surgem múltiplos retângulos verdes sobrepostos (ex.: uma caixa para a base `41.522.194/0001` e duas ou mais caixas coladas/deslocadas sobre o dígito `-72`), gerando um efeito visual estranho de bordas duplicadas com tonalidade escurecida/acumulada e caixas sobrepostas.
+- **Diagnóstico Técnico Preliminar:**
+  * **Acúmulo de elementos de contorno (Overlays DOM / Highlights):** Ao re-executar seleções parciais ou ao calcular múltiplos `DOMRects` via `range.getClientRects()`, retângulos antigos de contorno do Flash não estão sendo removidos do DOM ou do mapa de highlights antes da injeção do novo contorno.
+  * **Fragmentação indevida de nós/sub-ranges:** Quando o range divide nós de texto adjacentes ou cruza limites de pontuação, o despachador de contorno desenha caixas separadas para cada pedaço sem unir retângulos contíguos na mesma linha, gerando linhas duplas no encontro entre o corpo e o dígito verificador.
+- **Diretriz de Ajuste Futuro:**
+  * Garantir a limpeza atômica imediata (`limparFlashBorderImediatamente()`) antes de desenhar qualquer novo contorno.
+  * Empregar fusão geométrica (coalescência) de `DOMRects` contíguos na mesma linha horizontal ou aplicar contorno por `range.getBoundingClientRect()` unificado quando se tratar de uma mesma entidade/bloco textual, prevenindo caixas sobrepostas e saturação de cor.
+
+
 
 
 
