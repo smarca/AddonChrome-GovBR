@@ -3047,6 +3047,8 @@
             ultimoRangeSelecionadoSimples = typeof rangeAlvo.cloneRange === 'function' ? rangeAlvo.cloneRange() : null;
 
             await gravarNaAreaDeTransferencia(textoLimpo, rangeAlvo);
+            /* Registra a assinatura da selecao copiada para o "escutador" global nao copiar de novo */
+            try { ultimoRangeAssinaturaGlobal = calcularAssinaturaSelecao(window.getSelection()); } catch (_) {}
             await cederControleAoCompositorBlink();
             if (tempoFlashBorderMs > 0) {
                 dispararFlashBorderVisual(rangeAlvo);
@@ -3229,7 +3231,10 @@
                             if (clicouEmDelimitadorOuAspas) {
                                 resIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
                             } else if (clicouEmEspaco) {
-                                resIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+                                resIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
+                                if (!resIndices) {
+                                    resIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+                                }
                                 if (!resIndices) {
                                     resIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
                                 }
@@ -4103,6 +4108,50 @@
         }
 
         return { inicio: ini, fim };
+    }
+
+    /*
+     * FUNCAO: tentarExpandirSentencaPorDoisPontos
+     * OBJETIVO: Regra de bloco. Em "Atencao: confira o processo antes de prosseguir.", clicar no espaco
+     * entre ":" e "confira" seleciona a sentenca inteira, pois o ":" e um conectivo do que vem antes com o
+     * que vem depois. A sentenca vai do inicio da linha/frase ate o fim da frase (".", "!", "?" seguido de
+     * espaco/fim, ou quebra de linha), sem incluir a pontuacao final (igual ao Estagio 3).
+     * Retorna null se o clique nao foi no espaco imediatamente apos ":".
+     */
+    function tentarExpandirSentencaPorDoisPontos(texto, idx) {
+        if (!texto || typeof idx !== 'number' || idx < 0 || idx > texto.length) return null;
+        const ehEspacoSimples = (c) => Boolean(c) && eEspacoBranco(c) && !eQuebraDeLinha(c);
+
+        let i;
+        if (idx < texto.length && ehEspacoSimples(texto[idx])) {
+            i = idx;
+        } else if (idx > 0 && ehEspacoSimples(texto[idx - 1]) && !eAlfanumericoUnicode(texto[idx] || '')) {
+            i = idx - 1;
+        } else {
+            return null;
+        }
+
+        let j = i;
+        while (j >= 0 && ehEspacoSimples(texto[j])) j--;
+        if (j < 0 || texto[j] !== ':') return null;
+
+        let k = i;
+        while (k < texto.length && ehEspacoSimples(texto[k])) k++;
+        if (k >= texto.length || eQuebraDeLinha(texto[k])) return null;
+
+        const ehFimDeSentenca = (p) => {
+            const c = texto[p];
+            return (c === '.' || c === '!' || c === '?') && (p + 1 >= texto.length || eEspacoBranco(texto[p + 1]));
+        };
+
+        let ini = j;
+        while (ini > 0 && !eQuebraDeLinha(texto[ini - 1]) && !ehFimDeSentenca(ini - 1)) ini--;
+        let fim = k;
+        while (fim < texto.length && !eQuebraDeLinha(texto[fim]) && !ehFimDeSentenca(fim)) fim++;
+
+        while (ini < fim && eEspacoBranco(texto[ini])) ini++;
+        while (fim > ini && eEspacoBranco(texto[fim - 1])) fim--;
+        return (fim > ini) ? { inicio: ini, fim } : null;
     }
 
     function expandirFraseAtePontuacaoEstagio3(texto, idx) {
@@ -5286,7 +5335,11 @@
         } else if (clicouEmDelimitadorOuAspas) {
             resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
         } else if (clicouEmEspaco) {
-            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+            /* Regra de bloco: espaco logo apos ":" liga o rotulo ao que vem depois -> sentenca inteira */
+            resultadoIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+            }
             if (!resultadoIndices) {
                 resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
             }
@@ -5907,14 +5960,40 @@
     }
 
     /*
+     * FUNCAO: calcularAssinaturaSelecao
+     * OBJETIVO: Gerar uma assinatura unica (offsets + texto) da selecao atual, usada para saber se
+     * aquela selecao exata ja foi copiada (por qualquer caminho: clique, arraste, teclado ou sistema).
+     */
+    function calcularAssinaturaSelecao(sel) {
+        try {
+            if (!sel || sel.isCollapsed || sel.rangeCount === 0) return '';
+            const r = sel.getRangeAt(0);
+            const txt = (sel.toString() || '').trim();
+            if (!txt) return '';
+            return `${r.startOffset}_${r.endOffset}_${txt}`;
+        } catch (_) {
+            return '';
+        }
+    }
+
+    /*
      * FUNCAO: tratarMudancaSelecaoGlobal
      * DIRETRIZ ROOT: Identifica globalmente selecoes de texto ativas na pagina ou em
      * visualizadores de PDF (criadas por teclado Shift+Setas, selecoes nativas, mouseup)
      * e garante a aplicacao imediata da formatacao, copia para a Area de Transferencia
      * e contorno visual, sem quebrar o fluxo do usuario.
+     * Regra: toda selecao (do sistema ou feita pelo addon) que ainda nao foi copiada e copiada agora.
      */
     function tratarMudancaSelecaoGlobal(winAlvo) {
         const win = winAlvo || window;
+        /* Selecao desfeita: libera a assinatura imediatamente (mesmo com o mouse pressionado), para que
+         * selecionar novamente o MESMO texto (ex.: duplo clique na mesma palavra) volte a ser copiado. */
+        try {
+            const selReset = (win && typeof win.getSelection === 'function') ? win.getSelection() : window.getSelection();
+            if (!selReset || selReset.rangeCount === 0 || selReset.isCollapsed) {
+                ultimoRangeAssinaturaGlobal = '';
+            }
+        } catch (_) {}
         if (selecaoSendoAplicadaPeloAddon) return;
         if (timerDebounceSelecaoGlobal) {
             clearTimeout(timerDebounceSelecaoGlobal);
@@ -6148,6 +6227,11 @@
         }, { capture: true, passive: true, signal });
         document.addEventListener('mouseup', () => {
             isMousePressionado = false;
+            /* Rede de seguranca: a selecao feita com o mouse (ex.: duplo clique) que ainda nao foi copiada
+             * por outro caminho e copiada agora. A assinatura evita copiar duas vezes a mesma selecao. */
+            setTimeout(() => {
+                try { tratarMudancaSelecaoGlobal(); } catch (_) {}
+            }, 200);
         }, { capture: true, passive: true, signal });
         window.addEventListener('blur', () => {
             isMousePressionado = false;
@@ -6581,7 +6665,8 @@
             } else if (clicouEmDelimitadorOuAspas) {
                 res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
             } else if (clicouEmEspaco) {
-                res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, false);
+                res = tentarExpandirSentencaPorDoisPontos(texto, idxZeroBased);
+                if (!res) res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, false);
                 if (!res) res = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
                 if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
                 if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);

@@ -2389,6 +2389,20 @@
             const txtLei = 'da lei (art. 12 da Lei no 12.016/2009);';
             const casosCursor = [
                 {
+                    desc: 'Regra de bloco: clicar no espaco apos ":" seleciona a sentenca inteira (rotulo + complemento)',
+                    txt: 'Atencao: confira o processo antes de prosseguir. Outra frase.',
+                    idx: 8, /* espaco entre ":" e "confira" */
+                    cliques: 1,
+                    esp: 'Atencao: confira o processo antes de prosseguir'
+                },
+                {
+                    desc: 'Regra de bloco: clicar na palavra apos ":" continua selecionando so a palavra',
+                    txt: 'Atencao: confira o processo antes de prosseguir.',
+                    idx: 12, /* meio de "confira" */
+                    cliques: 1,
+                    esp: 'confira'
+                },
+                {
                     desc: 'Posicao antes do 1o caractere (cursor = -1) retorna vazio com seguranca',
                     txt: txtLei,
                     idx: -1,
