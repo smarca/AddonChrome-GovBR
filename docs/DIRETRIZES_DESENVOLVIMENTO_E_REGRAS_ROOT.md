@@ -245,6 +245,32 @@ O motor opera um ciclo deterministico de transicao dinamica de estados baseado n
   - Blindagem de Timezone: Reconhece estritamente siglas de fuso oficiais ("BRT", "BRST", "UTC", "GMT") evitando falso englobamento de palavras em portugues (ex: "nos", "em", "de").
   - Ja datas abreviadas ("17 ago. 2026"), por extenso ("29 de fevereiro de 2025") e competencias Mes/Ano ("out. 26") sao sempre selecionadas inteiras imediatamente no 1o clique.
 
+### 2.17 DIRETRIZ ROOT: DIFERENCIACAO E COMPORTAMENTO ESTRITO ENTRE TELAS DE TEXTO/LEITURA E TELAS DE SISTEMA/INTERFACE/CONTROLES
+- **Dicotomia Soberana de Ambientes:**
+  - **Telas/Areas de Texto e Leitura Comum:** (documentos judiciais, peticoes, despachos, sentencas, acordaos, artigos, paginas de conteudo informativo e visualizadores de PDF):
+    - O motor de selecao opera de forma ampla e confortavel: 1 clique seleciona e copia palavras/entidades atomicas; 2 cliques expandem frases ou delimitadores simetricos; arrasto seleciona e mantem texto selecionado; `Alt + Ctrl` atua como Modo Acumulador.
+  - **Telas/Areas de Sistema, Interface e Controles (Modais, Dialogos, Dropdowns, Menus e Formularios):**
+    - Exemplos tipicos: Modais popup (ex: "Tipo - Modelo de Documento"), menus de contexto suspensos (ex: "Encaminhar para assinatura..."), seletores e listas de opcoes (ex: "Sentenca Tipo D"), barras de ferramentas, botoes, inputs e abas.
+    - **Regra de Ouro da Interface:** **JAMAIS FORCAR OU MANTER SELECAO VISUAL** (evitando poluir a tela com fundos azuis residuais em botoes, menus ou caixas de dialogo). O unico feedback de sucesso permitido e o **Contorno Visual Rapido ao Copiar (Flash Temporizado Verde)**.
+- **Regras Operacionais Estritas para Telas de Sistema / Interface:**
+  1. **1 Clique simples sem teclas modificadoras:**
+     - Palavra avulsa comum: **Nao faz nada** (nem seleciona, nem copia; preserva totalmente a interacao e navegacao nativa da pagina/sistema).
+     - Mascara util ou Bloco Estruturado (ex: data completa "17/09/2026 13:28:25", processo CNJ, CPF, CNPJ): **Copia para a Area de Transferencia** e exibe estritamente o **contorno verde temporizado (flash)**, **SEM selecionar o texto e SEM manter selecao ativa na tela**.
+  2. **2 Cliques (duplo clique):**
+     - Seleciona a palavra normalmente para o usuario que desejar intencionalmente a selecao nativa no elemento.
+  3. **Arrasto de Mouse (Drag to Select):**
+     - O usuario pode arrastar o mouse para capturar um trecho especifico.
+     - Ao soltar o mouse (`mouseup`): copia o texto arrastado, dispara o contorno verde (flash) e **remove imediatamente a selecao da tela (`window.getSelection().removeAllRanges()`)**, garantindo que a tela de sistema permaneca limpa sem retangulos azuis residuais.
+     - Ao segurar `Alt + Arrastar` sobre links, menus ou botoes: **JAMAIS selecionar o elemento inteiro**. O arrasto deve permitir selecionar estritamente os caracteres percorridos pelo cursor.
+  4. **Alt + Clique Unico (sem arrasto):**
+     - Copia o texto completo do controle, menu, botao ou item de lista (ex: "Sentenca Tipo D").
+     - Dispara o contorno verde temporizado (flash) ao redor do elemento.
+     - **Nao cria selecao visual** (ou desseleciona se criada).
+     - Bloqueia a acao padrao (`preventDefault()`, `stopPropagation()`) para que o clique com Alt copie o texto sem navegar para links nem acionar submissoes de formularios.
+  5. **Modo Acumulador (`Alt + Ctrl`):**
+     - **Estritamente desabilitado** em qualquer tipo de controle, formulario ou elemento de interface (inputs, caixas, botoes, menus, modais).
+     - Reservado com exclusividade para textos comuns de leitura.
+
 ---
 
 ## 3. SISTEMA DE LOGS E PRIORIDADES DO CONSOLE

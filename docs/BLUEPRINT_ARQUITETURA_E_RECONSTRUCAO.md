@@ -234,6 +234,28 @@ O motor opera um ciclo deterministico de transicao dinamica de estados baseado n
 - Enriquecimento Diagnostico em debug.js:
   - Registro de telemetria completa em caso de qualquer discrepancia futura (texto testado, indice do cursor, palavra, limite e comprimentos res1/res2).
 
+### 2.21 COMPORTAMENTO ESTRITO EM TELAS DE SISTEMA/INTERFACE VS. TELAS DE TEXTO/LEITURA
+- **Dicotomia de Ambientes:**
+  - **Telas de Leitura/Texto Comum:** Textos juridicos, sentencas, acordaos, peticoes, PDFs e conteudos estaticos. O motor atua amplamente (1 clique seleciona e copia palavras/blocos; 2 cliques expandem; arrasto mantem selecao; `Alt+Ctrl` acumula).
+  - **Telas de Sistema / Interface (Modais, Dialogos, Menus, Selects, Botoes, Abas):**
+    - Proibicao absoluta de forcar ou reter selecao visual na interface (zero poluição visual).
+    - O feedback visual soberano e exclusivo e o **Contorno Visual Verde Temporizado (Flash)**.
+- **Regras Operacionais:**
+  1. **1 Clique simples:**
+     - Palavra isolada comum: Ignora totalmente (nao seleciona, nao copia, permite interacao nativa livre).
+     - Mascara util / Bloco Estruturado (ex: data "17/09/2026 13:28:25", processo CNJ, CPF, CNPJ): Copia para o clipboard e emite flash verde temporizado, **SEM selecionar nem manter texto selecionado** na tela.
+  2. **2 Cliques:** Seleciona a palavra normalmente para quem desejar selecao explicita.
+  3. **Arrasto de Mouse (Drag to Select):**
+     - Permite arrasto pontual; ao soltar (`mouseup`), copia o trecho arrastado, emite flash verde e **desseleciona imediatamente o texto (`removeAllRanges()`)**, mantendo o dialogo/menu despoluido.
+     - `Alt + Arrastar` em links/menus: **NÃO** forca selecao do elemento inteiro; seleciona estritamente os caracteres percorridos.
+  4. **Alt + Clique Unico (sem arrasto):**
+     - Copia o texto integral do controle, menu, botao ou item de lista (ex: "Sentenca Tipo D").
+     - Dispara o contorno verde ao redor do elemento.
+     - **Nao gera selecao visual** (ou desseleciona se criada).
+     - Aplica `preventDefault()` e `stopPropagation()` para nao acionar navegacao ou clique na interface.
+  5. **Modo Acumulador (`Alt + Ctrl`):**
+     - **Desabilitado** em qualquer elemento de controle/formulario/interface. Atua apenas em leitura comum.
+
 ---
 
 ## 3. ARQUITETURA MODULAR DOS ARQUIVOS DO SISTEMA (AGRUPAMENTO MODULAR)
