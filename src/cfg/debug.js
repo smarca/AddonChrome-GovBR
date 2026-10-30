@@ -876,6 +876,8 @@
             /* Grupo 7: LEGISLACAO_JURISPRUDENCIA_E_ATOS */
             { grupo: 'G7_DISPOSITIVO', desc: 'Dispositivo legal complexo com emenda', amostra: 'Vide art. 24, paragrafos 1 e 2 da EC n.o 103/2019.', esp: 'art. 24, paragrafos 1 e 2 da EC n.o 103/2019' },
             { grupo: 'G7_IN_ORGAO_COMPOSTO', desc: 'Instrucao Normativa com orgao composto (PRES/INSS)', amostra: 'Conforme Instrucao Normativa PRES/INSS no 128/2022 vigente', esp: 'Instrucao Normativa PRES/INSS no 128/2022' },
+            { grupo: 'G7_ATO_ADM_ORGAO_3_NIVEIS', desc: 'Ato Adm com orgao de 3 niveis (SAJ/SG/PR)', amostra: 'Conforme Portaria SAJ/SG/PR no 15/2023 vigente', esp: 'Portaria SAJ/SG/PR no 15/2023' },
+            { grupo: 'G7_ATO_ADM_ORGAO_NUMERICO', desc: 'Ato Adm com orgao numerico ##/##/###/###', amostra: 'Conforme Portaria 12/34/567/890 no 5/2020 vigente', esp: 'Portaria 12/34/567/890 no 5/2020' },
             { grupo: 'G7_SUMULA', desc: 'Sumula Vinculante com tribunal', amostra: 'Aplicacao da Sumula Vinculante 13 do STF', esp: 'Sumula Vinculante 13 do STF' },
             { grupo: 'G7_ATO_CURTO', desc: 'Numero de ato com prefixo no/ano', amostra: 'Portaria no 136/2025 publicada', esp: 'no 136/2025' },
             /* Grupo 8: COORDENADAS_GPS_E_PLUS_CODES */
