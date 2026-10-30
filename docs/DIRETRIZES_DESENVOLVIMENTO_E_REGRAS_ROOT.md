@@ -592,6 +592,16 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
 
 ---
 
+### 6.19 Status de Implementacao (2026-10-30)
+* **Implementado e coberto por auditoria (181/181 testes):**
+  * Colar com botao do meio usa a "Ultima Selecao" (sem ler o clipboard do sistema); Ctrl + Meio envia Win+V; opcoes "Usar clipboard do sistema" e "Historico/Rollback" removidas (UI, background, content script, testes).
+  * Painel "Ultima Selecao" (substitui "Conteudo atual da Area de Transferencia"), sem leitura de clipboard e sem alertas de permissao.
+  * "Ato INSS" generalizado para "Ato Adm" (testes com orgaos de 3 niveis e numericos ##/##/###/###).
+  * Auto-copia de selecao ainda nao copiada (assinatura offsets+texto liberada ao desfazer a selecao, mesmo com mouse pressionado; rede de seguranca no mouseup).
+  * Regra de bloco do ":" (clique no espaco apos ":" seleciona a sentenca inteira).
+  * Contorno flash sem sobreposicao: so retangulos de texto, fusao por linha e um poligono unico em varias linhas.
+* **Pendente:** auditoria de idempotencia; encapsulamento em OO por modulo (.js) com checagem de existencia de funcoes externas; separar formalmente "funcoes de copia" x "funcoes de selecao" (hoje o escutador global + assinatura cumprem o papel); desmarcar selecao do sistema apos copiar em PDF do Chrome (exceto interface do visualizador).
+* **Limitacao conhecida:** extensao do Chrome so dispara eventos de teclado sinteticos (nao confiaveis); o Windows NAO recebe o Win+V. Abrir o historico de verdade exige componente nativo (Native Messaging/AutoHotkey).
 ## 7. RADAR AUTÔNOMO DE ANÁLISE DE ENGENHARIA (BUGS, BOAS PRÁTICAS E NOVAS FUNCIONALIDADES IDENTIFICADAS)
 
 > [!NOTE]
