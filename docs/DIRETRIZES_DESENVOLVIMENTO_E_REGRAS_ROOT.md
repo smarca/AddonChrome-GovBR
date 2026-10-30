@@ -548,6 +548,25 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
     2. **Fusão Horizontal de Retângulos na Mesma Linha (`mergeHorizontalRects`):** Retângulos adjacentes situados no mesmo alinhamento vertical (`Math.abs(r1.top - r2.top) < 3` e sobreposição ou proximidade horizontal `<= 6px`) devem ser fundidos em uma única caixa retangular unificada, eliminando completamente as bordas duplas internas.
     3. **Unificação Vertical Estética:** Em blocos contíguos de parágrafo, avaliar o uso de um contorno envolvente contíguo (`CSS Custom Highlight API` nativa onde suportada, ou uma máscara poligonal/envelope limpo) para evitar o aspecto de "gaiola de caixas empilhadas" com linhas desiguais.
 
+### 6.16 Desacoplamento Arquitetural entre Seleção e Cópia (Listener Reativo de Cópia sobre Seleções Ativas e Retenção Condicional de Seleção)
+- **Falha Observada no Comportamento Atual:**
+  * Em certas situações, ao dar duplo clique sobre palavras longas ou blocos textuais, a seleção nativa/visual ocorre na tela, porém o texto **não é copiado para a Área de Transferência**, mesmo atendendo com folga ao requisito de comprimento mínimo de caracteres.
+- **Validação Técnica da Lógica Proposta:**
+  * A proposta é **100% válida, robusta e aderente às melhores práticas de arquitetura desacoplada**.
+  * Atualmente, o fluxo de clique tenta realizar simultaneamente o cálculo geométrico do range, a injeção do Flash temporizado, a atualização da seleção do DOM e a cópia para a Área de Transferência em uma única função monolítica. Se qualquer etapa intermediária sofrer race condition ou bloqueio temporário de foco, a cópia falha silenciosamente.
+- **Estruturação do Novo Modelo Desacoplado:**
+  1. **Módulo de Seleção Autônoma (Geometria, Interação e Flash):**
+     * Opera com base na posição do cursor, cliques (1, 2, 3 cliques, espaço), modificadores de teclado e regras de bloco.
+     * Aplica o contorno visual rápido do Flash Verde temporizado (se ativo nas preferências).
+     * **Regra de Retenção da Seleção do Sistema:**
+       - Se o elemento clicado **não for elemento de interface** (isto é, pertencer à área de leitura/texto judicial ou documento): **mantém a seleção ativa no sistema** que foi replicada ou criada.
+       - Se for elemento de interface gráfica/controle: **remove imediatamente a seleção do sistema** (`window.getSelection().removeAllRanges()`) logo após a finalização da ação, sem precisar aguardar o término do Flash temporizado visual.
+  2. **Módulo de Cópia Reativo (Escuta e Disparo por Seleção):**
+     * A funcionalidade de cópia atua como uma **escuta reativa (listener)** que monitora seleções ativas na tela (sejam disparadas pelo motor de seleção do próprio addon, pelo duplo clique nativo do navegador, por arraste de mouse ou por atalhos de teclado).
+     * **Garantia de Entrega:** Ao detectar uma seleção válida na janela/frame, a rotina de cópia verifica: *"Este texto selecionado já foi copiado no ciclo atual?"*. Caso não tenha sido copiado ainda, **dispara a cópia para a Área de Transferência imediatamente**.
+     * Isso assegura que **jamais ocorra seleção sem cópia correspondente**, tornando o sistema imune a falhas em duplo clique.
+
+
 ---
 
 ## 7. RADAR AUTÔNOMO DE ANÁLISE DE ENGENHARIA (BUGS, BOAS PRÁTICAS E NOVAS FUNCIONALIDADES IDENTIFICADAS)
