@@ -474,6 +474,17 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * **Guarda de Idempotência Precoce:** Garantir que se a flag `window.__JUSGOVBR_INICIALIZADO__` já estiver ativa, a execução seja interrompida imediatamente no primeiro milissegundo, antes de qualquer query no DOM ou attach de listeners.
   * **Otimização de Observers:** Ajustar o `MutationObserver` de subframes para ser disparado com debounce/throttling ou limitá-lo a contêineres específicos em vez de `document.documentElement` irrestrito durante o carregamento inicial.
 
+### 6.11 Otimizações do PJe: Eliminação de Delays e Popups/Toasts Nativos (Eliminar "Lag" e Falta de Fluidez do Mouse)
+- **Sintoma Observado e Contexto Operacional:**
+  * Em operações habituais do PJe (ex.: movimentação em painéis de tarefas e etiquetas de processos), surgem pequenos popups/toasts retangulares verdes no canto da tela (ex.: `"Tarefa - A tarefa foi executada!"`, `"Etiqueta - Etiqueta vinculada ao processo"`, `"Etiqueta - Etiqueta desvinculada do processo"`).
+  * Esses popups e animações/delays nativos do framework (Angular/toastr/growl) causam uma sensação notória de lentidão ("lag"), tornando o movimento e arraste do mouse pesado, travado e sem fluidez ao arrastar ou clicar em elementos na interface do PJe.
+- **Diretriz de Engenharia e Comportamento Futuro Solicitado:**
+  * **No Módulo de Otimizações do PJe (`src/mod-pje/`):**
+    1. **Eliminar Delays Artificiais e Animações:** Interceptar ou suprimir as animações, transições e esperas temporizadas de transição de estado que bloqueiam a thread visual do navegador.
+    2. **Suprimir / Neutralizar Popups e Toasts Nativos:** Ocultar e eliminar imediatamente a exibição desses toasts/popups repetitivos de feedback (como confirmações sucessivas de "Etiqueta vinculada", "Etiqueta desvinculada" e "Tarefa executada"), seja via injeção de CSS de alta prioridade (`display: none !important; opacity: 0 !important; pointer-events: none !important;`) nas classes correspondentes (ex.: `.toast`, `.toastr`, `.ui-growl`, `.snack-bar`, ou elementos de notificação flutuante do PJe), seja anulando o delay de fade/renderização.
+    3. **Restaurar Fluidez Total do Mouse:** Ao remover esses nós flutuantes pesados e suas rotinas de animação JS/CSS, eliminar qualquer atraso de renderização gráfica que cause atrito ("lag") na interação com o ponteiro do mouse.
+
+
 
 
 
