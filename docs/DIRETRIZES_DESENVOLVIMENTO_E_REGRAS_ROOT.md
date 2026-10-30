@@ -486,6 +486,19 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
     2. **Suprimir / Neutralizar Popups e Toasts Nativos:** Ocultar e eliminar imediatamente a exibição desses toasts/popups repetitivos de feedback (como confirmações sucessivas de "Etiqueta vinculada", "Etiqueta desvinculada" e "Tarefa executada"), seja via injeção de CSS de alta prioridade (`display: none !important; opacity: 0 !important; pointer-events: none !important;`) nas classes correspondentes (ex.: `.toast`, `.toastr`, `.ui-growl`, `.snack-bar`, ou elementos de notificação flutuante do PJe), seja anulando o delay de fade/renderização.
     3. **Restaurar Fluidez Total do Mouse:** Ao remover esses nós flutuantes pesados e suas rotinas de animação JS/CSS, eliminar qualquer atraso de renderização gráfica que cause atrito ("lag") na interação com o ponteiro do mouse em modais de etiquetas e no uso com PJe+R.
 
+### 6.12 Eliminação de Bloqueios de Interface / Telas Escuras (Overlays e Modais Residuais) no PJe
+- **Sintoma Observado e Contexto Operacional:**
+  * Na transição de tarefas ou carregamento de processos no painel PJe (conforme evidenciado na tela dividida em colunas), ocorre um bloqueio persistente onde a interface fica escura (efeito "backdrop" / máscara cinza translúcida travada).
+  * O bloqueio visual pode incidir sobre a **tela total**, ou afetar **apenas o lado esquerdo** (coluna de processos/tarefas) ou **apenas o lado direito** (painel de detalhes/visualização do processo) separadamente.
+  * Esse escurecimento bloqueia a interação do usuário com os elementos da tela, exigindo recarregamentos forçados ou gerando perda de tempo operacional.
+- **Diagnóstico Técnico Preliminar:**
+  * Os frameworks do PJe (Angular / RichFaces / Bootstrap / UI-Blocker) inserem elementos de sobreposição (`.modal-backdrop`, `.block-ui-overlay`, `.loading-overlay`, `.cdk-overlay-backdrop`, `.rf-st-mp`) que deveriam ser destruídos ao final de requisições AJAX ou conclusão da tarefa.
+  * Quando há erro de script, resposta assíncrona fora de ordem ou interferência nos eventos de ciclo de vida, o elemento de overlay de backdrop não é removido do DOM ou mantém as propriedades `pointer-events: auto` e `opacity > 0`, travando o painel correspondente na escuridão.
+- **Diretriz de Ajuste Futuro no Módulo Acelerador PJe Turbo (`src/mod-pje/`):**
+  * **Neutralização Contínua de Overlays Zumbis:** No CSS Anti-Ampulhetas e no monitoramento de lifecycle, neutralizar qualquer camada de bloqueio/escurecimento residual que permaneça visível sem atividade de rede real (`opacity: 0 !important; pointer-events: none !important; display: none !important;`).
+  * **Tratamento Específico por Coluna:** Mapear os seletores de bloqueio de painel divido (painel lateral esquerdo vs container de visualização direito) para desbloquear pontualmente a coluna afetada sem quebrar eventuais modais legítimos abertos pelo usuário (como janelas ativas de digitação de despachos/decisões).
+
+
 
 
 
