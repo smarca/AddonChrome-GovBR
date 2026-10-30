@@ -423,6 +423,15 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * **Permissão de Cópia Completa:** Assegurar que tanto a seleção automatizada por clique quanto a seleção nativa/manual de datas isoladas (`23/10/2026`), horários isolados (`10:14:18`) e blocos contíguos de data com horário (`23/10/2026 10:14:18`) sejam sempre copiados fielmente para a Área de Transferência.
   * **Preservação de Formato:** Tratar a expressão combinada `DD/MM/AAAA HH:MM:SS` como entidade temporal forense de primeira classe no motor, garantindo que o clique simples, clique no espaço intermediário ou arrasto manual envie exatamente os dados limpos para a Área de Transferência com validação matemática e contorno visual verde imediato.
 
+### 6.6 Correção do Escopo de Seleção em Alt + Clique sobre Botões e Itens Pequenos (Evitar Selecionar o Contêiner do Botão em Vez da Palavra/Label)
+- **Comportamento Estranho Observado:**
+  * Ao clicar com a tecla `Alt` pressionada sobre itens pequenos de interface ou botões (ex.: botão `"MARCAR TODOS COMO LIDOS"`, que não é um link `<a>` comum), está ocorrendo um erro em que o elemento botão inteiro (o contêiner/caixa externa com sua borda retangular completa) é selecionado visualmente com Flash Verde, em vez de selecionar/copiar apenas o texto/label interno ou a palavra clicada dentro do botão.
+- **Diagnóstico Técnico Preliminar:**
+  * No Passo 9.7.1 (`Alt + Clique`), ao detectar que o elemento é um botão (`elInterativo`), o código executa `rangeParaFlash.selectNode(elInterativo)` ou `rangeParaFlash.selectNodeContents(elInterativo)` envolvendo a caixa do elemento pai inteiro em vez de restringir a seleção ao nó de texto do rótulo (`TextNode` do label) ou à palavra sob o cursor.
+- **Diretriz de Ajuste Futuro:**
+  * Refinar o `Alt + Clique` em botões e elementos interativos para que o contorno visual do Flash e a cópia incidam estritamente sobre o texto/label visível (`range` do nó de texto interno), e não sobre a caixa ou estrutura física do contêiner do botão, evitando a impressão visual de "selecionar tudo" ou englobar o componente gráfico da interface.
+
+
 
 
 
