@@ -51,6 +51,10 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
 10. Centralizacao de Documentos Instrutivos em docs/ e Arquivos Temporarios em tmp/:
    - Todos os arquivos do tipo .md que instruem o projeto devem estar rigorosamente centralizados dentro da pasta docs/, localizada na raiz do projeto (ex: docs/DIRETRIZES_DESENVOLVIMENTO_E_REGRAS_ROOT.md, docs/BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md, docs/AGENTS.md). Qualquer arquivo .md presente em docs/ deve ser carregado e considerado no contexto.
    - Todos os arquivos temporarios de trabalho, testes ou intermediarios devem estar estritamente contidos na pasta tmp/, a qual nao e sujeita a backup. A pasta outros/, se existente, tambem permanece estritamente fora do backup.
+11. Diretiva Arquitetural Fundamental de Engenharia de Software: Modularidade, Coesão, Baixo Acoplamento e Independência Funcional:
+   - **Encapsulamento Orientado a Objetos por Módulo e Arquivo:** Todo arquivo `.js` e todo módulo do sistema deve obrigatoriamente encapsular suas variáveis, estado interno e métodos por meio de Orientação a Objetos (classes, closures blindadas ou namespaces estritos), sendo terminantemente vedado expor variáveis globais soltas no escopo da janela (`window`).
+   - **Tolerância a Falhas e Desativação Modular (Guardas Pré-Chamada):** Se um arquivo ou módulo necessitar de funções ou serviços de outro módulo/arquivo externo por qualquer razão, é **estritamente obrigatório testar a existência prévia do método/serviço antes de sua invocação** (ex.: `typeof moduloX?.metodoY === 'function'`). O código jamais pode sofrer interrupção ("crash" ou "abort") por `TypeError: ... is not a function` ou `ReferenceError` caso um módulo externo venha a ser desativado, falhe ao carregar ou seja modularmente desligado nas opções.
+   - **Casamento de Alta Coesão e Baixo Acoplamento:** Cada módulo deve possuir independência funcional estrita, operando de modo autônomo, robusto e previsível, mantendo suas responsabilidades delimitadas ao seu domínio primário.
 
 ---
 
@@ -510,6 +514,9 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   2. **Preservação Unificada das Telas de Opções e Ajuda:**
      * As páginas centrais de configuração ([options.html](../src/cfg/options.html)) e a Central de Ajuda ([ajuda.html](../src/cfg/ajuda.html)) devem **continuar centralizadas em arquivos únicos**, contendo todos os módulos integrados.
      * Manter a excelente organização já consolidada, onde as preferências e documentações são agrupadas de forma clara e intuitiva em seções/abas temáticas por módulo.
+  3. **Aderência Obrigatória aos Princípios de Engenharia (Item 11 das Diretrizes Root):**
+     * Estruturação de cada arquivo `.js` por Orientação a Objetos com encapsulamento de estado interno e guardas defensivas (`typeof ... === 'function'`) antes de qualquer chamada intermodular, garantindo que o desligamento de qualquer módulo de UI ou cópia jamais aborte ou quebre os demais módulos em execução.
+
 
 
 
