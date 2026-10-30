@@ -3486,15 +3486,26 @@
             };
         }
 
-        /* Execução assíncrona da auditoria unitária com atualização suave da barra de progresso */
-        if (typeof onProgresso === 'function') onProgresso(20, 'Baterias 1-3');
-        await new Promise(r => setTimeout(r, 25));
-        if (typeof onProgresso === 'function') onProgresso(50, 'Baterias 4-6');
-        await new Promise(r => setTimeout(r, 25));
-        if (typeof onProgresso === 'function') onProgresso(80, 'Baterias 7-8');
-        await new Promise(r => setTimeout(r, 25));
+        /* Execução assíncrona da auditoria unitária com subpassos detalhados no console */
+        const etapasAuditoria = [
+            { pct: 12, rotulo: 'Bateria 1: Validação Matemática' },
+            { pct: 25, rotulo: 'Bateria 2: Catálogo Forense (13 Grupos)' },
+            { pct: 37, rotulo: 'Bateria 3: Modo Acumulador e Toggle' },
+            { pct: 50, rotulo: 'Bateria 4: Seleção em Tabelas' },
+            { pct: 62, rotulo: 'Bateria 5: Posições de Cursor e Minoração' },
+            { pct: 75, rotulo: 'Bateria 6: Filtros HTML em 5 Níveis' },
+            { pct: 87, rotulo: 'Bateria 7: Preferências e Atalho F1' },
+            { pct: 95, rotulo: 'Bateria 8: Varredura de Limites nos HTMLs' }
+        ];
+
+        for (const etapa of etapasAuditoria) {
+            if (typeof onProgresso === 'function') {
+                onProgresso(etapa.pct, etapa.rotulo);
+            }
+            await new Promise(r => setTimeout(r, 60));
+        }
+
         const res = executarAuditoriaCompleta(opcoes);
-        if (typeof onProgresso === 'function') onProgresso(100, 'Concluído');
         return res;
     }
 

@@ -1962,15 +1962,27 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Passo 4.7: Executar Bateria Automatizada de Auditoria (debug.js) na Aba Laboratório */
     adicionarOuvinteSeguro(btnExecutarAuditoriaDebug, 'click', async () => {
         if (typeof window.JusGovExecutarAuditoria === 'function' || typeof window.JusGovExecutarAuditoriaAsync === 'function') {
-            exibirProgressoConsole(10);
+            exibirToast('Executando Auditoria... aguarde');
             btnExecutarAuditoriaDebug.disabled = true;
+            btnExecutarAuditoriaDebug.textContent = 'Executando...';
+            exibirProgressoConsole(5);
             try {
                 let relatorio;
                 if (typeof window.JusGovExecutarAuditoriaAsync === 'function') {
-                    relatorio = await window.JusGovExecutarAuditoriaAsync({}, (pct) => exibirProgressoConsole(pct));
+                    relatorio = await window.JusGovExecutarAuditoriaAsync({}, (pct, nomeBateria) => {
+                        exibirProgressoConsole(pct);
+                        if (nomeBateria) {
+                            registrarMensagemDiretaNoVisorConsole('INFO', `Auditoria [${Math.round(pct)}%]: ${nomeBateria}...`);
+                        }
+                    });
                 } else {
                     relatorio = window.JusGovExecutarAuditoria({
-                        onProgress: (pct) => exibirProgressoConsole(pct)
+                        onProgress: (pct, nomeBateria) => {
+                            exibirProgressoConsole(pct);
+                            if (nomeBateria) {
+                                registrarMensagemDiretaNoVisorConsole('INFO', `Auditoria [${Math.round(pct)}%]: ${nomeBateria}...`);
+                            }
+                        }
                     });
                 }
                 exibirProgressoConsole(100);
@@ -1989,6 +2001,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 registrarMensagemDiretaNoVisorConsole('ERROR', `Falha na auditoria: ${errAuditoria && errAuditoria.message ? errAuditoria.message : String(errAuditoria)}`);
             } finally {
                 btnExecutarAuditoriaDebug.disabled = false;
+                btnExecutarAuditoriaDebug.textContent = 'Auditoria';
                 ocultarProgressoConsole(450);
             }
         } else {

@@ -96,3 +96,4 @@ if ($Arquivo1 -and $Arquivo2) {
         Write-Host "Arquivos sao identicos." -ForegroundColor Green
     }
 }
+
