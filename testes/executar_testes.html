@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Execução de Auditoria JusGovBR</title>
+    <script>
+        window.__ERRO_GLOBAL__ = '';
+        window.addEventListener('error', (e) => {
+            window.__ERRO_GLOBAL__ += '\n[ERRO JS GLOBAL] ' + e.message + ' em ' + e.filename + ':' + e.lineno + ':' + e.colno;
+        });
+    </script>
+</head>
+<body>
+    <pre id="resultado">Carregando...</pre>
+    <script src="../src/mod-copia/ConstantesPadroes.js"></script>
+    <script src="../src/mod-copia/AvisoFlutuante.js"></script>
+    <script src="../src/mod-copia/AcumuladorCopia.js"></script>
+    <script src="../src/mod-copia/SelecionarCopiar.js"></script>
+    <script src="../src/cfg/debug.js"></script>
+    <script src="../src/cfg/editor_demo.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                if (typeof window.JusGovExecutarAuditoria === 'function') {
+                    const res = window.JusGovExecutarAuditoria();
+                    document.getElementById('resultado').innerText = res.logTexto;
+                } else {
+                    document.getElementById('resultado').innerText = '[ERRO] JusGovExecutarAuditoria nao encontrado.' + window.__ERRO_GLOBAL__;
+                }
+            } catch (err) {
+                document.getElementById('resultado').innerText = '[ERRO] ' + err.stack + window.__ERRO_GLOBAL__;
+            }
+        });
+    </script>
+</body>
+</html>
+

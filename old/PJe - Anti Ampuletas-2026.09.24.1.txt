@@ -1,0 +1,108 @@
+// ==UserScript==
+// @name         PJe - Anti Ampuletas
+// @namespace    http://tampermonkey.net/
+// @version      2026.09.24.1
+// @author       smarca@gmail.com
+// @description  Anti bloqueio de interface e ampuletas.
+// @include      *://*pje*.*.jus.br/*
+// @tag          PJE
+// @run-in       normal-tabs
+// @grant        GM_addStyle
+// @run-at       document-start
+// @allFrames    true
+// ==/UserScript==
+
+/* Diretivas de geração IA:
+1) manter comentários personalizados
+2) incluir comentários extensivamente, focados no porquê
+3) código visivel e fácil de entender
+*/
+
+(function() {
+    'use strict';
+
+    // =====================================================================
+    // === 1. INJEÇÃO CSS: ANIQUILAÇÃO DE ANIMAÇÕES E ESCUDOS VISUAIS ===
+    // =====================================================================
+    const turboCSS = `
+        /* ANIQUILAÇÃO DOS LOADERS E SPINNERS
+           O PORQUÊ: O PJe bloqueia a tela inteira a cada requisição AJAX.
+           O 'pointer-events: none' garante que o usuário possa continuar clicando através do fantasma do spinner. */
+        [id="movimentarRegion:status.stop"],
+        [id*="mploading" i],
+        [class*="mploading" i] {
+            pointer-events: none !important;
+            cursor: auto !important;
+            opacity: 0.01 !important;
+            z-index: -99999 !important;
+        }
+
+        /* ANIQUILAÇÃO GLOBAL DE TEMPO E ANIMAÇÃO
+           O PORQUÊ: O framework Angular/JSF do PJe injeta atrasos artificiais (0.3s a 0.5s)
+           em modais e transições para criar "suavidade". Isso destrói a produtividade de quem
+           digita rápido. Esta regra força o navegador a ignorar todos os delays, fazendo a interface
+           responder instantaneamente aos comandos de teclado e mouse. */
+        *, *::before, *::after {
+            animation-delay: 0s !important;
+            transition: none !important;
+            transition-delay: 0s !important;
+            transition-duration: 0s !important;
+        }
+
+
+        /* RESTAURAÇÃO DE USABILIDADE GERAL E ANTI-BLOQUEIO
+           O PORQUÊ: O PJe ocasionalmente sofre bugs onde overlays invisíveis não são removidos
+           após o fechamento de um modal, impedindo cliques e seleção de texto.
+           Forçamos o 'pointer-events: auto' nas camadas principais para garantir acesso irrestrito. 
+        body, html, .main-panel, #divPainelUsuarioContent {
+            pointer-events: auto !important;
+            cursor: auto !important;
+        }
+        */
+    `;
+
+    // =====================================================================
+    // === 2. MOTOR DE INJEÇÃO MULTI-GATILHO COM TRAVA DE RAM ===
+    // =====================================================================
+    let cssBlindado = false; // Trava em memória RAM para evitar varreduras lentas (e caras) no DOM a cada clique.
+
+    // FUNÇÃO: Injetar o CSS turbo de forma segura e não redundante.
+    // O PORQUÊ: Ambientes de iframes duplos (comuns no PJe) podem causar injeções múltiplas do mesmo CSS,
+    // o que causa vazamento de memória e lentidão de renderização (re-paint/re-flow excessivos).
+    function blindarCSS() {
+        // Operação O(1): Aborta imediatamente se a variável local na RAM já confirmar a injeção.
+        if (cssBlindado) return;
+
+        // Fallback no DOM: Verifica se outro script paralelo injetou a tag.
+        if (document.getElementById('pje-turbo-lock')) {
+            cssBlindado = true;
+            return;
+        }
+
+        // Cria a folha de estilo de forma isolada.
+        const style = document.createElement('style');
+        style.id = 'pje-turbo-lock';
+        style.textContent = turboCSS;
+
+        // Injeta preferencialmente no <head> para evitar flash de conteúdo não estilizado (FOUC).
+        const alvo = document.head || document.documentElement;
+        if (alvo) {
+            alvo.appendChild(style);
+            cssBlindado = true;
+        }
+    }
+
+    // Controle Jurisdicional Flexível
+    // O PORQUÊ: Limita a atuação do motor pesado apenas ao escopo do PJe,
+    // poupando processamento em abas irrelevantes abertas pelo usuário.
+    const dominio = window.location.hostname;
+    if (dominio.includes('pje') && dominio.includes('.jus.br')) {
+        // Preparação Manifest V3: O método GM_addStyle está sumindo dos novos padrões de extensões.
+        // Este if/else garante que o script não quebre caso o usuário mude para um Add-on mais restritivo.
+        if (typeof GM_addStyle !== "undefined") {
+            GM_addStyle(turboCSS);
+        } else {
+            blindarCSS();
+        }
+    }
+})();

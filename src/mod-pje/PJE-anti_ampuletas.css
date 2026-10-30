@@ -1,0 +1,277 @@
+@charset "UTF-8";
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * (Espelho integral da Central de Ajuda / Options para reconstrucao mutua)
+ *
+ * 1. PROPOSITO DO MODULO PJE TURBO E MULTI-TRIBUNAIS (ANTI-AMPULHETAS):
+ * - Os sistemas judiciais brasileiros -- PJe 1.x (JSF/RichFaces), PJe 2.x e
+ *   PDPJ-Br (Angular/PrimeNG/Material), eproc (PHP/InfraPHP/jQuery), Projudi e
+ *   SEEU (JSP/Struts/DWR), SAJ (JSP/KendoUI/React), Creta (PHP/Prototype) e
+ *   e-STF/e-STJ -- injetam cortinas modais de bloqueio de tela inteira
+ *   ("Aguarde...", "Carregando...", ampulhetas e spinners AJAX) a cada clique
+ *   em arvore de autos, paginacao, assinatura ou juntada de documentos.
+ * - Muitas vezes a resposta assincrona ja chegou ou o usuario apenas precisa
+ *   rolar/ler uma peca enquanto outra aba ou componente secundario carrega em
+ *   background, mas a cortina modal sequestra 100% dos eventos de mouse e
+ *   aplica cursores "wait"/"progress" travando a produtividade.
+ *
+ * 2. POR QUE USAR "opacity: 0.01" E "z-index: -99999" (E JAMAIS "display: none",
+ *    "visibility: hidden" OU "content-visibility: hidden"):
+ * - Nos frameworks judiciais (em especial RichFaces/JSF "ModalPanel.js", "a4j:status"
+ *   e Angular Change Detection), os scripts internos medem dimensoes do container
+ *   ou verificam propriedades computadas no encerramento da requisicao (callbacks
+ *   "onstop" / "oncomplete" / "infraOcultarAviso").
+ * - Se uma extensao aplicar "display: none", "visibility: hidden" ou "content-visibility: hidden",
+ *   o motor JS lanca excecao ("TypeError: Cannot read properties of null") ou
+ *   julga que o componente travou, congelando a interface.
+ * - Solucao de Engenharia Definitiva (Battle-Tested):
+ *   a) "pointer-events: none !important": Faz os cliques e a rolagem atravessarem
+ *      o fantasma da cortina modal diretamente para os documentos e botoes abaixo.
+ *   b) "opacity: 0.01 !important": Torna a cortina 100% imperceptivel aos olhos
+ *      humanos, mas mantem o elemento vivo e mensuravel para os scripts do tribunal.
+ *   c) "z-index: -99999 !important": Envia o loader para tras de todo o conteudo util.
+ *   d) "*, *::before, *::after { animation-delay: 0s !important; transition: none !important; }":
+ *      Aniquila atrasos artificiais (0.3s a 0.5s) injetados pelo Angular/JSF em modais.
+ * ========================================================================== */
+
+/* ==========================================================================
+ * SISTEMA 1: PJE (TRF1, TRF3, TRF5, TRT, TJMG, TJDFT, CNJ E ESTADUAIS)
+ * ARQUITETURA: JSF/RichFaces (1.x) e Angular/PrimeNG (2.x) com AJAX pesado
+ * ========================================================================== */
+/* Passo 1.1: Neutralizacao de cortinas de bloqueio, overlays e spinners do PJe 1.x
+ * (RichFaces / JSF: a4j:status, mpProgresso, movimentarRegion:status) e PJe 2.x
+ * (Angular / PrimeNG / PREVJUD: mat-progress-spinner, mat-spinner, p-progress-spinner,
+ * ngx-loading, p-blockui, block-ui-wrapper, modal-backdrop, swal2).
+ * O porque: O 'pointer-events: none' garante que o usuario possa continuar clicando
+ * atraves do fantasma do spinner. 'opacity: 0.01' e 'z-index: -99999' tornam o spinner
+ * invisivel e posicionado atras do conteudo sem quebrar o ciclo de vida do Angular/JSF. */
+[id="movimentarRegion:status.stop"],
+[id="movimentarRegion:status.start"],
+[id$=":status.start"],
+[id*="mploading" i],
+[class*="mploading" i],
+[id*="mpProgresso" i],
+[id*="painelAguarde" i],
+[id*="modalAguarde" i],
+[class*="rich-mpnl-mask" i],
+mat-progress-spinner,
+mat-spinner,
+.mat-progress-spinner,
+.mat-spinner,
+.mat-mdc-progress-spinner,
+.mat-progress-spinner-indeterminate-animation,
+p-progressspinner,
+p-progressSpinner,
+.p-progress-spinner,
+.p-progress-spinner-svg,
+.p-progress-spinner-circle,
+.spinner-border,
+.spinner-grow,
+[class*="progress-spinner" i],
+[class*="progressspinner" i],
+[class*="loading-spinner" i],
+.loading-overlay,
+.loader-overlay,
+.spinner-overlay,
+.pje-loading,
+[class*="pje-loading" i],
+[id*="spinner" i],
+[class*="spinner" i],
+[id*="carregando" i],
+[class*="carregando" i],
+pdpj-loading,
+[class*="pdpj-loading" i],
+pdpj-spinner,
+[class*="pdpj-spinner" i],
+pje-spinner,
+app-loading,
+app-spinner,
+ngx-loading,
+.ngx-loading-backdrop,
+.loading-foreground,
+.block-ui-wrapper,
+.block-ui-overlay,
+.p-blockui,
+.p-blockui-document,
+.p-component-overlay,
+.ui-blockui,
+.ui-widget-overlay,
+.ui-widget-overlay.ui-blockui,
+.swal2-Delta-loading {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* ANIQUILAÇÃO TOTAL DE SPINNERS CIRCULARES MODERNOS (ANGULAR MATERIAL / PRIMENG / PJE 2.X / PREVJUD) */
+mat-progress-spinner,
+mat-spinner,
+mat-mdc-progress-spinner,
+mat-mdc-spinner,
+.mat-progress-spinner,
+.mat-spinner,
+.mat-mdc-progress-spinner,
+.mat-mdc-spinner,
+p-progressspinner,
+p-progressSpinner,
+.p-progress-spinner,
+.p-progress-spinner-svg,
+.p-progress-spinner-circle,
+.spinner-border,
+.spinner-grow,
+[class*="progress-spinner" i],
+[class*="progressspinner" i],
+[class*="loading-spinner" i],
+.loading-spinner,
+.pje-loading,
+[class*="pje-loading" i],
+pdpj-spinner,
+pje-spinner,
+app-loading,
+app-spinner {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Passo 1.2: Aniquilacao global de atrasos artificiais e transicoes lentas.
+ * O porque: O framework Angular/JSF do PJe injeta atrasos artificiais (0.3s a 0.5s)
+ * em modais e transicoes para criar "suavidade". Esta regra forca o navegador a ignorar
+ * todos os delays, fazendo a interface responder instantaneamente aos comandos. */
+*, *::before, *::after {
+    animation-delay: 0s !important;
+    transition: none !important;
+    transition-delay: 0s !important;
+    transition-duration: 0s !important;
+}
+
+/* Passo 1.3: Destravamento de cursores de espera ("wait" e "progress") forcados
+ * inline pelo JavaScript do PJe sobre o <body>, <html> ou containers de processo. */
+html[style*="wait" i],
+body[style*="wait" i],
+html[style*="progress" i],
+body[style*="progress" i],
+*[style*="cursor: wait" i],
+*[style*="cursor:wait" i],
+*[style*="cursor: progress" i],
+*[style*="cursor:progress" i],
+.wait-cursor,
+.busy-cursor {
+    cursor: auto !important;
+}
+
+
+/* ==========================================================================
+ * SISTEMA 2: EPROC (TRF2, TRF4, TRF6, TJRS, TJSC, TJTO, TJMG, TJAC)
+ * ARQUITETURA: Server-Side Rendering (PHP / Framework InfraPHP) + AJAX
+ *              pontual via jQuery / jQuery BlockUI / Bootstrap.
+ * ========================================================================== */
+/* Passo 2.1: Neutralizacao dos avisos flutuantes de bloqueio do framework
+ * InfraPHP (infraExibirAviso em InfraUtil.js) e overlays do plugin jQuery BlockUI. */
+#divInfraAviso,
+#divInfraAvisoFundo,
+.infraAviso,
+.infraAvisoFundo,
+.infraFundoTransparente[id*="Aviso" i],
+#divCarregando,
+.divCarregando,
+#divInfraCarregando,
+.blockUI.blockOverlay,
+.blockUI.blockMsg,
+.blockUI.blockPage {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+
+/* ==========================================================================
+ * SISTEMA 3: PROJUDI E SEEU (CNJ / TJPR, TJGO, TJBA, TJMA, TJAM, TJRR)
+ * ARQUITETURA: Hibrido Java EE com chamadas assincronas via DWR e Prototype.js.
+ * ========================================================================== */
+/* Passo 3.1: Neutralizacao da zona de bloqueio global do motor DWR
+ * (#disabledZone / #messageZone) e cortinas JSP de transicao de fases. */
+#disabledZone,
+#messageZone,
+#divAguarde,
+#mascaraAguarde,
+#fundoAguarde,
+#overlayAguarde,
+.painelAguarde,
+.mascaraAguarde,
+#divLoading,
+#loadingMask,
+#seeuAguarde,
+#modalProcessando,
+.seeu-loading,
+.processando-overlay {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+
+/* ==========================================================================
+ * SISTEMA 4: SAJ -- PORTAL E-SAJ E SAJ DIGITAL (SOFTPLAN -- TJSP, TJSC, TJMS, TJAL)
+ * ARQUITETURA: Hibrido Web JSP e SPA (Kendo UI / jQuery LoadMask).
+ * ========================================================================== */
+/* Passo 4.1: Neutralizacao das mascaras de carregamento da pasta digital e Kendo UI. */
+#bloqueioTela,
+.bloqueioTela,
+.esajAguarde,
+.saj-loading,
+.saj-overlay,
+.spw-loading,
+.spw-overlay,
+.k-loading-mask,
+.k-loading-image,
+.k-loading-color,
+.loadmask,
+.loadmask-msg {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+
+/* ==========================================================================
+ * SISTEMA 5: PDPJ-BR (CNJ), E-STF / STF DIGITAL E E-STJ
+ * ARQUITETURA: Front-End SPA Moderno (Angular 12+, Angular Material CDK Overlay, GovBR-DS).
+ * ========================================================================== */
+/* Passo 5.1: Neutralizacao de spinners e scrims de espera nos modulos da PDPJ-Br. */
+pdpj-loading,
+stf-loading,
+stj-loading,
+ngx-spinner,
+.ngx-spinner-overlay,
+.br-loading-mask,
+.br-scrim.is-loading,
+.spinner-border-overlay,
+.cdk-overlay-backdrop.loading-backdrop {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+
+/* ==========================================================================
+ * SISTEMA 6: CRETA (JUIZADOS ESPECIAIS FEDERAIS -- TRF5) E LEGADOS ESTADUAIS
+ * ARQUITETURA: Web PHP / JavaScript Classico (Prototype / jQuery / AJAX SSR).
+ * ========================================================================== */
+/* Passo 6.1: Neutralizacao de divs de bloqueio sincrono/assincrono do sistema Creta. */
+#div_aguarde,
+#tela_bloqueio,
+#carregando_dados,
+.creta-loading,
+.creta-overlay {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}

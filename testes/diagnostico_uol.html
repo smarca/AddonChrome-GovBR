@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Diagnóstico UOL</title>
+</head>
+<body>
+    <pre id="resultado">Executando diagnóstico...</pre>
+    <iframe id="frameUol" src="../tmp/uol.html" style="width: 1200px; height: 800px;"></iframe>
+    <script src="../src/mod-copia/ConstantesPadroes.js"></script>
+    <script src="../src/mod-copia/AvisoFlutuante.js"></script>
+    <script src="../src/mod-copia/AcumuladorCopia.js"></script>
+    <script src="../src/mod-copia/SelecionarCopiar.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                try {
+                    const iframe = document.getElementById('frameUol');
+                    const doc = iframe.contentDocument;
+                    if (!doc) {
+                        document.getElementById('resultado').innerText = 'Falha ao acessar contentDocument do iframe';
+                        return;
+                    }
+                    const logs = [];
+                    const p = doc.querySelector('p.bullet');
+                    if (!p) {
+                        logs.push('p.bullet nao encontrado!');
+                    } else {
+                        logs.push('p.bullet encontrado: "' + p.textContent.substring(0, 50) + '..."');
+                        const ctx = window.JusGovSelecionarCopiar.classificarContextoElementoAlvo(p);
+                        logs.push('classificarContextoElementoAlvo(p) = ' + ctx);
+                        
+                        const isInter = window.JusGovSelecionarCopiar.isElementoInterativoOuUi(p);
+                        logs.push('isElementoInterativoOuUi(p) = ' + isInter);
+
+                        // If isInter is true, let's test which ancestor triggered it!
+                        let cur = p;
+                        while (cur && cur !== doc.body && cur !== doc.documentElement) {
+                            const inter = window.JusGovSelecionarCopiar.isElementoInterativoOuUi(cur);
+                            logs.push(' -> Tag: ' + cur.tagName + ' (class=' + cur.className + ') isInter=' + inter);
+                            // inspect styles
+                            const st = iframe.contentWindow.getComputedStyle(cur);
+                            logs.push('    cursor=' + st.cursor + ', userSelect=' + (st.userSelect || st.webkitUserSelect));
+                            // inspect attributes
+                            for (let attr of cur.attributes) {
+                                logs.push('    attr: ' + attr.name + '="' + attr.value.substring(0, 30) + '"');
+                            }
+                            cur = cur.parentElement;
+                        }
+                    }
+                    document.getElementById('resultado').innerText = logs.join('\n');
+                } catch (err) {
+                    document.getElementById('resultado').innerText = 'Erro: ' + err.stack;
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

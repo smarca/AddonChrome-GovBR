@@ -1,0 +1,3023 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- ==========================================================================
+ * Nome do arquivo: options.html
+ * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * DIRETIVAS DE GERACAO E MANUTENCAO IA [DEV - ENGENHARIA DE CODIGO]:
+ * 1) DELIBERACAO PREVIA OBRIGATORIA: Jamais gerar codigo sem comando expresso;
+ *    sugerir preliminarmente e na ordem exata: (a) Eventuais Correcoes,
+ *    (b) Mudancas de Boas Praticas e (c) Novas Features.
+ * 2) PRESERVACAO DOCUMENTAL ABSOLUTA: E terminantemente proibido apagar,
+ *    resumir, ocultar ou encurtar comentarios no codigo-fonte. Todo comentario
+ *    deve explicar exaustivamente o *porque* (regras de negocio, falhas do
+ *    framework alvo, otimizacoes V8/Blink e protecoes de Regex Unicode) e nao
+ *    apenas o *o que*.
+ * 3) INTRA-COMENTARIOS DE RECONSTRUCAO (PSEUDOCODIGO INTERCALADO / BLUEPRINT):
+ *    O fluxo de dados ("Passos") deve estar obrigatoriamente INTERCALADO
+ *    dentro do corpo de cada secao, permitindo recriar 100% do painel de
+ *    Opcoes, Central de Ajuda e Laboratorio do zero.
+ * 4) CODIFICACAO UTF-8 NATIVA DIRETA (ACENTOS E CEDILHAS REAIS): O codigo-fonte
+ *    e a interface utilizam a codificacao padrao UTF-8 com suporte nativo a
+ *    acentos e cedilhas (ç, ã, é, etc.) diretamente no texto. E terminantemente
+ *    PROIBIDO o uso de entidades HTML (como ç, õ, é) no codigo ou em templates.
+ * 5) INTEGRIDADE FUNCIONAL E COPIA SILENCIOSA: Proibido simplificar a base de 6
+ *    estagios, remover suporte a Ctrl/Alt/Shift, exibir popups de "Copiado!" em
+ *    copias simples ou inserir anotacoes de versao (ChronoSemVer) nos cabecalhos.
+ * 6) SINCRONIZACAO OBRIGATORIA DE BLUE PRINT E SANDBOX: Toda alteracao de regra
+ *    de negocio, mascara ou validacao deve manter obrigatoriamente atualizados e
+ *    sincronizados o Blue Print (especificacao documental interna nos cabecalhos
+ *    e na Central de Ajuda) e o SandBox (area de Testes interativos em
+ *    options.html e bateria automatizada em debug.js), garantindo paridade entre
+ *    exemplos validos e invalidos para homologacao imediata.
+ * ========================================================================== -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opções, Central de Ajuda e Testes | JusGovBR</title>
+    <link rel="icon" type="image/png" href="../ico/icon128.png">
+    <style>
+        :root {
+            --azul-jusgov: #1a73e8;
+            --azul-escuro: #1557b0;
+            --azul-claro: #eff6ff;
+            --fundo-pagina: #f1f5f9;
+            --fundo-cartao: #ffffff;
+            --texto-principal: #0f172a;
+            --texto-secundario: #475569;
+            --texto-suave: #64748b;
+            --borda-padrao: #cbd5e1;
+            --borda-suave: #e2e8f0;
+            --verde-sucesso: #10b981;
+            --verde-fundo: #ecfdf5;
+            --verde-texto: #065f46;
+            --amarelo-alerta: #f59e0b;
+            --amarelo-fundo: #fffbeb;
+            --amarelo-texto: #78350f;
+            --vermelho-erro: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+            background-color: var(--fundo-pagina);
+            color: var(--texto-principal);
+            line-height: 1.55;
+            padding-bottom: 60px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+            color: #ffffff;
+            padding: 24px 32px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .cabecalho-interno {
+            width: 94%;
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .marca-bloco {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-jg {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: #1a73e8;
+            border: 2px solid #60a5fa;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .marca-bloco h1 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .marca-bloco p {
+            font-size: 13px;
+            color: #93c5fd;
+            margin-top: 2px;
+        }
+
+        .hero-badge {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #e0f2fe;
+        }
+
+        .barra-abas {
+            background: #ffffff;
+            border-bottom: 1px solid var(--borda-padrao);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .abas-interno {
+            width: 94%;
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 8px;
+            padding: 0 16px;
+            overflow-x: auto;
+        }
+
+        .btn-aba {
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 14px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--texto-secundario);
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-aba:hover {
+            color: var(--azul-jusgov);
+            background: #f8fafc;
+        }
+
+        .btn-aba.ativa {
+            color: var(--azul-jusgov);
+            border-bottom-color: var(--azul-jusgov);
+        }
+
+        .container {
+            width: 94%;
+            max-width: 1800px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+
+        .painel-aba {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .painel-aba.ativa {
+            display: flex;
+        }
+
+        .cartao {
+            background: var(--fundo-cartao);
+            border: 1px solid var(--borda-suave);
+            border-radius: 10px;
+            padding: 22px 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        .cartao h2 {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--texto-principal);
+            margin-bottom: 6px;
+        }
+
+        .cartao p.subtitulo {
+            font-size: 13.5px;
+            color: var(--texto-secundario);
+            margin-bottom: 16px;
+        }
+
+        .grade-opcoes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .grade-opcoes .caixa-opcao {
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .grade-opcoes select.seletor-modo {
+            width: 100%;
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+
+        .caixa-opcao {
+            border: 1px solid var(--borda-suave);
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .caixa-opcao h3 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .caixa-opcao p {
+            font-size: 12.5px;
+            color: var(--texto-secundario);
+        }
+
+        select.seletor-modo {
+            padding: 8px 12px;
+            border: 1px solid var(--borda-padrao);
+            border-radius: 6px;
+            font-size: 13.5px;
+            font-weight: 600;
+            background: #ffffff;
+            color: var(--texto-principal);
+            cursor: pointer;
+        }
+
+        textarea.lista-urls {
+            width: 100%;
+            min-height: 56px;
+            max-height: 240px;
+            height: 140px;
+            padding: 12px;
+            border: 1px solid var(--borda-padrao);
+            border-radius: 8px;
+            font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            background: #f8fafc;
+            color: #1e293b;
+            box-sizing: border-box;
+            resize: vertical;
+            overflow-y: auto;
+        }
+
+        textarea.lista-urls:focus {
+            outline: none;
+            border-color: var(--azul-jusgov);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+        }
+
+        .barra-botoes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 14px;
+        }
+
+        .btn {
+            padding: 9px 18px;
+            border-radius: 6px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .btn-primario {
+            background: var(--azul-jusgov);
+            color: #ffffff;
+        }
+
+        .btn-primario:hover {
+            background: var(--azul-escuro);
+        }
+
+        .btn-secundario {
+            background: #f1f5f9;
+            border-color: var(--borda-padrao);
+            color: var(--texto-principal);
+        }
+
+        .btn-secundario:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-clip-permitido {
+            background: #10b981 !important;
+            border-color: #059669 !important;
+            color: #ffffff !important;
+        }
+
+        .btn-clip-permitido:hover {
+            background: #059669 !important;
+            border-color: #047857 !important;
+            color: #ffffff !important;
+        }
+
+        .btn-clip-bloqueado {
+            background: #ef4444 !important;
+            border-color: #dc2626 !important;
+            color: #ffffff !important;
+        }
+
+        .btn-clip-bloqueado:hover {
+            background: #dc2626 !important;
+            border-color: #b91c1c !important;
+            color: #ffffff !important;
+        }
+
+        /* Acordeao de Configuracoes Avancadas */
+        details.secao-avancada {
+            background: var(--fundo-cartao);
+            border: 1px solid var(--borda-suave);
+            border-radius: 10px;
+            padding: 16px 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        details.secao-avancada summary {
+            font-size: 15.5px;
+            font-weight: 700;
+            color: #1e3a8a;
+            cursor: pointer;
+            user-select: none;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        details.secao-avancada summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.secao-avancada summary::after {
+            content: '+ Expandir Opções Avançadas';
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--azul-jusgov);
+            background: var(--azul-claro);
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        details.secao-avancada[open] summary::after {
+            content: '- Recolher Opções Avançadas';
+        }
+
+        .conteudo-avancado {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--borda-suave);
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--borda-suave);
+            gap: 16px;
+        }
+
+        .setting-item:last-of-type {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--texto-principal);
+        }
+
+        .setting-help {
+            font-size: 12.5px;
+            color: var(--texto-secundario);
+            margin-top: 2px;
+        }
+
+        .input-text {
+            width: 90px;
+            padding: 6px 10px;
+            border: 1px solid var(--borda-padrao);
+            border-radius: 6px;
+            font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .textarea-prompt-ia {
+            width: 100%;
+            min-height: 38px;
+            max-height: calc(10 * 1.45em + 14px);
+            box-sizing: border-box;
+            font-family: Tahoma, 'Segoe UI', Arial, sans-serif !important;
+            font-size: 12.5px;
+            line-height: 1.45;
+            text-align: left !important;
+            padding: 6px 10px;
+            border: 1px solid var(--borda-padrao);
+            border-radius: 6px;
+            resize: none;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background: #ffffff;
+            color: var(--texto-principal);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .textarea-prompt-ia:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-restaurar-campo {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--texto-secundario);
+            background: #ffffff;
+            border: 1px solid var(--borda-suave);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+            line-height: 1.2;
+        }
+
+        .btn-restaurar-campo:hover {
+            color: #2563eb;
+            background: rgba(59, 130, 246, 0.08);
+            border-color: #93c5fd;
+        }
+
+        .btn-restaurar-campo:active {
+            transform: scale(0.96);
+        }
+
+        .controle-slider-composto {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+            background: #f8fafc;
+            border: 1px solid var(--borda-suave);
+            border-radius: 8px;
+            padding: 6px 12px;
+        }
+
+        .input-range-custom {
+            width: 170px;
+            height: 6px;
+            accent-color: var(--azul-jusgov);
+            cursor: pointer;
+        }
+
+        .badge-valor-slider {
+            min-width: 138px;
+            text-align: center;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #1e3a8a;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 4px 8px;
+            white-space: nowrap;
+        }
+
+        .input-cor-compacto {
+            width: 30px;
+            height: 28px;
+            padding: 1px;
+            border: 1px solid var(--borda-padrao);
+            border-radius: 6px;
+            background: #ffffff;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #cbd5e1;
+            transition: 0.2s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ffffff;
+            transition: 0.2s;
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked+.slider {
+            background-color: var(--azul-jusgov);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .slider-atencao input:checked+.slider {
+            background-color: #f59e0b !important;
+        }
+
+        .barra-estatisticas {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--borda-padrao);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .categoria-avancada-titulo {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--azul-jusgov);
+            background: #eff6ff;
+            border-left: 3px solid var(--azul-jusgov);
+            padding: 6px 10px;
+            margin: 14px 0 6px 0;
+            border-radius: 4px;
+        }
+
+        .categoria-avancada-titulo:first-child {
+            margin-top: 0;
+        }
+
+        /* Aba 2: Cards e Tabelas da Central de Ajuda */
+        .grade-estagios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+            gap: 14px;
+            margin-top: 12px;
+        }
+
+        .card-estagio {
+            border: 1px solid var(--borda-suave);
+            border-left: 4px solid var(--azul-jusgov);
+            border-radius: 7px;
+            padding: 14px;
+            background: #f8fafc;
+        }
+
+        .card-estagio h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin-bottom: 6px;
+        }
+
+        .card-estagio ul {
+            padding-left: 18px;
+            font-size: 12.5px;
+            color: var(--texto-secundario);
+        }
+
+        .card-estagio li {
+            margin-bottom: 5px;
+        }
+
+        code,
+        .sample-token {
+            font-family: Consolas, monospace;
+            background: #e2e8f0;
+            color: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12.5px;
+        }
+
+        .tabela-comparativa code[title] {
+            cursor: help;
+            border-bottom: 1px dotted var(--primaria);
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .tabela-comparativa code[title]:hover {
+            background: #dbeafe;
+            color: var(--primaria-escura);
+        }
+
+        .sample-token {
+            background: #f1f5f9;
+            border: none;
+            display: inline-block;
+            margin: 2px 0;
+        }
+
+        .sample-valid {
+            background: var(--verde-fundo);
+            color: var(--verde-texto);
+            font-weight: 600;
+        }
+
+        .sample-invalid {
+            background: var(--amarelo-fundo);
+            color: var(--amarelo-texto);
+            font-weight: 600;
+        }
+
+        .badge-stage {
+            display: inline-block;
+            background: var(--azul-claro);
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+        }
+
+        table.tabela-doc {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+        table.tabela-doc th,
+        table.tabela-doc td {
+            border: 1px solid var(--borda-suave);
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        table.tabela-doc th {
+            background: #f8fafc;
+            font-weight: 700;
+            color: var(--texto-principal);
+        }
+
+        /* Aba 3: Laboratorio e Tabelas */
+        .bloco-teste {
+            background: #f8fafc;
+            border: 1px dashed #94a3b8;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+            font-size: 14px;
+            line-height: 1.75;
+        }
+
+        .bloco-teste h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--texto-suave);
+            margin-bottom: 8px;
+            letter-spacing: 0.04em;
+        }
+
+        .editable-demo {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #94a3b8;
+            border-radius: 6px;
+            font-size: 13.5px;
+            margin-top: 6px;
+            font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+            background: #ffffff;
+            color: var(--texto-principal);
+            box-sizing: border-box;
+        }
+
+        textarea.editable-demo {
+            min-height: 34px;
+            max-height: 240px;
+            resize: vertical;
+            overflow-y: auto;
+        }
+
+        /* Container e Toolbar do Editor HTML Online Demo */
+        .editor-container-wrapper {
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            border: 1px solid #94a3b8;
+            border-radius: 6px;
+            background: #ffffff;
+            margin-top: 6px;
+            box-sizing: border-box;
+            resize: vertical;
+            overflow: hidden;
+            min-height: 60px;
+            max-height: 260px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .editor-container-wrapper:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
+
+        .btn-toggle-toolbar {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            width: 26px;
+            height: 24px;
+            padding: 0;
+            font-size: 12px;
+            cursor: pointer;
+            color: #475569;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .btn-toggle-toolbar:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            border-color: #94a3b8;
+        }
+
+        .editor-toolbar-main {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 4px 6px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            user-select: none;
+            overflow-x: auto;
+        }
+
+        .btn-tb {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            min-width: 26px;
+            height: 26px;
+            padding: 0 4px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            font-family: inherit;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .btn-tb:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+
+        .btn-tb:active {
+            background: #e0e7ff;
+            border-color: #6366f1;
+            color: #4338ca;
+        }
+
+        .btn-tb-limpar {
+            color: #dc2626;
+        }
+
+        .btn-tb-limpar:hover {
+            background: #fef2f2;
+            border-color: #fca5a5;
+            color: #b91c1c;
+        }
+
+        .toolbar-sep {
+            width: 1px;
+            height: 16px;
+            background: #cbd5e1;
+            margin: 0 3px;
+            flex-shrink: 0;
+        }
+
+        .editor-content-area {
+            flex: 1 1 auto;
+            min-height: 48px;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 13.5px;
+            line-height: 1.6;
+            outline: none;
+            background: #ffffff;
+            color: var(--texto-principal);
+            word-break: break-word;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .editor-content-area p {
+            margin: 0 0 6px 0;
+            padding: 0;
+        }
+
+        .editor-content-area p:last-child {
+            margin-bottom: 0;
+        }
+
+        .clipboard-inspector {
+            margin-bottom: 16px;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid #1e293b;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .clipboard-inspector-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .clipboard-inspector-titulo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+            font-family: Consolas, monospace;
+        }
+
+        .clipboard-inspector-acoes {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .clipboard-preview-box {
+            background: #090d16;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-y: auto;
+            overflow-x: auto;
+            min-height: 38px;
+            max-height: 220px;
+            box-sizing: border-box;
+            resize: vertical;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .clipboard-preview-box:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 1px #38bdf8;
+        }
+
+        .clipboard-preview-box::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .clipboard-preview-box::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+
+        .clipboard-preview-box::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+
+        .clipboard-preview-box::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .clip-linha {
+            display: block;
+            line-height: 1.5;
+        }
+
+        .clip-linha+.clip-linha {
+            margin-top: 3px;
+        }
+
+        .clip-linha-rotulo {
+            color: #38bdf8;
+            font-weight: 700;
+        }
+
+        .clip-linha-colchete {
+            color: #64748b;
+        }
+
+        .clip-linha-dados {
+            color: #38bdf8;
+            font-weight: 500;
+        }
+
+        .clip-incompativel {
+            color: #fbbf24;
+            font-style: italic;
+        }
+
+        .clip-status-vazio {
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        .clip-status-negado {
+            color: #f87171;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-download-xmouse {
+            padding: 5px 7px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            width: 28px;
+            height: 28px;
+            box-sizing: border-box;
+            line-height: 1;
+            cursor: help;
+        }
+
+        .tabela-container {
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        table.tabela-teste {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            background: #ffffff;
+        }
+
+        table.tabela-teste th,
+        table.tabela-teste td {
+            border: 1px solid var(--borda-padrao);
+            padding: 7px 10px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        table.tabela-teste th {
+            background: #e2e8f0;
+            color: #0f172a;
+            font-weight: 700;
+            cursor: default;
+        }
+
+        table.tabela-teste tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        table.tabela-teste tr:hover {
+            background: #eff6ff;
+        }
+
+        #painelResultadoAuditoria,
+        #painelMensagensConsole {
+            margin-top: 14px;
+            padding: 14px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: Consolas, monospace;
+            font-size: 12.5px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            display: none;
+        }
+
+        .barra-console-e-testes {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .caixa-mensagens-console-inline {
+            flex: 1;
+            min-width: 280px;
+            background: #0f172a;
+            color: #e2e8f0;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .barra-progresso-console {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: #1e293b;
+            overflow: hidden;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            z-index: 5;
+        }
+
+        .preenchimento-progresso-console {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #38bdf8, #2563eb, #10b981);
+            transition: width 0.08s ease-out;
+        }
+
+        .cabecalho-console-inline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+
+        .visor-console-inline {
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #cbd5e1;
+            max-height: 174px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+            padding-right: 4px;
+        }
+
+        #toastNotificacao {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--verde-sucesso);
+            color: #ffffff;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transform: translateY(120px);
+            opacity: 0;
+            transition: all 0.25s ease;
+            z-index: 9999;
+        }
+
+        #toastNotificacao.visivel {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Passo 1.1: Banner Cabecalho de Identificacao do Ecossistema -->
+    <header>
+        <div class="cabecalho-interno">
+            <div class="marca-bloco">
+                <div class="logo-jg" style="background: transparent; border: none; padding: 0;">
+                    <svg id="iconeHeaderOptionsSvg" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"
+                        style="width: 48px; height: 48px;">
+                        <rect id="iconeOptionsBg" x="6" y="6" width="116" height="116" rx="26" fill="#10b981"
+                            stroke="#059669" stroke-width="4" />
+                        <rect x="24" y="34" width="46" height="10" rx="3" fill="rgba(255,255,255,0.3)" />
+                        <rect x="24" y="54" width="34" height="10" rx="3" fill="rgba(255,255,255,0.3)" />
+                        <rect x="24" y="74" width="40" height="10" rx="3" fill="rgba(255,255,255,0.3)" />
+                        <polygon id="iconeOptionsRaio" points="78,20 44,68 68,68 54,108 100,56 74,56" fill="#fef08a"
+                            stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <div>
+                    <h1>JusGovBR — Seleção &amp; Cópia Inteligente + PJe Turbo</h1>
+                    <p>Painel de Configurações, Central de Ajuda e Testes</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Passo 1.2: Barra de Navegacao das 3 Abas Principais -->
+    <nav class="barra-abas">
+        <div class="abas-interno">
+            <button type="button" class="btn-aba ativa" data-aba="abaConfiguracoes">1. Configurações e
+                Listas de Sites</button>
+            <button type="button" class="btn-aba" data-aba="abaAjuda">2. Central de Ajuda</button>
+            <button type="button" class="btn-aba" data-aba="abaLaboratorio">3. Testes</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- ==================================================================
+             ABA 1: CONFIGURACOES OPERACIONAIS, LISTA DE SITES E AVANCADO
+             ================================================================== -->
+        <div id="abaConfiguracoes" class="painel-aba ativa">
+            <!-- Passo 2.1: Bloco Basico Limpo -->
+            <section class="cartao">
+                <h2>Preferências Gerais de Operação e Formatação</h2>
+                <p class="subtitulo">
+                    Escolha como a seleção inteligente e a cópia de textos devem funcionar no seu
+                    navegador. Todas as alterações entram em vigor imediatamente, sem precisar recarregar
+                    as páginas.
+                </p>
+
+                <div class="grade-opcoes">
+                    <div class="caixa-opcao">
+                        <div>
+                            <h3>Modo de Ativação do Motor</h3>
+                            <p>Escolha se a seleção inteligente deve atuar em todos os sites ou apenas nos
+                                domínios listados abaixo.</p>
+                        </div>
+                        <select id="selectModoTurbo" class="seletor-modo">
+                            <option value="global">Todos os Sites (Global)</option>
+                            <option value="url">Só Sites da Lista</option>
+                            <option value="desligado">Desligado</option>
+                        </select>
+                    </div>
+
+                    <div class="caixa-opcao">
+                        <div>
+                            <h3>Comportamento do Ícone da Extensão</h3>
+                            <p>
+                                Escolha a ação ao clicar no ícone da extensão na barra de
+                                ferramentas:
+                                alternar modos com 1 clique (e 2 cliques para Opções) ou exibir
+                                diretamente o Painel Popup com 1 clique.
+                            </p>
+                        </div>
+                        <select id="selectComportamentoIcone" class="seletor-modo">
+                            <option value="popup">1 clique: Abrir Painel Popup (Padrão)</option>
+                            <option value="acoes_rapidas">1 clique: Alternar Modo | 2 cliques: Opções
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Nova linha: Remover Formatacoes (Somente Texto) e Nivel de Filtro de Estilos -->
+                <div class="caixa-opcao" style="flex-direction: column; align-items: stretch; gap: 14px; width: 100%;">
+                    <div
+                        style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; width: 100%;">
+                        <div>
+                            <h3 style="margin-bottom: 4px;">Remover Formatações (Somente Texto)</h3>
+                            <p>
+                                Quando marcado (padrão), copia apenas o texto limpo, sem nenhuma
+                                formatação visual (ideal para colar em formulários, campos de
+                                pesquisa ou sistemas que não aceitam estilos). Desmarcado (ou pressionando as
+                                teclas <code>Esc + Esc</code>): preserva a formatação visual do texto
+                                copiado conforme o nível selecionado no controle deslizante abaixo. O tipo e
+                                tamanho da letra original são sempre limpos para se adaptarem ao seu documento de
+                                destino.
+                            </p>
+                        </div>
+                        <input type="checkbox" id="checkOpcaoRemoverFormatacoes" checked
+                            style="width:20px;height:20px;cursor:pointer;flex-shrink:0;">
+                    </div>
+
+                    <div id="containerNivelFiltroEstilos"
+                        style="border-top: 1px dashed var(--borda-suave); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                        <div id="linhaControleSliderNivel"
+                            style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; width: 100%; transition: opacity 0.2s ease;">
+                            <h3 style="margin: 0; font-size: 14px;">Nível de Formatação Preservada
+                                ao Copiar</h3>
+                            <div class="controle-slider-composto"
+                                style="flex-shrink: 0; width: 380px; box-sizing: border-box; justify-content: space-between;">
+                                <input type="range" id="optNivelFiltroEstilos" class="input-range-custom" min="1"
+                                    max="4" step="1" value="1" style="width: 130px; flex-shrink: 0;"
+                                    title="1: Básico (Visual Simples) | 2: Intermediário (Parágrafos) | 3: Avançado (Documentos e Tabelas) | 4: Estendido (Suítes Office)">
+                                <span id="lblValorNivelFiltro" class="badge-valor-slider"
+                                    style="width: 210px; min-width: 210px; max-width: 210px; box-sizing: border-box; text-align: center; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">1
+                                    - Básico (Visual Simples)</span>
+                            </div>
+                        </div>
+
+                        <p id="lblDescNivelFiltroEstilos"
+                            style="margin: 0; font-size: 12.5px; color: var(--texto-secundario); line-height: 1.55;">
+                            <span id="blocoNiveisFormatacao"
+                                style="display: inline-block; transition: opacity 0.2s ease;">
+                                Escolha a quantidade de estilos mantidos ao copiar textos formatados (cada nível
+                                inclui os anteriores). O tipo e tamanho da fonte original são sempre limpos para
+                                combinar perfeitamente com seu editor de destino:
+                                <br>• <b>1 - Básico (Visual Simples)</b>: Preserva apenas <b>negrito</b>,
+                                <i>itálico</i>, <u>sublinhado</u>, <s>tachado</s>, texto <sub>subscrito</sub>
+                                (ex: H<sub>2</sub>O), texto <sup>sobrescrito</sup> (ex: 1º) e quebras de linha
+                                simples. Sem caixas ou tabelas. (Alvo: anotações rápidas,
+                                comentários e chats).
+                                <br>• <b>2 - Intermediário (Parágrafos e Listas)</b>: Inclui o
+                                Nível 1 mais parágrafos, citações recuadas, listas com
+                                marcadores (pontos ou números), linhas divisórias e alinhamentos de texto
+                                (centralizado, à direita ou justificado). <b>Sem tabelas</b>. (Alvo:
+                                certidões e despachos simples).
+                                <br>• <b>3 - Avançado (Documentos e Tabelas)</b>: Inclui o Nível 2
+                                mais títulos, cabeçalhos, blocos de texto especial e <b>tabelas
+                                    completas</b> com linhas, colunas, bordas e espaçamentos. (Alvo: editores de
+                                texto, petições e minutas com tabelas de cálculo).
+                                <br>• <b>4 - Estendido (Completo / Suítes Office)</b>: Inclui o Nível
+                                3 mais imagens, tabelas com células mescladas e caixas estruturadas. (Alvo: colar
+                                em documentos do Word, LibreOffice e Google Docs).
+                            </span>
+                            <br><span
+                                style="display:inline-block; margin-top:4px; font-size:11.5px; color:var(--texto-secundario);">•
+                                <b>Regra de Ouro</b>: Em qualquer nível, clicar sobre um <b>dado
+                                    específico</b> (como CPF, CNPJ, Número de Processo, Data, Valor em
+                                Dinheiro, Telefone) ou sobre uma <b>palavra única</b> copia sempre em <b>somente
+                                    texto puro</b>. Frases, parágrafos e tabelas mantêm a
+                                formatação ativa.</span>
+                            <br><span
+                                style="display:inline-block; margin-top:4px; font-size:11.5px; color:var(--texto-secundario);">•
+                                <b>Filtros de Conteúdo e Sanitização Ativa (Permanente / Não
+                                    Desativável)</b>: Opera ativamente em todos os modos de cópia
+                                (inclusive no modo somente texto). Remove automaticamente caracteres inválidos,
+                                ocultos e de largura zero (zero-width, soft-hyphens, marcas de ordem de byte BOM),
+                                caracteres de controle (&lt; 32) e espaços rígidos (&amp;nbsp;); suprime
+                                linhas em branco redundantes consecutivas e apara espaços supérfluos no
+                                início e fim de cada linha.</span>
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Passo 2.2: Lista de Dominios do Motor de Selecao e Copia -->
+            <section class="cartao">
+                <h2>Lista de Domínios do Motor de Seleção e Cópia</h2>
+                <p class="subtitulo">
+                    Utilizada quando o modo "Só Sites da Lista" está selecionado. Informe um
+                    padrão por linha (ex: <code>*://*.jus.br/*</code>).
+                </p>
+                <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
+            </section>
+
+            <!-- Passo 2.3: Secao Recolhivel de Configuracoes Avancadas Categorizadas -->
+            <details class="secao-avancada">
+                <summary>Configurações Avançadas</summary>
+                <div class="conteudo-avancado">
+                    <div class="categoria-avancada-titulo">1. ACELERADOR PJE TURBO (ANTI-AMPULHETAS)</div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Acelerador PJe Turbo (Anti-Ampulhetas)</div>
+                            <div class="setting-help">
+                                Evita que a tela fique travada com mensagens de "Aguarde..." ou ampulhetas
+                                durante o carregamento de páginas no PJe.<br>
+                                O sistema atua com foco primário no <b>Processo Judiciário
+                                    Eletrônico (PJe)</b> e suporte secundário aos sistemas processuais
+                                judiciários <b>Eproc</b> e <b>Projudi</b> (todos sob a zona
+                                <code>*.jus.br</code>). A lista do PJe Anti-Ampulhetas é gerenciada internamente
+                                para domínios do PJe.
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="checkOpcaoAmpuletas" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="categoria-avancada-titulo">2. CÓPIA INTELIGENTE: Editores de Minutas e
+                        Validação</div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
+                                para <code>id ..., pg. ...</code></div>
+                            <div class="setting-help">Ao selecionar cabeçalhos nativos de peças do PJe
+                                (ex: <code>Num. 2297820154 - Pág. 1</code>), copia automaticamente no formato
+                                padronizado e simplificado <code>id 2297820154, pg. 1</code>.</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="optConverterCabecalhoPje" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Pré-seleção sem Cópia em Campos
+                                Editáveis e Minutas</div>
+                            <div class="setting-help">Em caixas de texto e editores de minutas, seleciona marcadores de
+                                preenchimento (ex: <code>#[digite aqui]#</code>, <code>##########</code>) com 1 clique
+                                sem substituir o que você já tinha copiado no teclado.</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="optSelecaoAutomaticaTextoEditavel" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Seleção Automática de Placeholders em
+                                Editores HTML Online (Minutas)</div>
+                            <div class="setting-help">Comportamento de seleção em editores de minutas
+                                online (como CKEditor, TinyMCE e editores HTML): <strong>Desabilitado</strong> (cursor
+                                nativo sem seleção); <strong>Seleção apenas dos
+                                    placeholders</strong> (marca <code>[@@...@@]</code>, <code>##/##/20##</code>,
+                                <code>######</code> com 1 clique); <strong>Seleção Avançada com
+                                    Control</strong> (placeholders sem Ctrl; seleção avançada
+                                apenas com <code>Ctrl</code> pressionado); ou <strong>Seleção
+                                    Avançada</strong> (seleciona blocos, linhas e texto em qualquer clique,
+                                <strong>sem jamais alterar o seu Ctrl+C</strong>).</div>
+                        </div>
+                        <select id="selectModoPlaceholdersMinutasHtml" class="seletor-modo">
+                            <option value="desabilitado">Desabilitado (sem seleção alguma)</option>
+                            <option value="placeholders" selected>Seleção apenas dos placeholders
+                                (Padrão)</option>
+                            <option value="ctrl_avancado">Seleção Avançada se pressionado "Control"
+                                (Placeholders sem Ctrl)</option>
+                            <option value="avancado">Seleção Avançada (blocos, linhas e texto sem
+                                alterar o Ctrl+C)</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Conferência Automática de Documentos e Datas (CPF,
+                                CNPJ, Processo e Datas)</div>
+                            <div class="setting-help">Avisa na tela quando um número de documento copiado tiver
+                                dígitos incorretos ou a data for inválida no calendário (ex: 31 de
+                                abril ou ano não-bissexto).</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="optValidacaoMatematicaAtiva" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Tempo de Exibição dos Avisos na Tela</div>
+                            <div class="setting-help">Tempo que o aviso de conferência ou o resumo
+                                estatístico de tabelas permanece visível na tela (defina 0 para desligar
+                                os avisos).</div>
+                        </div>
+                        <div class="controle-slider-composto">
+                            <input type="range" id="optTempoExibicaoAlerta" class="input-range-custom" min="0" max="5"
+                                step="1" value="2">
+                            <span id="lblValorTempoAlerta" class="badge-valor-slider">3,5s (Padrão)</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Contorno Visual Rápido ao Copiar (Flash Temporizado)</div>
+                            <div class="setting-help">Exibe um discreto contorno colorido ao copiar um trecho simples
+                                para confirmar a captura sem balões intrusivos.</div>
+                        </div>
+                        <div class="controle-slider-composto">
+                            <input type="color" id="optCorFlashBorder" class="input-cor-compacto" value="#0d9488"
+                                title="Cor do contorno e destaque do Flash">
+                            <input type="range" id="optTempoFlashMs" class="input-range-custom" min="0" max="5000"
+                                step="250" value="500">
+                            <span id="lblValorTempoFlash" class="badge-valor-slider">500 ms</span>
+                        </div>
+                    </div>
+
+                    <div class="categoria-avancada-titulo">3. CÓPIA INTELIGENTE: Acumulador e Atalhos</div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Separador do Modo Acumulador (Ctrl + Alt)</div>
+                            <div class="setting-help">Símbolos ou pontuações inseridos entre os
+                                itens acumulados com <code>Ctrl + Alt</code> (máx. 5 caracteres, sem
+                                letras/dígitos; padrão <code>;</code>).</div>
+                        </div>
+                        <input type="text" id="optAcumuladorSeparador" class="input-text" value=";" maxlength="5">
+                    </div>
+
+                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;">
+                            <div>
+                                <div class="setting-label">Comando contendo o texto selecionado {{TEXTO}} a ser usado por comando na página de IA da Gemini:</div>
+                                <div class="setting-help">Ao acionar o comando de IA (ou atalho <code>F1</code>), abre ou localiza a aba do Google Gemini e preenche automaticamente este comando estruturado no campo de texto, substituindo <code>{{TEXTO}}</code> pelo conteúdo selecionado, sem sobrescrever a sua Área de Transferência.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="optAtalhoF1GeminiAtivo" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+                                <label for="optPromptF1Gemini"
+                                    style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                                    Máscara do comando (use a tag <code>{{TEXTO}}</code> onde o texto selecionado será inserido):
+                                </label>
+                                <button type="button" id="btnRestaurarPromptF1Padrao" class="btn-restaurar-campo"
+                                    title="Restaurar texto padrão original">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        aria-hidden="true">
+                                        <polyline points="1 4 1 10 7 10"></polyline>
+                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    </svg>
+                                    <span>Padrão</span>
+                                </button>
+                            </div>
+                            <textarea id="optPromptF1Gemini" class="textarea-prompt-ia" rows="2"
+                                spellcheck="true" lang="pt-BR" autocorrect="on" autocapitalize="sentences"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="categoria-avancada-titulo">4. TECLADO/MOUSE: Navegação por Teclado e
+                        Botões Laterais</div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Navegação entre Abas com os Botões Laterais
+                                do Mouse (Botão 4 Voltar e Botão 5 Avançar)</div>
+                            <div class="setting-help">Caso o mouse seja compatível e possua estes botões
+                                laterais físicos: <strong>Botão 4 (Voltar)</strong> atua como
+                                {Ctrl}+{Shift}+{Tab} retornando à aba anterior à esquerda;
+                                <strong>Botão 5 (Avançar)</strong> atua como {Ctrl}+{Tab} avançando
+                                para a próxima aba aberta à direita. Opera em ciclo contínuo entre
+                                as guias da janela ativa, inclusive em novas abas carregadas. (Dica: para funcionamento
+                                também em páginas internas restritas do Chrome como chrome://newtab,
+                                configure os atalhos {CTRL}{SHIFT}{TAB} e {CTRL}{TAB} no aplicativo do seu mouse ou
+                                X-Mouse Button Control).</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="optCapturaBotoesMouse4e5" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Bloco Principal de Mouse: Colar com o Botao do Meio e suas Sub-opcoes -->
+                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                            <div>
+                                <div class="setting-label">Colar com o botão do Meio (Scroll Click)</div>
+                                <div class="setting-help">
+                                    Permite colar o conteúdo da área de transferência diretamente em campos de texto e editores com 1 clique no botão do meio do mouse. Quando ativo, <strong>bloqueia a rolagem automática nativa (cursor de bússola/roda)</strong> e habilita os recursos de colagem e rollback abaixo. Se desativado, o clique do meio do mouse não é interceptado e retorna integralmente ao comportamento padrão do navegador (incluindo a rolagem automática nativa com cursor de bússola/roda).
+                                    <div id="avisoPermissaoBotaoMeio"
+                                        style="display: none; align-items: center; gap: 5px; margin-top: 6px; color: #d97706; font-size: 11.5px; font-weight: 500; cursor: pointer;"
+                                        title="Clique para solicitar permissão de leitura da área de transferência">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                            aria-hidden="true" style="color: #f59e0b; flex-shrink: 0;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                        <span>Atenção: operando com a memória interna do plugin (para
+                                            leitura de apps externos, autorize o clipboard na barra de
+                                            endereços)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="switch" id="lblSwitchColarBotaoMeio" style="flex-shrink: 0;">
+                                <input type="checkbox" id="optColarBotaoMeio" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Sub-opções subordinadas ao Colar com o Botão do Meio -->
+                        <div id="containerSubopcoesMouse" style="margin-left: 18px; padding-left: 14px; border-left: 2px solid var(--azul-claro, #bfdbfe); display: flex; flex-direction: column; gap: 12px; margin-top: 4px; transition: opacity 0.2s ease;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
+                                <div>
+                                    <div class="setting-label" style="font-size: 13px;">• Usar área de transferência (clipboard) do sistema</div>
+                                    <div class="setting-help">
+                                        Quando ativado, utiliza a área de transferência do sistema operacional ao colar com o mouse. Quando desativado (padrão), utiliza a memória interna do plugin e emula teclas de colagem para conteúdos estilizados. Ao copiar pelo mouse, o conteúdo copiado continua normalmente conectado e sendo enviado para a área de transferência do sistema.
+                                    </div>
+                                </div>
+                                <label class="switch" id="lblSwitchUsarClipboardSistema" style="flex-shrink: 0;">
+                                    <input type="checkbox" id="optUsarClipboardSistema">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
+                                <div>
+                                    <div class="setting-label" style="font-size: 13px;">• Histórico da Área de Transferência / Rollback (Ctrl + Botão do Meio do Mouse)</div>
+                                    <div class="setting-help">
+                                        Ao pressionar <strong>Ctrl + Botão do Meio do Mouse</strong> (scroll click) em campos editáveis, cola imediatamente o conteúdo da área de transferência interna anteriormente copiado pelo plugin (ou tenta chamar o histórico avançado Win+V do Windows). Cliques sucessivos com <code>Ctrl</code> alternam e colam dinamicamente entre o último e o penúltimo conteúdo copiado (vai e volta a cada clique).
+                                    </div>
+                                </div>
+                                <label class="switch" style="flex-shrink: 0;">
+                                    <input type="checkbox" id="optHistoricoClipboardCtrlMeio" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Permitir navegação em campos de entrada usando o
+                                teclado</div>
+                            <div class="setting-help">Permite usar as teclas <strong>Seta para Cima (↑)</strong> e
+                                <strong>Seta para Baixo (↓)</strong> para alternar o foco continuamente entre
+                                campos de entrada simples (&lt;input&gt;), avançando ou retrocedendo mesmo
+                                estando alinhados lado a lado na mesma linha.</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="optNavegacaoTecladoCampos" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="categoria-avancada-titulo">5. NAVEGADOR: Gerenciamento de Guias e Janelas</div>
+
+                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                            <div>
+                                <div class="setting-label">Janela Única (Bloquear Novas Janelas / Forçar
+                                    Novas Guias)</div>
+                                <div class="setting-help">Impede a abertura de novas janelas avulsas ou popups no
+                                    navegador, convertendo-as automaticamente em novas guias na mesma janela ativa
+                                    (padrão ativada).</div>
+                            </div>
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="optBloquearNovasJanelas" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="padding-top: 2px;">
+                            <label
+                                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;">
+                                <input type="checkbox" id="optPreservarJanelasAutenticacao" checked>
+                                <span>Preservar janelas de autenticação e certificados digitais (Gov.br,
+                                    ICP-Brasil, PJEOffice, SSO, Shodô)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <div>
+                            <div class="setting-label">Abertura de Novas Guias em Primeiro Plano</div>
+                            <div class="setting-help">Ao abrir uma nova guia, foca e ativa a nova guia imediatamente em primeiro plano. Quando desativado (padrão), abre silenciosamente em segundo plano, mantendo o foco na página atual.</div>
+                        </div>
+                        <label class="switch" title="Ativa a abertura de novas guias em primeiro plano (foco imediato); desmarcado abre em segundo plano">
+                            <input type="checkbox" id="optAbaEmPrimeiroPlano">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                            <div>
+                                <div class="setting-label">Reutilizar Guias Já Abertas
+                                    (Anti-Duplicação de Links)</div>
+                                <div class="setting-help">Ao abrir um link, se a página já estiver aberta
+                                    em outra guia da janela ativa, reaproveita a guia existente em vez de abrir uma
+                                    cópia duplicada. Se a abertura estiver configurada em primeiro plano, ativa e foca a guia; se estiver em segundo plano, não abre a duplicada mantendo o foco na página atual. Permite duplicação manual caso o usuário utilize o menu nativo "Duplicar" da guia.</div>
+                            </div>
+                            <label class="switch" style="flex-shrink: 0;" title="Ativa a prevenção de guias duplicadas, reaproveitando abas já abertas">
+                                <input type="checkbox" id="optReutilizarAbasAbertas">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div id="containerModosMonitoramentoUrls" style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding-top: 2px;">
+                            <label
+                                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                title="Monitora e compara a URL original informada no momento da criação da guia">
+                                <input type="checkbox" id="optMonitorarUrlOriginal">
+                                <span>Monitora a URL original de abertura</span>
+                            </label>
+                            <label
+                                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                title="Monitora e compara a URL em tempo real atualmente carregada na guia">
+                                <input type="checkbox" id="optMonitorarUrlAtual" checked>
+                                <span>Monitora a URL atual da página</span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding-top: 2px;">
+                            <button type="button" class="btn btn-secundario" id="btnFecharDuplicadasAgora"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                                title="Fecha imediatamente todas as guias abertas na janela ativa que possuírem URLs duplicadas">Limpar e Fechar Guias
+                                Duplicadas Agora</button>
+                            <span id="feedbackFecharDuplicadas"
+                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                        <div>
+                            <div class="setting-label">Ordenação e Agrupamento Automático de Guias</div>
+                            <div class="setting-help">Organiza e ordena as guias da janela ativa com base no critério e sentido configurados, com suporte nativo a Grupos de Abas coloridos do Chrome (Tab Groups API). Ao alterar o critério, as guias são imediatamente ordenadas.</div>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="optCriterioOrdenacaoGuias"
+                                    style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);"
+                                    title="Selecione o critério para reorganizar as guias">Ordenar
+                                    por:</label>
+                                <select id="optCriterioOrdenacaoGuias" class="input-select"
+                                    style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);"
+                                    title="Critério para reorganizar as guias da janela ativa">
+                                    <option value="nenhum">Nenhum (Desativado)</option>
+                                    <option value="ordem_criacao">Ordem de Abertura / Criação (Cronológica)</option>
+                                    <option value="tempo_acesso">Último acesso (Recentes)</option>
+                                    <option value="titulo">Título da Página</option>
+                                    <option value="dominio">Domínio Site</option>
+                                    <option value="url">URL Completa</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Sentido:</span>
+                                <label class="switch" style="flex-shrink: 0;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z) ou Da Direita para a Esquerda (Z-A)">
+                                    <input type="checkbox" id="optSentidoOrdenacaoGuiasSwitch" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="lblSentidoOrdenacaoGuias" style="font-size: 12px; color: var(--texto-principal); cursor: pointer;" title="Clique para alternar o sentido da ordenação">Da Esquerda para a Direita (A-Z)</span>
+                                <select id="optSentidoOrdenacaoGuias" style="display: none;">
+                                    <option value="esq_dir" selected>Da Esquerda para a Direita (A-Z / Antigos)</option>
+                                    <option value="dir_esq">Da Direita para a Esquerda (Z-A / Recentes)</option>
+                                </select>
+                            </div>
+                            <label
+                                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                title="Quando marcado, move e ordena também as guias fixadas no início da barra">
+                                <input type="checkbox" id="optOrdenarGuiasFixadas">
+                                <span>Ordenar guias fixadas</span>
+                            </label>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px;">
+                            <button type="button" class="btn btn-secundario" id="btnOrdenarGuiasAgora"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                                title="Reorganiza imediatamente todas as guias abertas na janela ativa na ordem do critério e sentido selecionados">Ordenar Guias Agora</button>
+                            <button type="button" class="btn btn-secundario" id="btnAgruparDominioAgora"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                                title="Alterna entre agrupar guias por domínio em caixas coloridas do Chrome ou desagrupar todas as guias">Agrupar por Domínio Agora (Tab Groups)</button>
+                            <button type="button" id="btnDesagruparGuiasAgora" style="display: none;"></button>
+                            <button type="button" class="btn btn-secundario" id="btnRestaurarOrdemGuiasPadrao"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;" title="Restaura o padrão do navegador: desativa a ordenação automática e desagrupa todas as guias da janela ativa">Restaurar Padrão do Navegador</button>
+                            <span id="feedbackAcoesGuias"
+                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                            <div>
+                                <div class="setting-label">Economizador de Memória (Descarte de Guias Inativas /
+                                    Tab Discarding)</div>
+                                <div class="setting-help">
+                                    Diferente do recurso básico nativo do navegador (que opera em horários fixos e opacos), este módulo permite <strong>ativar, desativar e personalizar livremente o tempo mínimo de inatividade</strong> para descarregar da memória RAM guias pesadas em segundo plano (via Chrome Tab Discarding). A guia permanece visível na barra e é recarregada instantaneamente com 1 clique ao retornar.
+                                </div>
+                            </div>
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="optDescarteGuiasInativas">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div id="containerOpcoesDescarte" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; transition: opacity 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="optTempoInatividadeDescarteMinutos" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Descartar guias após:</label>
+                                <select id="optTempoInatividadeDescarteMinutos" class="input-select" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                                    <option value="5">5 minutos</option>
+                                    <option value="10">10 minutos</option>
+                                    <option value="15">15 minutos</option>
+                                    <option value="20" selected>20 minutos (Padrão)</option>
+                                    <option value="30">30 minutos</option>
+                                    <option value="60">1 hora (60 minutos)</option>
+                                    <option value="120">2 horas (120 minutos)</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-secundario" id="btnDescartarGuiasInativasAgora"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;">Liberar Memória RAM Agora (Descartar Inativas)</button>
+                            <span id="feedbackDescarteGuias"
+                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Secao 6: Reservada para novos modulos processuais (ex: src/mod-eproc/, src/mod-projudi/) quando forem implementados e agrupados em sequencia -->
+                </div>
+            </details>
+
+            <!-- Passo 2.4: Barra Global de Sincronizacao na Nuvem, Restauracao de Fabrica e Backup Geral -->
+            <section class="cartao" style="margin-top: 18px;">
+                <h2>Sincronização na Nuvem, Backup Geral e Restauração</h2>
+                <p class="subtitulo">
+                    Todas as configurações acima são sincronizadas automaticamente na nuvem da sua
+                    Conta Google em todos os navegadores onde a extensão estiver instalada. Você
+                    também pode exportar ou importar um backup completo (JSON) de todas as preferências.
+                </p>
+                <div class="barra-botoes" style="margin-top: 8px;">
+                    <button type="button" class="btn btn-secundario" id="btnExportarJson">Exportar Todas as
+                        Configurações (JSON)</button>
+                    <button type="button" class="btn btn-secundario" id="btnImportarJson">Importar
+                        Configurações (JSON)</button>
+                    <input type="file" id="inputImportarArquivo" accept=".json" style="display:none;">
+                    <button type="button" class="btn btn-secundario" id="btnRestaurarPadroes">Restaurar Padrões
+                        de Fábrica</button>
+                    <button type="button" class="btn btn-primario" id="btnSalvarConfiguracoes">Salvar e Sincronizar na
+                        Nuvem</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================================================================
+             ABA 2: CENTRAL DE AJUDA COMPLETA (HELP BLUEPRINT PERPETUO)
+             ================================================================== -->
+        <div id="abaAjuda" class="painel-aba">
+            <!-- Passo 3.0: Funcionalidades Principais do Sistema -->
+            <section class="cartao">
+                <h2>Funcionalidades Principais do Sistema</h2>
+                <p class="subtitulo">
+                    Recursos integrados para maximizar a produtividade, a eficiência e a velocidade na
+                    navegação:
+                </p>
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 10px;">
+                    <div
+                        style="padding: 14px 16px; background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #2563eb; font-size: 14px;">Cópia Inteligente e
+                                Seleção Avançada</strong>
+                            <span class="badge-stage" style="background: #2563eb; color: #fff;">Seleção e
+                                Cópia</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            Seleção ágil em 1 clique para palavras isoladas (sem vírgula ou
+                            ponto colado), documentos (CPF, CNPJ clássico e alfanumérico, CNJ, SEI!,
+                            datas, valores monetários) e tabelas completas. Conta com acumulador
+                            multi-seleção (<code>Ctrl+Alt</code>), conversão automática de
+                            cabeçalhos do PJe (<code>Num. 2297820154 - Pág. 1</code> para
+                            <code>id 2297820154, pg. 1</code>), atalhos <code>F1</code> (Prompt de IA) e duplo
+                            <code>Esc</code> (alternar para texto puro), além de auditoria de
+                            digitação que aponta inconsistências com base em critérios de
+                            Módulo 11 e Módulo 97.
+                        </p>
+                    </div>
+                    <div
+                        style="padding: 14px 16px; background: rgba(13, 148, 136, 0.05); border: 1px solid rgba(13, 148, 136, 0.25); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #0d9488; font-size: 14px;">Acelerador PJe Turbo
+                                (Anti-Ampulhetas)</strong>
+                            <span class="badge-stage" style="background: #0d9488; color: #fff;">Navegação
+                                Fluida</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            Neutralização automática de telas cinzas de carregamento
+                            ("Aguarde...", ampulhetas e bloqueios visuais de cursor) e destravamento
+                            imediato da barra de rolagem em páginas e movimentações processuais no
+                            PJe, proporcionando leitura contínua e sem interrupções.
+                        </p>
+                    </div>
+                    <div
+                        style="padding: 14px 16px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #7c3aed; font-size: 14px;">Navegação e Produtividade com
+                                Teclado e Mouse</strong>
+                            <span class="badge-stage" style="background: #7c3aed; color: #fff;">Teclado e Mouse</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            Alternância circular contínua entre abas através dos botões
+                            laterais físicos do mouse (Botão 4 Voltar e Botão 5 Avançar),
+                            colagem direta em campos editáveis com o botão do meio (scroll click) com
+                            verificação online e fallback emulado de memória interna,
+                            navegação vertical entre campos de entrada (<code>&lt;input&gt;</code>) pelas
+                            setas do teclado (↑/↓) e histórico/rollback contínuo do clipboard
+                            via <code>Ctrl + Botão do Meio</code> (colagem imediata do item anterior e
+                            alternância sequencial entre o último e o penúltimo).
+                        </p>
+                    </div>
+                    <div
+                        style="padding: 14px 16px; background: rgba(2, 132, 199, 0.05); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #0284c7; font-size: 14px;">Gerenciamento Avançado de Guias e
+                                Janelas (Navegador)</strong>
+                            <span class="badge-stage" style="background: #0284c7; color: #fff;">Guias e Janelas</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            Modo Janela Única com bloqueio inteligente de popups avulsos (preservando janelas
+                            essenciais de autenticação do Gov.br, ICP-Brasil, PJEOffice, SSO e
+                            Shodô), fechamento atômico de guias duplicadas com limpeza de parâmetros de
+                            rastreamento, ordenação multicritério (por URL, Domínio,
+                            Título ou Acesso), agrupamento visual por domínio e economizador de
+                            memória por descarte automático de guias inativas em segundo plano.
+                        </p>
+                    </div>
+                    <div
+                        style="padding: 14px 16px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #d97706; font-size: 14px;">Editores de Minutas HTML e Assistente de
+                                IA</strong>
+                            <span class="badge-stage" style="background: #d97706; color: #fff;">Minutas e IA</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            Atalho <code>F1</code> para análise imediata do texto selecionado no painel lateral
+                            ou nova guia de IA, além de motor especializado em editores HTML online com 3 modos
+                            operacionais: desabilitado, seleção ágil exclusiva de placeholders
+                            (<code>#tag#</code>, <code>[@@campo@@]</code>) sem sobrescrever o Ctrl+C, ou
+                            seleção avançada preservando o clipboard do sistema para facilitar a
+                            colagem de dados.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Passo 3.1: Cards Executivos dos 6 Estagios -->
+            <section class="cartao">
+                <h2>Visão Geral: Progressão em 6 Estágios e Atalhos Práticos</h2>
+                <p class="subtitulo">
+                    Resumo rápido de operação diária para agilizar a leitura e
+                    elaboração de peças, pareceres e relatórios.
+                </p>
+                <div class="grade-estagios">
+                    <div class="card-estagio">
+                        <h3>Estágio 1: 1 Clique na Palavra ou Documento</h3>
+                        <ul>
+                            <li><strong>Palavra Isolada e Regra da Vírgula:</strong> 1 clique seleciona apenas a
+                                palavra. A vírgula <code>,</code> e o <code>;</code> nunca colam na palavra (em
+                                <code>Brasília,</code> seleciona só <code>Brasília</code>).</li>
+                            <li><strong>Documentos Inteiros:</strong> Captura imediata em 1 clique para CPF, CNPJ
+                                (clássico e alfanumérico), Processo CNJ, SEI!, Datas, Horas,
+                                <code>100%</code> e blocos pontuados.</li>
+                            <li><strong>Rótulos e Conectores:</strong> 1 clique sobre <code>id</code>,
+                                <code>fls.</code>, <code>art.</code>, <code>nº</code> ou conectores
+                                (<code>a</code>, <code>até</code>) captura a referência completa.</li>
+                            <li><strong>Datas e Horários com Hífen
+                                    (<code>28/10/2026 - 06:28:50</code>):</strong> 1 clique sobre a data seleciona
+                                apenas a data (<code>28/10/2026</code>); 1 clique sobre o horário seleciona
+                                apenas o horário (<code>06:28:50</code>).</li>
+                        </ul>
+                    </div>
+                    <div class="card-estagio">
+                        <h3>Estágio 2: Espaço Interno ou 2 Cliques (Expressão Completa)</h3>
+                        <ul>
+                            <li><strong>Números e Moedas com Extenso:</strong> Em
+                                <code>R$ 65,00 (sessenta e cinco reais)</code>: 1 clique em <code>65,00</code> pega
+                                só o número; em <code>R$</code> pega <code>R$ 65,00</code>; no
+                                espaço antes de <code>(</code> ou com 2 cliques pega tudo.</li>
+                            <li><strong>Boletos e Sequências Espaçadas:</strong> Em
+                                <code>215 7014 6992 8831</code>: 1 clique pega o bloco (<code>6992</code>); 1 clique no
+                                espaço ou 2 cliques copia a cadeia inteira.</li>
+                            <li><strong>Legislação e Datas Extensas:</strong> Captura
+                                <code>art. 24, parágrafos 1º e 2º da EC n.º 103/2019</code> e
+                                <code>17 ago. 2026</code>.</li>
+                            <li><strong>Data e Horário Inteiros:</strong> 1 clique sobre o hífen
+                                <code>-</code> ou espaços intermediários (ou 2 cliques em qualquer ponto)
+                                seleciona a expressão composta por inteiro (<code>28/10/2026 - 06:28:50</code>).
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-estagio">
+                        <h3>Estágios 3, 4 e 5: Frases, Parênteses/Aspas e Parágrafos</h3>
+                        <ul>
+                            <li><strong>Estágio 3 (Frase):</strong> 2 cliques em texto comum selecionam a frase
+                                até a pontuação (<code>,</code>, <code>;</code>, <code>.</code>).
+                            </li>
+                            <li><strong>Estágio 4 (Parênteses e Aspas):</strong> 1 clique na borda de
+                                <code>(...)</code>, <code>[...]</code> ou <code>"..."</code> captura o miolo interno; 2
+                                cliques na borda incluem os parênteses/aspas.</li>
+                            <li><strong>Estágio 5 (Parágrafo e Ciclo Circular):</strong> 3 cliques
+                                selecionam o parágrafo ou linha inteira. No ciclo contínuo de 5 degraus,
+                                após atingir a expansão máxima, a seleção regride
+                                gradualmente de volta à palavra e expande novamente de modo circular (ida e
+                                volta).</li>
+                        </ul>
+                    </div>
+                    <div class="card-estagio">
+                        <h3>Estágio 6: Acumulador (;), Tabelas, Shift, Esc+Esc e F1</h3>
+                        <ul>
+                            <li><strong>Acumulador (Ctrl+Alt):</strong> Une itens com <code>;</code> e termina com
+                                <code>;</code>. Absorve a seleção anterior automaticamente, ordena na
+                                sequência do texto (ou no final da fila com <code>Shift</code>), remove item ao
+                                clicar de novo e desfaz com <code>Ctrl+Alt+Clique Direito</code>.</li>
+                            <li><strong>Rollback da Área de Transferência
+                                    (<code>Ctrl + Botão do Meio</code>):</strong> Restaura e cola imediatamente o
+                                conteúdo anteriormente copiado em campos editáveis. Cliques repetidos em
+                                sequência com <code>Ctrl</code> alternam e colam continuamente entre o
+                                último e o penúltimo conteúdo copiado (vai e volta a cada clique).
+                            </li>
+                            <li><strong>Tabelas (Ctrl+Alt):</strong> Clique no cabeçalho da tabela (Coluna) ou na
+                                borda esquerda da linha (Linha).</li>
+                            <li><strong>Filtro Shift:</strong> <code>Shift + Clique</code> em documento copia apenas os
+                                números/letras sem pontuação (preenchendo zeros à esquerda
+                                no CNJ).</li>
+                            <li><strong>Duplo Esc (<code>Esc + Esc</code>):</strong> 2 toques sequenciais rápidos
+                                (&lt; 500ms) alternam instantaneamente "Remover Formatações"
+                                com aviso sonoro/visual. 1 Esc simples apenas cancela seleções visuais sem
+                                alterar o clipboard.</li>
+                            <li><strong>Atalho F1 e Google Gemini:</strong> Copia o prompt estruturado com
+                                <code>{{TEXTO}}</code> para a Área de Transferência. No Painel Lateral
+                                nativo do Chrome, cole com <code>Ctrl+V</code> no campo de prompt; na aba web
+                                <code>gemini.google.com/app</code>, o preenchimento é automático.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Passo 3.2: Tabela Detalhada da Arquitetura dos 6 Estagios -->
+            <section class="cartao">
+                <h2>Guia Detalhado dos 6 Estágios de Seleção Inteligente</h2>
+                <p class="subtitulo">
+                    Como funciona cada clique e atalho na leitura e conferência de processos, contratos e
+                    documentos.
+                </p>
+
+                <table class="tabela-doc">
+                    <thead>
+                        <tr>
+                            <th style="width: 18%;">Estágio</th>
+                            <th style="width: 30%;">Como Acionar</th>
+                            <th>Comportamento Exato e Exemplos Práticos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 1</span><br>
+                                <strong>Palavra ou Documento</strong>
+                            </td>
+                            <td>
+                                <strong>1 Clique Simples</strong> sobre a palavra, número ou código de
+                                documento
+                            </td>
+                            <td>
+                                • Ignora cliques acidentais em margens vazias de páginas e tabelas.<br>
+                                • <strong>Proteção de Links, Botões e
+                                    "Mãozinha" Apenas no Clique Simples:</strong> Cliques
+                                únicos simples (sem arrastar o mouse e sem tecla pressionada no teclado) sobre
+                                links, botões ou cabeçalhos com cursor de "mãozinha"
+                                não copiam o texto para não atrapalhar a navegação.
+                                Porém, ao <strong>arrastar o mouse</strong> ou manter <strong>qualquer tecla
+                                    modificadora pressionada</strong> (<code>Ctrl+Alt</code> no cabeçalho da
+                                coluna, <code>Ctrl</code>, <code>Alt</code>, <code>Shift</code> etc.), a
+                                "mãozinha" é ignorada e a cópia funciona
+                                normalmente!<br>
+                                • <strong>Regra da Vírgula (<code>,</code>) e Ponto e Vírgula
+                                    (<code>;</code>):</strong> Atuam como separadores e jamais colam na palavra clicada
+                                (clicar em <code>Brasília,</code> seleciona apenas
+                                <code>Brasília</code>).<br>
+                                • <strong>Documentos em 1 Clique:</strong> CNPJ (clássico ou
+                                alfanumérico), CPF, Processo CNJ, SEI!, PIS/PASEP/NIT, RG, OAB, CEP, Datas
+                                numéricas, Horários, Percentuais (<code>100%</code>), Telefones e E-mails
+                                são copiados inteiros com 1 clique.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 2</span><br>
+                                <strong>Expressão Completa (Espaço / 2 Cliques)</strong>
+                            </td>
+                            <td>
+                                <strong>1 Clique no espaço interno</strong>, sobre o rótulo inicial
+                                (<code>art.</code>, <code>fls.</code>, <code>id</code>, <code>nº</code>), conector
+                                (<code>a</code>, <code>até</code>) ou <strong>2 Cliques</strong>
+                            </td>
+                            <td>
+                                • <strong>Moeda com Extenso
+                                    (<code>R$ 65,00 (sessenta e cinco reais)</code>):</strong> 1 clique em
+                                <code>65,00</code> → <code>65,00</code>; 1 clique em <code>R$</code> →
+                                <code>R$ 65,00</code>; 1 clique no espaço antes de <code>(</code> ou 2 cliques
+                                → <code>R$ 65,00 (sessenta e cinco reais)</code>.<br>
+                                • <strong>Cardinal com Extenso (<code>65 (sessenta e cinco)</code>):</strong> 1
+                                clique em <code>65</code> → <code>65</code>; 1 clique no espaço entre
+                                <code>65</code> e <code>(</code> ou 2 cliques →
+                                <code>65 (sessenta e cinco)</code>.<br>
+                                • <strong>Sequências Espaçadas e Boletos
+                                    (<code>215 7014 6992 8831</code>):</strong> 1 clique no número →
+                                <code>6992</code>; 1 clique em qualquer espaço entre os blocos ou 2 cliques
+                                → cadeia completa.<br>
+                                • <strong>Protocolos com Barra (<code>136/2025</code>):</strong> 1 clique antes da
+                                barra → <code>136</code>; na barra <code>/</code> ou 2 cliques →
+                                <code>136/2025</code>.<br>
+                                • <strong>Sequência de Palavras em LETRAS MAIÚSCULAS ou com
+                                    Formatação de Destaque:</strong> 1 clique no espaço interno ou
+                                2 cliques seleciona todo o conjunto contíguo de palavras em CAIXA ALTA (ex:
+                                <code>REGULAR PROSSEGUIMENTO DO FEITO</code>) ou todo o conjunto de palavras destacadas
+                                em <b>negrito</b>, <i>itálico</i>, <u>sublinhado</u>, <mark>marca-texto</mark> ou
+                                combinações.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 3</span><br>
+                                <strong>Frase ou Trecho</strong>
+                            </td>
+                            <td>
+                                <strong>2 Cliques Rápidos</strong> em texto comum ou clique em espaço
+                                comum
+                            </td>
+                            <td>
+                                • Seleciona todo o trecho até a pontuação mais próxima
+                                (<code>,</code>, <code>;</code>, <code>.</code>, <code>!</code>, <code>?</code>,
+                                <code>:</code>), parênteses ou quebra de linha.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 4</span><br>
+                                <strong>Parênteses, Colchetes e Aspas</strong>
+                            </td>
+                            <td>
+                                Clique nas bordas de <code>()</code>, <code>[]</code>, <code>{}</code>,
+                                <code>&lt;&gt;</code> e Aspas <code>"" ''</code>
+                            </td>
+                            <td>
+                                • <strong>1 clique na borda</strong> (sobre <code>(</code> ou <code>)</code>) ou no
+                                espaço adjacente: seleciona apenas o <strong>conteúdo interno</strong>
+                                (<code>sessenta e cinco</code>) sem os parênteses.<br>
+                                • <strong>2 cliques na borda ou no espaço interno</strong>: seleciona o
+                                trecho <strong>incluindo os parênteses ou aspas</strong>
+                                (<code>(sessenta e cinco)</code>)!
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 5</span><br>
+                                <strong>Minoração de Blocos, Parágrafo Localizado e
+                                    Minutas</strong>
+                            </td>
+                            <td>
+                                <strong>3 Cliques Rápidos</strong> em blocos ou no início de
+                                parágrafos, ou <strong>1 Clique</strong> sobre marcador de minuta
+                            </td>
+                            <td>
+                                • <strong>3 Cliques em Blocos Compostos (Minoração):</strong> Em
+                                blocos como <code>12.016/2009</code>, 3 cliques tendencia a <strong>minorar</strong> a
+                                seleção, capturando apenas a parte antes da barra (<code>12.016</code>) ou
+                                após a barra (<code>2009</code>) conforme o ponto clicado.<br>
+                                • <strong>3 Cliques no Início de Parágrafo:</strong> Seleciona e
+                                copia exclusivamente o parágrafo localizado (numerado ou não, ex:
+                                <code>3. Ordenar...</code>), sem invadir parágrafos anteriores ou
+                                posteriores.<br>
+                                • <strong>Proteção de Editores de Texto:</strong> Em campos de
+                                digitação, nada é copiado sozinho para não perder o que
+                                você ia colar. Ao clicar em marcadores de minutas como <code>#tag/campo#</code>,
+                                <code>#[tag/campo]#</code>, <code>##tag/campo##</code>, <code>@@ tag/campo @@</code>,
+                                <code>### tag/campo ##</code>, <code>##########</code>, <code>$$$$$$$$</code> ou
+                                <code>@@@@@@@@</code>, o marcador fica selecionado na tela pronto para receber
+                                <code>Ctrl+V</code>!
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="badge-stage">ESTÁGIO 6</span><br>
+                                <strong>Acumulador, Tabelas e Atalhos</strong>
+                            </td>
+                            <td>
+                                Teclas <code>Ctrl+Alt</code>, <code>Ctrl</code>, <code>Alt</code>, <code>Shift</code>,
+                                <code>Esc+Esc</code> e <code>F1</code>
+                            </td>
+                            <td>
+                                • <strong>Conversão de Cabeçalho PJe:</strong> Selecionar
+                                <code>Num. 2297820154 - Pág. 1</code> grava automaticamente
+                                <code>id 2297820154, pg. 1</code>.<br>
+                                • <strong>Seleção Elástica com <code>Ctrl</code> vs.
+                                    Seleção de Objetos com <code>Alt</code>:</strong> <code>Ctrl</code>
+                                continua, expande ou reduz a seleção existente por palavras. Já
+                                <code>Alt + Clique</code> <strong>inicia sempre uma nova seleção</strong>:
+                                ao clicar com <code>Alt</code> sobre links, botões (ex:
+                                <code>MARCAR TODOS COMO LIDOS</code>), menus ou itens, seleciona e copia o texto todo do
+                                objeto (ou permite <code>Alt + Arrastar</code> para copiar apenas parte do texto do
+                                link/botão).<br>
+                                • <strong>Modo Acumulador (<code>Ctrl+Alt</code>) e Colunas/Linhas de
+                                    Tabelas:</strong> Une vários itens separados pelo símbolo configurado
+                                (padrão <code>;</code>, personalizável até 5
+                                símbolos/pontuações), absorve a seleção anterior,
+                                ordena na sequência do documento (ou no final da lista com <code>Shift</code>),
+                                remove item repetido ao clicar de novo e desfaz o último com
+                                <code>Ctrl+Alt+Clique Direito</code>. Em tabelas, <code>Ctrl+Alt+Clique</code> no
+                                cabeçalho (alto da coluna, ignorando a "mãozinha") copia a
+                                coluna inteira, e na borda esquerda copia a linha inteira.<br>
+                                • <strong>Rollback da Área de Transferência
+                                    (<code>Ctrl + Botão do Meio</code>):</strong> Restaura e cola imediatamente o
+                                conteúdo anteriormente copiado em campos editáveis. Clicar novamente em
+                                sequência com <code>Ctrl</code> pressionado alterna e cola continuamente entre o
+                                último e o penúltimo item copiado (vai e volta a cada acionamento).<br>
+                                • <strong>Filtro Shift (<code>Shift+Clique</code>):</strong> Copia apenas os
+                                números/letras sem pontuação (completando os 7 dígitos
+                                iniciais do processo CNJ com zeros), ou marca início e fim de um trecho.<br>
+                                • <strong>Atalho <code>F1</code> (Prompt de IA):</strong> Formata o comando
+                                estruturado com a tag <code>{{TEXTO}}</code> e grava na Área de
+                                Transferência para colar no painel lateral de IA ou na aba aberta do assistente.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Passo 3.3: Catalogo Completo de Padroes Reconhecidos -->
+            <section class="cartao">
+                <h2>Catálogo Completo de Padrões Reconhecidos Automaticamente</h2>
+                <p class="subtitulo">
+                    Todos os grupos de documentos, normas e valores abaixo são identificados e validados
+                    instantaneamente ao clicar.
+                </p>
+
+                <table class="tabela-doc">
+                    <thead>
+                        <tr>
+                            <th style="width: 26%;">Categoria / Grupo</th>
+                            <th style="width: 38%;">Padrões Suportados</th>
+                            <th>Comportamento de Clique</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>1. Documentos Pessoais, Fiscais e Profissionais</strong></td>
+                            <td>
+                                • CNPJ Clássico: Válido (<code>11.222.333/0001-81</code>) |
+                                Inválido (<code>11.222.333/0001-99</code>)<br>
+                                • Novo CNPJ Alfanumérico RFB: Válido
+                                (<code>12.ABC.345/01DE-35</code>) | Inválido
+                                (<code>12.ABC.345/01DE-99</code>)<br>
+                                • CPF: Válido (<code>529.982.247-25</code>) | Inválido
+                                (<code>529.982.247-00</code>)<br>
+                                • PIS/PASEP/NIT (<code>120.43256.72-4</code>), RG / NB INSS, CEP
+                                (<code>64.200-000</code>), OAB (<code>OAB/PI 12.345</code>), Passaporte e UUID/PIX
+                            </td>
+                            <td><strong>1 Clique</strong> em qualquer parte do documento copia o código inteiro e
+                                valida o dígito verificador (ou <strong>Shift + 1 Clique</strong> para copiar
+                                apenas os números/letras sem pontuação).</td>
+                        </tr>
+                        <tr>
+                            <td><strong>2. Processos Judiciais, Administrativos e Protocolos</strong></td>
+                            <td>
+                                • Processo Judicial CNJ: Válido (<code>0991234-55.2024.4.01.4002</code>) |
+                                Inválido (<code>0991234-65.2024.4.01.4002</code>)<br>
+                                • Processo Administrativo SEI! (<code>00000.000000/2025-00</code>)<br>
+                                • Placas Mercosul e Antigas (<code>ABC-1D23</code>)<br>
+                                • Protocolos/Atos com barra de ano (<code>136/2025</code>,
+                                <code>nº 136/2025</code>)
+                            </td>
+                            <td><strong>1 Clique</strong> seleciona CNJ (auditando o Módulo 97), SEI! e Placas
+                                inteiros. Em protocolos simples <code>136/2025</code>, 1 clique no número
+                                seleciona <code>136</code> e 1 clique na barra <code>/</code> ou 2 cliques seleciona
+                                <code>136/2025</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>3. Legislação, Jurisprudência e Atos Normativos</strong>
+                            </td>
+                            <td>
+                                • Artigos, parágrafos, incisos, alíneas e Emendas Constitucionais
+                                (<code>art. 24, parágrafos 1º e 2º da EC n.º 103/2019</code>)<br>
+                                • Súmulas, Temas de Repercussão Geral/Repetitivos e OJs<br>
+                                • Instruções Normativas com siglas de órgãos
+                                (<code>Instrução Normativa PRES/INSS nº 128/2022</code>), Portarias,
+                                Decretos, Resoluções, Ofícios, Acórdãos,
+                                Matrículas, Livros e Certidões
+                            </td>
+                            <td><strong>1 Clique</strong> sobre uma palavra isolada copia só a palavra; <strong>1
+                                    Clique no espaço interno</strong>, no rótulo inicial
+                                (<code>art.</code>, <code>fls.</code>, <code>id</code>, <code>nº</code>) ou
+                                <strong>2 Cliques</strong> copia toda a citação normativa!</td>
+                        </tr>
+                        <tr>
+                            <td><strong>4. Datas, Horários, Intervalos e Referências de Autos</strong></td>
+                            <td>
+                                • Datas numéricas: Válidas (<code>23/10/2026</code>,
+                                <code>29/02/2024</code>) | Inválidas (<code>29/02/2025</code>,
+                                <code>31/04/2026</code>)<br>
+                                • <strong>Data com Horário Espaçado (<code>DD/MM/AAAA HH:MM</code> e
+                                    <code>DD/MM/AAAA HH:MM:SS</code>):</strong> Válidas
+                                (<code>28/10/2026 06:28</code>, <code>28/10/2026 06:28:50</code>) | Inválidas
+                                (data bissexta <code>29/02/2025 06:28</code>, hora excedente
+                                <code>28/10/2026 25:10</code>, minuto excedente <code>28/10/2026 06:75</code>)<br>
+                                • Datas abreviadas/extenso: Válida (<code>17 ago. 2026</code>) |
+                                Inválida (<code>29 de fevereiro de 2025</code>) e Mês/Ano
+                                (<code>out. 26</code>)<br>
+                                • Intervalos de datas (<code>01/01/2026 a 31/12/2026</code>) e horários
+                                (<code>08:00 às 18:00</code>)<br>
+                                • Referências PJe e Autos (<code>id 12345678 pg 55v</code>,
+                                <code>fls. 10/25</code>, <code>Num. 2297820154 - Pág. 1</code>)
+                            </td>
+                            <td>Datas/horários simples, datas abreviadas (<code>17 ago. 2026</code>) e
+                                Mês/Ano (<code>out. 26</code>) saem inteiros com <strong>1 Clique</strong>. Em
+                                Datas com Horário Espaçado, 1 clique na data seleciona a data, 1 clique na
+                                hora seleciona a hora, e <strong>1 clique no espaço</strong> (ou conector) ou
+                                <strong>2 cliques</strong> seleciona Data + Horário inteiros com auditoria
+                                matemática de calendário e horário!</td>
+                        </tr>
+                        <tr>
+                            <td><strong>5. Valores Monetários, Percentuais, Boletos e Contatos</strong></td>
+                            <td>
+                                • Moeda com extenso (<code>R$ 65,00 (sessenta e cinco reais)</code>)<br>
+                                • Cardinal/Percentual com extenso (<code>65 (sessenta e cinco)</code>,
+                                <code>100%</code>, <code>20,500%</code>)<br>
+                                • Sequências numéricas espaçadas, chaves NF-e e linhas
+                                digitáveis de boletos<br>
+                                • Telefones com DDD/DDI/0800/hífen e E-mails
+                            </td>
+                            <td>Progressão incremental em moedas e números com extenso; em
+                                sequências espaçadas/boletos, <strong>1 Clique</strong> copia o bloco
+                                contíguo e <strong>1 Clique no espaço</strong> ou <strong>2
+                                    Cliques</strong> copia a cadeia completa; Telefones e E-mails saem inteiros com
+                                <strong>1 Clique</strong>.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Passo 3.4: Arquitetura Progressiva de Filtros HTML em 5 Niveis -->
+            <section class="cartao">
+                <h2>Arquitetura Progressiva de Filtros HTML (5 Níveis Estritos)</h2>
+                <p class="subtitulo">
+                    Sanitização ativa, interoperabilidade com editores e direção
+                    unidirecional ascendente (cada nível herda as permissões do anterior). As fontes de
+                    origem e comentários MSO são sempre descartados:
+                </p>
+                <table class="tabela-comparativa">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">Nível</th>
+                            <th style="width: 170px;">Denominação</th>
+                            <th>Escopo Semântico &amp; Sanitização</th>
+                            <th>Alvo / Destino</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>0</strong></td>
+                            <td><strong>Texto Puro</strong></td>
+                            <td>Remove 100% das tags HTML/XML, converte entidades (<code
+                                    title="Entidade HTML: &amp;nbsp;&#10;Função: Espaço Inquebrável (Non-Breaking Space)&#10;Convertido automaticamente para um espaço comum em texto puro.">&amp;nbsp;</code>
+                                → espaço, <code
+                                    title="Entidade HTML: &amp;amp;&#10;Função: E Comercial (&amp;)&#10;Convertido de volta para o caractere '&amp;' legível.">&amp;amp;</code>
+                                → &amp;, <code
+                                    title="Entidade HTML: &amp;lt;&#10;Função: Menor Que (&lt;)&#10;Convertido de volta para o caractere '&lt;' legível.">&amp;lt;</code>
+                                → &lt;, <code
+                                    title="Entidade HTML: &amp;gt;&#10;Função: Maior Que (&gt;)&#10;Convertido de volta para o caractere '&gt;' legível.">&amp;gt;</code>
+                                → &gt;), normaliza quebras de linha (<code
+                                    title="Caracteres de Quebra de Linha Windows (\r\n)&#10;Função: Retorno de Carro + Nova Linha&#10;Padronizado universalmente para \n no texto puro.">\r\n</code>
+                                → <code
+                                    title="Caractere de Nova Linha (\n)&#10;Função: Quebra de Linha Padrão (Line Feed).">\n</code>).
+                                Sanitização ativa extraindo o conteúdo exclusivamente via nó
+                                de texto DOM (<code
+                                    title="Propriedade DOM do Navegador&#10;Função: Texto Puro Direto&#10;Extrai somente os caracteres de texto do elemento, descartando sumariamente todas as marcações HTML, scripts e formatações.">node.textContent</code>)
+                                para evitar injeção de tags órfãs ou caracteres
+                                invisíveis.</td>
+                            <td>input, textarea, logs, variáveis de busca, campos de sistema legados sem suporte
+                                a markup.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>1</strong></td>
+                            <td><strong>Básico (Inline)</strong></td>
+                            <td>Apenas formatação de caracteres: <code
+                                    title="Tag: &lt;b&gt;&#10;Função: Negrito (Bold)&#10;Destaque visual espesso para enfatizar termos relevantes.">"b" (&lt;b&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;strong&gt;&#10;Função: Negrito com Ênfase Semântica&#10;Indica texto de grande importância nos documentos.">"strong" (&lt;strong&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;i&gt;&#10;Função: Itálico (Italic)&#10;Inclina o texto para destacar termos estrangeiros, expressões em latim (ex: a quo) e conceitos técnicos.">"i" (&lt;i&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;em&gt;&#10;Função: Ênfase em Itálico (Emphasis)&#10;Enfatiza a entonação da leitura no texto.">"em" (&lt;em&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;u&gt;&#10;Função: Sublinhado (Underline)&#10;Traça uma linha contínua sob o texto para destaque formal.">"u" (&lt;u&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;s&gt;&#10;Função: Tachado / Riscado (Strikethrough)&#10;Passa um traço horizontal no meio das palavras, indicando texto modificado ou revogado.">"s" (&lt;s&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;sub&gt;&#10;Função: Subscrito (Subscript)&#10;Posiciona o caractere abaixo da linha base (ex: H&lt;sub&gt;2&lt;/sub&gt;O ou notas de rodapé).">"sub" (&lt;sub&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;sup&gt;&#10;Função: Sobrescrito (Superscript)&#10;Posiciona o caractere acima da linha base (ex: 1º ou potências X&lt;sup&gt;2&lt;/sup&gt;).">"sup" (&lt;sup&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;span&gt;&#10;Função: Trecho em Linha (Inline Span)&#10;Aplica estilos pontuais de cor ou destaque sem quebrar o fluxo da frase.">"span" (&lt;span&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;br&gt;&#10;Função: Quebra de Linha (Break Line)&#10;Pula para a próxima linha imediatamente sem iniciar um novo parágrafo.">"br" (&lt;br&gt;)</code>.
+                                Proibido qualquer atributo CSS de bloco ou quebras estruturais.</td>
+                            <td>Caixas de comentário, anotações rápidas, chats internos.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>2</strong></td>
+                            <td><strong>Intermediário (Parágrafo/Fluxo)</strong></td>
+                            <td>Nível 1 + <code
+                                    title="Tag: &lt;p&gt;&#10;Função: Parágrafo&#10;Bloco contínuo de texto autônomo com recuos e margens superior e inferior padronizadas.">"p" (&lt;p&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;blockquote&gt;&#10;Função: Citação em Bloco Recuado&#10;Aplica recuo à esquerda com espaçamento diferenciado, ideal para transcrições de acórdãos e jurisprudência.">"blockquote" (&lt;blockquote&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;ul&gt;&#10;Função: Lista com Marcadores (Unordered List)&#10;Agrupa itens marcados por tópicos com pontos ou bolinhas.">"ul" (&lt;ul&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;ol&gt;&#10;Função: Lista Numerada (Ordered List)&#10;Agrupa itens organizados sequencialmente em números ou letras.">"ol" (&lt;ol&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;li&gt;&#10;Função: Item de Lista (List Item)&#10;Define cada elemento individual dentro de uma lista com marcadores ou numerada.">"li" (&lt;li&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;hr&gt;&#10;Função: Linha Divisória Horizontal (Horizontal Rule)&#10;Traça uma linha horizontal separadora entre seções do documento.">"hr" (&lt;hr&gt;)</code>.
+                                CSS restrito a alinhamento (<code
+                                    title="Propriedade: text-align&#10;Função: Alinhamento de Texto&#10;Controla o alinhamento horizontal: à esquerda, à direita, centralizado ou justificado.">text-align</code>)
+                                e recuo simples (<code
+                                    title="Propriedade: margin-left&#10;Função: Recuo à Esquerda&#10;Aplica recuo horizontal para indentação de blocos ou citações.">margin-left</code>
+                                / <code
+                                    title="Propriedade: text-indent&#10;Função: Recuo da Primeira Linha&#10;Cria o tradicional recuo de parágrafo na primeira linha do texto.">text-indent</code>).
+                                <strong>Sem tabelas</strong> (tabelas são desenroladas em fluxo).</td>
+                            <td>CKEditor / TinyMCE em modo padrão de redação jurídica
+                                (despachos simples, certidões).</td>
+                        </tr>
+                        <tr>
+                            <td><strong>3</strong></td>
+                            <td><strong>Avançado (Documental / RTF clássico)</strong></td>
+                            <td>Nível 2 + <code
+                                    title="Tags: &lt;h1&gt; a &lt;h6&gt;&#10;Função: Títulos e Cabeçalhos Hierárquicos&#10;Estruturam a hierarquia visual do documento do título principal (H1) aos subtítulos menores (H6).">"h1-h6" (&lt;h1&gt;-&lt;h6&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;pre&gt;&#10;Função: Texto Pré-Formatado (Preformatted)&#10;Preserva fielmente todos os espaços em branco múltiplos e quebras de linha com fonte de largura fixa.">"pre" (&lt;pre&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;code&gt;&#10;Função: Trecho de Código&#10;Exibe palavras ou comandos com tipografia monoespaçada.">"code" (&lt;code&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;table&gt;&#10;Função: Tabela Estruturada&#10;Cria uma estrutura retangular completa organizada em linhas e colunas.">"table" (&lt;table&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;thead&gt;&#10;Função: Cabeçalho da Tabela (Table Head)&#10;Agrupa a linha com os títulos das colunas no topo da tabela.">"thead" (&lt;thead&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;tbody&gt;&#10;Função: Corpo da Tabela (Table Body)&#10;Agrupa todas as linhas de conteúdo e valores da tabela.">"tbody" (&lt;tbody&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;tfoot&gt;&#10;Função: Rodapé da Tabela (Table Foot)&#10;Agrupa a linha final de fechamento, somatórios ou totais da tabela.">"tfoot" (&lt;tfoot&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;tr&gt;&#10;Função: Linha da Tabela (Table Row)&#10;Define cada linha horizontal que contém as células da tabela.">"tr" (&lt;tr&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;th&gt;&#10;Função: Célula de Título (Table Header Cell)&#10;Célula de cabeçalho da coluna, renderizada em negrito e centralizada.">"th" (&lt;th&gt;)</code>,
+                                <code
+                                    title="Tag: &lt;td&gt;&#10;Função: Célula de Conteúdo (Table Data Cell)&#10;Célula comum que armazena dados, números ou textos nas linhas da tabela.">"td" (&lt;td&gt;)</code>.
+                                CSS inline para bordas, preenchimento (<code
+                                    title="Propriedade: padding&#10;Função: Preenchimento Interno da Célula&#10;Define o respiro e distância interna entre a borda da célula e o texto.">padding</code>)
+                                e larguras de coluna (<code
+                                    title="Propriedade: width&#10;Função: Largura de Coluna/Tabela&#10;Define a largura horizontal fixa ou percentual de cada coluna da tabela.">width</code>).
+                            </td>
+                            <td>Editores RTF completos, relatórios formatados, minutas com tabelas de
+                                cálculo.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>4</strong></td>
+                            <td><strong>Estendido (Suítes Office / Canvas)</strong></td>
+                            <td>Nível 3 + <code
+                                    title="Tag: &lt;img&gt;&#10;Função: Imagem&#10;Insere imagens, assinaturas gráficas digitais ou ilustrações incorporadas ao documento.">"img" (&lt;img&gt;)</code>,
+                                <code
+                                    title="Atributo: colspan&#10;Função: Mesclagem Horizontal de Colunas&#10;Permite que uma célula ocupe o espaço de duas ou mais colunas horizontalmente.">colspan</code>,
+                                <code
+                                    title="Atributo: rowspan&#10;Função: Mesclagem Vertical de Linhas&#10;Permite que uma célula ocupe o espaço de duas ou mais linhas verticalmente.">rowspan</code>,
+                                metadados de página/seção, listas multinível aninhadas,
+                                <code
+                                    title="Tag: &lt;div&gt;&#10;Função: Divisão Estrutural em Bloco&#10;Contêiner genérico utilizado para agrupar e posicionar seções ou painéis inteiros de conteúdo.">"div" (&lt;div&gt;)</code>
+                                com posicionamento controlado.</td>
+                            <td>LibreOffice Online, Google Docs, DOCX, ODT.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 12px; color: var(--texto-secundario); margin-top: 10px; line-height: 1.5;">
+                    • <strong>Regra de Ouro da Implementação:</strong><br>
+                    <strong>Direção Unidirecional Ascendente:</strong> Cada nível herda
+                    rigorosamente as regras do nível anterior e adiciona sua camada de permissão
+                    (allowlist).<br>
+                    <strong>Sanitização Ativa no Nível 0:</strong> O nível inicial
+                    não apenas ignora tags, mas extrai o conteúdo via nó de texto DOM
+                    (<code>node.textContent</code>) para evitar injeção de tags órfãs ou
+                    caracteres de controle invisíveis.<br>
+                    <strong>Regra de Ouro da Cópia:</strong> Clicar sobre qualquer palavra única ou bloco
+                    estruturado (CNPJ, CPF, CNJ, Data, Moeda etc.) copia estritamente como somente texto puro,
+                    independentemente do nível ativo.
+                </p>
+            </section>
+        </div>
+
+        <!-- ==================================================================
+             ABA 3: LABORATORIO DE TESTES E TABELAS (SANDBOX UNIFICADO)
+             ================================================================== -->
+        <div id="abaLaboratorio" class="painel-aba">
+            <section class="cartao">
+                <h2>Área de Testes Interativos (Clique para Testar)</h2>
+
+                <!-- Inspetor ao Vivo da Area de Transferencia -->
+                <div class="clipboard-inspector">
+                    <div class="clipboard-inspector-header">
+                        <span class="clipboard-inspector-titulo">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+                                style="color: #38bdf8;">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1 2-2h2"></path>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            </svg>
+                            Conteúdo atual do seu Ctrl+C:
+                        </span>
+                        <div class="clipboard-inspector-acoes">
+                            <button type="button" id="btnAtualizarPreview" class="btn btn-secundario"
+                                data-jusgov-ignore="true" style="padding: 5px 12px; font-size: 12px;">Ler Área de
+                                Transferência</button>
+                            <button type="button" id="btnDownloadXMouse" class="btn btn-secundario btn-download-xmouse"
+                                data-jusgov-ignore="true" style="cursor: help;"
+                                title="Dica de configuração recomendada (X-Mouse Button Control / Mouse de Hardware):&#10;• Botão do Meio (Scroll Click): {ACTIVATE}{CTRL}{SHIFT}v&#10;• Botão 4 (Voltar): {CTRL}{SHIFT}{TAB} (Aba anterior)&#10;• Botão 5 (Avançar): {CTRL}{TAB} (Próxima aba)&#10;&#10;• Se você deseja que os botões 4 e 5 funcionem inclusive com o cursor parado na tela interna chrome://newtab ou na barra de URLs do Chrome, a solução recomendada é configurar no X-Mouse Button Control (ou no software proprietário do seu mouse) a simulação de teclas em nível de hardware:&#10;  • Mouse Button 4 (Voltar): {CTRL}{SHIFT}{TAB}&#10;  • Mouse Button 5 (Avançar): {CTRL}{TAB}&#10;&#10;Clique para baixar o utilitário oficial.">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <line x1="12" y1="3" x2="12" y2="17"></line>
+                                    <polyline points="7 12 12 17 17 12"></polyline>
+                                    <line x1="5" y1="21" x2="19" y2="21"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="previewAreaTransferencia" class="clipboard-preview-box" data-jusgov-ignore="true"
+                        role="region" aria-label="Pré-visualização da área de transferência" tabindex="0">
+                        <span class="clip-status-vazio">&lt;vazio&gt;</span>
+                    </div>
+                    <div id="avisoPermissaoClipboardInspector"
+                        style="display: none; align-items: center; gap: 5px; margin-top: 8px; color: #d97706; font-size: 11.5px; font-weight: 500; cursor: pointer;"
+                        title="Clique para solicitar autorização de leitura da área de transferência">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            aria-hidden="true" style="color: #f59e0b; flex-shrink: 0;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>Atenção: operando com a memória interna do plugin (para leitura de apps externos, autorize o clipboard na barra de endereços)</span>
+                    </div>
+                </div>
+
+                <p class="subtitulo" style="margin-top: 14px; margin-bottom: 12px;">
+                    Experimente clicar nos itens abaixo com <strong>1 clique</strong>, <strong>2 cliques</strong>, ou
+                    segurando <strong>Shift</strong>, <strong>Ctrl</strong>, <strong>Alt</strong> ou <strong>Ctrl +
+                        Alt</strong>.
+                </p>
+
+                <!-- Bloco 1: Documentos Validos e Invalidos -->
+                <div class="bloco-teste">
+                    <h4>1. Auditoria Matemática Silenciosa (Documentos Válidos vs. Alerta Âmbar de
+                        Erro de Digitação)</h4>
+                    <p>
+                        <strong>Válidos (Cópia 100% Silenciosa):</strong>
+                        CPF: <span class="sample-token sample-valid">529.982.247-25</span> |
+                        CNPJ Clássico: <span class="sample-token sample-valid">11.222.333/0001-81</span> |
+                        Novo CNPJ Alfanumérico: <span class="sample-token sample-valid">12.ABC.345/01DE-35</span>
+                        |
+                        Processo CNJ: <span class="sample-token sample-valid">0991234-55.2024.4.01.4002</span> |
+                        CNJ Curto (Teste Shift Zero-Pad): <span
+                            class="sample-token sample-valid">991234-55.2024.4.01.4002</span> |
+                        Data Bissexta: <span class="sample-token sample-valid">29/02/2024</span> |
+                        Data Abreviada: <span class="sample-token sample-valid">17 ago. 2026</span> |
+                        Competência: <span class="sample-token sample-valid">out. 26</span> |
+                        Data c/ Horário (HH:MM): <span class="sample-token sample-valid">28/10/2026 06:28</span>
+                        |
+                        Data c/ Horário (HH:MM:SS): <span class="sample-token sample-valid">28/10/2026
+                            06:28:50</span>
+                    </p>
+                    <p style="margin-top: 8px;">
+                        <strong>Inválidos (Disparam o Alerta Amarelo sem bloquear a cópia!):</strong>
+                        CPF Inválido: <span class="sample-token sample-invalid">529.982.247-99</span> |
+                        CPF Repetido: <span class="sample-token sample-invalid">111.111.111-11</span> |
+                        CNPJ Clássico Inválido: <span
+                            class="sample-token sample-invalid">11.222.333/0001-99</span> |
+                        CNPJ Alfanumérico Inválido: <span
+                            class="sample-token sample-invalid">12.ABC.345/01DE-99</span> |
+                        CNJ Inválido: <span class="sample-token sample-invalid">0991234-65.2024.4.01.4002</span>
+                        |
+                        Data Inexistente: <span class="sample-token sample-invalid">29/02/2025</span> |
+                        Mês de 30 Dias: <span class="sample-token sample-invalid">31/04/2026</span> |
+                        Mês e Dia Inválidos: <span class="sample-token sample-invalid">31/31/1998</span> |
+                        Extenso Inválido: <span class="sample-token sample-invalid">29 de fevereiro de
+                            2025</span> |
+                        Data Inexistente c/ Horário: <span class="sample-token sample-invalid">29/02/2025
+                            06:28</span> |
+                        Hora Excedente: <span class="sample-token sample-invalid">28/10/2026 25:10</span> |
+                        Minuto Excedente: <span class="sample-token sample-invalid">28/10/2026 06:75</span> |
+                        Horário Isolado Inválido: <span class="sample-token sample-invalid">25:10</span>
+                    </p>
+                </div>
+
+                <!-- Bloco 2: Citacoes, Moedas com Extenso, Numeros com Extenso, Boletos e Cabecalho PJe -->
+                <div class="bloco-teste">
+                    <h4>2. Citações Normativas, Moedas Incrementais, Boletos Espaçados e
+                        Cabeçalho PJe</h4>
+                    <p>
+                        Legislação: <span class="sample-token">art. 5º, inciso LV, da CF/88</span> |
+                        Emenda: <span class="sample-token">art. 24, parágrafos 1º e 2º da EC n.º
+                            103/2019</span> |
+                        Ato INSS: <span class="sample-token">Instrução Normativa PRES/INSS nº
+                            128/2022</span> |
+                        Protocolo/Ano: <span class="sample-token">nº 136/2025</span> |
+                        Percentuais: <span class="sample-token">100%</span> e <span class="sample-token">20,500%</span>
+                        |
+                        Competência: <span class="sample-token">out. 26</span>
+                    </p>
+                    <p style="margin-top: 8px;">
+                        Moeda Incremental: <span class="sample-token">R$ 65,00 (sessenta e cinco reais)</span> |
+                        Cardinal c/ Extenso: <span class="sample-token">65 (sessenta e cinco)</span> |
+                        Sequência Espaçada (1 clique = bloco; espaço ou 2 cliques = tudo): <span
+                            class="sample-token">215 7014 6992 8831</span> |
+                        Unidade Consumidora (Não-CPF): <span
+                            class="sample-token sample-valid">1.325.256.019-75</span> |
+                        Lei p/ 3 Cliques (Minorar): <span class="sample-token">12.016/2009</span> |
+                        Cabeçalho Nativo PJe (converte para <code>id 2297820154, pg. 1</code>): <span
+                            class="sample-token">Num. 2297820154 - Pág. 1</span>
+                    </p>
+                    <p style="margin-top: 8px;">
+                        Blocos Destacados (Teste 1 clique no espaço ou 2 cliques):
+                        REGULAR PROSSEGUIMENTO DO FEITO |
+                        <b>conjunto de palavras em negrito</b> |
+                        <i>sequência toda em itálico</i> |
+                        <u>palavras todas sublinhadas</u> |
+                        <b><i><u>combinação de formatações destacadas</u></i></b> |
+                        Link p/ Alt+Clique: <a href="#teste-link-id" onclick="return false;">2289376501</a> |
+                        Botão p/ Alt+Clique: <button type="button" class="btn btn-secundario"
+                            style="padding: 2px 8px; font-size: 12px;">MARCAR TODOS COMO LIDOS</button>
+                    </p>
+                    <p style="margin-top: 8px;">
+                        Texto Corrido: Prazo de 65 (sessenta e cinco) dias úteis, em Brasília, com multa
+                        de 100% ou 20,500% sobre R$ 65,00 (sessenta e cinco reais), conforme o art. 24,
+                        parágrafos 1º e 2º da EC n.º 103/2019 e a Instrução
+                        Normativa PRES/INSS nº 128/2022.
+                    </p>
+                </div>
+
+                <!-- Bloco 3: Editor Multilinhas com Placeholders de Simbolos -->
+                <div class="bloco-teste">
+                    <h4>3. Teste de Pré-Seleção sem Cópia em Editor Multilinhas e Editores
+                        HTML (Placeholders de Minutas)</h4>
+                    <p style="font-size: 13px; color: var(--texto-secundario);">
+                        Clique com 1 clique sobre qualquer marcador de símbolos abaixo: ele será
+                        selecionado na tela para digitação/colagem imediata <strong>sem jamais
+                            sobrescrever seu Ctrl+C</strong>:
+                    </p>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0 4px 0;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--texto-primario);">Caixa de Texto
+                            Padrão (&lt;textarea&gt;):</span>
+                        <button type="button" id="btnRestaurarTextareaDemo" class="btn-restaurar-campo"
+                            title="Restaurar texto padrão com marcadores">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            <span>Padrão</span>
+                        </button>
+                    </div>
+                    <textarea id="textareaMinutasDemo" class="editable-demo" rows="2"
+                        spellcheck="true">texto #tag/campo# texto #[tag/campo]# texto ##tag/campo## texto @@ tag/campo @@ texto ### tag/campo ## texto id ########## texto R$ $$$$$$$$ texto @@@@@@@@ texto.</textarea>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 4px 0;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--texto-primario);">Editor HTML
+                            Online (contenteditable):</span>
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <button type="button" id="btnToggleToolbarDemo" class="btn-toggle-toolbar"
+                                title="Expandir barra de ferramentas de edição">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m6 9 6 6 6-6" />
+                                </svg>
+                            </button>
+                            <button type="button" id="btnRestaurarEditorHtmlDemo" class="btn-restaurar-campo"
+                                title="Restaurar texto padrão com marcadores">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                    aria-hidden="true">
+                                    <polyline points="1 4 1 10 7 10"></polyline>
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                </svg>
+                                <span>Padrão</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="editor-container-wrapper" id="containerEditorDemo">
+                        <!-- Toolbar Principal Estreita / Compacta (recolhida/subida por padrao) -->
+                        <div class="editor-toolbar-main" id="toolbarPrincipalDemo" style="display: none;">
+                            <button type="button" class="btn-tb" data-cmd="undo" title="Desfazer (Ctrl+Z)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 14 4 9l5-5" />
+                                    <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+                                </svg>
+                            </button>
+                            <button type="button" class="btn-tb" data-cmd="redo" title="Refazer (Ctrl+Y)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m15 14 5-5-5-5" />
+                                    <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" />
+                                </svg>
+                            </button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb" data-cmd="bold"
+                                title="Negrito (Ctrl+B)"><b>B</b></button>
+                            <button type="button" class="btn-tb" data-cmd="italic" title="Itálico (Ctrl+I)"><i
+                                    style="font-family: serif; font-size: 13px;">I</i></button>
+                            <button type="button" class="btn-tb" data-cmd="underline"
+                                title="Sublinhado (Ctrl+U)"><u>U</u></button>
+                            <button type="button" class="btn-tb" data-cmd="strikeThrough"
+                                title="Tachado / Riscado"><s>S</s></button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb" data-cmd="hiliteColor" title="Marca-Texto">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m9 11-6 6v3h3l6-6" />
+                                    <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
+                                    <path d="m18 2 4 4" />
+                                    <line x1="2" y1="22" x2="22" y2="22" stroke="#eab308" stroke-width="3.5" />
+                                </svg>
+                            </button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb" data-cmd="subscript" title="Subscrito (X&#8322;)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="3" y1="5" x2="11" y2="13" />
+                                    <line x1="11" y1="5" x2="3" y2="13" />
+                                    <path d="M14.5 16.2a1.8 1.8 0 0 1 3.2.8c0 1.2-1.7 2.2-3.2 3.5h3.6" />
+                                </svg>
+                            </button>
+                            <button type="button" class="btn-tb" data-cmd="superscript" title="Sobrescrito (X&#178;)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="3" y1="11" x2="11" y2="19" />
+                                    <line x1="11" y1="11" x2="3" y2="19" />
+                                    <path d="M14.5 5.7a1.8 1.8 0 0 1 3.2.8c0 1.2-1.7 2.2-3.2 3.5h3.6" />
+                                </svg>
+                            </button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb" data-cmd="justifyLeft"
+                                title="Alinhar à Esquerda">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round">
+                                    <line x1="3" y1="5" x2="21" y2="5" />
+                                    <line x1="3" y1="10" x2="14" y2="10" />
+                                    <line x1="3" y1="15" x2="19" y2="15" />
+                                    <line x1="3" y1="20" x2="11" y2="20" />
+                                </svg>
+                            </button>
+                            <button type="button" class="btn-tb" data-cmd="justifyCenter" title="Centralizar">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round">
+                                    <line x1="3" y1="5" x2="21" y2="5" />
+                                    <line x1="6.5" y1="10" x2="17.5" y2="10" />
+                                    <line x1="4.5" y1="15" x2="19.5" y2="15" />
+                                    <line x1="8" y1="20" x2="16" y2="20" />
+                                </svg>
+                            </button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb btn-tb-limpar" data-cmd="removeFormat"
+                                title="Limpar Formatação">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                                    <path d="M22 21H7" />
+                                    <path d="m5 11 9 9" />
+                                </svg>
+                            </button>
+                            <div class="toolbar-sep"></div>
+                            <button type="button" class="btn-tb" data-cmd="justifyRight"
+                                title="Alinhar à Direita">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round">
+                                    <line x1="3" y1="5" x2="21" y2="5" />
+                                    <line x1="10" y1="10" x2="21" y2="10" />
+                                    <line x1="5" y1="15" x2="21" y2="15" />
+                                    <line x1="13" y1="20" x2="21" y2="20" />
+                                </svg>
+                            </button>
+                            <button type="button" class="btn-tb" data-cmd="justifyFull" title="Justificar">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round">
+                                    <line x1="3" y1="5" x2="21" y2="5" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                    <line x1="3" y1="15" x2="21" y2="15" />
+                                    <line x1="3" y1="20" x2="21" y2="20" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Area Editavel do Editor HTML Online (Minuta extensa com placeholders reais) -->
+                        <div contenteditable="true" spellcheck="true" class="editor-content-area"
+                            id="editorHtmlOnlineDemo">
+                            <p>Nome #Autor da ação#, telefone <i>(##)####-####</i>, manifesta-se nos autos
+                                conforme <b>id #######</b> e <b>id ###### fl. ##</b>.</p>
+                            <p>Em síntese, na data <b>##/##/20##</b> insurge-se contra <b>[@@ato
+                                    impugnado@@]</b>, postulando o valor de <u>R$ ##.###,##</u>.</p>
+                            <p>Para a regular instrução processual, enumera-se <b>#####</b> e <b>#####</b>
+                                como elementos indispensáveis à tutela requerida.</p>
+                            <p><b>[##TEXTO DA DECISÃO##]</b></p>
+                        </div>
+                    </div>
+
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 6px 0;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--texto-primario);">Campo de Entrada
+                            (input):</span>
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <button type="button" id="btnAdicionarLinhaEntradaDemo" class="btn-restaurar-campo"
+                                title="Adicionar nova linha após preenchimento completo">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                    aria-hidden="true">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span>Adicionar</span>
+                            </button>
+                            <button type="button" id="btnLimparCamposEntradaDemo" class="btn-restaurar-campo"
+                                title="Limpar todos os campos digitados e remover linhas adicionais">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                    aria-hidden="true">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path
+                                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                    </path>
+                                </svg>
+                                <span>Limpar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="containerLinhasEntradaDemo" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="linha-campos-entrada"
+                            style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <input type="text" class="editable-demo input-data-extenso" id="demoInputAlternancia"
+                                style="flex: 2; min-width: 170px; padding: 6px 10px; font-family: inherit; font-size: 13px;"
+                                placeholder="" title="">
+                            <input type="text" class="editable-demo input-data-mascara"
+                                style="flex: 1; min-width: 105px; max-width: 115px; padding: 6px 8px; font-family: inherit; font-size: 13px; text-align: center;"
+                                placeholder="DD/MM/AAAA" maxlength="10" title="Data no formato DD/MM/AAAA">
+                            <input type="text" class="editable-demo input-cpf-cnpj"
+                                style="flex: 1.5; min-width: 155px; max-width: 175px; padding: 6px 10px; font-family: inherit; font-size: 13px;"
+                                placeholder="CPF ou CNPJ" maxlength="18"
+                                title="CPF (000.000.000-00) ou CNPJ (00.000.000/0000-00) automático">
+                            <input type="text" class="editable-demo input-texto-tamanho3"
+                                style="width: 55px; padding: 6px 8px; font-family: inherit; font-size: 13px; text-align: center;"
+                                placeholder="UF" maxlength="3" title="Campo de texto de tamanho 3">
+                        </div>
+                    </div>
+
+                    <p style="font-size: 11.5px; color: var(--texto-secundario); margin-top: 6px;">
+                        • <strong>1º Clique (1ª vez):</strong> Seleciona todo o texto para
+                        substituição imediata.<br>
+                        • <strong>Próximos Cliques (mesmo mudando o foco):</strong> Permanece
+                        desselecionado, posicionando o cursor de edição no ponto clicado.<br>
+                        • <strong>2 Cliques:</strong> Seleciona tudo novamente.<br>
+                        • <strong>Tecla Esc:</strong> Remove o foco do campo e reinicia o estado (no próximo
+                        clique volta a selecionar tudo).<br>
+                        • <strong>Navegação Automatizada com Setas (Teclado):</strong> Teclas
+                        <strong>Seta para Cima (↑)</strong> e <strong>Seta para Baixo (↓)</strong> alternam o
+                        foco entre os campos sequencialmente, mesmo estando lado a lado na mesma linha.
+                    </p>
+                </div>
+
+                <!-- Bloco 4: Tabela de 10 Colunas -->
+                <div class="bloco-teste">
+                    <h4>4. Tabela de 10 Colunas (Teste Ctrl+Alt no Cabeçalho para Colunas ou na Borda Esquerda
+                        para Linhas)</h4>
+                    <div class="tabela-container">
+                        <table class="tabela-teste" id="tabelaSandbox10Colunas">
+                            <thead>
+                                <tr>
+                                    <th>Col 1 (Linha)</th>
+                                    <th>Col 2 (Processo)</th>
+                                    <th>Col 3 (Parte)</th>
+                                    <th>Col 4 (CPF/CNPJ)</th>
+                                    <th>Col 5 (Data)</th>
+                                    <th>Col 6 (Valor R$)</th>
+                                    <th>Col 7 (Índice)</th>
+                                    <th>Col 8 (Juros %)</th>
+                                    <th>Col 9 (Total R$)</th>
+                                    <th>Col 10 (Situação)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Linha 01</td>
+                                    <td>0991001-43.2024.4.01.4000</td>
+                                    <td>Autor A</td>
+                                    <td>529.982.247-25</td>
+                                    <td>10/01/2026</td>
+                                    <td>R$ 1.000,00</td>
+                                    <td>IPCA-E</td>
+                                    <td>1,00%</td>
+                                    <td>R$ 1.010,00</td>
+                                    <td>Ativo</td>
+                                </tr>
+                                <tr>
+                                    <td>Linha 02</td>
+                                    <td>0991002-28.2024.4.01.4000</td>
+                                    <td>Autor B</td>
+                                    <td>11.222.333/0001-81</td>
+                                    <td>15/02/2026</td>
+                                    <td>R$ 2.000,00</td>
+                                    <td>SELIC</td>
+                                    <td>1,50%</td>
+                                    <td>R$ 2.030,00</td>
+                                    <td>Ativo</td>
+                                </tr>
+                                <tr>
+                                    <td>Linha 03</td>
+                                    <td>0991003-13.2024.4.01.4000</td>
+                                    <td>Autor C</td>
+                                    <td>12.ABC.345/01DE-35</td>
+                                    <td>29/02/2024</td>
+                                    <td>R$ 3.500,00</td>
+                                    <td>IPCA-E</td>
+                                    <td>2,00%</td>
+                                    <td>R$ 3.570,00</td>
+                                    <td>Homologado</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Bloco 5: Datas Numericas com Horario Espacado (HH:MM e HH:MM:SS) e com Hifen -->
+                <div class="bloco-teste">
+                    <h4>5. Datas Numéricas com Horário Espaçado (HH:MM e HH:MM:SS) e com
+                        Hífen</h4>
+                    <p>
+                        Data c/ Horário (HH:MM): <span class="sample-token">28/10/2026 06:28</span> |
+                        Data c/ Horário (HH:MM:SS): <span class="sample-token">18/09/2026 10:03:34</span> |
+                        Data c/ Horário e Hífen: <span class="sample-token">28/10/2026 - 06:28:50</span> |
+                        Data com Horário e Traço En-Dash: <span class="sample-token">28/10/2026 –
+                            14:30:00</span> |
+                        Data com "às": <span class="sample-token">28/10/2026 às
+                            09:15:20</span>
+                    </p>
+                    <p style="font-size: 12.5px; color: var(--texto-secundario); margin-top: 6px;">
+                        • <strong>Teste 1:</strong> Dê 1 clique sobre a data <code>28/10/2026</code> ou
+                        <code>18/09/2026</code> → copia apenas a data isolada.<br>
+                        • <strong>Teste 2:</strong> Dê 1 clique sobre o horário <code>06:28</code>,
+                        <code>10:03:34</code> ou <code>06:28:50</code> → copia apenas o horário isolado.<br>
+                        • <strong>Teste 3:</strong> Dê 1 clique sobre o espaço intermediário,
+                        sobre o hífen <code>-</code> ou 2 cliques em qualquer ponto → seleciona e copia a
+                        expressão composta por inteiro (<code>28/10/2026 06:28</code>,
+                        <code>18/09/2026 10:03:34</code> ou <code>28/10/2026 - 06:28:50</code>)!
+                    </p>
+                </div>
+
+                <!-- Bloco 6: Teste do Atalho F1 (Prompt de IA) e Duplo Esc (Esc + Esc) -->
+                <div class="bloco-teste">
+                    <h4>6. Atalho Inteligente F1 (Prompt de IA / Assistente) e Alternância Rápida Esc + Esc
+                    </h4>
+                    <p>
+                        Trecho Jurídico p/ Teste F1 (Prompt de IA): <span class="sample-token">art. 5º,
+                            inciso LXXVIII, da Constituição Federal de 1988</span>
+                    </p>
+                    <p style="font-size: 12.5px; color: var(--texto-secundario); margin-top: 6px;">
+                        • <strong>Teste F1 (Prompt de IA):</strong> Clique no trecho acima para selecioná-lo
+                        e pressione <code>F1</code>. O prompt estruturado será gravado na Área de
+                        Transferência. No Painel Lateral do navegador, cole com <code>Ctrl+V</code> no campo de
+                        prompt ("Digite / para usar as habilidades"); caso a aba web do assistente de IA
+                        esteja aberta, o preenchimento ocorrerá automaticamente.<br>
+                        • <strong>Teste Esc + Esc:</strong> Pressione duas vezes a tecla <code>Esc</code>
+                        rapidamente (em menos de 500ms) para alternar o modo "Remover Formatações
+                        (Somente Texto)" — observe o aviso sonoro e a notificação flutuante na
+                        tela!
+                    </p>
+                </div>
+
+                <!-- Bloco 7: Regra de Ouro da Formatacao (Bloco Estruturado ou Palavra Unica = Somente Texto) -->
+                <div class="bloco-teste">
+                    <h4>7. Regra de Ouro da Formatação (Bloco Estruturado ou Palavra Única =
+                        Somente Texto Puro)</h4>
+                    <p>
+                        Palavra Única (Texto Puro): <span class="sample-token"><b>deferido</b></span> |
+                        Bloco Estruturado (Texto Puro): <span class="sample-token"><b>529.982.247-25</b></span> |
+                        Data com Horário (Texto Puro): <span class="sample-token"><b>18/09/2026
+                                10:03:34</b></span> |
+                        Moeda (Texto Puro): <span class="sample-token"><b>R$ 65,00</b></span>
+                    </p>
+                    <p style="margin-top: 6px;">
+                        Frase/Parágrafo (Mantém Formatação HTML): <span
+                            class="sample-token"><b>JULGO PROCEDENTE</b> o pedido constante da <i>inicial</i>.</span>
+                    </p>
+                    <p style="font-size: 12.5px; color: var(--texto-secundario); margin-top: 6px;">
+                        • Mesmo com a Manutenção de Formatação <strong>ativa</strong>
+                        (Níveis 1 a 4), clicar em uma palavra única ou em um bloco estruturado grava
+                        <strong>exclusivamente texto puro</strong> sem tags HTML.<br>
+                        • Ao selecionar ou copiar frases compostas, parágrafos ou tabelas, a
+                        formatação é sanitizada de acordo com o Nível ativo (0: Texto Puro,
+                        1: Básico, 2: Intermediário, 3: Avançado, 4: Estendido).
+                    </p>
+                </div>
+
+                <!-- Contadores Operacionais na Aba Testes (Pequeno, Discreto e Funcional) -->
+                <div class="barra-contadores-testes" data-jusgov-ignore="true"
+                    style="margin-top: 14px; margin-bottom: 2px; padding: 6px 12px; background: #f8fafc; border: 1px solid var(--borda-suave); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--texto-secundario);">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span>Cópias: <strong id="lblTotalCopias"
+                                style="color: var(--texto-principal);">0</strong></span>
+                        <span style="color: var(--borda-suave);">|</span>
+                        <span>Inconsistências: <strong id="lblTotalAlertas"
+                                style="color: var(--texto-principal);">0</strong></span>
+                        <span style="color: var(--borda-suave);">|</span>
+                        <span>desde: <strong id="lblDataInicioContadores"
+                                style="color: var(--texto-principal);">--/--/---- --:--:--</strong></span>
+                    </div>
+                    <button type="button" id="btnResetarEstatisticas" class="btn btn-secundario"
+                        style="padding: 2px 8px; font-size: 11px; height: 22px;"
+                        title="Zera os contadores e reinicia o registro temporal">Zerar</button>
+                </div>
+
+                <div class="barra-console-e-testes" data-jusgov-ignore="true">
+                    <div class="caixa-mensagens-console-inline" data-jusgov-ignore="true">
+                        <div class="cabecalho-console-inline">
+                            <span>Mensagens de Console (<span id="lblContadorConsole">0</span>)</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <button type="button" class="btn btn-primario" id="btnExecutarAuditoriaDebug"
+                                    style="padding: 2px 10px; font-size: 11px;"
+                                    title="Executa bateria automatizada completa de blueprint do debug.js">Auditoria</button>
+                                <button type="button" class="btn btn-secundario" id="btnExecutarFuzzingDebug"
+                                    style="padding: 2px 10px; font-size: 11px;"
+                                    title="Executa bateria estendida de fuzzing com dados randômicos (1s por tipo)">Fuzzing
+                                    (1s/T)</button>
+                                <button type="button" class="btn btn-secundario" id="btnLimparConsole"
+                                    style="padding: 2px 8px; font-size: 11px;"
+                                    title="Limpa o histórico de mensagens do console">Limpar</button>
+                            </div>
+                        </div>
+                        <pre id="visorMensagensConsole"
+                            class="visor-console-inline">(Nenhuma mensagem ou erro de console registrado até o momento)</pre>
+                        <div id="barraProgressoConsole" class="barra-progresso-console" style="display: none;"
+                            aria-hidden="true" title="Progresso da execução da bateria de testes">
+                            <div id="preenchimentoProgressoConsole" class="preenchimento-progresso-console"></div>
+                        </div>
+                    </div>
+                </div>
+                <pre id="painelResultadoAuditoria" data-jusgov-ignore="true"></pre>
+            </section>
+        </div>
+    </div>
+
+    <div id="toastNotificacao">Configurações salvas com sucesso!</div>
+
+    <!-- Passo 4.1: Scripts do motor carregados na ordem deterministica exata para habilitar o Sandbox e a Auditoria -->
+    <script src="../mod-copia/ConstantesPadroes.js"></script>
+    <script src="../mod-copia/AvisoFlutuante.js"></script>
+    <script src="../mod-copia/AcumuladorCopia.js"></script>
+    <script src="../mod-copia/SelecionarCopiar.js"></script>
+    <script src="debug.js"></script>
+    <script src="options.js"></script>
+    <script src="editor_demo.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,109 @@
+/* ==========================================================================
+ * Nome do arquivo: manifest.json
+ * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * DIRETIVAS DE GERACAO E MANUTENCAO IA [DEV - ENGENHARIA DE CODIGO]:
+ * 1) DELIBERACAO PREVIA OBRIGATORIA: Jamais gerar codigo sem comando expresso;
+ *    sugerir preliminarmente e na ordem exata: (a) Eventuais Correcoes,
+ *    (b) Mudancas de Boas Praticas e (c) Novas Features.
+ * 2) PRESERVACAO DOCUMENTAL ABSOLUTA: E terminantemente proibido apagar,
+ *    resumir, ocultar ou encurtar comentarios no codigo-fonte. Todo comentario
+ *    deve explicar exaustivamente o *porque* (regras de negocio, permissoes
+ *    Manifest V3 e interoperabilidade com o PJe) e nao apenas o *o que*.
+ * 3) INTRA-COMENTARIOS DE RECONSTRUCAO (PSEUDOCODIGO INTERCALADO / BLUEPRINT):
+ *    O proposito de cada chave de configuracao esta documentado neste cabecalho
+ *    para reconstrucao integral do manifesto a qualquer tempo.
+ * 4) CODIFICACAO US-ASCII PURO E LEGIVEL (7-BITS / ZERO UTF-8): E terminantemente
+ *    proibido usar UTF-8, acentuacao direta, BOM (\uFEFF), entidades HTML (&...;)
+ *    ou escapes (\uXXXX) em strings, comentarios ou interfaces. Escapes \uXXXX sao
+ *    restritos unica e exclusivamente a simbolos invisiveis/incompreensiveis dentro
+ *    de Expressoes Regulares (RegExp), devendo ser minimizados ao extremo.
+ * 5) INTEGRIDADE FUNCIONAL E COPIA SILENCIOSA: Proibido simplificar a base de 6
+ *    estagios, remover suporte a Ctrl/Alt/Shift, exibir popups de "Copiado!" em
+ *    copias simples ou inserir anotacoes de versao (ChronoSemVer) nos cabecalhos.
+ * 6) SINCRONIZACAO OBRIGATORIA DE BLUE PRINT E SANDBOX: Toda alteracao de regra
+ *    de negocio, mascara ou validacao deve manter obrigatoriamente atualizados e
+ *    sincronizados o Blue Print (especificacao documental interna nos cabecalhos
+ *    e na Central de Ajuda) e o SandBox (area de Testes interativos em
+ *    options.html e bateria automatizada em debug.js), garantindo paridade entre
+ *    exemplos validos e invalidos para homologacao imediata.
+ *
+ * ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * (Espelho integral da Central de Ajuda / Options para reconstrucao mutua)
+ *
+ * 1. ARQUITETURA MANIFEST V3 (CHROMIUM 116+):
+ * - "manifest_version": 3 -> Adota o padrao moderno de seguranca e isolamento
+ *   do Google Chrome, substituindo Background Pages persistentes pelo Service
+ *   Worker orientado a eventos ("background.js").
+ * - "minimum_chrome_version": "116" -> Garante suporte nativo as APIs modernas
+ *   utilizadas pelo motor: CSS Custom Highlight API (CSS.highlights), Top Layer
+ *   Popover API (showPopover/hidePopover), OffscreenCanvas no Service Worker e
+ *   chrome.storage.session em memoria RAM.
+ *
+ * 2. JUSTIFICATIVA TECNICA DAS PERMISSOES DECLARADAS:
+ * - "clipboardWrite": Permite gravar o texto higienizado (ou HTML basico com
+ *   negrito, italico e sublinhado quando configurado) diretamente na area de
+ *   transferencia do sistema operacional sem exibir prompts de permissao.
+ * - "scripting": Permite ao Service Worker registrar, atualizar e injetar
+ *   dinamicamente o CSS Anti-Ampulhetas (em "document_start") e os 4 modulos JS
+ *   do motor de selecao (em "document_idle"), aplicando filtragem nativa em C++
+ *   por Match Patterns quando no modo "So Sites da Lista".
+ * - "storage": Permite persistir na nuvem (chrome.storage.sync) e em RAM rapida
+ *   (chrome.storage.session) as listas de URLs, o estado de ativacao dos modulos
+ *   e a preferencia de formatacao ("Remover Formatacoes / Somente Texto" vs.
+ *   "Manter Formatacoes Basicas: Negrito, Italico e Sublinhado").
+ * - Permissao "activeTab" intencionalmente omitida: Como a extensao ja possui
+ *   declarada "host_permissions": ["<all_urls>"] e permissao "tabs", o uso de
+ *   "activeTab" era redundante e provocava a adicao automatica pelo Chrome da
+ *   mensagem indesejada "Quer ter acesso a este site" no tooltip do icone.
+ * - "tabs": Permite consultar a URL da aba ativa no Popup, abrir links em nova
+ *   aba com Alt+Clique, acionar o painel Gemini com F1 e propagar mudancas de
+ *   configuracao em tempo real para todas as abas abertas sem exigir F5.
+ * - "tabGroups": Permite organizar visualmente as abas da mesma origem/tribunal
+ *   em Grupos de Abas nativos coloridos do Google Chrome (Tab Groups API).
+ * - "host_permissions": ["<all_urls>"] -> Necessario para que o modo "Todos os
+ *   Sites" e os dominios customizados adicionados pelo usuario em Opcoes possam
+ *   receber a injecao dinamica sem recompilar a extensao.
+ *
+ * NOTA DE PRODUCAO: Caso o carregador de extensoes descompactadas do Chrome
+ * exija JSON estrito sem comentarios no topo, salve no disco apenas o objeto
+ * delimitado entre as chaves { ... } abaixo.
+ * ========================================================================== */
+{
+  "manifest_version": 3,
+  "name": "Sele\u00e7\u00e3o/C\u00f3pia de Textos Aprimorada",
+  "short_name": "Sele\u00e7\u00e3o/C\u00f3pia Aprimorada",
+  "version": "2026.10.28.1",
+  "description": "Sele\u00e7\u00e3o, Valida\u00e7\u00e3o e C\u00f3pia de Textos Aprimorada.",
+  "author": "smarca@gmail.com",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "clipboardWrite",
+    "scripting",
+    "storage",
+    "tabs",
+    "tabGroups"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/cfg/background.js"
+  },
+  "options_page": "src/cfg/options.html",
+  "options_ui": {
+    "page": "src/cfg/options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Sele\u00e7\u00e3o/C\u00f3pia Aprimorada \u2014 Ativo (Global)\n(1 clique: abrir popup)",
+    "default_popup": "src/cfg/popup.html"
+  },
+  "icons": {
+    "16": "src/ico/icon128.png",
+    "48": "src/ico/icon128.png",
+    "128": "src/ico/icon128.png"
+  }
+}

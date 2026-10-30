@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- ==========================================================================
+ * Nome do arquivo: popup.html
+ * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * DIRETIVAS DE GERACAO E MANUTENCAO IA [DEV - ENGENHARIA DE CODIGO]:
+ * 1) DELIBERACAO PREVIA OBRIGATORIA: Jamais gerar codigo sem comando expresso.
+ * 2) PRESERVACAO DOCUMENTAL ABSOLUTA: Todo comentario explica o *porque*.
+ * 3) INTRA-COMENTARIOS DE RECONSTRUCAO (PSEUDOCODIGO INTERCALADO / BLUEPRINT).
+ * 4) CODIFICACAO UTF-8 NATIVA DIRETA (ACENTOS E CEDILHAS REAIS): O codigo-fonte
+ *    e a interface utilizam a codificacao padrao UTF-8 com suporte nativo a
+ *    acentos e cedilhas (ç, ã, é, etc.) diretamente no texto. E terminantemente
+ *    PROIBIDO o uso de entidades HTML (como ç, õ, é) no codigo ou em templates.
+ * 5) INTEGRIDADE FUNCIONAL E COPIA SILENCIOSA.
+ * 6) SINCRONIZACAO OBRIGATORIA DE BLUE PRINT E SANDBOX: Manter Blue Print e
+ *    SandBox (options.html e debug.js) permanentemente sincronizados.
+ * ========================================================================== -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JusGovBR - Painel de Controle Rápido</title>
+    <style>
+        :root {
+            --azul-primario: #1a73e8;
+            --azul-escuro: #1557b0;
+            --azul-claro: #eff6ff;
+            --fundo-pagina: #f8fafc;
+            --fundo-cartao: #ffffff;
+            --texto-forte: #0f172a;
+            --texto-medio: #475569;
+            --texto-suave: #64748b;
+            --borda-padrao: #e2e8f0;
+            --verde-ativo: #10b981;
+            --amarelo-aviso: #f59e0b;
+            --vermelho-perigo: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 350px;
+            font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+            background-color: var(--fundo-pagina);
+            color: var(--texto-forte);
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+            color: #ffffff;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+        }
+
+        .marca-grupo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-container {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+        }
+
+        .titulo-cabecalho h1 {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+        }
+
+        .titulo-cabecalho p {
+            font-size: 11px;
+            color: #bfdbfe;
+            margin-top: 2px;
+        }
+
+        .badge-status {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.25);
+            border: 1px solid #34d399;
+            color: #ecfdf5;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .badge-status.lista {
+            background: rgba(26, 115, 232, 0.28);
+            border-color: #60a5fa;
+            color: #dbeafe;
+        }
+
+        .badge-status.inativo {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: #f87171;
+            color: #fef2f2;
+        }
+
+        main {
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cartao {
+            background: var(--fundo-cartao);
+            border: 1px solid var(--borda-padrao);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+
+        .cartao-titulo {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--texto-suave);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .grade-modos {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+        }
+
+        .btn-modo {
+            background: var(--fundo-pagina);
+            border: 1px solid var(--borda-padrao);
+            color: var(--texto-medio);
+            padding: 8px 6px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .btn-modo:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: var(--texto-forte);
+        }
+
+        .btn-modo.ativo {
+            background: #ecfdf5;
+            border-color: var(--verde-ativo);
+            color: #065f46;
+            box-shadow: inset 0 0 0 1px var(--verde-ativo);
+        }
+
+        .btn-modo.modo-url.ativo {
+            background: var(--azul-claro);
+            border-color: var(--azul-primario);
+            color: var(--azul-primario);
+            box-shadow: inset 0 0 0 1px var(--azul-primario);
+        }
+
+        .btn-modo.perigo.ativo {
+            background: #fef2f2;
+            border-color: var(--vermelho-perigo);
+            color: #b91c1c;
+            box-shadow: inset 0 0 0 1px var(--vermelho-perigo);
+        }
+
+        .barra-dominio-atual {
+            margin-top: 9px;
+            padding-top: 9px;
+            border-top: 1px dashed var(--borda-padrao);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .info-dominio {
+            font-size: 11px;
+            color: var(--texto-medio);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .info-dominio strong {
+            color: var(--texto-forte);
+            font-family: Consolas, monospace;
+        }
+
+        .btn-alternar-dominio {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: var(--texto-forte);
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-alternar-dominio:hover {
+            background: #e2e8f0;
+        }
+
+        .linha-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 7px 0;
+            border-top: 1px solid var(--borda-padrao);
+        }
+
+        .linha-switch:first-of-type {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .linha-switch:last-of-type {
+            padding-bottom: 0;
+        }
+
+        .switch-texto {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .switch-titulo {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--texto-forte);
+        }
+
+        .switch-sub {
+            font-size: 11px;
+            color: var(--texto-suave);
+            line-height: 1.3;
+        }
+
+        .tag-atalho {
+            display: inline-block;
+            background: #fef08a;
+            color: #9a3412;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-top: 2px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 42px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: 0.2s;
+            border-radius: 22px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ffffff;
+            transition: 0.2s;
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        input:checked + .slider {
+            background-color: var(--azul-primario);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        footer {
+            padding: 10px 14px 12px;
+            background: var(--fundo-cartao);
+            border-top: 1px solid var(--borda-padrao);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn-opcoes {
+            width: 100%;
+            background: var(--azul-primario);
+            color: #ffffff;
+            border: none;
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-opcoes:hover {
+            background: var(--azul-escuro);
+        }
+
+        .rodape-nota {
+            text-align: center;
+            font-size: 10.5px;
+            color: var(--texto-suave);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="marca-grupo">
+            <div class="logo-container">
+                <svg id="iconeHeaderSvg" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+                    <rect id="iconeBg" x="6" y="6" width="116" height="116" rx="26" fill="#10b981" stroke="#059669" stroke-width="4"/>
+                    <rect x="24" y="34" width="46" height="10" rx="3" fill="rgba(255,255,255,0.3)"/>
+                    <rect x="24" y="54" width="34" height="10" rx="3" fill="rgba(255,255,255,0.3)"/>
+                    <rect x="24" y="74" width="40" height="10" rx="3" fill="rgba(255,255,255,0.3)"/>
+                    <polygon id="iconeRaio" points="78,20 44,68 68,68 54,108 100,56 74,56" fill="#fef08a" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="titulo-cabecalho">
+                <h1>JusGovBR Turbo</h1>
+                <p>Seleção, Validação e Cópia de Textos Aprimorada.</p>
+            </div>
+        </div>
+        <span id="badgeStatusGeral" class="badge-status">ATIVO<br>(GLOBAL)</span>
+    </header>
+
+    <main>
+        <section class="cartao">
+            <div class="cartao-titulo">
+                <span>Modo do Motor de Cópia</span>
+                <span id="labelModoAtual">Todos os Sites</span>
+            </div>
+            <div class="grade-modos">
+                <button type="button" class="btn-modo" id="btnModoGlobal" title="Funciona em qualquer site aberto no Chrome">
+                    Todos os Sites
+                </button>
+                <button type="button" class="btn-modo modo-url" id="btnModoUrl" title="Funciona apenas nos sites cadastrados na lista">
+                    Lista de Sites
+                </button>
+                <button type="button" class="btn-modo perigo" id="btnModoDesligado" title="Desativa temporariamente o motor de seleção">
+                    Desligado
+                </button>
+            </div>
+            <div class="barra-dominio-atual" id="barraDominioAtual" style="display: none;">
+                <div class="info-dominio" id="infoDominioAba">Site: <strong>...</strong></div>
+                <button type="button" class="btn-alternar-dominio" id="btnAlternarDominioAba" title="Adiciona ou remove o site desta aba na lista">
+                    + Incluir na Lista
+                </button>
+            </div>
+        </section>
+
+        <!-- Opcao PJe Anti-Ampulhetas (Oculto por padrao, visivel apenas se PJe) -->
+        <section class="cartao" id="containerAmpuletas" style="display: none;">
+            <div class="linha-switch" style="border-top: none; padding: 0;">
+                <div class="switch-texto">
+                    <span class="switch-titulo">PJe Turbo (Anti-Ampulhetas)</span>
+                    <span class="switch-sub">
+                        Neutraliza cortinas de bloqueio ("Aguarde...") e libera cliques imediatos no PJe.
+                    </span>
+                </div>
+                <label class="switch" title="Ativa ou desativa a ocultação de ampulhetas no PJe">
+                    <input type="checkbox" id="checkAmpuletas" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <button type="button" class="btn-opcoes" id="btnAbrirOpcoes">
+            Abrir Opções e Central de Ajuda
+        </button>
+        <div class="rodape-nota">Seleção, Validação e Cópia de Textos Aprimorada.</div>
+    </footer>
+
+    <script src="popup.js"></script>
+</body>
+</html>

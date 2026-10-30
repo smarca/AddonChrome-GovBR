@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Verificador Geral de Sintaxe JS</title>
+    <script>
+        window.__ERROS__ = [];
+        window.addEventListener('error', (e) => {
+            window.__ERROS__.push('[ERRO] ' + e.message + ' em ' + (e.filename || 'desconhecido') + ':' + e.lineno + ':' + e.colno);
+        });
+
+        // Mock minimo da API chrome para permitir parsing e execucao top-level de Service Worker e Popups
+        window.chrome = {
+            runtime: {
+                onInstalled: { addListener: () => {} },
+                onStartup: { addListener: () => {} },
+                onMessage: { addListener: () => {} },
+                sendMessage: () => Promise.resolve(),
+                getURL: (p) => p,
+                openOptionsPage: () => {}
+            },
+            action: {
+                setIcon: () => Promise.resolve(),
+                onClicked: { addListener: () => {} }
+            },
+            storage: {
+                sync: {
+                    get: () => Promise.resolve({}),
+                    set: () => Promise.resolve(),
+                    remove: () => Promise.resolve()
+                },
+                session: {
+                    get: () => Promise.resolve({}),
+                    set: () => Promise.resolve()
+                },
+                local: {
+                    get: () => Promise.resolve({}),
+                    set: () => Promise.resolve()
+                },
+                onChanged: { addListener: () => {} }
+            },
+            tabs: {
+                query: () => Promise.resolve([]),
+                sendMessage: () => Promise.resolve(),
+                create: () => Promise.resolve(),
+                update: () => Promise.resolve(),
+                get: () => Promise.resolve({}),
+                onActivated: { addListener: () => {} },
+                onUpdated: { addListener: () => {} },
+                onRemoved: { addListener: () => {} }
+            },
+            windows: {
+                getLastFocused: () => Promise.resolve(null),
+                update: () => Promise.resolve()
+            },
+            scripting: {
+                registerContentScripts: () => Promise.resolve(),
+                unregisterContentScripts: () => Promise.resolve(),
+                executeScript: () => Promise.resolve(),
+                insertCSS: () => Promise.resolve()
+            },
+            tabGroups: {
+                query: () => Promise.resolve([]),
+                group: () => Promise.resolve(1),
+                update: () => Promise.resolve(),
+                ungroup: () => Promise.resolve()
+            },
+            downloads: {
+                download: () => Promise.resolve()
+            }
+        };
+    </script>
+</head>
+<body>
+    <pre id="resultado">Testando sintaxe...</pre>
+    <script src="../src/mod-copia/ConstantesPadroes.js"></script>
+    <script src="../src/mod-copia/AvisoFlutuante.js"></script>
+    <script src="../src/mod-copia/AcumuladorCopia.js"></script>
+    <script src="../src/mod-copia/SelecionarCopiar.js"></script>
+    <script src="../src/cfg/background.js"></script>
+    <script src="../src/cfg/options.js"></script>
+    <script src="../src/cfg/popup.js"></script>
+    <script src="../src/cfg/debug.js"></script>
+    <script src="../src/cfg/editor_demo.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const out = document.getElementById('resultado');
+            if (window.__ERROS__.length === 0) {
+                out.innerText = 'SUCESSO_TODOS_SCRIPTS_PARSEADOS_OK';
+            } else {
+                out.innerText = window.__ERROS__.join('\n');
+            }
+        });
+    </script>
+</body>
+</html>

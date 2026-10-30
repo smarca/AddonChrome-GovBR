@@ -1,0 +1,1165 @@
+// ==UserScript==
+// @name         JusGovBR - Modo Turbo e Produtividade Global
+// @namespace    http://tampermonkey.net/
+// @version      2026.10.22.01
+// @author       smarca@gmail.com
+// @description  Cópia Síncrona, Auto-Seleção VIP, Pulo Inteligente Contextual, Cola em Cascata.
+// @include      *://*.*.jus.br/*
+// @include      *://*.*.gov.br/*
+// @include      *://gemini.google.com/*
+// @include      *://serasa-judicial.serasaexperian.com.br/*
+// @tag          JUSBR-PJDB
+// @run-in       normal-tabs
+// @grant        GM_addStyle
+// @grant        GM_info
+// @grant        GM_setClipboard
+// @run-at       document-start
+// @allFrames    true
+// ==/UserScript==
+
+/* ==========================================================================
+ * DIRETIVAS DE GERAÇÃO E MANUTENÇÃO IA [DEV - ENGENHARIA DE CÓDIGO]:
+ * 1) PRESERVAÇÃO DOCUMENTAL ABSOLUTA: É terminantemente proibido apagar,
+ *    resumir, ocultar ou encurtar comentários no código-fonte.
+ * 2) INTRA-COMENTÁRIOS DE RECONSTRUÇÃO (PSEUDOCÓDIGO INTERCALADO): A densidade
+ *    deve ser extrema. O fluxo de dados ("Passos") deve estar obrigatoriamente
+ *    INTERCALADO linha a linha (ou bloco a bloco) DENTRO do corpo da função,
+ *    explicando o "como" e o "porquê" antes da execução do código em si.
+ * 3) ARQUITETURA DRY (MODULARIZAÇÃO E CLASSES): Sempre encapsular lógicas
+ *    repetitivas e agrupar responsabilidades em Classes apropriadas. Proibido
+ *    vazar funções para o escopo global mitigando colisão com o framework alvo.
+ * 4) INTERVENÇÃO CIRÚRGICA: Alterações devem ser mínimas, pontuais e estritamente
+ *    modulares. Mantenha o restante intacto.
+ * 5) VERSIONAMENTO: Autoincrementar versão estilo ChronoSemVer (YYYY.MM.DD.VV).
+ * ========================================================================== */
+
+(function() {
+    'use strict';
+
+    // =====================================================================
+    // CLASSE 1: MOTOR DE CÓPIA E HIGIENIZAÇÃO (Tratamento de Texto)
+    // =====================================================================
+    class MotorCopia {
+
+        // FUNÇÃO A: Detox Militar (Limpeza Estrutural Bruta)
+        // OBJETIVO: Sanitizar lixo invisível vindo de cópias do visualizador de PDFs interno do PJe.
+        aplicarDetoxMilitar(texto) {
+            return texto
+                // PASSO 1: Varre com regex expurgando caracteres Unicode zero-width e controle ASCII.
+                .replace(/[\u200B-\u200D\uFEFF\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+                // PASSO 2: Converte Non-Breaking Spaces (NBSP) para espaços simples padrão.
+                .replace(/\xA0/g, ' ')
+                // PASSO 3: Normaliza Carriage Returns do Windows (\r\n) para UNIX (\n).
+                .replace(/\r\n|\r/g, '\n')
+                // PASSO 4: Remove espaços nas bordas de cada linha individual (trim multiline).
+                .replace(/^[^\S\n]+|[^\S\n]+$/gm, '')
+                // PASSO 5: Detecta linhas decepadas por quebras de PDF (sem pontuação final) e funde com a próxima.
+                .replace(/([^.;:?!\n])\n(?=[^\n])/g, '$1 ')
+                // PASSO 6: Comprime espaços múltiplos em caracteres únicos.
+                .replace(/[^\S\n]{2,}/g, ' ')
+                // PASSO 7: Comprime quebras de linha múltiplas e devolve a string limpa.
+                .replace(/\n{2,}/g, '\n')
+                .trim();
+        }
+
+        // FUNÇÃO B: Correção de Dados (Sanitarização Semântica e Formatação)
+        // OBJETIVO: Evitar que erros humanos de digitação ou formatações preguiçosas travem os validadores do JSF.
+        corrigirDados(texto) {
+            let corrigido = texto;
+
+            // PASSO 1: Identifica bounce de teclado em barras de data (ex: //) e reduz para barra simples.
+            while (corrigido.match(/(\d+)\/{2,}(\d+)/)) {
+                corrigido = corrigido.replace(/(\d+)\/{2,}(\d+)/g, '$1/$2');
+            }
+
+            // PASSO 2: Normalização expansiva e blindagem matemática de Datas (DD/MM/AA, MM/AA, D.M.AA)
+            const regexDataCurta = /^(\d{1,2})[\.\-\/](\d{1,2})(?:[\.\-\/](\d{2}|\d{4}))?$/;
+            const matchData = corrigido.match(regexDataCurta);
+
+            if (matchData) {
+                let p1Num = parseInt(matchData[1], 10);
+                let p2Num = parseInt(matchData[2], 10);
+
+                // Blindagem: Evita formatar frações matemáticas de custas ou cotas (ex: 1/50).
+                if (p1Num <= 31 && p2Num <= 12 || (p1Num <= 12 && p2Num > 31)) {
+                    let dia = matchData[1].padStart(2, '0');
+                    let mes = matchData[2].padStart(2, '0');
+                    let p3 = matchData[3];
+
+                    if (p3) {
+                        // Formato triplo (DD/MM/AA ou DD/MM/AAAA)
+                        let anoNum = parseInt(p3, 10);
+                        let ano = p3.length === 2 ? (anoNum > 30 ? '19' + p3 : '20' + p3) : p3;
+                        corrigido = `${dia}/${mes}/${ano}`;
+                    } else {
+                        // Formato duplo (DD/MM ou MM/AA).
+                        // Se o segundo número passa de 31, obrigatoriamente é um ano (MM/AA).
+                        if (p2Num > 31 || (p1Num <= 12 && p2Num > 12)) {
+                            let ano = p2Num > 30 ? '19' + matchData[2] : '20' + matchData[2];
+                            // Reajusta a ordem assumindo que o primeiro bloco era o mês
+                            corrigido = `${matchData[1].padStart(2, '0')}/${ano}`;
+                        } else {
+                            // Se ambíguo ou p2 <= 12, assume o clássico DD/MM com segurança.
+                            corrigido = `${dia}/${mes}`;
+                        }
+                    }
+                }
+            }
+
+            // PASSO 3: Formatação Automática de Moedas e Decimais (Ex: R$ 1123345,00 -> R$ 1.123.345,00)
+            corrigido = corrigido.replace(/(R\$\s?)?(\d{4,}),(\d{2})/g, (match, prefix, inteiros, centavos) => {
+                prefix = prefix || '';
+                let formatado = inteiros.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                return `${prefix}${formatado},${centavos}`;
+            });
+
+            // PASSO 4: Limpeza extra de linhas vazias parasitas no final da string antes de colar.
+            return corrigido.replace(/^\s*[\r\n]/gm, '').trim();
+        }
+
+        // FUNÇÃO CENTRAL: Higienização Orquestrada (O Maestro)
+        higienizarTexto(texto) {
+            // O PORQUÊ: Encapsula as chamadas de tratamento interno da Classe para manter o fluxo limpo em um comando só.
+            let textoLimpo = this.aplicarDetoxMilitar(texto);
+            textoLimpo = this.corrigirDados(textoLimpo);
+            return textoLimpo;
+        }
+
+        // FUNÇÃO: Motor Bélico de Cópia (Seletor de API Fallback)
+        // OBJETIVO: Forçar a injeção do texto na prancheta do Sistema Operacional contra todas as defesas do navegador.
+        forcarCopia(textoBruto) {
+            // PASSO 1: Recebe o texto a ser copiado. Se for vazio, aborta.
+            if (!textoBruto || textoBruto.trim() === '') return;
+
+            // PASSO 2: Envia para a orquestra de higienização.
+            const textoLimpo = this.higienizarTexto(textoBruto);
+            if (!textoLimpo || textoLimpo.trim() === '') return;
+
+            // PASSO 3: Testa a existência da API Suprema GM_setClipboard (Tampermonkey). Se existir, usa-a para furar o Sandbox e o Cross-Origin.
+            if (typeof GM_setClipboard !== "undefined") {
+                GM_setClipboard(textoLimpo, "text");
+                return;
+            }
+
+            // PASSO 4: Se falhar, testa a navigator.clipboard nativa, requerendo HTTPS e permissões do DOM.
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textoLimpo).catch(() => {
+                    this.fallbackCopy(textoLimpo);
+                });
+            } else {
+                // PASSO 5: Se tudo falhar, ou o contexto for inseguro, desce para o plano de cópia raiz legado (execCommand).
+                this.fallbackCopy(textoLimpo);
+            }
+        }
+
+        // FUNÇÃO: Cópia Raiz (Bala de Prata Legada e Preservação de Grifo)
+        fallbackCopy(texto) {
+            try {
+                // PASSO 1: Captura as coordenadas (Ranges) da seleção azul ativa do usuário para backup fotográfico.
+                const selecaoAtual = window.getSelection();
+                const rangesSalvos = [];
+                for (let i = 0; i < selecaoAtual.rangeCount; i++) {
+                    rangesSalvos.push(selecaoAtual.getRangeAt(i));
+                }
+
+                // PASSO 2: Cria um elemento `<textarea>` invisível e o injeta fisicamente na tela.
+                const textArea = document.createElement("textarea");
+                textArea.value = texto;
+                textArea.style.position = "fixed";
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+
+                // PASSO 3: Joga a string limpa dentro dele, foca o elemento e executa a cópia nativa document.execCommand('copy').
+                textArea.focus();
+                textArea.select();
+                document.execCommand("copy");
+
+                // PASSO 4: Destrói o `<textarea>` para limpar o DOM (Queima de arquivo).
+                document.body.removeChild(textArea);
+
+                // PASSO 5: Lê o backup fotográfico e devolve o grifo azul ao texto original na tela para que o usuário não note a troca de foco.
+                selecaoAtual.removeAllRanges();
+                rangesSalvos.forEach(r => selecaoAtual.addRange(r));
+            } catch (err) {
+                console.error('Falha suprema ao copiar. Nenhuma API de Clipboard disponível.', err);
+            }
+        }
+    }
+
+    // =====================================================================
+    // CLASSE 2: MOTOR DE NAVEGAÇÃO E SENSORES DE DOM (Manipulação de Tela)
+    // =====================================================================
+    class MotorNavegacao {
+        constructor() {
+            this.cacheFocaveis = null;
+            this.cacheContexto = null;
+            this.tempoCacheFocaveis = 0;
+            this.ultimoTempoSelecao = 0;
+        }
+
+        // FUNÇÃO SENSORA: Sensor de Campo de Digitação (Validador Rápido O(1))
+        isCampoDeTextoValido(target) {
+            // Checa rapidamente a tag e o atributo TYPE para confirmar se a caixa recebe digitação ativa.
+            if (!target) return false;
+            const tag = target.tagName ? target.tagName.toLowerCase() : '';
+            if (tag === 'input') {
+                const type = target.type ? target.type.toLowerCase() : 'text';
+                if (['button','submit','reset','checkbox','radio','hidden','file','image'].includes(type)) return false;
+                return true;
+            }
+            if (tag === 'textarea') return true;
+            return false;
+        }
+
+        // FUNÇÃO SENSORA: Identificador Universal de Editores de Texto
+        isElementoEditavel(elemento) {
+            // Rastrea propriedades de iframes WYSIWYG (TinyMCE, CKEditor, contenteditable, designMode)
+            // para desativar automações destrutivas e preservar as redações ativas do usuário judicial.
+            if (!elemento) return false;
+            const tag = elemento.tagName ? elemento.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea') return true;
+            if (elemento.isContentEditable) return true;
+            if (elemento.closest && elemento.closest('[contenteditable="true"]')) return true;
+            if (elemento.ownerDocument && elemento.ownerDocument.designMode === 'on') return true;
+            return false;
+        }
+
+        // FUNÇÃO SENSORA: Blindagem de Controles Nativos (PDF.js e Toolbars)
+        isControleNativo(target) {
+            // Varre atributos e id nativos para não explodir atalhos de barra de progresso, input e pesquisa de visualizadores embarcados.
+            if (!target || typeof target.matches !== 'function') return false;
+            return target.matches('#findInput, #pageNumber, .toolbarField, [data-l10n-id^="pdfjs-"]');
+        }
+
+        // FUNÇÃO: Scanner Geométrico de Foco (Cache DOM)
+        getCamposFocaveis(contexto) {
+            const agora = Date.now();
+            // PASSO 1: Confere o timestamp do último cache. Se tiver menos de 500ms, retorna o cache para não fritar a CPU (Throttle).
+            if (this.cacheFocaveis && this.cacheContexto === contexto && (agora - this.tempoCacheFocaveis < 500)) {
+                return this.cacheFocaveis;
+            }
+
+            // PASSO 2: Cria uma QuerySelector massiva que exclui botões, tipos ocultos e leitura inativa.
+            const textSelectors = 'input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([readonly]):not([disabled]), textarea:not([readonly]):not([disabled])';
+
+            // PASSO 3: Filtra a lista com GetBoundingClientRect para checar fisicalidade. Se width/height forem 0, ou visibility hidden, descarta.
+            this.cacheFocaveis = Array.from(contexto.querySelectorAll(textSelectors)).filter(el => {
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && el.tabIndex >= 0 && !el.disabled && !el.readOnly;
+            });
+
+            // PASSO 4: Armazena a matriz final no cache e retorna.
+            this.cacheContexto = contexto;
+            this.tempoCacheFocaveis = agora;
+            return this.cacheFocaveis;
+        }
+
+        // FUNÇÃO: Arremessar o cursor bidirecionalmente (Frente/Trás).
+        focarProximoCampo(targetCorrente, direcao = 'frente') {
+            // PASSO 1: Encontra o "closest" formulário ou painel pai. Isso impede que o pulo vaze para fora de janelas Popup.
+            const contexto = targetCorrente.closest('form, .ui-dialog, .modal-content, .main-panel, .panel') || document.body;
+
+            // PASSO 2: Requisita a matriz de elementos focáveis daquele contexto.
+            const focusables = this.getCamposFocaveis(contexto);
+
+            // PASSO 3: Acha a indexação do input atual na matriz.
+            const index = focusables.indexOf(targetCorrente);
+
+            // PASSO 4: Se direcao = frente, incrementa o index e dispara o `.focus()`. Se trás, decrementa.
+            if (direcao === 'frente') {
+                if (index > -1 && index < focusables.length - 1) {
+                    focusables[index + 1].focus();
+                    return true;
+                }
+                return false;
+            } else {
+                if (index > 0) {
+                    focusables[index - 1].focus();
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // FUNÇÃO CAÇADORA: Gatilho de Botão de Submissão (Escopo Localizado)
+        focarBotaoSalvar(contexto) {
+            // PASSO 1 e 2: Consulta o contêiner por botões e lê o texto procurando verbos judiciais (Salvar, Continuar, Avançar).
+            const botoes = Array.from(contexto.querySelectorAll('input[type="submit"], button[type="submit"], input.btn-primary, button.btn-primary, input[value*="Salvar" i], input[value*="Continuar" i], input[value*="Enviar" i], button'))
+                                .filter(el => {
+                                    const txt = (el.innerText || el.value || '').toLowerCase();
+                                    return (txt.includes('salvar') || txt.includes('continuar') || txt.includes('enviar') || txt.includes('avançar') || el.type === 'submit') && el.getBoundingClientRect().width > 0 && !el.disabled;
+                                });
+            // PASSO 3: Filtra botões inativos e atira o foco no último botão válido encontrado na interface.
+            if (botoes.length > 0) botoes[botoes.length - 1].focus();
+        }
+
+        // FUNÇÃO CENTRAL: Motor de Colagem em Cascata (Smart Paste)
+        injetarCascata(target, textoBase) {
+            // PASSO 1: Recebe o texto (ex: CNJ copiado) e arranca a pontuação (hífens/pontos) mantendo matriz estritamente numérica.
+            const apenasNumeros = textoBase.replace(/\D/g, '');
+
+            // PASSO 2: Captura o contêiner atual (pai) e gera o mapa geométrico dos inputs focáveis.
+            const contexto = target.closest('form, .ui-dialog, .modal-content, .main-panel, .panel') || document.body;
+            const focusables = this.getCamposFocaveis(contexto);
+
+            let currIndex = focusables.indexOf(target);
+            let charIndex = 0;
+
+            // PASSO 3 e 4: Lê o max-length da caixa atual, fatia a string matemática e insere os dados.
+            while (charIndex < apenasNumeros.length && currIndex < focusables.length) {
+                let field = focusables[currIndex];
+                let fieldMax = parseInt(field.getAttribute('maxlength') || '20', 10);
+
+                let pedaco = apenasNumeros.substring(charIndex, charIndex + fieldMax);
+                field.value = pedaco;
+
+                // PASSO 5: Dispara gatilhos nativos (`input` e `change`) forçando o Framework JSF do servidor a gravar o dado no backend.
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+
+                // PASSO 6: Pula para a próxima caixa focável e avança no charIndex.
+                charIndex += pedaco.length;
+                currIndex++;
+            }
+
+            // PASSO 7: Assenta o foco de tela na caixa subsequente final para fluidez humana.
+            if (currIndex < focusables.length) {
+                focusables[currIndex].focus();
+            } else {
+                focusables[currIndex - 1].focus();
+            }
+        }
+
+        // FUNÇÃO: Foco Inteligente e Auto-Seleção (Autofill Helper)
+        lidarFocoInteligente(event) {
+            const target = event.target;
+
+            // PASSO 1: Intercepta evento de `focusin`. Checa se é caixa de digitação.
+            if (this.isCampoDeTextoValido(target) && !target.readOnly && !target.disabled) {
+
+                // PASSO 2: Confere o relógio interno. Se menos de 150ms do último foco, aborta para não deflagrar loop do JSF.
+                const agora = Date.now();
+                if (agora - this.ultimoTempoSelecao < 150) return;
+
+                // PASSO 3: Se o usuário clicar pela 2ª vez numa caixa não-vazia, aborta e deixa o cursor humano agir pontualmente.
+                const temAlfanumerico = /[\p{L}\p{N}]/u.test(target.value || '');
+                if (target.dataset.autoselected && temAlfanumerico) return;
+
+                target.dataset.autoselected = 'true';
+                target.addEventListener('blur', () => {
+                    delete target.dataset.autoselected;
+                }, { once: true });
+
+                // PASSO 4: Envia a ordem física assíncrona de `.select()` que grifa o bloco todo em azul.
+                setTimeout(() => {
+                    try {
+                        if (typeof target.select === 'function') {
+                            target.select();
+                            this.ultimoTempoSelecao = Date.now();
+                        }
+                    } catch(e) {}
+                }, 50);
+            }
+        }
+
+        // FUNÇÃO PIVÔ: Âncora Estacionária do Botão Central
+        colarBotaoMeio(event) {
+            // PASSO 1: Foca o alvo passivamente. A injeção pesada cross-sandbox é encargo do X-Mouse Control O.S.
+            const target = event.target;
+            if (this.isCampoDeTextoValido(target) && !target.readOnly && !target.disabled) {
+                target.focus();
+            }
+        }
+
+        // FUNÇÃO: Pulo de Campo Multidirecional e Loop Fechado
+        navegarTurbo(event) {
+            const target = event.target;
+
+            // PASSO 1: Deflagra com evento keydown. Verifica se o enter é em painel blindado ou modal.
+            if (this.isControleNativo(target)) return;
+
+            const tag = target.tagName ? target.tagName.toUpperCase() : '';
+            const type = target.type ? target.type.toLowerCase() : '';
+            const contexto = target.closest('form, .ui-dialog, .modal-content, .main-panel, .panel') || document.body;
+            const isBotao = tag === 'BUTTON' || (tag === 'INPUT' && ['submit', 'button', 'reset'].includes(type));
+
+            // PASSO 2 e 3: Identifica ArrowUp e Control+Enter para marcha a ré, e ArrowDown para rota propulsora se estivermos num botão.
+            if (isBotao) {
+                if (event.key === 'ArrowUp' || (event.ctrlKey && event.key === 'Enter')) {
+                    event.preventDefault();
+                    const focusables = this.getCamposFocaveis(contexto);
+                    if (focusables.length > 0) focusables[focusables.length - 1].focus();
+                }
+                else if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const focusables = this.getCamposFocaveis(contexto);
+                    if (focusables.length > 0) focusables[0].focus();
+                }
+                return;
+            }
+
+            if (!this.isCampoDeTextoValido(target) || target.readOnly || target.disabled) return;
+            if (tag === 'TEXTAREA') return;
+
+            if (event.key === 'Enter') {
+                if (event.ctrlKey) {
+                    event.preventDefault();
+                    this.focarProximoCampo(target, 'tras');
+                    return;
+                }
+
+                // PASSO 4: Intercepta menus dropdowns (.select2-results) consumindo o Enter para fechar o popup.
+                const dropdownOpen = document.querySelector('.select2-results__option, .select2-result, tr.suggestion-complete');
+                if (dropdownOpen) {
+                    const primeiroItem = document.querySelector('.select2-results__option:not([aria-disabled="true"]), .select2-result, tr.suggestion-complete');
+                    if (primeiroItem) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        primeiroItem.click();
+                        return;
+                    }
+                }
+
+                // Pulo para frente padrão.
+                event.preventDefault();
+                if (!this.focarProximoCampo(target, 'frente')) this.focarBotaoSalvar(contexto);
+
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!this.focarProximoCampo(target, 'frente')) this.focarBotaoSalvar(contexto);
+
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                this.focarProximoCampo(target, 'tras');
+            }
+        }
+    }
+
+    // =====================================================================
+    // CLASSE 3: MOTOR DE SELEÇÃO E GEOMETRIA DE DOM (Cálculos de Mouse)
+    // =====================================================================
+    class MotorSelecao {
+        constructor(motorCopia, motorNavegacao) {
+            this.copia = motorCopia;
+            this.nav = motorNavegacao;
+
+            // ARQUITETURA DE DADOS: Dicionário Semântico de Padrões VIP (Ordem de prioridade importa)
+            // BLINDAGEM: Lookbehinds (?<![\p{L}\p{N}]) e Lookaheads (?![\p{L}\p{N}]) exigem isolamento por pontuação, espaços ou quebra de linha.
+            this.CATALOGO_PADROES = [
+                {
+                    grupo: "FINANCEIRO_E_DECIMAIS",
+                    regexes: [
+                        // Moeda e Decimais: Aceita com/sem R$, com/sem pontos, terminando em vírgula.
+                        /(?<![\p{L}\p{N}])(?:R\$\s?)?(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2}(?:\s*\([\p{L}\p{N}\s,\-\.]+\))?(?![\p{L}\p{N}])/gui
+                    ]
+                },
+                {
+                    grupo: "LEGISLACAO_E_JURISPRUDENCIA",
+                    regexes: [
+                        // Captura blocos extensos de citação legal em cascata (Ex: art. 5º, inciso X, da CF/88)
+                        // Ignição: arts., artigo, §, inciso, lei, súmula, cpc, cf...
+                        // Corpo: Limita a varredura a números, algarismos romanos, letras únicas e conectivos fechados do dicionário.
+                        /(?<![\p{L}\p{N}])(?:arts?\.|artigos?|§§?|parágrafos?|incisos?|alíneas?|caput|leis?|lc|súmulas?|enunciados?|cpc|cf|cc|clt|cpp|cp|ctn)(?!\p{L})(?:[\s,;:\-]+|(?:de|do|da|dos|das|e|c\/c|n[º°\.]?)(?!\p{L})|(?:arts?\.|artigos?|§§?|parágrafos?|incisos?|alíneas?|caput|leis?|lc|cpc|cf|cc|clt|cpp|cp|ctn|stj|stf|tnu|tst|tse)(?!\p{L})|\d+(?:\.\d+)*(?:\/\d{2,4})?[º°]?|[IVXLCDM]+(?!\p{L})|['"][a-z]['"]|[a-z](?!\p{L}))+(?![\p{L}\p{N}])/giu
+                    ]
+                },
+                {
+                    grupo: "DOCUMENTOS_PESSOAIS_E_FISCAIS",
+                    regexes: [
+                        // CNPJ (Clássico e Alfanumérico Novo)
+                        /(?<![\p{L}\p{N}])[A-Z0-9]{2,3}\.[A-Z0-9]{3}\.[A-Z0-9]{3}\/[A-Z0-9]{4}-\d{2}(?![\p{L}\p{N}])/giu,
+                        // CPF (11 dígitos, sufixo de 2 dígitos)
+                        /(?<![\p{L}\p{N}])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\p{L}\p{N}])/gu,
+                        // Benefício INSS - NB (10 dígitos, sufixo de 1 dígito)
+                        /(?<![\p{L}\p{N}])\d{3}\.\d{3}\.\d{3}-\d{1}(?![\p{L}\p{N}])/gu,
+                        // Inscrição OAB (Ex: OAB/SP 123456 ou OAB 12345)
+                        /(?<![\p{L}\p{N}])OAB\/?(?:[A-Z]{2})?\s?\d{3,7}(?![\p{L}\p{N}])/giu
+                    ]
+                },
+                {
+                    grupo: "NUMERACOES_ID_E_PUBLICAS",
+                    regexes: [
+                        // CNJ Certidões Universais (Nascimento/Casamento): 32 dígitos.
+                        /(?<![\p{L}\p{N}])\d{6}[\.\s]?\d{2}[\.\s]?\d{2}[\.\s]?\d{4}[\.\s]?\d[\.\s]?\d{5}[\.\s]?\d{3}[\.\s]?\d{7}[\.\s]?\d{2}(?![\p{L}\p{N}])/gu,
+                        // CNJ Processos Judiciais (Com ou sem zeros à esquerda).
+                        /(?<![\p{L}\p{N}])\d{1,7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}(?![\p{L}\p{N}])/gu,
+                        // Placa Veicular (Antiga e Mercosul)
+                        /(?<![\p{L}\p{N}])[A-Z]{3}[- ]?[0-9][A-Z0-9][0-9]{2}(?![\p{L}\p{N}])/giu,
+                        // Fração Numérica Longa (Separa identificadores unidos por barra, ex: 31/6477373606)
+                        /(?<![\p{L}\p{N}\/])(\d+)\/(\d{5,})(?![\p{L}\p{N}\/])/gu
+                    ]
+                },
+                {
+                    grupo: "DATAS",
+                    regexes: [
+                        // Cobre simultaneamente DD/MM/AAAA, DD/MM, MM/AA e MM/AAAA.
+                        /(?<![\p{L}\p{N}\/])\d{1,2}\/(?:\d{1,2}\/\d{2,4}|\d{2,4})(?![\p{L}\p{N}\/])/gu
+                    ]
+                },
+                {
+                    grupo: "GENERICOS_E_FALLBACKS",
+                    regexes: [
+                        // Matriculas de Imóveis, Portarias e sequenciais padronizados pelos tribunais.
+                        /(?<![\p{L}\p{N}])(?:\d+[\/\-\.,]){1,}\d+(?![\p{L}\p{N}])/gu,
+                        // Numerações puras e IDs sem pontuação (Matrículas, Contas, NB sem formatação).
+                        /(?<![\p{L}\p{N}])\d{3,}(?![\p{L}\p{N}])/gu
+                    ]
+                }
+            ];
+        }
+
+        // FUNÇÃO UNIFICADA: Motor de Busca Estruturado por Tipo
+        // OBJETIVO: Varrer o texto seguindo a taxonomia do Catálogo e retornar os limites (start, end).
+        encontrarLimitesPadrao(texto, offset) {
+            let start = offset;
+            let end = offset;
+            let matchFound = false;
+
+            // PASSO 1: Itera hierarquicamente sobre o catálogo semântico.
+            for (const categoria of this.CATALOGO_PADROES) {
+                for (const regex of categoria.regexes) {
+                    regex.lastIndex = 0;
+                    let match;
+                    while ((match = regex.exec(texto)) !== null) {
+
+                        let dataStart = match.index;
+                        let dataEnd = match.index + match[0].length;
+
+                        // PASSO 1.5: Sensor de Pré-Indicadores Dinâmicos (Ex: "CPF:", "NB-", "DT: ")
+                        // Busca de trás para frente se existe uma palavra âncora (2 a 15 letras/números) colada ao dado.
+                        const txtAnterior = texto.substring(0, dataStart);
+                        const prefixMatch = txtAnterior.match(/([\p{L}\p{N}º°]{2,15}\s?[:\-]\s?)$/ui);
+
+                        let prefixStart = dataStart;
+                        if (prefixMatch) {
+                            prefixStart = dataStart - prefixMatch[1].length;
+                        }
+
+                        // O radar geográfico engloba o bloco total virtual (Prefixo + Dado)
+                        if (offset >= prefixStart && offset <= dataEnd) {
+
+                            // PASSO 1.6: Lógica de Seleção Direcional (Gatilho de Isolamento)
+                            if (offset < dataStart) {
+                                // Clicou EXATAMENTE no prefixo (Ex: em cima de "CPF:"). Captura a âncora e o dado unidos.
+                                start = prefixStart;
+                                end = dataEnd;
+                            } else {
+                                // Clicou no DADO. Isola e descarta o prefixo.
+                                if (regex.source.includes('(\\d{5,})')) {
+                                    // TRATAMENTO CIRÚRGICO: Fração Numérica Longa (Ex: 31/6477373606)
+                                    const slashIndex = match.index + match[1].length;
+                                    if (offset === slashIndex) {
+                                        start = match.index;
+                                        end = dataEnd;
+                                    } else if (offset < slashIndex) {
+                                        start = match.index;
+                                        end = slashIndex;
+                                    } else {
+                                        start = slashIndex + 1;
+                                        end = dataEnd;
+                                    }
+                                } else {
+                                    // PADRÃO GERAL: Captura apenas a matemática/dado limpo.
+                                    start = dataStart;
+                                    end = dataEnd;
+                                }
+                            }
+                            matchFound = true;
+                            break;
+                        }
+                    }
+                    if (matchFound) break;
+                }
+                if (matchFound) break;
+            }
+
+            // PASSO 2: Fallback Dinâmico (Palavras comuns ou strings sem padrão definido).
+            if (!matchFound) {
+                const isBloco = (char) => /^[\p{L}\p{N}_\.\-\/:,]$/u.test(char);
+                const isSpace = (char) => /^\s$/.test(char);
+
+                let charAt = texto[offset] || '';
+                if (isSpace(charAt)) {
+                    while (start > 0 && texto[start - 1] !== '\n') start--;
+                    while (end < texto.length && texto[end] !== '\n') end++;
+                } else {
+                    let charBefore = texto[offset - 1] || '';
+                    if (!isBloco(charAt) && !isBloco(charBefore)) return null;
+
+                    while (start > 0 && isBloco(texto[start - 1])) start--;
+                    while (end < texto.length && isBloco(texto[end])) end++;
+                }
+            }
+
+            // Apara sujeira final da seleção dinâmica
+            while (end > start && /[\.,;]/.test(texto[end - 1])) end--;
+
+            return { start, end };
+        }
+
+        // FUNÇÃO MATEMÁTICA 1: Sensor de Clique Direto no Símbolo (1 Clique)
+        // OBJETIVO: Englobar os parênteses/chaves e tudo que há dentro deles.
+        calcularLimitesSimboloClicado(texto, offset) {
+            const PARES = { '(': ')', '[': ']', '{': '}' };
+            const INVERSO = { ')': '(', ']': '[', '}': '{' };
+
+            // PASSO 1: Checa a posição exata do clique ou a imediatamente anterior (comportamento do caret do DOM)
+            let charAt = texto[offset] || '';
+            let charBefore = texto[offset - 1] || '';
+            let targetChar = '';
+            let targetIndex = -1;
+
+            if (PARES[charAt] || INVERSO[charAt]) {
+                targetChar = charAt; targetIndex = offset;
+            } else if (PARES[charBefore] || INVERSO[charBefore]) {
+                targetChar = charBefore; targetIndex = offset - 1;
+            }
+
+            if (targetIndex === -1) return null;
+
+            // PASSO 2: Se for símbolo de ABERTURA, avança para a direita contando profundidade.
+            if (PARES[targetChar]) {
+                let depth = 1;
+                let closeChar = PARES[targetChar];
+                for (let i = targetIndex + 1; i < texto.length; i++) {
+                    // BLINDAGEM DE PERFORMANCE: Se bater em quebra de linha, aborta imediatamente.
+                    if (texto[i] === '\n' || texto[i] === '\r') return null;
+
+                    if (texto[i] === targetChar) depth++;
+                    else if (texto[i] === closeChar) {
+                        depth--;
+                        if (depth === 0) return { start: targetIndex, end: i + 1 };
+                    }
+                }
+            }
+            // PASSO 3: Se for símbolo de FECHAMENTO, recua para a esquerda contando profundidade.
+            else if (INVERSO[targetChar]) {
+                let depth = 1;
+                let openChar = INVERSO[targetChar];
+                for (let i = targetIndex - 1; i >= 0; i--) {
+                    // BLINDAGEM DE PERFORMANCE: Aborta se bater em quebra de linha prévia.
+                    if (texto[i] === '\n' || texto[i] === '\r') return null;
+
+                    if (texto[i] === targetChar) depth++;
+                    else if (texto[i] === openChar) {
+                        depth--;
+                        if (depth === 0) return { start: i, end: targetIndex + 1 };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // FUNÇÃO MATEMÁTICA 2: Sensor de Conteúdo Interno (2 Cliques)
+        // OBJETIVO: Encontrar os limites das extremidades e extrair APENAS o texto interno, ignorando os símbolos.
+        calcularLimitesConteudoSimbolos(texto, offset) {
+            const PARES = { '(': ')', '[': ']', '{': '}' };
+            const INVERSO = { ')': '(', ']': '[', '}': '{' };
+
+            let depth = 0;
+            let openIndex = -1;
+            let openChar = '';
+
+            // PASSO 1: Radares para a esquerda caçando o invólucro de abertura mais próximo.
+            for (let i = offset - 1; i >= 0; i--) {
+                let char = texto[i];
+                // BLINDAGEM DE PERFORMANCE: Aborta na quebra de linha.
+                if (char === '\n' || char === '\r') return null;
+
+                if (INVERSO[char]) depth++;
+                else if (PARES[char]) {
+                    if (depth > 0) depth--;
+                    else {
+                        openIndex = i; openChar = char; break;
+                    }
+                }
+            }
+            if (openIndex === -1) return null;
+
+            depth = 0;
+            let expectedClose = PARES[openChar];
+            let closeIndex = -1;
+
+            // PASSO 2: Radares para a direita caçando o fechamento compatível respectivo.
+            for (let i = offset; i < texto.length; i++) {
+                let char = texto[i];
+                // BLINDAGEM DE PERFORMANCE: Aborta na quebra de linha.
+                if (char === '\n' || char === '\r') return null;
+
+                if (PARES[char]) depth++;
+                else if (INVERSO[char]) {
+                    if (depth > 0) depth--;
+                    else if (char === expectedClose) {
+                        closeIndex = i; break;
+                    }
+                }
+            }
+            if (closeIndex === -1) return null;
+
+            // PASSO 3: Move a âncora 1 casa para dentro (para pular os símbolos) e apara espaços em branco parasitas nas pontas.
+            let start = openIndex + 1;
+            let end = closeIndex;
+            while (start < end && /\s/.test(texto[start])) start++;
+            while (end > start && /\s/.test(texto[end - 1])) end--;
+
+            if (start >= end) return null;
+            return { start, end };
+        }
+
+        // FUNÇÃO SENSORA: Área Blindada (Proteção Máxima de Prancheta e Menus Dinâmicos)
+        isAreaBloqueadaParaCopia(target, ativo) {
+            // PASSO 1: Aborta se for área de digitação (WYSIWYG).
+            if (this.nav.isElementoEditavel(ativo) || this.nav.isElementoEditavel(target)) return true;
+
+            // PASSO 2: Varre ancestrais buscando onclick. Se a palavra for um botão disfarçado (PrimeFaces), aborta cópia.
+            if (target.closest('[onclick]')) return true;
+
+            const tag = target.tagName ? target.tagName.toLowerCase() : '';
+            const tagsBloqueadas = ['input', 'textarea', 'button', 'select', 'label', 'li', 'ul', 'option'];
+            // PASSO 3: Compara a tag raiz contra whitelist estrutural morta.
+            const estruturasBloqueadas = 'a, label, button, .checkbox, .radio, .ui-chkbox, .ui-radiobutton, .p-checkbox, .p-radiobutton, [role="checkbox"], [role="radio"], [role="button"], [role="switch"], [type="checkbox"], [type="radio"], .select2-container, .select2-results, .select2-dropdown, .ui-autocomplete, .ui-dropdown-items, [role="listbox"], [role="option"], [role="combobox"], [role="treeitem"], [onclick]';
+
+            // PASSO 4: Lê CSS rules renderizadas. Cursor 'pointer' (mãozinha) = bloqueia a cópia para não matar link.
+            if (tagsBloqueadas.includes(tag) ||
+                target.isContentEditable ||
+                target.closest(estruturasBloqueadas) ||
+                window.getComputedStyle(target).cursor === 'pointer') {
+                return true;
+            }
+            return false;
+        }
+
+        // FUNÇÃO: Ajustador Geométrico de Pontuação Final (Saneador de Frase Condicional)
+        ajustarPontuacaoFinal(range) {
+            // PASSO 1: Recebe o range de seleção finalizado. Identifica nós e offsets iniciais e finais.
+            const startNode = range.startContainer;
+            const startOffset = range.startOffset;
+            const endNode = range.endContainer;
+            const endOffset = range.endOffset;
+
+            // PASSO 2: Verifica se o início do grifo azul corresponde ao início real de uma frase (texto anterior vazio ou ponto final prévio).
+            let isInicioFrase = false;
+            if (startNode && startNode.nodeType === Node.TEXT_NODE) {
+                const textoAnterior = startNode.nodeValue.substring(0, startOffset);
+                const textoAnteriorLimpo = textoAnterior.trim();
+                if (textoAnteriorLimpo === '' || /[\.\!\?][\s\u00A0]*$/.test(textoAnterior)) {
+                    isInicioFrase = true;
+                }
+            } else {
+                isInicioFrase = true;
+            }
+
+            // PASSO 3: Lógica Condicional Bidirecional (Engolir ou Cuspir)
+            if (endNode && endNode.nodeType === Node.TEXT_NODE) {
+                const text = endNode.nodeValue;
+
+                if (isInicioFrase) {
+                    // EXPANSÃO: Se INICIAR uma frase, engole a pontuação final esticando a borda direita em +1.
+                    if (endOffset < text.length) {
+                        const charAtEnd = text[endOffset];
+                        const nextChar = text[endOffset + 1] || ' ';
+                        if (/^[\.,;:!\?]$/.test(charAtEnd) && /^[\s\n]$/.test(nextChar)) {
+                            range.setEnd(endNode, endOffset + 1);
+                        }
+                    }
+                } else {
+                    // CONTRAÇÃO: Se NÃO INICIAR uma frase, inspeciona a borda direita. Se encontrar um ponto ali retido, recua a borda em -1 para ejetá-lo.
+                    if (endOffset > 0) {
+                        const charJustBeforeEnd = text[endOffset - 1];
+                        if (/^[\.,;:!\?]$/.test(charJustBeforeEnd)) {
+                            range.setEnd(endNode, endOffset - 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        // MOTOR ELÁSTICO DE SELEÇÃO ESTRUTURAL (Expansão e Contração via Control)
+        executarMotorElastico(event) {
+            if (event.button !== 0 || !event.ctrlKey) return false;
+
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') return false;
+
+            let range, textNode, offset;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(event.clientX, event.clientY);
+                if (!range) return false;
+                textNode = range.startContainer;
+                offset = range.startOffset;
+            } else return false;
+
+            if (textNode.nodeType !== Node.TEXT_NODE) return false;
+
+            // DELEGAÇÃO: Motor Unificado localiza os limites
+            const text = textNode.nodeValue;
+            const limites = this.encontrarLimitesPadrao(text, offset);
+            if (!limites) return false;
+
+            const { start, end } = limites;
+
+            const currentRange = selection.getRangeAt(0);
+            const clickedRange = document.createRange();
+            clickedRange.setStart(textNode, start);
+            clickedRange.setEnd(textNode, end);
+
+            const isBefore = currentRange.compareBoundaryPoints(Range.START_TO_START, clickedRange) > 0;
+            const isAfter  = currentRange.compareBoundaryPoints(Range.END_TO_END, clickedRange) < 0;
+            const isInside = !isBefore && !isAfter;
+
+            const newRange = document.createRange();
+
+            try {
+                if (isAfter) {
+                    newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                    newRange.setEnd(textNode, end);
+                } else if (isBefore) {
+                    newRange.setStart(textNode, start);
+                    newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                } else if (isInside) {
+                    const leftSide = document.createRange();
+                    leftSide.setStart(currentRange.startContainer, currentRange.startOffset);
+                    leftSide.setEnd(textNode, start);
+
+                    const rightSide = document.createRange();
+                    rightSide.setStart(textNode, end);
+                    rightSide.setEnd(currentRange.endContainer, currentRange.endOffset);
+
+                    const leftTextLivre = leftSide.toString().replace(/[\s\u00A0\.,;:!\?]/g, '');
+                    const rightTextLivre = rightSide.toString().replace(/[\s\u00A0\.,;:!\?]/g, '');
+
+                    if (leftTextLivre === '') {
+                        let newStart = end;
+                        while (newStart < text.length && /[\s\u00A0\.,;]/.test(text[newStart])) newStart++;
+                        newRange.setStart(textNode, newStart);
+                        newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                    }
+                    else if (rightTextLivre === '') {
+                        let newEnd = start;
+                        while (newEnd > 0 && /[\s\u00A0\.,;]/.test(text[newEnd - 1])) newEnd--;
+                        newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                        newRange.setEnd(textNode, newEnd);
+                    }
+                    else {
+                        if (leftSide.toString().length <= rightSide.toString().length) {
+                            newRange.setStart(textNode, start);
+                            newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                        } else {
+                            newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                            newRange.setEnd(textNode, end);
+                        }
+                    }
+                }
+
+                this.ajustarPontuacaoFinal(newRange);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                this.copiarTextoSelecionado(event);
+                return true;
+            } catch(e) {
+                return false;
+            }
+        }
+
+        // FUNÇÃO: Seleção Inteligente de Moeda/Data/Palavra ao Clicar (O Motor VIP)
+        SelecionarVIP(event) {
+            if (event.button !== 0) return;
+            if (this.isAreaBloqueadaParaCopia(event.target, document.activeElement)) return;
+
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) return;
+
+            let range, textNode, offset;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(event.clientX, event.clientY);
+                if (!range) return;
+                textNode = range.startContainer;
+                offset = range.startOffset;
+            } else return;
+
+            if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+            const text = textNode.nodeValue;
+
+            // PRIORIDADE 1: Sensor de clique direto nos Símbolos.
+            let limites = this.calcularLimitesSimboloClicado(text, offset);
+
+            // PRIORIDADE 2: Se não clicou num símbolo, delega ao motor principal do catálogo.
+            if (!limites) {
+                limites = this.encontrarLimitesPadrao(text, offset);
+            }
+
+            if (limites && limites.start !== limites.end) {
+                const newRange = document.createRange();
+                newRange.setStart(textNode, limites.start);
+                newRange.setEnd(textNode, limites.end);
+                this.ajustarPontuacaoFinal(newRange);
+
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+            }
+        }
+
+        // FUNÇÃO: Escolta Passiva de Injeção em Prancheta
+        copiarTextoSelecionado(event) {
+            // PASSO 1: Disparada após a soltura do mouse. Se as fronteiras demarcarem fragmentos úteis, executa.
+            if (this.nav.isElementoEditavel(document.activeElement) || this.nav.isElementoEditavel(event.target)) return;
+
+            let texto = window.getSelection().toString().trim();
+            const isApenasNumeros = /^\d+$/.test(texto);
+
+            // PASSO 2: Usa Regex isApenasNumeros. Se o bloco for só de números, obriga ter pelo menos 2 dígitos.
+            // PASSO 3: Se possuir caracteres alfabéticos, a captura mínima exigida é de 3 caracteres (evita lixo de preposições).
+            if ((isApenasNumeros && texto.length >= 2) || (!isApenasNumeros && texto.length >= 3)) {
+                // PASSO 4: Se passar no crivo de segurança, delega ao Motor Bélico global para injeção nativa na prancheta.
+                this.copia.forcarCopia(texto);
+            }
+        }
+
+        // FUNÇÃO AUXILIAR: Mapeador Sensorial para Nomes Próprios (Caixa Alta)
+        calcularLimitesCaixaAlta(texto, offset) {
+            const regex = /[\p{L}\p{N}]+/gu;
+            let match;
+            const palavras = [];
+
+            // PASSO 1: Foca no offset original gerado por um duplo-clique.
+            // PASSO 2: Quebra toda a frase do nó de texto e testa propriedades upperCase em matriz.
+            // PASSO 3: Mantém whitelist restrita de conectivos lícitos que cruzam Caixa Alta (de, do, da, das, e).
+            while ((match = regex.exec(texto)) !== null) {
+                const palavra = match[0];
+                palavras.push({
+                    start: match.index,
+                    end: match.index + palavra.length,
+                    isUpper: palavra === palavra.toUpperCase() && /[\p{L}]/u.test(palavra),
+                    isConn: /^(e|de|da|do|das|dos|no|na|nos|nas|com|por|em|ou|aos?|às?|um|uma)$/i.test(palavra)
+                });
+            }
+
+            let idx = palavras.findIndex(p => offset >= p.start && offset <= p.end);
+            if (idx === -1) {
+                idx = palavras.findIndex(p => offset >= p.start - 2 && offset <= p.end + 2);
+            }
+
+            if (idx === -1 || !palavras[idx].isUpper) return null;
+
+            let left = idx;
+            let right = idx;
+
+            // PASSO 4: Inicia um scan radial iterativo lateral (para esquerda e direita) acoplando as strings compatíveis.
+            while (left > 0) {
+                const prev = palavras[left - 1];
+                if (prev.isUpper) {
+                    left--;
+                } else if (prev.isConn && left - 2 >= 0 && palavras[left - 2].isUpper) {
+                    left -= 2;
+                } else {
+                    break;
+                }
+            }
+
+            while (right < palavras.length - 1) {
+                const next = palavras[right + 1];
+                if (next.isUpper) {
+                    right++;
+                } else if (next.isConn && right + 2 < palavras.length && palavras[right + 2].isUpper) {
+                    right += 2;
+                } else {
+                    break;
+                }
+            }
+
+            let finalStart = palavras[left].start;
+            let finalEnd = palavras[right].end;
+
+            while (finalStart > 0 && /[\(\[\{"']/.test(texto[finalStart - 1])) { finalStart--; }
+            while (finalEnd < texto.length && /[\)\]\}"'\.,;:\-—]/.test(texto[finalEnd])) {
+                finalEnd++;
+            }
+
+            // PASSO 5: Retorna objeto {start, end} agrupando o bloco jurídico (Ex: ESTADO DO PIAUÍ) para jogar na prancheta de uma vez.
+            if (left !== right || finalStart !== palavras[left].start || finalEnd !== palavras[right].end) {
+                return { start: finalStart, end: finalEnd };
+            }
+
+            return null;
+        }
+
+        // FUNÇÃO CAÇADORA: Gatilho Duplo para Sublinhados e Negritos do PJe
+        selecionarBlocosEspeciais(event) {
+            if (event.button !== 0) return;
+            if (this.isAreaBloqueadaParaCopia(event.target, document.activeElement)) return;
+
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            const textNode = range.startContainer;
+
+            if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+            const texto = textNode.nodeValue;
+            const offset = range.startOffset;
+            let houveExpansao = false;
+
+            // PRIORIDADE 1: Tenta extrair o recheio do texto entre os Símbolos.
+            let limites = this.calcularLimitesConteudoSimbolos(texto, offset);
+
+            // PRIORIDADE 2: Se não estiver dentro de parênteses/chaves, recorre à Caixa Alta.
+            if (!limites) {
+                limites = this.calcularLimitesCaixaAlta(texto, offset);
+            }
+
+            if (limites) {
+                const newRange = document.createRange();
+                newRange.setStart(textNode, limites.start);
+                newRange.setEnd(textNode, limites.end);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+                houveExpansao = true;
+            } else {
+                // PRIORIDADE 3: Fallback de escopo HTML (Negrito, Sublinhado, etc).
+                const parent = textNode.parentElement;
+                if (parent) {
+                    const style = window.getComputedStyle(parent);
+                    const isBold = parseInt(style.fontWeight) >= 600 || style.fontWeight === 'bold';
+                    const isUnderlined = style.textDecorationLine.includes('underline');
+                    const tagsPermitidas = ['b', 'strong', 'u', 'span', 'em', 'i', 'font', 'label'];
+                    const tag = parent.tagName.toLowerCase();
+
+                    if ((isBold || isUnderlined) && tagsPermitidas.includes(tag)) {
+                        const styleRange = document.createRange();
+                        styleRange.selectNodeContents(parent);
+                        selection.removeAllRanges();
+                        selection.addRange(styleRange);
+                        houveExpansao = true;
+                    }
+                }
+            }
+
+            if (houveExpansao) {
+                this.copiarTextoSelecionado(event);
+            }
+        }
+    }
+
+    // =====================================================================
+    // CLASSE 4: BOOTSTRAPPER E FIREWALL (O Controlador Principal do App)
+    // =====================================================================
+    class JusGovApp {
+        constructor() {
+            // Instanciação encadeada mantendo a arquitetura DRY com Injeção de Dependências.
+            this.copia = new MotorCopia();
+            this.nav = new MotorNavegacao();
+            this.sel = new MotorSelecao(this.copia, this.nav);
+        }
+
+        // FIREWALL DE EVENTOS (Camada Protetiva):
+        isBypass(e) {
+            // PASSO 1: Exceção vital para permitir que Ctrl+Enter (marcha a ré) chegue nos sensores.
+            if (e.ctrlKey && e.key === 'Enter') return false;
+
+            // PASSO 2: Exceção vital para o Motor Elástico, permitindo que cliques com Control passem imunes.
+            if (e.ctrlKey && (e.type === 'mousedown' || e.type === 'mouseup' || e.type === 'pointerdown' || e.type === 'dblclick')) return false;
+
+            // PASSO 3: Analisa todos os outros eventos e aborta sumariamente se teclas de atalho de sistema estiverem acionadas.
+            return e.ctrlKey || e.metaKey || e.altKey || e.key === 'Meta' || e.key === 'OS';
+        }
+
+        // INIT: Amarra os radares do DOM às funções contidas nas Classes.
+        iniciar() {
+            // 1. Escuta passiva focusin: Assenta dados de click vazio em autoselect no painel.
+            document.addEventListener('focusin', (event) => {
+                if (this.isBypass(event)) return;
+                this.nav.lidarFocoInteligente(event);
+            }, true);
+
+            // 2. Escuta mouseup: Atua bifurcada. Se Botão do Meio, Eixo Y. Se Esquerdo simples (não control), Seleção Radial e joga na prancheta.
+            document.addEventListener('mouseup', (event) => {
+                if (this.isBypass(event)) return;
+                if (event.button === 0) {
+                    if (event.ctrlKey) return;
+                    this.sel.SelecionarVIP(event);
+                    this.sel.copiarTextoSelecionado(event);
+                } else if (event.button === 1) {
+                    this.nav.colarBotaoMeio(event);
+                }
+            }, true);
+
+            // 3. EXTERMINADOR DE AUTO-SCROLL E PRESERVADOR DE SELEÇÃO:
+            const destruirScroll = (event) => {
+                if (this.isBypass(event)) return;
+
+                if (event.button === 1) {
+                    // PASSO 1: Previne a engrenagem nativa e popup nativa em botão do meio.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (this.nav.isCampoDeTextoValido(event.target)) {
+                        event.target.focus();
+                    }
+                } else if (event.button === 0 && event.ctrlKey) {
+                    // PASSO 2: Em mousedown + Control, executa integralmente a matemática visual e range cruzado DO MOTOR ELÁSTICO ANTES do Chromium destruir a tela.
+                    if (this.sel.executarMotorElastico(event)) {
+                        // Se retornou true, o preventDefault nativo embutido no motor garantiu a integridade visual da operação.
+                    }
+                }
+            };
+            document.addEventListener('mousedown', destruirScroll, { capture: true, passive: false });
+            document.addEventListener('pointerdown', destruirScroll, { capture: true, passive: false });
+
+            // 4. Interceptador Navegação contínua turbo: Joga os keys para analisar propulsão das marchas.
+            document.addEventListener('keydown', (event) => {
+                if (this.isBypass(event)) return;
+                if (event.repeat) return;
+                this.nav.navegarTurbo(event);
+            }, true);
+
+            // 5. Buraco Negro de Concorrência Cascata:
+            document.addEventListener('keyup', (event) => {
+                if (this.isBypass(event)) return;
+                if (['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+                    // PASSO 1: Suga o keyup natural da base de teclados antes que acionem gatilhos fantasmas JSF por já estarmos flutuando na próxima caixa no keydown hiperveloz, esgotando o rebatimento natural.
+                    if (this.nav.isCampoDeTextoValido(event.target)) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                }
+            }, { capture: true, passive: false });
+
+            // 6. Sensor DblClick para acionar Radar de caixa alta e sublinhados judiciais.
+            document.addEventListener('dblclick', (event) => {
+                if (this.isBypass(event)) return;
+                this.sel.selecionarBlocosEspeciais(event);
+            });
+
+            // 7. Arquiteto Geométrico de Paste:
+            document.addEventListener('paste', (event) => {
+                const target = event.target;
+                if (!this.nav.isCampoDeTextoValido(target) || target.readOnly || target.disabled) return;
+
+                const clipboardData = event.clipboardData || window.clipboardData;
+                if (!clipboardData) return;
+
+                // PASSO 1: Ouve colagens atípicas. Subtrai tamanho maximo, varre integridade numérica do clipboard, e roda injeção contínua (cascata) quebrando por matriz.
+                const textoPasted = clipboardData.getData('text');
+                const apenasNumeros = textoPasted.replace(/\D/g, '');
+                const max = parseInt(target.getAttribute('maxlength'), 10);
+
+                if (max && apenasNumeros.length > max && !/[a-zA-Z]/.test(textoPasted)) {
+                    event.preventDefault();
+                    this.nav.injetarCascata(target, textoPasted);
+                }
+            }, true);
+        }
+    }
+
+    // Ignição do Motor Geral
+    const app = new JusGovApp();
+    app.iniciar();
+
+})();
