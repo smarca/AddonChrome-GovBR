@@ -378,6 +378,13 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
 - Ao simular ou executar cliques duplos em palavras comuns antecedendo expressoes delimitadas (como "completo (JSON)" ou "sobrescrito (ex: 1)"), o cursor sobre o corpo da palavra possui busca de borda restrita a zero (raioBusca = 0), prevenindo que o algoritmo de delimitadores salte sobre o espaco em branco e capture indevidamente blocos externos menores que a palavra alvo.
 - A expansao de delimitadores simetricos para o escopo externo ocorre apenas quando o clique incide diretamente sobre o caractere delimitador ou sobre o espaco adjacente imediato (delta <= 1), ou quando a palavra esta estritamente aninhada dentro dos delimitadores.
 
+### 5.11 Injecao Universal em Subframes, Documentos PDF e Deteccao Global de Selecao
+- Subframes e Visualizadores de PDF (PDF.js, PJe, eproc, iframes, embeds):
+  * Durante a navegacao web ou abertura de processos e documentos judiciais, o motor e injetado universalmente em todos os frames (`allFrames: true`), combinando declaracao nativa (`content_scripts`), monitoramento ativo de ciclo de vida (`webNavigation`), MutationObserver com deteccao de insercao e mutacao de atributos (`src`/`data`), inspecao local em iframes same-origin e captura de eventos `load` em subframes com retentativas temporizadas assincronas (250ms e 800ms).
+  * Camadas de texto de documentos PDF (`.textLayer`, `.pdfViewer`, `.page`, `[data-page-number]`, `embed[type*="pdf"]`, etc.) pertencem estritamente ao dominio de `LEITURA_COMUM`, sendo vedado classifica-las como controles de sistema ou des-seleciona-las arbitrariamente.
+  * Deteccao Global de Selecao: Qualquer selecao ativa de texto na tela (seja gerada por arrasto de mouse, atalhos de teclado como Shift+Setas ou selecoes nativas de visualizadores) e identificada globalmente via `selectionchange` (com debounce de 120ms) e imediatamente processada pelo motor (higienizacao, formatacao no nivel configurado, copia para a Area de Transferencia, validacao matematica com alerta e contorno visual com Flash Verde), sem interferir em campos de digitacao protegidos pela Regra de Ouro.
+
+
 
 
 

@@ -255,6 +255,11 @@
     let timerFlashBorder = null;
     let aguardandoDesselecaoFlash = false;
     let flashExclusivoSemSelecao = false;
+    let selecaoSendoAplicadaPeloAddon = false;
+    let timerDebounceSelecaoGlobal = null;
+    let ultimoRangeAssinaturaGlobal = '';
+    let isMousePressionado = false;
+    let observerFrames = null;
     let timestampCriacaoFlash = 0;
     const LIMITE_MAXIMO_CONTADOR_OPERACIONAL = 900000000;
     let converterCabecalhoPjeAtivo = true;
@@ -599,6 +604,19 @@
      */
     function isElementoInterativoOuUi(el) {
         if (!el) return false;
+
+        /* DIRETRIZ PDF E DOCUMENTOS: Visualizadores de PDF (PDF.js, PJe, eproc, textLayer)
+         * e camadas de texto de paginas de documentos pertencem estritamente a LEITURA_COMUM,
+         * NUNCA a controles de sistema ou menus de interface. */
+        if (typeof el.closest === 'function') {
+            const ehVisualizadorPdf = el.closest('.textLayer, .pdfViewer, .page[data-page-number], #viewerContainer, .pdf-container, embed[type*="pdf"], object[type*="pdf"]');
+            if (ehVisualizadorPdf) {
+                const ehBarraFerramentas = el.closest('.toolbar, #toolbarViewer, #toolbarContainer, button, .toolbarButton');
+                if (!ehBarraFerramentas) {
+                    return false;
+                }
+            }
+        }
 
         const TAGS_INTERATIVAS = new Set([
             'BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
@@ -2931,18 +2949,20 @@
         }
         if (!textoLimpo || textoLimpo.length === 0) return false;
 
-        const sel = window.getSelection();
-        if (sel) {
-            const rangeJaAtivo = sel.rangeCount > 0 &&
-                sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
-                sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
-                sel.getRangeAt(0).endContainer === rangeAlvo.endContainer &&
-                sel.getRangeAt(0).endOffset === rangeAlvo.endOffset;
-            if (!rangeJaAtivo) {
-                sel.removeAllRanges();
-                sel.addRange(rangeAlvo);
+        selecaoSendoAplicadaPeloAddon = true;
+        try {
+            const sel = window.getSelection();
+            if (sel) {
+                const rangeJaAtivo = sel.rangeCount > 0 &&
+                    sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
+                    sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
+                    sel.getRangeAt(0).endContainer === rangeAlvo.endContainer &&
+                    sel.getRangeAt(0).endOffset === rangeAlvo.endOffset;
+                if (!rangeJaAtivo) {
+                    sel.removeAllRanges();
+                    sel.addRange(rangeAlvo);
+                }
             }
-        }
 
         /* Passo 5.6: Processar Modo Acumulador vs. Copia Simples Silenciosa preservando a ativacao do gesto do usuario */
         if (modoAcumulador && acumulador) {
@@ -3003,6 +3023,11 @@
         }
 
         return true;
+        } finally {
+            setTimeout(() => {
+                selecaoSendoAplicadaPeloAddon = false;
+            }, 60);
+        }
     }
 
     /* ==========================================================================
@@ -4586,6 +4611,7 @@
 
         if (e.button !== 0) return;
 
+        isMousePressionado = true;
         coordsMouseDown.x = e.clientX;
         coordsMouseDown.y = e.clientY;
         houveArrastoMouse = false;
@@ -4924,16 +4950,21 @@
             return;
         }
 
-        /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou com Acumulador (Ctrl+Alt)
-         * Preservacao integral da selecao por arrasto em texto comum. Em telas de sistema/interface: copia e
-         * remove a selecao visual da tela (removeAllRanges) imediatamente para evitar poluicao visual! */
-        if (houveArrastoMouse) {
+        /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou selecao ativa na tela (PDF / texto)
+         * Preservacao integral da selecao por arrasto/manual em texto comum e visualizadores de PDF.
+         * Em telas de sistema/interface: copia e remove a selecao visual da tela (removeAllRanges) imediatamente! */
+        isMousePressionado = false;
+        coordsMouseDown = { x: 0, y: 0 };
+        const selAtualNoMouseUp = window.getSelection();
+        const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && selAtualNoMouseUp.toString().trim().length > 0);
+        const ehArrastoOuSelecaoManual = houveArrastoMouse || (temTextoSelecionadoEfetivo && !e.altKey && !e.shiftKey);
+
+        if (ehArrastoOuSelecaoManual) {
             houveArrastoMouse = false;
             pontoAncoraArrastoAlt = null;
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && sel.rangeCount > 0 && sel.toString().trim().length > 0) {
+            if (temTextoSelecionadoEfetivo) {
                 ignorarProximoClick = true;
-                const rangeArrastado = sel.getRangeAt(0).cloneRange();
+                const rangeArrastado = selAtualNoMouseUp.getRangeAt(0).cloneRange();
                 const ehSistema = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target) || (rangeArrastado && isContextoDeSistemaOuUi(rangeArrastado.commonAncestorContainer));
                 await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador);
                 if (ehSistema) {
@@ -5896,6 +5927,160 @@
         window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
     }
 
+    /*
+     * FUNCAO: tratarMudancaSelecaoGlobal
+     * DIRETRIZ ROOT: Identifica globalmente selecoes de texto ativas na pagina ou em
+     * visualizadores de PDF (criadas por teclado Shift+Setas, selecoes nativas, mouseup)
+     * e garante a aplicacao imediata da formatacao, copia para a Area de Transferencia
+     * e contorno visual, sem quebrar o fluxo do usuario.
+     */
+    function tratarMudancaSelecaoGlobal(winAlvo) {
+        const win = winAlvo || window;
+        if (selecaoSendoAplicadaPeloAddon) return;
+        if (timerDebounceSelecaoGlobal) {
+            clearTimeout(timerDebounceSelecaoGlobal);
+        }
+        timerDebounceSelecaoGlobal = setTimeout(async () => {
+            timerDebounceSelecaoGlobal = null;
+            if (isMousePressionado) return; // Se mouse ainda esta sendo arrastado, aguarda mouseup
+            if (!verificarUrlPermitida()) return;
+            const sel = (win && typeof win.getSelection === 'function') ? win.getSelection() : window.getSelection();
+            if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+                ultimoRangeAssinaturaGlobal = '';
+                return;
+            }
+            const textoSel = (sel.toString() || '').trim();
+            if (textoSel.length === 0) return;
+
+            const range = sel.getRangeAt(0);
+            if (!range) return;
+
+            // Nao intercepta campos de entrada simples ou editores para respeitar a Regra de Ouro
+            const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
+            if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
+
+            // Assinatura única para evitar re-execução em loop da mesma seleção exata
+            const assinatura = `${range.startOffset}_${range.endOffset}_${textoSel}`;
+            if (assinatura === ultimoRangeAssinaturaGlobal) return;
+            ultimoRangeAssinaturaGlobal = assinatura;
+
+            const rangeClone = range.cloneRange();
+            const ehSistema = (ctx === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(range.commonAncestorContainer);
+
+            selecaoSendoAplicadaPeloAddon = true;
+            try {
+                await aplicarSelecaoECopiar(rangeClone, false);
+                if (ehSistema) {
+                    sel.removeAllRanges();
+                    flashExclusivoSemSelecao = true;
+                }
+            } finally {
+                setTimeout(() => {
+                    selecaoSendoAplicadaPeloAddon = false;
+                }, 60);
+            }
+        }, 120);
+    }
+
+    /*
+     * FUNCAO: observarFramesDinamicos
+     * DIRETRIZ ROOT: Observa a adicao e navegacao dinamica de iframes, embeds ou objects
+     * de visualizadores de PDF (comuns em sistemas judiciais como PJe e eproc), notifica o
+     * Service Worker para garantir a injecao imediata da suite em subframes e anexa
+     * diretamente ouvintes de seguranca em iframes same-origin.
+     */
+    function observarFramesDinamicos() {
+        if (observerFrames) {
+            try { observerFrames.disconnect(); } catch (_) {}
+            observerFrames = null;
+        }
+        try {
+            const notificarInjecao = () => {
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => {});
+                    }
+                } catch (_) {}
+            };
+
+            const inspecionarIframeLocal = (el) => {
+                if (!el || el.tagName !== 'IFRAME') return;
+                try {
+                    if (el.contentDocument && el.contentWindow) {
+                        const subDoc = el.contentDocument;
+                        const subWin = el.contentWindow;
+                        if (!subWin.__JUSGOV_OUVINTE_LOCAL__) {
+                            subWin.__JUSGOV_OUVINTE_LOCAL__ = true;
+                            subDoc.addEventListener('selectionchange', () => {
+                                tratarMudancaSelecaoGlobal(subWin);
+                            }, { passive: true });
+                            subWin.addEventListener('mouseup', (e) => {
+                                aoSoltarBotaoMouse(e);
+                            }, { capture: true });
+                        }
+                    }
+                } catch (_) {}
+            };
+
+            // Inspecionar iframes ja existentes no DOM no momento da carga
+            if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+                const iframesIniciais = document.querySelectorAll('iframe');
+                for (let i = 0; i < iframesIniciais.length; i++) {
+                    inspecionarIframeLocal(iframesIniciais[i]);
+                }
+            }
+
+            observerFrames = new MutationObserver((mutations) => {
+                let temFrame = false;
+                for (let i = 0; i < mutations.length; i++) {
+                    const m = mutations[i];
+                    if (m.type === 'attributes') {
+                        const t = m.target;
+                        if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
+                            temFrame = true;
+                            inspecionarIframeLocal(t);
+                            break;
+                        }
+                    }
+                    const nodes = m.addedNodes;
+                    if (!nodes || nodes.length === 0) continue;
+                    for (let j = 0; j < nodes.length; j++) {
+                        const n = nodes[j];
+                        if (n && n.nodeType === Node.ELEMENT_NODE) {
+                            const tag = n.tagName;
+                            if (tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT') {
+                                temFrame = true;
+                                inspecionarIframeLocal(n);
+                                break;
+                            } else if (typeof n.querySelector === 'function') {
+                                const subFrame = n.querySelector('iframe, embed, object');
+                                if (subFrame) {
+                                    temFrame = true;
+                                    inspecionarIframeLocal(subFrame);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (temFrame) break;
+                }
+                if (temFrame) {
+                    notificarInjecao();
+                }
+            });
+
+            const alvoObservacao = document.documentElement || document.body;
+            if (alvoObservacao) {
+                observerFrames.observe(alvoObservacao, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['src', 'data']
+                });
+            }
+        } catch (_) {}
+    }
+
     /* ==========================================================================
      * SECAO 10: INICIALIZACAO, ABORTCONTROLLER E SINCRONIZACAO COM SERVICE WORKER
      * ========================================================================== */
@@ -5903,11 +6088,26 @@
         if (controladorCicloVida) {
             try { controladorCicloVida.abort(); } catch (_) {}
         }
+        if (window.__JUSGOV_ABORT_CONTROLLER__) {
+            try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) {}
+        }
         controladorCicloVida = new AbortController();
         window.__JUSGOV_ABORT_CONTROLLER__ = controladorCicloVida;
         const signal = controladorCicloVida.signal;
 
+        signal.addEventListener('abort', () => {
+            if (observerFrames) {
+                try { observerFrames.disconnect(); } catch (_) {}
+                observerFrames = null;
+            }
+            if (timerDebounceSelecaoGlobal) {
+                clearTimeout(timerDebounceSelecaoGlobal);
+                timerDebounceSelecaoGlobal = null;
+            }
+        });
+
         blindarCSS();
+        observarFramesDinamicos();
 
         window.addEventListener('pointerdown', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
         window.addEventListener('mousedown', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
@@ -5943,6 +6143,7 @@
         }, { capture: true, signal });
         window.addEventListener('keyup', aoSoltarTecla, { capture: true, passive: true, signal });
         document.addEventListener('selectionchange', () => {
+            tratarMudancaSelecaoGlobal();
             if (!aguardandoDesselecaoFlash) return;
             if (flashExclusivoSemSelecao) return;
             if ((performance.now() - timestampCriacaoFlash) < 40) return;
@@ -5951,7 +6152,23 @@
                 agendarRetiradaFlashAposDesselecao();
             }
         }, { passive: true, signal });
+        window.addEventListener('load', (e) => {
+            const t = e.target;
+            if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => {});
+                    }
+                } catch (_) {}
+            }
+        }, { capture: true, passive: true, signal });
+        document.addEventListener('mouseup', () => {
+            isMousePressionado = false;
+        }, { capture: true, passive: true, signal });
         window.addEventListener('blur', () => {
+            isMousePressionado = false;
+            coordsMouseDown = { x: 0, y: 0 };
+            houveArrastoMouse = false;
             botaoLateralEmProcessamento = 0;
             teclasPressionadasAtivas.clear();
             agendarRetiradaFlashAposDesselecao();

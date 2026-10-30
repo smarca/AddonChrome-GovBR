@@ -63,9 +63,17 @@
  *   configuracao em tempo real para todas as abas abertas sem exigir F5.
  * - "tabGroups": Permite organizar visualmente as abas da mesma origem/tribunal
  *   em Grupos de Abas nativos coloridos do Google Chrome (Tab Groups API).
+ * - "webNavigation": Permite detectar navegacoes e carregamentos de subframes,
+ *   iframes e visualizadores de PDF em tempo real para injecao confiavel.
  * - "host_permissions": ["<all_urls>"] -> Necessario para que o modo "Todos os
  *   Sites" e os dominios customizados adicionados pelo usuario em Opcoes possam
  *   receber a injecao dinamica sem recompilar a extensao.
+ *
+ * 3. DECLARACAO ESTRITA DE CONTENT SCRIPTS (CHROME 116+):
+ * - "content_scripts": Injeta os modulos da suite diretamente em todas as paginas,
+ *   subframes, iframes, about:blank e blobs de visualizadores de PDF (all_frames,
+ *   match_about_blank e match_origin_as_fallback), garantindo operacao imediata
+ *   durante a navegacao sem depender de acionamento do Service Worker.
  *
  * NOTA DE PRODUCAO: Caso o carregador de extensoes descompactadas do Chrome
  * exija JSON estrito sem comentarios no topo, salve no disco apenas o objeto
@@ -84,10 +92,28 @@
     "scripting",
     "storage",
     "tabs",
-    "tabGroups"
+    "tabGroups",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/mod-copia/ConstantesPadroes.js",
+        "src/mod-copia/AvisoFlutuante.js",
+        "src/mod-copia/AcumuladorCopia.js",
+        "src/mod-copia/SelecionarCopiar.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start"
+    }
   ],
   "background": {
     "service_worker": "src/cfg/background.js"
