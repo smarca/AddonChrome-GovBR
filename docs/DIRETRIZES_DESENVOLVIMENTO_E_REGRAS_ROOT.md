@@ -61,6 +61,9 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
      (a) Testes Randômicos (geração estocástica/pseudoaleatória de strings mutadas, caracteres de borda e sequências truncadas para estresse de robustez);
      (b) Testes Pré-definidos (conjuntos fixos de regressão forense com casos canônicos de sucesso e insucesso);
      (c) Testes Obrigatórios de Conformidade (auditorias determinísticas de validação matemática de CPF, CNPJ, CNJ e calendário gregoriano).
+13. Padrão Visual Obrigatório para Listagem e Implementação de Ações:
+   - Sempre que apresentar ações pendentes, planos de implementação ou relatórios de ações concluídas ao usuário, utilizar obrigatoriamente a visualização estruturada em tabela Markdown (`📋 Próximas ações pendentes` / `✅ Resumo de implementação`) com as colunas `# | Descrição | Área` (ou `# | Descrição | Área | Status`), seguida de tópicos objetivos com os detalhes técnicos essenciais.
+
 
 ---
 
@@ -593,15 +596,27 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
 ---
 
 ### 6.19 Status de Implementacao (2026-10-30)
-* **Implementado e coberto por auditoria (181/181 testes):**
-  * Colar com botao do meio usa a "Ultima Selecao" (sem ler o clipboard do sistema); Ctrl + Meio envia Win+V; opcoes "Usar clipboard do sistema" e "Historico/Rollback" removidas (UI, background, content script, testes).
+* **Implementado e coberto por auditoria (182/182 testes):**
+  * **Performance e Eliminação de Lentidão (Idempotência O(1) e Debounce de Injeção):**
+    * Guardas de idempotência imediatas (`__JUSGOV_*_CARREGADO__` / `__JUSGOV_MOTOR_SELECAO_ATIVO__`) em `ConstantesPadroes.js`, `AvisoFlutuante.js`, `AcumuladorCopia.js` e `SelecionarCopiar.js`, impedindo recompilação repetitiva de dezenas de Regex e recriação de listeners DOM.
+    * Remoção do registro dinâmico redundante em `background.js` e substituição da tempestade tripla de `executeScript` (`0ms / 250ms / 800ms`) por `agendarInjecaoSeguraNaAba` com debounce de `350ms` por aba.
+    * Otimização de hot-paths DOM: `getComputedStyle` limitado à profundidade máxima de 6 níveis após checagens rápidas de tags/atributos; `caretRangeFromPoint` em O(1) antes de varredura de caracteres; eliminação de `querySelectorAll('*')` no `Escape`; neutralização de toasts/backdrops órfãos do PJe em `PJE-anti_ampuletas.css`.
+  * **Separação Formal entre Seleção e Cópia (`aplicarSelecaoDOM` vs `executarCopiaDeSelecao`):**
+    * Módulo de Seleção (`aplicarSelecaoDOM`) aplica o range, calcula e desenha o Flash Verde e decide a retenção ou limpeza imediata da seleção no DOM.
+    * Módulo de Cópia (`executarCopiaDeSelecao`) sanitiza, formata, grava no clipboard do sistema e atualiza o clipboard simulado interno com backup.
+  * **Distinção Refinada entre Áreas de Interface (UI) e Áreas de Texto/Leitura/PDF (`isAreaLeituraOuPdfConteudo`, `isTelaSistemaEstritaParaDesselecao`, `deveManterSelecaoAtivaNoDom`):**
+    * Áreas de Leitura e camadas de conteúdo de PDF (`.textLayer`, `.pdfViewer`, `.page[data-page-number]`, `#viewerContainer`, exceto barras de ferramentas `.toolbar`, `#toolbarViewer`, `#toolbarContainer`) mantêm a seleção ativa no DOM após a cópia.
+    * Áreas de Interface/Sistema (modais, diálogos, botões, links, menus, `.pje-etiquetas`, toolbar de PDF) removem imediatamente a seleção (`removeAllRanges()`) após copiar, mantendo o Flash Verde; arrastes curtos acidentais (`< 5` caracteres) sem `Alt` em UI estrita são ignorados; `Alt + Clique` prioriza blocos forenses antes do texto integral do controle.
+  * **Simulação de Clipboard com Backup Anterior (`Botão do Meio` e `Ctrl + Botão do Meio`):**
+    * Após gravar no clipboard do sistema, `salvarClipboardInternoComBackup` salva com `try/catch` e trava de 512KB o item anterior em `window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__` e o novo em `window.__JUSGOV_ULTIMO_CLIPBOARD__`.
+    * Clique com o Botão do Meio cola o clipboard simulado atual; `Ctrl + Botão do Meio` cola diretamente o clipboard simulado anterior (sem alterar o clipboard principal).
   * Painel "Ultima Selecao" (substitui "Conteudo atual da Area de Transferencia"), sem leitura de clipboard e sem alertas de permissao.
   * "Ato INSS" generalizado para "Ato Adm" (testes com orgaos de 3 niveis e numericos ##/##/###/###).
   * Auto-copia de selecao ainda nao copiada (assinatura offsets+texto liberada ao desfazer a selecao, mesmo com mouse pressionado; rede de seguranca no mouseup).
   * Regra de bloco do ":" (clique no espaco apos ":" seleciona a sentenca inteira).
   * Contorno flash sem sobreposicao: so retangulos de texto, fusao por linha e um poligono unico em varias linhas.
-* **Pendente:** auditoria de idempotencia; encapsulamento em OO por modulo (.js) com checagem de existencia de funcoes externas; separar formalmente "funcoes de copia" x "funcoes de selecao" (hoje o escutador global + assinatura cumprem o papel); desmarcar selecao do sistema apos copiar em PDF do Chrome (exceto interface do visualizador).
-* **Limitacao conhecida:** extensao do Chrome so dispara eventos de teclado sinteticos (nao confiaveis); o Windows NAO recebe o Win+V. Abrir o historico de verdade exige componente nativo (Native Messaging/AutoHotkey).
+* **Pendente (Salvo para implementação futura):**
+  * Desacoplamento físico em arquivos separados (Módulo de Seleção e Cópia vs Módulo de Mudança de Interface/UI) e encapsulamento POO completo por módulo `.js` (Seção 6.13 / Diretriz Root 11).
 ## 7. RADAR AUTÔNOMO DE ANÁLISE DE ENGENHARIA (BUGS, BOAS PRÁTICAS E NOVAS FUNCIONALIDADES IDENTIFICADAS)
 
 > [!NOTE]

@@ -250,27 +250,10 @@ function enfileirarRegistro(urlsTurbo, urlsAmpuletas, modoTurbo, estadoAmpuletas
                 }
             }
 
-            /* Passo 3.4: Configurar registro dos modulos JS do Motor de Selecao, Copia e Navegacao */
-            if (modoTurbo !== 'desligado') {
-                try {
-                    await chrome.scripting.registerContentScripts([{
-                        id: 'modulo-SelecionarCopiar-Suite',
-                        matches: ['<all_urls>'],
-                        js: [...ARQUIVOS_MODULO_COPIA],
-                        runAt: 'document_start',
-                        allFrames: true,
-                        matchOriginAsFallback: true
-                    }]);
-                } catch (_) {
-                    await chrome.scripting.registerContentScripts([{
-                        id: 'modulo-SelecionarCopiar-Suite',
-                        matches: ['<all_urls>'],
-                        js: [...ARQUIVOS_MODULO_COPIA],
-                        runAt: 'document_start',
-                        allFrames: true
-                    }]);
-                }
-            }
+            /* Passo 3.4: Os modulos JS do Motor de Selecao, Copia e Navegacao ja sao declarados
+             * estaticamente no manifest.json para <all_urls> (all_frames: true, document_start).
+             * Nao registrar dinamicamente um segundo Content Script identico para evitar dupla
+             * injecao e sobrecarga de CPU a cada navegacao ou criacao de iframe. */
         } catch (err) {
             console.warn('[JusGovBR] Aviso ao atualizar registro de scripts:', err);
         }
@@ -749,27 +732,35 @@ chrome.runtime.onStartup.addListener(async () => {
     await sincronizarEstado();
 });
 
-/* Passo 6.3: Injetar e sincronizar automaticamente ao atualizar ou carregar novas abas e frames */
+/* Passo 6.3: Injetar e sincronizar automaticamente ao concluir o carregamento de abas e frames */
+const mapaDebounceInjecaoTab = new Map();
+function agendarInjecaoSeguraNaAba(tabId, frameIdsOpcional = null) {
+    if (!tabId) return;
+    const agora = Date.now();
+    const chave = frameIdsOpcional ? `${tabId}_${frameIdsOpcional.join(',')}` : `${tabId}_all`;
+    const ultimo = mapaDebounceInjecaoTab.get(chave) || 0;
+    if ((agora - ultimo) < 350) return;
+    mapaDebounceInjecaoTab.set(chave, agora);
+
+    const target = (Array.isArray(frameIdsOpcional) && frameIdsOpcional.length > 0)
+        ? { tabId, frameIds: frameIdsOpcional }
+        : { tabId, allFrames: true };
+
+    chrome.scripting.executeScript({
+        target,
+        files: [...ARQUIVOS_MODULO_COPIA]
+    }).catch(() => {});
+}
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if ((changeInfo.status === 'complete' || changeInfo.status === 'loading' || changeInfo.url) && tab && tab.url) {
+    if (changeInfo.status === 'complete' && tab && tab.url) {
         try {
             if (/^(?:chrome|edge|about|devtools|view-source|chrome-extension):/i.test(tab.url)) return;
             const config = await obterConfiguracoesGerais();
-            
-            // Verifica se o motor está ativo e injeta os scripts imediatamente em todos os frames
+
+            // Garante injecao complementar em subframes tardios (PDF.js / iframes dinamicos) com idempotencia O(1)
             if (config.modoTurbo !== 'desligado') {
-                const injetarFrames = () => {
-                    chrome.scripting.executeScript({
-                        target: { tabId: tabId, allFrames: true },
-                        files: [...ARQUIVOS_MODULO_COPIA]
-                    }).catch(() => {});
-                };
-                injetarFrames();
-                // Retentativas temporizadas para cobrir visualizadores de PDF (PDF.js) e iframes assincronos (PJe/eproc)
-                if (changeInfo.status === 'complete') {
-                    setTimeout(injetarFrames, 250);
-                    setTimeout(injetarFrames, 800);
-                }
+                agendarInjecaoSeguraNaAba(tabId);
             }
 
             // Gerencia o CSS anti-ampulhetas do PJe se a URL corresponder aos padrões
@@ -783,7 +774,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     }
 });
 
-/* Passo 6.3.1: Monitorar via webNavigation o carregamento de subframes, iframes dinamicos e visualizadores de PDF */
+/* Passo 6.3.1: Monitorar via webNavigation o carregamento concluido de subframes, iframes dinamicos e visualizadores de PDF */
 if (typeof chrome !== 'undefined' && chrome.webNavigation) {
     const garantirInjecaoEmFrameNavegado = async (details) => {
         try {
@@ -792,36 +783,16 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation) {
             const config = await obterConfiguracoesGerais();
             if (config.modoTurbo !== 'desligado') {
                 if (typeof details.frameId === 'number' && details.frameId > 0) {
-                    chrome.scripting.executeScript({
-                        target: { tabId: details.tabId, frameIds: [details.frameId] },
-                        files: [...ARQUIVOS_MODULO_COPIA]
-                    }).catch(() => {
-                        chrome.scripting.executeScript({
-                            target: { tabId: details.tabId, allFrames: true },
-                            files: [...ARQUIVOS_MODULO_COPIA]
-                        }).catch(() => {});
-                    });
+                    agendarInjecaoSeguraNaAba(details.tabId, [details.frameId]);
                 } else {
-                    chrome.scripting.executeScript({
-                        target: { tabId: details.tabId, allFrames: true },
-                        files: [...ARQUIVOS_MODULO_COPIA]
-                    }).catch(() => {});
+                    agendarInjecaoSeguraNaAba(details.tabId);
                 }
             }
         } catch (_) {}
     };
 
-    if (chrome.webNavigation.onCommitted) {
-        chrome.webNavigation.onCommitted.addListener(garantirInjecaoEmFrameNavegado);
-    }
-    if (chrome.webNavigation.onDOMContentLoaded) {
-        chrome.webNavigation.onDOMContentLoaded.addListener(garantirInjecaoEmFrameNavegado);
-    }
     if (chrome.webNavigation.onCompleted) {
         chrome.webNavigation.onCompleted.addListener(garantirInjecaoEmFrameNavegado);
-    }
-    if (chrome.webNavigation.onHistoryStateUpdated) {
-        chrome.webNavigation.onHistoryStateUpdated.addListener(garantirInjecaoEmFrameNavegado);
     }
 }
 
@@ -928,15 +899,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 try {
                     const config = await obterConfiguracoesGerais();
                     if (config.modoTurbo !== 'desligado') {
-                        const injetar = () => {
-                            chrome.scripting.executeScript({
-                                target: { tabId, allFrames: true },
-                                files: [...ARQUIVOS_MODULO_COPIA]
-                            }).catch(() => {});
-                        };
-                        injetar();
-                        setTimeout(injetar, 250);
-                        setTimeout(injetar, 800);
+                        agendarInjecaoSeguraNaAba(tabId);
                     }
                 } catch (_) {}
             })();

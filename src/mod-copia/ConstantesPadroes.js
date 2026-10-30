@@ -122,7 +122,11 @@
     'use strict';
 
     /* Passo 1.1: Permitir atualizacao limpa do namespace global caso o Service Worker
-     * reinjete os scripts em abas abertas. */
+     * reinjete os scripts em abas abertas, evitando recompilar todo o catalogo de Regex
+     * se ja estiver carregado e integro no contexto atual (Idempotencia O(1)). */
+    if (window.__JUSGOV_CONSTANTES_CARREGADO__ && window.JusGovConstantes && window.JusGovConstantes.CATALOGO_PADROES_JURIDICOS) {
+        return;
+    }
     window.__JUSGOV_CONSTANTES_CARREGADO__ = true;
 
     /* ==========================================================================

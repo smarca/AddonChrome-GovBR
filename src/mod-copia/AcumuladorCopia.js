@@ -76,7 +76,11 @@
 (function() {
     'use strict';
 
-    /* Passo 1.1: Permitir atualizacao da classe em reinjecoes sem perder compatibilidade */
+    /* Passo 1.1: Permitir atualizacao da classe em reinjecoes sem perder compatibilidade,
+     * evitando reprocessamento redundante se a classe ja estiver registrada no frame. */
+    if (window.__JUSGOV_ACUMULADOR_CARREGADO__ && typeof window.JusGovAcumulador === 'function') {
+        return;
+    }
     window.__JUSGOV_ACUMULADOR_CARREGADO__ = true;
 
     const C_EXT = window.JusGovConstantes || {};

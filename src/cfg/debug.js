@@ -3477,6 +3477,86 @@
                 'Motor de Injeção CSS PJe Anti-Ampulhetas com Trava de RAM, aniquilação de loaders e delays (opacity: 0.01, z-index: -99999, pointer-events: none)',
                 { falhas: falhasAntiAmpuletas }
             );
+
+            /* ==============================================================
+             * TESTE DE SEPARAÇÃO SELEÇÃO vs CÓPIA, ÁREAS UI/PDF E BACKUP CLIPBOARD SIMULADO
+             * ============================================================== */
+            let falhasSeparacaoUiPdfClip = 0;
+            if (!motorTeste ||
+                typeof motorTeste.aplicarSelecaoDOM !== 'function' ||
+                typeof motorTeste.executarCopiaDeSelecao !== 'function' ||
+                typeof motorTeste.isAreaLeituraOuPdfConteudo !== 'function' ||
+                typeof motorTeste.deveManterSelecaoAtivaNoDom !== 'function' ||
+                typeof motorTeste.salvarClipboardInternoComBackup !== 'function') {
+                falhasSeparacaoUiPdfClip++;
+            } else {
+                const containerTesteUiPdf = document.createElement('div');
+                containerTesteUiPdf.innerHTML = `
+                    <div class="pdfViewer"><div class="textLayer"><span id="teste-pdf-span">Processo 0800123-45.2024.4.05.8100 em curso.</span></div></div>
+                    <div id="toolbarViewer"><button id="teste-pdf-toolbar-btn">Zoom</button></div>
+                    <div class="modal" role="dialog"><span id="teste-modal-ui">CPF: 529.982.247-25</span></div>
+                `;
+                document.body.appendChild(containerTesteUiPdf);
+
+                try {
+                    const spanPdf = containerTesteUiPdf.querySelector('#teste-pdf-span');
+                    const btnToolbar = containerTesteUiPdf.querySelector('#teste-pdf-toolbar-btn');
+                    const spanModal = containerTesteUiPdf.querySelector('#teste-modal-ui');
+
+                    /* 1. Camada de texto de PDF é área de leitura e mantém seleção */
+                    if (!motorTeste.isAreaLeituraOuPdfConteudo(spanPdf)) falhasSeparacaoUiPdfClip++;
+                    if (!motorTeste.deveManterSelecaoAtivaNoDom(spanPdf)) falhasSeparacaoUiPdfClip++;
+
+                    /* 2. Toolbar de PDF e Modal de sistema são UI estrita e NÃO mantêm seleção */
+                    if (motorTeste.isAreaLeituraOuPdfConteudo(btnToolbar)) falhasSeparacaoUiPdfClip++;
+                    if (motorTeste.deveManterSelecaoAtivaNoDom(btnToolbar)) falhasSeparacaoUiPdfClip++;
+                    if (motorTeste.deveManterSelecaoAtivaNoDom(spanModal)) falhasSeparacaoUiPdfClip++;
+
+                    /* 3. Teste de separação aplicarSelecaoDOM vs executarCopiaDeSelecao */
+                    const rangePdf = document.createRange();
+                    rangePdf.selectNodeContents(spanPdf.firstChild);
+                    const resSelPdf = motorTeste.aplicarSelecaoDOM(rangePdf);
+                    if (!resSelPdf || !resSelPdf.manterSelecaoNoDom) falhasSeparacaoUiPdfClip++;
+
+                    const rangeModal = document.createRange();
+                    rangeModal.selectNodeContents(spanModal.firstChild);
+                    const resSelModal = motorTeste.aplicarSelecaoDOM(rangeModal);
+                    if (!resSelModal || resSelModal.manterSelecaoNoDom) falhasSeparacaoUiPdfClip++;
+
+                    /* 4. Teste do backup do clipboard simulado (atual vs anterior para Ctrl+Middle-Click) */
+                    motorTeste.salvarClipboardInternoComBackup({
+                        texto: 'CLIP_ANTERIOR_111',
+                        html: '<b>CLIP_ANTERIOR_111</b>',
+                        rtf: '',
+                        nivel: 'basico',
+                        timestamp: Date.now()
+                    });
+                    motorTeste.salvarClipboardInternoComBackup({
+                        texto: 'CLIP_ATUAL_222',
+                        html: '<b>CLIP_ATUAL_222</b>',
+                        rtf: '',
+                        nivel: 'basico',
+                        timestamp: Date.now()
+                    });
+                    if (!window.__JUSGOV_ULTIMO_CLIPBOARD__ || window.__JUSGOV_ULTIMO_CLIPBOARD__.texto !== 'CLIP_ATUAL_222') {
+                        falhasSeparacaoUiPdfClip++;
+                    }
+                    if (!window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__.texto !== 'CLIP_ANTERIOR_111') {
+                        falhasSeparacaoUiPdfClip++;
+                    }
+                } finally {
+                    if (containerTesteUiPdf.parentNode) {
+                        containerTesteUiPdf.parentNode.removeChild(containerTesteUiPdf);
+                    }
+                }
+            }
+
+            registrar(
+                falhasSeparacaoUiPdfClip === 0,
+                'SEPARACAO_SELECAO_COPIA_UI_PDF_E_BACKUP_CLIPBOARD',
+                'Separação formal entre aplicarSelecaoDOM e executarCopiaDeSelecao, distinção Leitura/PDF vs UI estrita e backup do clipboard simulado (Ctrl + Botão do Meio)',
+                { falhas: falhasSeparacaoUiPdfClip }
+            );
         }
 
         /* ==================================================================

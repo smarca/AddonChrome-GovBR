@@ -97,7 +97,14 @@ ngx-loading,
 .ui-blockui,
 .ui-widget-overlay,
 .ui-widget-overlay.ui-blockui,
-.swal2-Delta-loading {
+.swal2-Delta-loading,
+.rf-st-mp,
+#toast-container,
+.toast-container,
+.toastr,
+.ui-growl,
+.p-toast,
+.cdk-overlay-backdrop.cdk-overlay-dark-backdrop:empty {
     pointer-events: none !important;
     cursor: auto !important;
     opacity: 0.01 !important;

@@ -8,4 +8,6 @@
 - All deterministic tests in the headless test suite must pass 100% on every modification.
 - All instructional markdown files (.md) must reside strictly within docs/ in the project root and must be loaded.
 - All temporary files must be placed within tmp/ (excluded from backups). Any folder named 'outros' is also excluded from backups.
+- **Visual Format Standard for Pending & Implemented Actions:** Whenever presenting pending actions, implementation plans, or completed action summaries to the user, ALWAYS use the structured Markdown table format (`📋 Próximas ações pendentes` / `✅ Ações implementadas` with columns `# | Descrição | Área`) followed by a concise bulleted summary of key details.
+
 

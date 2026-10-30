@@ -160,7 +160,14 @@
 (function() {
     'use strict';
 
-    /* Passo 1.1: Substituicao limpa de listeners caso o script seja reinjetado */
+    /* Passo 1.1: Guarda de idempotencia global O(1): se o motor ja estiver inicializado
+     * e ativo neste frame, evita destruir e recriar listeners e MutationObserver
+     * em reinjecoes automaticas do Service Worker. */
+    if (window.__JUSGOV_MOTOR_SELECAO_ATIVO__ && window.JusGovMotorSelecaoTeste) {
+        return;
+    }
+    window.__JUSGOV_MOTOR_SELECAO_ATIVO__ = true;
+
     if (window.__JUSGOV_ABORT_CONTROLLER__) {
         try {
             window.__JUSGOV_ABORT_CONTROLLER__.abort();
@@ -339,7 +346,14 @@
         [id*="spinner" i],
         [class*="spinner" i],
         [id*="carregando" i],
-        [class*="carregando" i] {
+        [class*="carregando" i],
+        .rf-st-mp,
+        #toast-container,
+        .toast-container,
+        .toastr,
+        .ui-growl,
+        .p-toast,
+        .cdk-overlay-backdrop.cdk-overlay-dark-backdrop:empty {
             pointer-events: none !important;
             cursor: auto !important;
             opacity: 0.01 !important;
@@ -589,20 +603,40 @@
      * icones (ex: microfone), menus, abas, links e controles web sejam repassados
      * 100% nativos, sem selecoes indesejadas, sem copias espurias e sem bloqueios.
      */
+    /*
+     * FUNCAO: isAreaLeituraOuPdfConteudo
+     * DIRETRIZ ROOT 6.16: Identifica se o elemento alvo pertence ao conteudo textual de um
+     * visualizador de PDF no Chrome (PDF.js / .textLayer / .pdfViewer / .page / embed[type*="pdf"])
+     * ou area de leitura documental, excluindo barras de ferramentas e controles do PDF.
+     */
+    function isAreaLeituraOuPdfConteudo(el) {
+        if (!el) return false;
+        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!base) return false;
+        if (typeof base.closest === 'function') {
+            const ehControlePdf = base.closest(
+                '.toolbar, #toolbarViewer, #toolbarContainer, #secondaryToolbar, #sidebarContainer, button, .toolbarButton, a, [role="link"], [role="button"], [role="toolbar"], select, input'
+            );
+            if (ehControlePdf) return false;
+            const ehCamadaPdf = base.closest(
+                '.textLayer, .pdfViewer, .page[data-page-number], #viewerContainer, .pdf-container, embed[type*="pdf"], object[type*="pdf"]'
+            );
+            if (ehCamadaPdf) return true;
+        }
+        if (typeof document !== 'undefined' && document.contentType === 'application/pdf') {
+            return true;
+        }
+        return false;
+    }
+
     function isElementoInterativoOuUi(el) {
         if (!el) return false;
 
         /* DIRETRIZ PDF E DOCUMENTOS: Visualizadores de PDF (PDF.js, PJe, eproc, textLayer)
          * e camadas de texto de paginas de documentos pertencem estritamente a LEITURA_COMUM,
          * NUNCA a controles de sistema ou menus de interface (exceto se o proprio alvo for link ou botao). */
-        if (typeof el.closest === 'function') {
-            const ehVisualizadorPdf = el.closest('.textLayer, .pdfViewer, .page[data-page-number], #viewerContainer, .pdf-container, embed[type*="pdf"], object[type*="pdf"]');
-            if (ehVisualizadorPdf) {
-                const ehControleDentroDePdf = el.closest('.toolbar, #toolbarViewer, #toolbarContainer, button, .toolbarButton, a, [role="link"], [role="button"], select, input');
-                if (!ehControleDentroDePdf) {
-                    return false;
-                }
-            }
+        if (isAreaLeituraOuPdfConteudo(el)) {
+            return false;
         }
 
         const TAGS_INTERATIVAS = new Set([
@@ -629,7 +663,7 @@
         let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         let profundidade = 0;
 
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 30) {
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
             profundidade++;
             if (atual.nodeType === Node.ELEMENT_NODE) {
                 if (atual.hasAttribute('data-jusgov-ignore')) return true;
@@ -640,7 +674,7 @@
                     return true;
                 }
 
-                /* Inspecao de Modais, Dialogos, Popovers e Menus Suspensos WAI-ARIA */
+                /* Inspecao de Modais, Dialogos, Popovers, Etiquetas PJe e Menus Suspensos WAI-ARIA */
                 if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') {
                     return true;
                 }
@@ -656,7 +690,9 @@
                     cls.includes('context-menu') ||
                     cls.includes('mat-dialog') ||
                     cls.includes('p-dialog') ||
-                    cls.includes('pje-modal')
+                    cls.includes('pje-modal') ||
+                    cls.includes('pje-etiquetas') ||
+                    cls.includes('toolbar')
                 )) {
                     return true;
                 }
@@ -727,20 +763,23 @@
                     }
                 }
 
-                /* Inspecao de Estilos Computados: cursor pointer ("maozinha"), help ("ajuda"), grab e user-select none */
-                try {
-                    const st = window.getComputedStyle(atual);
-                    if (st) {
-                        const cur = st.cursor;
-                        if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
-                            return true;
+                /* Inspecao de Estilos Computados (limitada aos 6 ancestrais mais proximos para evitar Layout Thrashing):
+                 * cursor pointer ("maozinha"), help ("ajuda"), grab e user-select none */
+                if (profundidade <= 6) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st) {
+                            const cur = st.cursor;
+                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
+                                return true;
+                            }
+                            const us = st.userSelect || st.webkitUserSelect;
+                            if (us === 'none') {
+                                return true;
+                            }
                         }
-                        const us = st.userSelect || st.webkitUserSelect;
-                        if (us === 'none') {
-                            return true;
-                        }
-                    }
-                } catch (_) {}
+                    } catch (_) {}
+                }
             }
 
             /* Subida na arvore atravessando Shadow DOM para o Host do componente */
@@ -811,15 +850,17 @@
                     }
                 }
 
-                try {
-                    const st = window.getComputedStyle(atual);
-                    if (st) {
-                        const cur = st.cursor;
-                        if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
-                            return true;
+                if (profundidade <= 6) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st) {
+                            const cur = st.cursor;
+                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
+                                return true;
+                            }
                         }
-                    }
-                } catch (_) {}
+                    } catch (_) {}
+                }
             }
             atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
         }
@@ -938,12 +979,13 @@
 
     function isTelaSistemaEstritaParaDesselecao(el) {
         if (!el) return false;
+        if (isAreaLeituraOuPdfConteudo(el)) return false;
         let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         let profundidade = 0;
         const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU']);
         const ROLES_ESTRITOS = new Set(['button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option', 'dialog', 'alertdialog', 'toolbar']);
 
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 30) {
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
             profundidade++;
             if (atual.nodeType === Node.ELEMENT_NODE) {
                 const tagUpper = (atual.tagName || '').toUpperCase();
@@ -962,7 +1004,9 @@
                     cls.includes('context-menu') ||
                     cls.includes('mat-dialog') ||
                     cls.includes('p-dialog') ||
-                    cls.includes('pje-modal')
+                    cls.includes('pje-modal') ||
+                    cls.includes('pje-etiquetas') ||
+                    cls.includes('toolbar')
                 )) {
                     return true;
                 }
@@ -970,6 +1014,20 @@
             atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
         }
         return false;
+    }
+
+    /*
+     * FUNCAO: deveManterSelecaoAtivaNoDom
+     * DIRETRIZ ROOT 6.16: Regra de Retencao da Selecao do Sistema:
+     * - Se o elemento pertencer a area de leitura/texto judicial ou documento PDF aberto no Chrome
+     *   (excluindo barras de ferramentas e controles do PDF): MANTEM a selecao ativa no sistema.
+     * - Se for elemento de interface grafica/controle/modal estrito: REMOVE imediatamente a selecao do sistema.
+     */
+    function deveManterSelecaoAtivaNoDom(noOuElemento) {
+        if (!noOuElemento) return true;
+        if (isAreaLeituraOuPdfConteudo(noOuElemento)) return true;
+        if (isTelaSistemaEstritaParaDesselecao(noOuElemento)) return false;
+        return true;
     }
 
     /*
@@ -1211,13 +1269,17 @@
     function localizarPontoTextoDentroDeElemento(elRaiz, x, y) {
         /* Passo 4.0.1: Resolver com exatidao o TextNode e o offset do caractere sob (x, y)
          * mesmo dentro de controles encapsulados como <button>, <summary> ou abas onde
-         * caretRangeFromPoint retorna apenas o ELEMENT_NODE pai. */
+         * caretRangeFromPoint retorna apenas o ELEMENT_NODE pai.
+         * Otimizacao anti-Layout-Thrashing: verifica a caixa do TextNode primeiro e limita
+         * o total de leituras de caracteres para nunca travar a thread principal. */
         if (!elRaiz) return null;
         const walker = document.createTreeWalker(elRaiz, NodeFilter.SHOW_TEXT, null);
         let melhorNo = null;
         let melhorOffset = 0;
         let menorDist = Infinity;
         let n;
+        let totalTestesRect = 0;
+        const LIMITE_TESTES_RECT = 160;
         const r = document.createRange();
 
         while ((n = walker.nextNode())) {
@@ -1225,7 +1287,17 @@
             const len = txt.length;
             if (len === 0) continue;
 
+            try {
+                r.selectNodeContents(n);
+                const rectNo = r.getBoundingClientRect();
+                if (!rectNo || (rectNo.width === 0 && rectNo.height === 0)) continue;
+                const dxNo = x < rectNo.left ? (rectNo.left - x) : (x > rectNo.right ? (x - rectNo.right) : 0);
+                const dyNo = y < rectNo.top ? (rectNo.top - y) : (y > rectNo.bottom ? (y - rectNo.bottom) : 0);
+                if ((dxNo + dyNo * 2) > 48 && len > 24) continue;
+            } catch (_) {}
+
             for (let i = 0; i < len; i++) {
+                if (++totalTestesRect > LIMITE_TESTES_RECT) break;
                 try {
                     r.setStart(n, i);
                     r.setEnd(n, i + 1);
@@ -1245,6 +1317,7 @@
                     }
                 } catch (_) {}
             }
+            if (totalTestesRect > LIMITE_TESTES_RECT) break;
         }
 
         if (melhorNo && menorDist <= 48) {
@@ -1258,13 +1331,6 @@
         const elSobPonto = (typeof document.elementFromPoint === 'function')
             ? document.elementFromPoint(x, y)
             : null;
-        const containerInterativo = (elSobPonto && typeof elSobPonto.closest === 'function')
-            ? elSobPonto.closest('a, button, summary, select, option, li, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
-            : null;
-        if (containerInterativo) {
-            const pt = localizarPontoTextoDentroDeElemento(containerInterativo, x, y);
-            if (pt) return pt;
-        }
 
         let no = null;
         let offset = 0;
@@ -1280,6 +1346,16 @@
             if (pos) {
                 no = pos.offsetNode;
                 offset = pos.offset;
+            }
+        }
+
+        if (!no || no.nodeType !== Node.TEXT_NODE) {
+            const containerInterativo = (elSobPonto && typeof elSobPonto.closest === 'function')
+                ? elSobPonto.closest('a, button, summary, select, option, li, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
+                : null;
+            if (containerInterativo) {
+                const pt = localizarPontoTextoDentroDeElemento(containerInterativo, x, y);
+                if (pt) return pt;
             }
         }
 
@@ -2547,8 +2623,45 @@
         return false;
     }
 
+    /*
+     * FUNCAO: salvarClipboardInternoComBackup
+     * OBJETIVO DE RECONSTRUCAO: Ao gravar uma nova selecao no clipboard simulado interno do addon,
+     * preserva o valor anterior em window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ (usado em Ctrl + Botao do Meio)
+     * e atualiza window.__JUSGOV_ULTIMO_CLIPBOARD__ (usado no Botao do Meio simples), tudo protegido com try/catch
+     * e limite de seguranca contra overflow de dados.
+     */
+    function salvarClipboardInternoComBackup(novoPayload) {
+        try {
+            if (!novoPayload || typeof novoPayload !== 'object') return;
+            const LIMITE_BYTES_EMULACAO = 512 * 1024;
+            const txtSeguro = typeof novoPayload.texto === 'string'
+                ? (novoPayload.texto.length > LIMITE_BYTES_EMULACAO ? novoPayload.texto.slice(0, LIMITE_BYTES_EMULACAO) : novoPayload.texto)
+                : '';
+            const htmlSeguro = typeof novoPayload.html === 'string'
+                ? (novoPayload.html.length > LIMITE_BYTES_EMULACAO ? novoPayload.html.slice(0, LIMITE_BYTES_EMULACAO) : novoPayload.html)
+                : '';
+
+            const atual = window.__JUSGOV_ULTIMO_CLIPBOARD__;
+            if (atual && (atual.texto || atual.html) && (atual.texto !== txtSeguro || atual.html !== htmlSeguro)) {
+                window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = {
+                    texto: atual.texto || '',
+                    html: atual.html || '',
+                    formatado: Boolean(atual.formatado)
+                };
+            }
+
+            window.__JUSGOV_ULTIMO_CLIPBOARD__ = {
+                texto: txtSeguro,
+                html: htmlSeguro,
+                formatado: Boolean(novoPayload.formatado)
+            };
+            registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__, window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__);
+        } catch (_) {}
+    }
+
     async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null) {
-        /* Passo 5.3: Gravacao com suporte a formatos basicos, avancados ou sem filtro (Blob text/html + ClipboardItem -> copy event -> writeText -> textarea) */
+        /* Passo 5.3: Gravacao com suporte a formatos basicos, avancados ou sem filtro (Blob text/html + ClipboardItem -> copy event -> writeText -> textarea)
+         * Paralelamente, DEPOIS de inserir a informacao no clipboard do sistema, salva-se tambem para emulacao interna com try/catch. */
         if (!textoFinal || typeof textoFinal !== 'string') return false;
 
         let deveManterFormatacao = Boolean(manterFormatacaoBasica && rangeDOMOpcional);
@@ -2577,8 +2690,7 @@
                             'text/plain': blobTexto
                         });
                         await navigator.clipboard.write([dadosParaCopiar]);
-                        window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPlanoMultilinha, html: codigoHTML, formatado: true };
-                        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
+                        salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: codigoHTML, formatado: true });
                         console.log('Texto formatado copiado! HTML:', codigoHTML);
                         return true;
                     }
@@ -2600,8 +2712,7 @@
                     const sucessoCopy = document.execCommand('copy');
                     document.removeEventListener('copy', manipuladorCopy, { capture: true });
                     if (sucessoCopy || copiouViaEvento) {
-                        window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPlanoMultilinha, html: codigoHTML, formatado: true };
-                        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
+                        salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: codigoHTML, formatado: true });
                         console.log('Texto formatado copiado (fallback copy)! HTML:', codigoHTML);
                         return true;
                     }
@@ -2620,53 +2731,65 @@
                 ? extrairTextoPuroSanitizado(textoFinal)
                 : aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(textoFinal));
         }
-        window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPuroFinal, html: '', formatado: false };
-        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
 
+        let gravouSistema = false;
         try {
             if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                 await navigator.clipboard.writeText(textoPuroFinal);
-                return true;
+                gravouSistema = true;
             }
         } catch (errTxt) {
             console.error('Erro em navigator.clipboard.writeText:', errTxt);
         }
 
-        try {
-            const areaTemp = document.createElement('textarea');
-            areaTemp.setAttribute('data-jusgov-ignore', 'true');
-            areaTemp.value = textoPuroFinal;
-            areaTemp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-            document.body.appendChild(areaTemp);
-            areaTemp.select();
-            document.execCommand('copy');
-            document.body.removeChild(areaTemp);
-            return true;
-        } catch (errArea) {
-            console.error('Erro no fallback textarea copy:', errArea);
-            return false;
+        if (!gravouSistema) {
+            try {
+                const areaTemp = document.createElement('textarea');
+                areaTemp.setAttribute('data-jusgov-ignore', 'true');
+                areaTemp.value = textoPuroFinal;
+                areaTemp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
+                document.body.appendChild(areaTemp);
+                areaTemp.select();
+                document.execCommand('copy');
+                document.body.removeChild(areaTemp);
+                gravouSistema = true;
+            } catch (errArea) {
+                console.error('Erro no fallback textarea copy:', errArea);
+            }
         }
+
+        /* DEPOIS de inserir a informacao no clipboard do sistema, salva-se tambem para emulacao interna */
+        salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false });
+        return gravouSistema;
     }
 
     /*
      * FUNCAO: registrarUltimaSelecao
      * OBJETIVO DE RECONSTRUCAO: Persistir a "Ultima Selecao" (conteudo exato, TXT e/ou HTML, enviado por este
-     * addon a area de transferencia no momento da copia). E a unica fonte usada para colar com o botao do meio;
-     * o addon nunca le o clipboard do sistema.
+     * addon a area de transferencia no momento da copia) e o item anterior para colagem simulada.
      */
-    function registrarUltimaSelecao(novoItem) {
+    function registrarUltimaSelecao(novoItem, itemAnteriorOpcional) {
         if (!novoItem || (!novoItem.texto && !novoItem.html)) return;
         try {
             const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
             if (storageLocal) {
-                storageLocal.set({
+                const payloadStorage = {
                     ultimoClipboardInterno: {
                         texto: novoItem.texto || '',
                         html: novoItem.html || '',
                         formatado: Boolean(novoItem.formatado),
                         timestamp: Date.now()
                     }
-                });
+                };
+                if (itemAnteriorOpcional && (itemAnteriorOpcional.texto || itemAnteriorOpcional.html)) {
+                    payloadStorage.ultimoClipboardAnteriorInterno = {
+                        texto: itemAnteriorOpcional.texto || '',
+                        html: itemAnteriorOpcional.html || '',
+                        formatado: Boolean(itemAnteriorOpcional.formatado),
+                        timestamp: Date.now()
+                    };
+                }
+                storageLocal.set(payloadStorage);
             }
         } catch (_) {}
     }
@@ -3114,32 +3237,35 @@
     }
 
     /*
-     * FUNCAO: aplicarSelecaoECopiar
-     * OBJETIVO DE RECONSTRUCAO: Aplicar visualmente o Range na janela, higienizar o
-     * texto, gerenciar o Modo Acumulador (absorvendo selecao previa na posicao 0 e
-     * exibindo APENAS estatisticas de intervalos, palavras e caracteres) ou a copia
-     * simples silenciosa com flash opcional.
+     * FUNCAO: aplicarSelecaoDOM
+     * DIRETRIZ ROOT 6.16 (Modulo de Selecao Autonoma):
+     * Aplica o Range na Selection API do navegador, aciona o contorno visual rapido
+     * do Flash Verde temporizado (se ativo) e aplica a Regra de Retencao da Selecao do Sistema:
+     * - Se o elemento for de leitura/texto judicial ou documento PDF aberto no Chrome
+     *   (excluindo barras de ferramentas e controles do PDF): MANTEM a selecao ativa no sistema.
+     * - Se for elemento de interface grafica/controle/modal estrito: REMOVE imediatamente a selecao
+     *   do sistema (window.getSelection().removeAllRanges()) quando solicitado ou ao finalizar a acao.
      */
-    async function aplicarSelecaoECopiar(rangeAlvo, modoAcumulador = false, textoSobrescrito = null) {
-        /* Passo 5.5: Validar Range e aplicar na Selection API do navegador */
-        if (!rangeAlvo) return false;
+    function aplicarSelecaoDOM(rangeAlvo, opcoes = {}) {
+        if (!rangeAlvo) return { ok: false, manterSelecao: true };
+        const noContexto = opcoes.noContexto || rangeAlvo.commonAncestorContainer || null;
+        const manterSelecao = (opcoes.forcarDesselecao === true)
+            ? false
+            : ((opcoes.forcarManterSelecao === true) ? true : deveManterSelecaoAtivaNoDom(noContexto));
 
-        let textoLimpo = '';
-        if (textoSobrescrito !== null) {
-            textoLimpo = higienizarTextoParaCopia(textoSobrescrito);
-        } else {
-            /* Extrai o texto preservando as quebras estruturais dos blocos do DOM */
-            textoLimpo = extrairTextoPuroSanitizado(rangeAlvo);
-            if (!textoLimpo) {
-                textoLimpo = higienizarTextoParaCopia(rangeAlvo.toString());
-            }
-        }
-        if (!textoLimpo || textoLimpo.length === 0) return false;
-
-        selecaoSendoAplicadaPeloAddon = true;
         try {
             const sel = window.getSelection();
-            if (sel) {
+            if (sel && manterSelecao) {
+                const rangeJaAtivo = sel.rangeCount > 0 &&
+                    sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
+                    sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
+                    sel.getRangeAt(0).endContainer === rangeAlvo.endContainer &&
+                    sel.getRangeAt(0).endOffset === rangeAlvo.endOffset;
+                if (!rangeJaAtivo) {
+                    sel.removeAllRanges();
+                    sel.addRange(rangeAlvo);
+                }
+            } else if (sel && !manterSelecao && opcoes.aplicarNoDomAntesDeLimpar !== false) {
                 const rangeJaAtivo = sel.rangeCount > 0 &&
                     sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
                     sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
@@ -3150,11 +3276,52 @@
                     sel.addRange(rangeAlvo);
                 }
             }
+        } catch (_) {}
 
-        /* Passo 5.6: Processar Modo Acumulador vs. Copia Simples Silenciosa preservando a ativacao do gesto do usuario */
+        if (opcoes.dispararFlash !== false) {
+            if (tempoFlashBorderMs > 0) {
+                if (!manterSelecao) {
+                    flashExclusivoSemSelecao = true;
+                }
+                dispararFlashBorderVisual(rangeAlvo);
+            } else {
+                limparFlashBorderImediatamente();
+            }
+        }
+
+        if (!manterSelecao && opcoes.limparImediatamente === true) {
+            try {
+                const selLimpar = window.getSelection();
+                if (selLimpar) selLimpar.removeAllRanges();
+                flashExclusivoSemSelecao = true;
+            } catch (_) {}
+        }
+
+        return { ok: true, manterSelecao };
+    }
+
+    /*
+     * FUNCAO: executarCopiaDeSelecao
+     * DIRETRIZ ROOT 6.16 (Modulo de Copia Desacoplado e Reativo):
+     * Higieniza o texto do Range (ou texto sobrescrito), gerencia o Modo Acumulador ou copia simples,
+     * grava na Area de Transferencia (e no clipboard simulado interno com backup do anterior),
+     * registra a assinatura de deduplicacao e executa a validacao matematica nao-bloqueante.
+     */
+    async function executarCopiaDeSelecao(rangeAlvo, modoAcumulador = false, textoSobrescrito = null) {
+        if (!rangeAlvo && textoSobrescrito === null) return false;
+
+        let textoLimpo = '';
+        if (textoSobrescrito !== null) {
+            textoLimpo = higienizarTextoParaCopia(textoSobrescrito);
+        } else if (rangeAlvo) {
+            textoLimpo = extrairTextoPuroSanitizado(rangeAlvo);
+            if (!textoLimpo) {
+                textoLimpo = higienizarTextoParaCopia(rangeAlvo.toString());
+            }
+        }
+        if (!textoLimpo || textoLimpo.length === 0) return false;
+
         if (modoAcumulador && acumulador) {
-            /* Se o acumulador estiver vazio mas ja havia uma selecao simples anterior na tela,
-             * absorve-a automaticamente como o 1o item antes de anexar o novo clique Ctrl+Alt! */
             if (acumulador.obterQuantidade() === 0 && ultimoTextoSelecionadoLimpo && ultimoTextoSelecionadoLimpo !== textoLimpo) {
                 acumulador.absorverSelecaoPreviaSeVazio(ultimoTextoSelecionadoLimpo, ultimoRangeSelecionadoSimples);
                 ultimoTextoSelecionadoLimpo = '';
@@ -3167,7 +3334,7 @@
                 await gravarNaAreaDeTransferencia(res.consolidado || '', null);
                 await cederControleAoCompositorBlink();
                 let alertaInvalido = false;
-                if (validador) {
+                if (validador && rangeAlvo) {
                     const check = validacaoMatematicaAtiva
                         ? validador.auditarEAlerta(textoLimpo, rangeAlvo)
                         : { valido: true, msg: '' };
@@ -3189,29 +3356,83 @@
                 }
                 registrarEstatisticaOperacional(alertaInvalido);
             }
-        } else {
-            if (acumulador) acumulador.limpar();
-            ultimoTextoSelecionadoLimpo = textoLimpo;
-            ultimoRangeSelecionadoSimples = typeof rangeAlvo.cloneRange === 'function' ? rangeAlvo.cloneRange() : null;
-
-            await gravarNaAreaDeTransferencia(textoLimpo, rangeAlvo);
-            /* Registra a assinatura da selecao copiada para o "escutador" global nao copiar de novo */
-            try { ultimoRangeAssinaturaGlobal = calcularAssinaturaSelecao(window.getSelection()); } catch (_) {}
-            await cederControleAoCompositorBlink();
-            if (tempoFlashBorderMs > 0) {
-                dispararFlashBorderVisual(rangeAlvo);
-            } else {
-                limparFlashBorderImediatamente();
-            }
-            let alertaInvalido = false;
-            if (validador && validacaoMatematicaAtiva) {
-                const check = validador.auditarEAlerta(textoLimpo, rangeAlvo);
-                alertaInvalido = !check.valido;
-            }
-            registrarEstatisticaOperacional(alertaInvalido);
+            return true;
         }
 
+        if (acumulador) acumulador.limpar();
+        ultimoTextoSelecionadoLimpo = textoLimpo;
+        ultimoRangeSelecionadoSimples = (rangeAlvo && typeof rangeAlvo.cloneRange === 'function') ? rangeAlvo.cloneRange() : null;
+
+        await gravarNaAreaDeTransferencia(textoLimpo, rangeAlvo);
+        try {
+            const selAssinatura = window.getSelection();
+            const ass = calcularAssinaturaSelecao(selAssinatura);
+            if (ass) {
+                ultimoRangeAssinaturaGlobal = ass;
+            } else if (rangeAlvo) {
+                ultimoRangeAssinaturaGlobal = `${rangeAlvo.startOffset}_${rangeAlvo.endOffset}_${textoLimpo}`;
+            }
+        } catch (_) {}
+
+        await cederControleAoCompositorBlink();
+        let alertaInvalido = false;
+        if (validador && validacaoMatematicaAtiva && rangeAlvo) {
+            const check = validador.auditarEAlerta(textoLimpo, rangeAlvo);
+            alertaInvalido = !check.valido;
+        }
+        registrarEstatisticaOperacional(alertaInvalido);
         return true;
+    }
+
+    /*
+     * FUNCAO: aplicarSelecaoECopiar
+     * OBJETIVO DE RECONSTRUCAO: Orquestrar de forma desacoplada a selecao visual no DOM
+     * (aplicarSelecaoDOM) e a copia para a Area de Transferencia (executarCopiaDeSelecao),
+     * respeitando a retencao de selecao em areas de leitura/PDF e a desselecao imediata em UI.
+     */
+    async function aplicarSelecaoECopiar(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesSelecao = {}) {
+        /* Passo 5.5: Validar Range e orquestrar Selecao Autonoma + Copia Reativa */
+        if (!rangeAlvo) return false;
+
+        let textoPreview = '';
+        if (textoSobrescrito !== null) {
+            textoPreview = higienizarTextoParaCopia(textoSobrescrito);
+        } else {
+            textoPreview = extrairTextoPuroSanitizado(rangeAlvo) || higienizarTextoParaCopia(rangeAlvo.toString());
+        }
+        if (!textoPreview || textoPreview.length === 0) return false;
+
+        selecaoSendoAplicadaPeloAddon = true;
+        try {
+            const infoSel = aplicarSelecaoDOM(rangeAlvo, {
+                ...opcoesSelecao,
+                dispararFlash: false,
+                limparImediatamente: false
+            });
+
+            const copiou = await executarCopiaDeSelecao(rangeAlvo, modoAcumulador, textoSobrescrito);
+            if (!copiou) return false;
+
+            if (!modoAcumulador) {
+                if (tempoFlashBorderMs > 0) {
+                    if (!infoSel.manterSelecao) {
+                        flashExclusivoSemSelecao = true;
+                    }
+                    dispararFlashBorderVisual(rangeAlvo);
+                } else {
+                    limparFlashBorderImediatamente();
+                }
+            }
+
+            if (!infoSel.manterSelecao) {
+                try {
+                    const sel = window.getSelection();
+                    if (sel) sel.removeAllRanges();
+                    flashExclusivoSemSelecao = true;
+                } catch (_) {}
+            }
+
+            return true;
         } finally {
             setTimeout(() => {
                 selecaoSendoAplicadaPeloAddon = false;
@@ -5196,12 +5417,23 @@
             houveArrastoMouse = false;
             pontoAncoraArrastoAlt = null;
             const selAtualNoMouseUp = window.getSelection();
-            const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && selAtualNoMouseUp.toString().trim().length > 0);
+            const textoArrastadoBruto = selAtualNoMouseUp ? selAtualNoMouseUp.toString().trim() : '';
+            const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && textoArrastadoBruto.length > 0);
             if (temTextoSelecionadoEfetivo) {
-                ignorarProximoClick = true;
                 const rangeArrastado = selAtualNoMouseUp.getRangeAt(0).cloneRange();
                 const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(e.target) || (rangeArrastado && isTelaSistemaEstritaParaDesselecao(rangeArrastado.commonAncestorContainer));
-                await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador);
+
+                /* DIRETRIZ ROOT 2.17 e 6.9: Em tela de sistema/interface sem a tecla Alt, se o arrasto for menor que 5 caracteres,
+                 * considera-se esbarrao/clique acidental: ignora a copia e remove a selecao residual imediatamente. */
+                if (ehSistemaEstrito && !e.altKey && textoArrastadoBruto.length < 5) {
+                    selAtualNoMouseUp.removeAllRanges();
+                    return;
+                }
+
+                ignorarProximoClick = true;
+                await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador, null, {
+                    forcarDesselecao: ehSistemaEstrito
+                });
                 if (ehSistemaEstrito) {
                     /* Em tela de sistema/interface (modais, menus, botoes, links): NUNCA manter selecao visual residual */
                     const selAtual = window.getSelection();
@@ -5307,16 +5539,41 @@
         }
 
         /* Passo 9.7.1: Alt + Clique (sem arrasto) sobre links, botoes, menus, abas ou controles de interface:
-         * DIRETRIZ ROOT 2.17: Copia apenas o texto VISIVEL do elemento com Flash Verde temporizado,
-         * descartando textos ocultos (display:none, visibility:hidden, aria-hidden, sr-only) e
-         * NUNCA forca nem mantem selecao visual azul residual na interface! */
+         * DIRETRIZ ROOT 2.17, 6.6 e 6.7:
+         * 1) Se o cursor estiver sobre um bloco forense util (data, CNJ, CPF, CNPJ, moeda), prioriza copiar e contornar esse bloco.
+         * 2) Caso contrario, copia apenas o texto VISIVEL do elemento com Flash Verde temporizado,
+         *    descartando textos ocultos (display:none, visibility:hidden, aria-hidden, sr-only) e
+         *    NUNCA forca nem mantem selecao visual azul residual na interface! */
         if (e.altKey && !e.ctrlKey && !e.shiftKey && e.detail === 1) {
             let textoParaCopiar = '';
             let rangeParaFlash = null;
             let usarRangeNaGravacao = true;
             const elInterativo = obterObjetoInterativoParaSelecaoCompleta(e.target);
 
-            if (elInterativo) {
+            /* Verifica primeiro se o clique com Alt incidiu diretamente sobre uma mascara/bloco forense especifico */
+            const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
+            if (pontoAlt) {
+                const mapaAlt = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
+                if (mapaAlt) {
+                    const resBlocoAlt = tentarExpandirPadraoComposto(mapaAlt.texto, mapaAlt.idxCursor, false, false);
+                    if (resBlocoAlt) {
+                        const rBlocoAlt = criarRangeDOMAPartirDeIndices(mapaAlt, resBlocoAlt.inicio, resBlocoAlt.fim);
+                        if (rBlocoAlt) {
+                            const txtBlocoAlt = extrairTextoPuroSanitizado(rBlocoAlt) || rBlocoAlt.toString().trim();
+                            if (txtBlocoAlt && txtBlocoAlt.length > 0) {
+                                ignorarProximoClick = true;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                rangeParaFlash = rBlocoAlt;
+                                textoParaCopiar = txtBlocoAlt;
+                                usarRangeNaGravacao = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!textoParaCopiar && elInterativo) {
                 ignorarProximoClick = true;
                 e.preventDefault();
                 e.stopPropagation();
@@ -5335,22 +5592,16 @@
                     rangeParaFlash = document.createRange();
                     rangeParaFlash.selectNodeContents(elInterativo);
                 }
-            } else if (isContextoDeSistemaOuUi(e.target) || tipoContexto === 'LINK_CLICAVEL') {
+            } else if (!textoParaCopiar && (isContextoDeSistemaOuUi(e.target) || tipoContexto === 'LINK_CLICAVEL')) {
                 ignorarProximoClick = true;
                 e.preventDefault();
                 e.stopPropagation();
-                const ponto = obterPontoDoClique(e.clientX, e.clientY);
-                if (ponto) {
-                    const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                if (pontoAlt) {
+                    const mapa = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
                     if (mapa) {
-                        const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
-                        if (resComposto) {
-                            rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
-                        } else {
-                            const resAtomica = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
-                            if (resAtomica) {
-                                rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resAtomica.inicio, resAtomica.fim);
-                            }
+                        const resAtomica = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
+                        if (resAtomica) {
+                            rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resAtomica.inicio, resAtomica.fim);
                         }
                         if (rangeParaFlash) {
                             textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
@@ -5360,8 +5611,7 @@
             }
 
             if (textoParaCopiar && textoParaCopiar.length > 0) {
-                await gravarNaAreaDeTransferencia(textoParaCopiar, usarRangeNaGravacao ? rangeParaFlash : null);
-                await cederControleAoCompositorBlink();
+                await executarCopiaDeSelecao(usarRangeNaGravacao ? rangeParaFlash : null, false, textoParaCopiar);
                 if (tempoFlashBorderMs > 0 && rangeParaFlash) {
                     flashExclusivoSemSelecao = true;
                     dispararFlashBorderVisual(rangeParaFlash);
@@ -5393,12 +5643,9 @@
                             if (rangeComposto) {
                                 const textoLimpo = extrairTextoPuroSanitizado(rangeComposto) || rangeComposto.toString().trim();
                                 if (textoLimpo && textoLimpo.length > 0) {
-                                    await gravarNaAreaDeTransferencia(textoLimpo, rangeComposto);
-                                    await cederControleAoCompositorBlink();
-                                    if (tempoFlashBorderMs > 0) {
-                                        flashExclusivoSemSelecao = true;
-                                        dispararFlashBorderVisual(rangeComposto);
-                                    }
+                                    await aplicarSelecaoECopiar(rangeComposto, false, textoLimpo, {
+                                        forcarDesselecao: true
+                                    });
                                     const sel = window.getSelection();
                                     if (sel) sel.removeAllRanges();
                                     ignorarProximoClick = false;
@@ -5628,13 +5875,12 @@
 
     /*
      * FUNCAO: executarColagemBotaoDireito
-     * OBJETIVO DE RECONSTRUCAO: Executar colagem (botao do meio / botao direito) SEM jamais ler o
-     * clipboard do sistema (politicas corporativas podem proibir). Usa a "Ultima Selecao": o conteudo
-     * exato (TXT/HTML) que o proprio addon enviou ao clipboard no momento da copia.
-     * - Campo simples ou modo texto puro: insere texto puro;
-     * - Editor rico com HTML disponivel: simula Ctrl+V (emularTeclasColar).
+     * OBJETIVO DE RECONSTRUCAO: Executar colagem (botao do meio / botao direito) usando a simulacao
+     * interna de clipboard do addon ("Ultima Selecao" em window.__JUSGOV_ULTIMO_CLIPBOARD__ ou a selecao
+     * anterior em window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ quando acionado via Ctrl + Botao do Meio).
+     * Tudo protegido com try/catch.
      */
-    async function executarColagemBotaoDireito(alvo, modo) {
+    async function executarColagemBotaoDireito(alvo, modo, usarAnterior = false) {
         try {
             if (!alvo) return;
 
@@ -5642,34 +5888,28 @@
              * 2 cliques rapidos forcam obrigatoriamente colar SOMENTE TEXTO puro do clipboard. */
             const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
 
-            let colou = false;
             const ehEditorRico = Boolean(alvo.isContentEditable ||
                 (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
                 (alvo.closest && alvo.closest('[contenteditable="true"]')) ||
                 document.designMode === 'on');
             const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
 
-            /* Regra: o addon NUNCA le o clipboard do sistema. A colagem usa exclusivamente a
-             * "Ultima Selecao" (conteudo que o proprio addon enviou ao clipboard no momento da copia). */
-            if (!colou) {
-                const itemInterno = window.__JUSGOV_ULTIMO_CLIPBOARD__;
-                const textoEmulado = (itemInterno && itemInterno.texto) || ultimoTextoSelecionadoLimpo || '';
-                const htmlEmulado = (itemInterno && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
+            const itemInterno = usarAnterior
+                ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
+                : window.__JUSGOV_ULTIMO_CLIPBOARD__;
+            const textoEmulado = (itemInterno && itemInterno.texto) || (!usarAnterior ? ultimoTextoSelecionadoLimpo : '') || '';
+            const htmlEmulado = (itemInterno && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
 
-                if (textoEmulado && textoEmulado.trim().length > 0) {
-                    if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
-                        /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
-                        inserirTextoEmElemento(alvo, textoEmulado, false);
-                    } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
-                        /* Editor Web / HTML / RTF / contenteditable: cola com formatacao (simula Ctrl+V) */
-                        emularTeclasColar(alvo, textoEmulado, htmlEmulado);
-                    } else {
-                        inserirTextoEmElemento(alvo, textoEmulado, false);
-                    }
-                    colou = true;
+            if (textoEmulado && textoEmulado.trim().length > 0) {
+                if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
+                    /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
+                    inserirTextoEmElemento(alvo, textoEmulado, false);
+                } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
+                    /* Editor Web / HTML / RTF / contenteditable: cola com formatacao */
+                    inserirTextoEmElemento(alvo, htmlEmulado, true);
+                } else {
+                    inserirTextoEmElemento(alvo, textoEmulado, false);
                 }
-                /* Se der qualquer erro ou falta de acesso e nao houver texto emulado para colar:
-                 * 'Fazer nada' silenciosamente, sem exibir alertas de erro intrusivos ao usuario. */
             }
         } catch (_) {}
     }
@@ -5704,11 +5944,15 @@
                 ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
                 : e.target;
 
-            /* Ctrl + Botao do Meio: envia Win+V ao sistema (historico nativo do Windows, se configurado) */
+            /* Ctrl + Botao do Meio: cola o item ANTERIOR salvo no clipboard interno simulado do addon
+             * (sem sobrescrever o clipboard atual) e tambem mantem o disparo opcional de emularTeclasWinV para compatibilidade. */
             if (e.ctrlKey && !e.altKey && !e.shiftKey) {
                 e.preventDefault();
                 e.stopPropagation();
                 try {
+                    if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
+                        executarColagemBotaoDireito(alvo, 'normal', true);
+                    }
                     if (typeof emularTeclasWinV === 'function') {
                         emularTeclasWinV(alvo);
                     }
@@ -5722,7 +5966,7 @@
                 e.stopPropagation();
                 if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
                     try {
-                        executarColagemBotaoDireito(alvo, 'normal');
+                        executarColagemBotaoDireito(alvo, 'normal', false);
                     } catch (_) {}
                 }
                 /* Se der qualquer erro ou elemento nao for editavel: 'fazer nada' silenciosamente */
@@ -5839,22 +6083,12 @@
         } catch (_) {}
 
         try {
-            /* 4. Shadow Roots Acessiveis no Documento */
-            if (doc.querySelectorAll) {
-                const elementos = doc.querySelectorAll('*');
-                for (let i = 0; i < elementos.length; i++) {
-                    const el = elementos[i];
-                    if (el && el.shadowRoot) {
-                        try {
-                            if (typeof el.shadowRoot.getSelection === 'function') {
-                                const sSh = el.shadowRoot.getSelection();
-                                if (sSh) {
-                                    if (typeof sSh.empty === 'function') sSh.empty();
-                                    if (typeof sSh.removeAllRanges === 'function') sSh.removeAllRanges();
-                                }
-                            }
-                        } catch (_) {}
-                    }
+            /* 4. Shadow Roots Acessiveis no Documento (somente elementos customizados com hifen para evitar varredura O(N) de todo o DOM) */
+            if (doc.activeElement && doc.activeElement.shadowRoot && typeof doc.activeElement.shadowRoot.getSelection === 'function') {
+                const sShAtivo = doc.activeElement.shadowRoot.getSelection();
+                if (sShAtivo) {
+                    if (typeof sShAtivo.empty === 'function') sShAtivo.empty();
+                    if (typeof sShAtivo.removeAllRanges === 'function') sShAtivo.removeAllRanges();
                 }
             }
         } catch (_) {}
@@ -6177,10 +6411,16 @@
 
             const rangeClone = range.cloneRange();
             const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(range.commonAncestorContainer);
+            if (ehSistemaEstrito && !teclasPressionadasAtivas.has('alt') && textoSel.length < 5) {
+                sel.removeAllRanges();
+                return;
+            }
 
             selecaoSendoAplicadaPeloAddon = true;
             try {
-                await aplicarSelecaoECopiar(rangeClone, false);
+                await aplicarSelecaoECopiar(rangeClone, false, null, {
+                    forcarDesselecao: ehSistemaEstrito
+                });
                 if (ehSistemaEstrito) {
                     sel.removeAllRanges();
                     flashExclusivoSemSelecao = true;
@@ -6263,11 +6503,16 @@
                                 temFrame = true;
                                 inspecionarIframeLocal(n);
                                 break;
-                            } else if (typeof n.querySelector === 'function') {
-                                const subFrame = n.querySelector('iframe, embed, object');
-                                if (subFrame) {
+                            } else if (typeof n.getElementsByTagName === 'function') {
+                                const subIframes = n.getElementsByTagName('iframe');
+                                if (subIframes && subIframes.length > 0) {
                                     temFrame = true;
-                                    inspecionarIframeLocal(subFrame);
+                                    inspecionarIframeLocal(subIframes[0]);
+                                    break;
+                                }
+                                const subEmbeds = n.getElementsByTagName('embed');
+                                if (subEmbeds && subEmbeds.length > 0) {
+                                    temFrame = true;
                                     break;
                                 }
                             }
@@ -6869,6 +7114,14 @@
         isElementoInterativoOuUi,
         isElementoInterativoClicavelDireto,
         isContextoDeSistemaOuUi,
+        isAreaLeituraOuPdfConteudo,
+        isTelaSistemaEstritaParaDesselecao,
+        deveManterSelecaoAtivaNoDom,
+        aplicarSelecaoDOM,
+        executarCopiaDeSelecao,
+        aplicarSelecaoECopiar,
+        salvarClipboardInternoComBackup,
+        executarColagemBotaoDireito,
         extrairTextoVisivelLimpoDeElemento,
         dispararFlashBorderVisual,
         limparFlashBorderImediatamente,

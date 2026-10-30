@@ -71,6 +71,9 @@
 
     /* Passo 1.1: Guarda de idempotencia global para evitar redeclaracao da classe
      * caso o Service Worker execute injecao multipla na mesma aba ou frame. */
+    if (window.__JUSGOV_AVISO_FLUTUANTE_CARREGADO__ && typeof window.JusGovAvisoFlutuante === 'function') {
+        return;
+    }
     window.__JUSGOV_AVISO_FLUTUANTE_CARREGADO__ = true;
 
     /* A REGEX_AUDITORIA pre-compilada foi migrada e sera lida via
