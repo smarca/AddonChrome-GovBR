@@ -394,3 +394,10 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Permitir que um clique simples (1 clique) sobre esses blocos de metadados/dados estruturados na interface consiga isolar e selecionar o dado/máscara útil correspondente (`30/10/2026`, `30/10/2026 00:35:21`, etc.) de forma inteligente e pontual.
   * Diferenciar claramente esses contêineres estáticos de texto/metadados da interface (mesmo que tenham classes de sistema ou filhos decorativos) de botões de ação e links clicáveis de navegação direta, garantindo que o 1 clique nesses dados copie/selecione a informação sem interferir nos controles interativos reais.
 
+### 6.2 Auto Seleção Inteligente de Texto em Visualizadores de Documentos PDF Nativos / Incorporados
+- **Contexto Operacional:** Em visualizadores de documentos PDF (como o visualizador nativo do Chromium ou leitores web com camadas `textLayer`, ex.: petição inicial `1. INICIAL.pdf` exibindo endereçamento `"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A)..."`, partes `"IMPETRANTE: ..."` e `"IMPETRADO: ..."`), os nós de texto são renderizados em posições absolutas ou dentro de visualizadores de página inteira.
+- **Comportamento Previsto para Futura Implementação:**
+  * Permitir a auto seleção inteligente com 1 clique diretamente sobre blocos de texto, parágrafos, qualificações e dados contidos nas páginas de documentos PDF, espelhando o comportamento suave de seleção que já opera em páginas HTML comuns.
+  * Garantir a reconstrução do mapa de texto contínuo mesmo com quebras virtuais de linhas geradas pela disposição CSS dos `<span>` posicionados da camada de texto (`textLayer`) do visualizador de PDF.
+
+
