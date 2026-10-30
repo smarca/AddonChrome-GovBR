@@ -559,7 +559,7 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
      * Opera com base na posição do cursor, cliques (1, 2, 3 cliques, espaço), modificadores de teclado e regras de bloco.
      * Aplica o contorno visual rápido do Flash Verde temporizado (se ativo nas preferências).
      * **Regra de Retenção da Seleção do Sistema:**
-       - Se o elemento clicado **não for elemento de interface** (isto é, pertencer à área de leitura/texto judicial ou documento): **mantém a seleção ativa no sistema** que foi replicada ou criada.
+       - Se o elemento clicado **não for elemento de interface** (isto é, pertencer à área de leitura/texto judicial, documento, petição, decisão, certidão ou **documento PDF aberto dentro do Chrome / visualizador de PDF**): **mantém a seleção ativa no sistema** que foi replicada ou criada. *(Ressalva explícita: não inclui a barra de ferramentas ou botões de interface de abertura/navegação do PDF, que continuam classificados estritamente como interface)*.
        - Se for elemento de interface gráfica/controle: **remove imediatamente a seleção do sistema** (`window.getSelection().removeAllRanges()`) logo após a finalização da ação, sem precisar aguardar o término do Flash temporizado visual.
   2. **Módulo de Cópia Reativo (Escuta e Disparo por Seleção):**
      * A funcionalidade de cópia atua como uma **escuta reativa (listener)** que monitora seleções ativas na tela (sejam disparadas pelo motor de seleção do próprio addon, pelo duplo clique nativo do navegador, por arraste de mouse ou por atalhos de teclado).
