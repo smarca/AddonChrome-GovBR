@@ -1773,10 +1773,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function obterClipboardInternoParaVisor() {
         const clipInterno = (typeof window !== 'undefined' ? window.__JUSGOV_ULTIMO_CLIPBOARD__ : null);
-        if (clipInterno && (clipInterno.texto || clipInterno.html)) {
-            const txt = String(clipInterno.texto || clipInterno.html || '').trim();
-            if (txt.length > 0) {
-                return txt;
+        if (clipInterno) {
+            if (typeof clipInterno === 'object') {
+                if (clipInterno.texto || clipInterno.html) {
+                    return clipInterno;
+                }
+            } else if (typeof clipInterno === 'string' && clipInterno.trim().length > 0) {
+                return clipInterno.trim();
             }
         }
         return '';
@@ -1797,8 +1800,8 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             if (!clipboardSistemaAtivo) {
-                const txtInterno = obterClipboardInternoParaVisor();
-                renderizarNoVisorClipboard(txtInterno);
+                const clipInterno = obterClipboardInternoParaVisor();
+                renderizarNoVisorClipboard(clipInterno);
                 return;
             }
 
@@ -1833,8 +1836,8 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         if (!clipboardSistemaAtivo) {
-            const txtInterno = obterClipboardInternoParaVisor();
-            renderizarNoVisorClipboard(txtInterno);
+            const clipInterno = obterClipboardInternoParaVisor();
+            renderizarNoVisorClipboard(clipInterno);
             return;
         }
 
@@ -1893,22 +1896,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    /* Passo 4.6.0: Atualização automática do visor de Ctrl+C a cada cópia e a cada 5 segundos se a janela estiver ativa */
+    /* Passo 4.6.0: Atualização automática do visor da Área de Transferência a cada cópia */
     window.addEventListener('copy', () => {
         try {
-            const sel = window.getSelection ? window.getSelection().toString() : '';
-            if (sel && sel.trim().length > 0) {
-                window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: sel, html: '', formatado: false };
-                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                    chrome.storage.local.set({ ultimoClipboardInterno: window.__JUSGOV_ULTIMO_CLIPBOARD__ }).catch(() => { });
+            setTimeout(() => {
+                const clipAtual = window.__JUSGOV_ULTIMO_CLIPBOARD__;
+                if (!clipAtual || (!clipAtual.formatado && !clipAtual.html)) {
+                    const sel = window.getSelection ? window.getSelection().toString() : '';
+                    if (sel && sel.trim().length > 0) {
+                        window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: sel, html: '', formatado: false };
+                        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                            chrome.storage.local.set({ ultimoClipboardInterno: window.__JUSGOV_ULTIMO_CLIPBOARD__ }).catch(() => { });
+                        }
+                    }
                 }
-            }
+                if (!leituraManualEmAndamento) {
+                    atualizarVisorClipboardPassivo();
+                }
+            }, 60);
         } catch (_) { }
-        setTimeout(() => {
-            if (!leituraManualEmAndamento) {
-                atualizarVisorClipboardPassivo();
-            }
-        }, 150);
     });
     window.addEventListener('focus', () => {
         if (!leituraManualEmAndamento) {

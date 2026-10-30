@@ -2405,10 +2405,11 @@
 
             // 2. Despacha ClipboardEvent('paste') com text/html e text/plain sintetico
             let pasteTratadoPeloEditor = false;
+            const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable="true"]')) || document.designMode === 'on');
             try {
                 if (typeof DataTransfer !== 'undefined') {
                     const dt = new DataTransfer();
-                    if (html) dt.setData('text/html', html);
+                    if (html && ehEditorRico) dt.setData('text/html', html);
                     dt.setData('text/plain', texto || '');
                     const evtPaste = new ClipboardEvent('paste', {
                         clipboardData: dt,
@@ -2427,13 +2428,14 @@
                     colouExec = document.execCommand('paste');
                 } catch (_) {}
                 if (!colouExec) {
-                    if (html && (alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable="true"]')) || document.designMode === 'on')) {
+                    if (html && ehEditorRico) {
                         try {
                             colouExec = document.execCommand('insertHTML', false, html);
                         } catch (_) {}
                     }
                     if (!colouExec) {
-                        inserirTextoEmElemento(alvo, html || texto || '', Boolean(html));
+                        const conteudoParaInserir = (ehEditorRico && html) ? html : (texto || '');
+                        inserirTextoEmElemento(alvo, conteudoParaInserir, Boolean(ehEditorRico && html));
                     }
                 }
             }
@@ -5253,14 +5255,15 @@
 
             let colou = false;
             let erroOcorrido = null;
-            const ehContentEditable = Boolean(alvo.isContentEditable ||
+            const ehEditorRico = Boolean(alvo.isContentEditable ||
                 (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
                 (alvo.closest && alvo.closest('[contenteditable="true"]')) ||
                 document.designMode === 'on');
+            const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
 
             /* 1. Verificacao online e direta da area de transferencia nativa (somente se habilitado) */
             if (usarClipboardSistemaAoColar) {
-                if (modoEfetivo === 'normal' && ehContentEditable && navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+                if (modoEfetivo === 'normal' && ehEditorRico && navigator.clipboard && typeof navigator.clipboard.read === 'function') {
                     try {
                         const itens = await navigator.clipboard.read();
                         if (itens && itens.length > 0) {
@@ -5287,7 +5290,7 @@
                     try {
                         const textoPuro = await navigator.clipboard.readText();
                         if (typeof textoPuro === 'string' && textoPuro.length > 0) {
-                            inserirTextoEmElemento(alvo, textoPuro, (modoEfetivo === 'normal' && ehContentEditable));
+                            inserirTextoEmElemento(alvo, textoPuro, false);
                             colou = true;
                         }
                     } catch (errText) {
@@ -5311,10 +5314,16 @@
                             validador.projetarMiniTipGlobal(`${descErro}: (emulando) [${resumo}]`, '#f59e0b');
                         }
                     }
-                    if (!usarClipboardSistemaAoColar && modoEfetivo === 'normal' && htmlEmulado) {
-                        emularTeclasColar(alvo, textoEmulado, htmlEmulado);
-                    } else if (modoEfetivo === 'normal' && ehContentEditable && htmlEmulado) {
-                        inserirTextoEmElemento(alvo, htmlEmulado, true);
+                    if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
+                        /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
+                        inserirTextoEmElemento(alvo, textoEmulado, false);
+                    } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
+                        /* Editor Web / HTML / RTF / contenteditable: cola com formatacao */
+                        if (!usarClipboardSistemaAoColar) {
+                            emularTeclasColar(alvo, textoEmulado, htmlEmulado);
+                        } else {
+                            inserirTextoEmElemento(alvo, htmlEmulado, true);
+                        }
                     } else {
                         inserirTextoEmElemento(alvo, textoEmulado, false);
                     }

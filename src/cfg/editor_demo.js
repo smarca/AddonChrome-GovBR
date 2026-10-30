@@ -106,9 +106,17 @@
         /* Normaliza lista de entradas vindas do Acumulador ou navigator.clipboard.read() */
         let listaEntradas = [];
         if (typeof origem === 'object' && !Array.isArray(origem) && (origem.texto !== undefined || origem.html !== undefined)) {
-            if (origem.formatado && origem.html) {
-                if (origem.texto) {
-                    listaEntradas.push({ type: 'text/plain', data: origem.texto, isTextual: true });
+            const temHtml = Boolean(origem.html && String(origem.html).trim().length > 0);
+            if (temHtml) {
+                const txt = origem.texto || (function () {
+                    try {
+                        const tempEl = document.createElement('div');
+                        tempEl.innerHTML = origem.html;
+                        return tempEl.textContent || tempEl.innerText || '';
+                    } catch (_) { return ''; }
+                })();
+                if (txt) {
+                    listaEntradas.push({ type: 'text/plain', data: txt, isTextual: true });
                 }
                 listaEntradas.push({ type: 'text/html', data: origem.html, isTextual: true });
                 if (origem.rtf) {
