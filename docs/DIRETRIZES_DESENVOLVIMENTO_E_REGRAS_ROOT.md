@@ -394,11 +394,13 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Permitir que um clique simples (1 clique) sobre esses blocos de metadados/dados estruturados na interface consiga isolar e selecionar o dado/máscara útil correspondente (`30/10/2026`, `30/10/2026 00:35:21`, etc.) de forma inteligente e pontual.
   * Diferenciar claramente esses contêineres estáticos de texto/metadados da interface (mesmo que tenham classes de sistema ou filhos decorativos) de botões de ação e links clicáveis de navegação direta, garantindo que o 1 clique nesses dados copie/selecione a informação sem interferir nos controles interativos reais.
 
-### 6.2 Auto Seleção Inteligente de Texto em Visualizadores de Documentos PDF Nativos / Incorporados
-- **Contexto Operacional:** Em visualizadores de documentos PDF (como o visualizador nativo do Chromium ou leitores web com camadas `textLayer`, ex.: petição inicial `1. INICIAL.pdf` exibindo endereçamento `"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A)..."`, partes `"IMPETRANTE: ..."` e `"IMPETRADO: ..."`), os nós de texto são renderizados em posições absolutas ou dentro de visualizadores de página inteira.
+### 6.2 Auto Seleção Inteligente de Texto em Visualizadores de Documentos PDF Nativos / Incorporados (Ex.: PJe download.seam)
+- **Contexto Operacional:** Em visualizadores de documentos PDF abertos diretamente pelo navegador ou incorporados no tribunal (ex.: `pje1g.trf1.jus.br/pje/download.seam?cid=...` exibindo certidões de juntada com `"O documento a seguir foi juntado aos autos do processo de nmero 1015306-38.2026.4.01.4002 em 19/10/2026 11:13:55..."` ou petições iniciais), os textos residem no visualizador interno de PDF do Chromium / PDF.js.
 - **Comportamento Previsto para Futura Implementação:**
-  * Permitir a auto seleção inteligente com 1 clique diretamente sobre blocos de texto, parágrafos, qualificações e dados contidos nas páginas de documentos PDF, espelhando o comportamento suave de seleção que já opera em páginas HTML comuns.
+  * **Habilitar Seleção Completa de Textos em PDF:** Permitir a seleção e cópia de qualquer texto em documentos PDF (seja com 1 clique para palavras/números de processo/datas ou arrasto manual contínuo), garantindo que a suíte capture os eventos dentro do visualizador (`embed`, `object`, `#viewer`, `.textLayer` ou documento PDF direto).
+  * **Reconhecimento de Entidades em PDF:** Assegurar que o motor reconheça processos (`1015306-38.2026.4.01.4002`), datas/horários (`19/10/2026 11:13:55`), nomes e parágrafos dentro de PDFs, aplicando contorno visual imediato e cópia formatada/texto puro para a Área de Transferência sem bloqueios do visualizador.
   * Garantir a reconstrução do mapa de texto contínuo mesmo com quebras virtuais de linhas geradas pela disposição CSS dos `<span>` posicionados da camada de texto (`textLayer`) do visualizador de PDF.
+
 
 ### 6.3 Supressão de Quebras de Linha em Linha Única com Espaçamento Obrigatório Anti-Truncamento
 - **Contexto Operacional:** Em cards e painéis do PJe (ex.: listas de tarefas `col-sm-11`, cartões de processo com `dtPoloAtivo`, `dtPoloPassivo`, `ÚLTIMA MOVIMENTAÇÃO: REMETIDOS OS AUTOS...`, etiquetas e classes `col-sm-12 no-padding`), elementos irmãos ou `<span>`/`<div>` quebrados em múltiplas linhas visuais contêm trechos contíguos de texto.
