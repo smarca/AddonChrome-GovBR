@@ -384,7 +384,13 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Camadas de texto de documentos PDF (`.textLayer`, `.pdfViewer`, `.page`, `[data-page-number]`, `embed[type*="pdf"]`, etc.) pertencem estritamente ao dominio de `LEITURA_COMUM`, sendo vedado classifica-las como controles de sistema ou des-seleciona-las arbitrariamente.
   * Deteccao Global de Selecao: Qualquer selecao ativa de texto na tela (seja gerada por arrasto de mouse, atalhos de teclado como Shift+Setas ou selecoes nativas de visualizadores) e identificada globalmente via `selectionchange` (com debounce de 120ms) e imediatamente processada pelo motor (higienizacao, formatacao no nivel configurado, copia para a Area de Transferencia, validacao matematica com alerta e contorno visual com Flash Verde), sem interferir em campos de digitacao protegidos pela Regra de Ouro.
 
+---
 
+## 6. BACKLOG DE TAREFAS FUTURAS E ANOTAÇÕES DE ENGENHARIA
 
-
+### 6.1 Seleção com 1 Clique em Elementos de Interface Contendo Dados Estruturados / Máscaras Úteis
+- **Contexto Operacional:** Em telas e cabeçalhos de sistema (como barras informativas do PJe, painéis superiores ou faixas informativas como `Informação de Prevenção` / metadados do tipo `"Juntado por ... em 30/10/2026 00:35:21"` ou `"30/10/2026"`), existem blocos de texto que, embora estejam estruturados no DOM dentro de áreas de interface (como `div#detalheDocumento`, contêineres de etiquetas, badges ou barras de ferramentas), contêm dados forenses de interesse direto do operador (datas completas com hora, números de processos, etc.).
+- **Comportamento Previsto para Futura Implementação:**
+  * Permitir que um clique simples (1 clique) sobre esses blocos de metadados/dados estruturados na interface consiga isolar e selecionar o dado/máscara útil correspondente (`30/10/2026`, `30/10/2026 00:35:21`, etc.) de forma inteligente e pontual.
+  * Diferenciar claramente esses contêineres estáticos de texto/metadados da interface (mesmo que tenham classes de sistema ou filhos decorativos) de botões de ação e links clicáveis de navegação direta, garantindo que o 1 clique nesses dados copie/selecione a informação sem interferir nos controles interativos reais.
 
