@@ -566,6 +566,29 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
      * **Garantia de Entrega:** Ao detectar uma seleção válida na janela/frame, a rotina de cópia verifica: *"Este texto selecionado já foi copiado no ciclo atual?"*. Caso não tenha sido copiado ainda, **dispara a cópia para a Área de Transferência imediatamente**.
      * Isso assegura que **jamais ocorra seleção sem cópia correspondente**, tornando o sistema imune a falhas em duplo clique.
 
+### 6.17 Redefinição do Botão do Meio (Scroll Click), Histórico Nativo Win+V e Extinção Total de Leitura do Clipboard
+- **Contexto e Motivação Arquitetural:**
+  * Políticas recentes de segurança de navegadores Chromium (Permissions-Policy / clipboard-read) bloqueiam ou exigem confirmações invasivas e restrições para a leitura assíncrona do Clipboard (`navigator.clipboard.readText()`).
+  * Para simplificar radicalmente a experiência e conferir máxima confiabilidade sem atritos de permissão, o addon **extingue por completo qualquer dependência de releitura do clipboard do sistema**.
+- **Novo Comportamento do Botão do Meio do Mouse (Scroll Click / Botão 2/3):**
+  1. **Clique do Meio Simples (Scroll Click sem teclas):**
+     * Simula as teclas de colagem nativas do sistema (`Ctrl + V`) no elemento em foco (ou invoca rotina própria de inserção via `document.execCommand('paste')` / despacho de evento de input/paste).
+  2. **Ctrl + Clique do Meio (Scroll Click com tecla Ctrl):**
+     * Envia/despacha para o sistema a combinação de teclas de chamada do histórico nativo da Área de Transferência do Windows: **`Win + V`** (ou aciona o atalho correspondente para abrir o menu flutuante nativo de histórico de área de transferência do SO, caso configurado no sistema operacional pelo usuário).
+- **Simplificação das Telas de Opções, Ajuda e Configurações:**
+  * **Configuração Única:** Mantém-se apenas a opção unificada: *"Colar com o botão do Meio (Scroll Click)"*.
+  * **Remoção de Opções Obsoletas:** Ficam desnecessárias e devem ser eliminadas as opções *"Usar área de transferência (clipboard) do sistema"* e *"Histórico da Área de Transferência / Rollback (Ctrl + Botão do Meio do Mouse)"*, bem como quaisquer caixas de diálogo ou alertas sobre acesso impossibilitado ao clipboard.
+  * **Migração do Texto de Ajuda:** A explicação que residia no help de rollback deve ser condensada e integrada de forma simples diretamente na descrição de *"Colar com o botão do Meio (Scroll Click)"*, informando o suporte ao atalho `Ctrl + Clique do Meio` para acionamento do histórico `Win + V`.
+- **Eliminação Total da Releitura do Clipboard e Nova Tela "Última Seleção":**
+  * **Retirada de Leitura:** Varrer e remover do código-fonte toda e qualquer rotina que tente ler ou requisitar o conteúdo da Área de Transferência do sistema operacional (`clipboard.read`, `readText`).
+  * **Preservação Integral da Escrita:** As rotinas de gravação no clipboard (`writeText`, `write` com MIME types text/plain e text/html conforme o nível de formatação configurado) permanecem ativas exatamente como estão!
+  * **Nova Área de Monitoramento "Última Seleção:":** No painel de controle e depuração, a seção anterior *"Conteúdo atual da Área de Transferência:"* será renomeada e ajustada para **"Última Seleção:"**, mantendo abas/formatos HTML e TXT. Essa área exibirá estritamente o payload exato que este addon enviou para a Área de Transferência no momento da cópia, dispensando 100% qualquer leitura física do clipboard do SO.
+
+### 6.18 Generalização da Regra de Atos Administrativos (De "Ato INSS" para "Ato Adm: Órgão/Sigla")
+- **Contexto da Regra:** Anteriormente mapeada para casos específicos (ex.: `"Ato INSS: Instrução Normativa PRES/INSS nº 128/2022"`).
+- **Regra de Negócio Generalizada:**
+  * Expandir a categorização e a máscara regex para **"Ato Adm:"** de forma universal, contemplando qualquer órgão, autarquia, tribunal ou ministério da administração pública.
+  * O padrão deve suportar dinamicamente siglas e subdivisões fracionadas em barras de múltiplos níveis (ex.: `##`, `##/##`, `##/##/###/###`, como `PRES/INSS`, `DG/DPF`, `SAJ/SG/PR`, `SGP/SEGES/MGI`, etc.), reconhecendo número e ano (`nº 128/2022`) e capturando a menção do ato administrativo normativo de forma completa e íntegra.
 
 ---
 
