@@ -1,23 +1,26 @@
 # Script de verificacao de Codificacao UTF-8 Nativa e Proibicao Estrita de Entidades HTML
 # Projeto: JusGovBR - Copia Inteligente & PJe Turbo
 
+$testesDir = $PSScriptRoot
+$baseDir = (Get-Item $testesDir).Parent.FullName
+
 $arquivosBase = @(
-    'z:\AddonChrome\src\mod-copia\ConstantesPadroes.js',
-    'z:\AddonChrome\src\mod-copia\AvisoFlutuante.js',
-    'z:\AddonChrome\src\mod-copia\AcumuladorCopia.js',
-    'z:\AddonChrome\src\mod-copia\SelecionarCopiar.js',
-    'z:\AddonChrome\src\cfg\background.js',
-    'z:\AddonChrome\src\cfg\options.js',
-    'z:\AddonChrome\src\cfg\options.html',
-    'z:\AddonChrome\src\cfg\popup.html',
-    'z:\AddonChrome\src\cfg\popup.js',
-    'z:\AddonChrome\src\cfg\debug.js',
-    'z:\AddonChrome\src\cfg\editor_demo.js',
-    'z:\AddonChrome\src\mod-pje\PJE-anti_ampuletas.css',
-    'z:\AddonChrome\manifest.json'
+    (Join-Path $baseDir 'src\mod-copia\ConstantesPadroes.js'),
+    (Join-Path $baseDir 'src\mod-copia\AvisoFlutuante.js'),
+    (Join-Path $baseDir 'src\mod-copia\AcumuladorCopia.js'),
+    (Join-Path $baseDir 'src\mod-copia\SelecionarCopiar.js'),
+    (Join-Path $baseDir 'src\cfg\background.js'),
+    (Join-Path $baseDir 'src\cfg\options.js'),
+    (Join-Path $baseDir 'src\cfg\options.html'),
+    (Join-Path $baseDir 'src\cfg\popup.html'),
+    (Join-Path $baseDir 'src\cfg\popup.js'),
+    (Join-Path $baseDir 'src\cfg\debug.js'),
+    (Join-Path $baseDir 'src\cfg\editor_demo.js'),
+    (Join-Path $baseDir 'src\mod-pje\PJE-anti_ampuletas.css'),
+    (Join-Path $baseDir 'manifest.json')
 )
 
-$docsMd = Get-ChildItem -Path "z:\AddonChrome\docs" -Filter "*.md" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+$docsMd = Get-ChildItem -Path (Join-Path $baseDir 'docs') -Filter "*.md" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 $arquivos = $arquivosBase + $docsMd
 
 $regexEntidadesProibidas = '&(ccedil|Ccedil|atilde|Atilde|otilde|Otilde|aacute|Aacute|eacute|Eacute|iacute|Iacute|oacute|Oacute|uacute|Uacute|acirc|Acirc|ecirc|Ecirc|ocirc|Ocirc|agrave|Agrave|uuml|Uuml|ordm|ordf|bull|ldquo|rdquo|lsquo|rsquo|ndash|mdash|hellip|rarr|larr|uarr|darr);'

@@ -1,6 +1,8 @@
 $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-$htmlPath = 'file:///z:/AddonChrome/testes/executar_testes.html'
-$txtOut = 'z:\AddonChrome\testes\chrome_output.txt'
+$testesDir = $PSScriptRoot
+$htmlFile = Join-Path $testesDir 'executar_testes.html'
+$htmlPath = 'file:///' + ($htmlFile -replace '\\', '/')
+$txtOut = Join-Path $testesDir 'chrome_output.txt'
 
 if (Test-Path $txtOut) {
     Remove-Item $txtOut -Force
