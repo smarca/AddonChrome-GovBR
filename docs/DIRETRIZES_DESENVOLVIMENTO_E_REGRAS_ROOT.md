@@ -431,6 +431,15 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
 - **Diretriz de Ajuste Futuro:**
   * Refinar o `Alt + Clique` em botões e elementos interativos para que o contorno visual do Flash e a cópia incidam estritamente sobre o texto/label visível (`range` do nó de texto interno), e não sobre a caixa ou estrutura física do contêiner do botão, evitando a impressão visual de "selecionar tudo" ou englobar o componente gráfico da interface.
 
+### 6.7 Prioridade de Bloco / Máscara Útil vs. Texto Total do Link em Alt + Clique
+- **Regra de Negócio Estabelecida:**
+  * Ao clicar em um link (`<a href>`) com a tecla `Alt` pressionada, o comportamento padrão é copiar automaticamente todo o texto visível do link.
+  * **Exceção de Precedência (Bloco Interno):** Se dentro do texto do link houver um bloco específico ou máscara estruturada (ex.: um número de ID, número de processo CNJ, CPF, data, etc.) e o clique incidir sobre esse bloco:
+    1. **Passo 1 (Teste Prévio de Bloco):** Primeiramente testa-se se a posição do clique corresponde a um bloco/padrão estruturado do catálogo forense ou máscara útil.
+    2. **Passo 2 (Aplicação da Regra Geral de Textos):** Havendo bloco sob o cursor, segue-se estritamente a regra geral de textos com base nas máscaras e regras tradicionais (clique no número isola o número; clique no hífen ou separador expande o bloco completo; clique no espaço seleciona conforme as regras consolidadas do motor).
+    3. **Passo 3 (Fallback para o Link Inteiro):** Somente se NÃO for identificado nenhum bloco/máscara no ponto clicado, o motor realiza a cópia de todo o texto visível do link.
+
+
 
 
 
