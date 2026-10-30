@@ -406,5 +406,15 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Ao suprimir quebras de linha (`\n`, `<br>`) para condensar o conteúdo copiado em uma única linha (linha só), é **estritamente obrigatório** inserir um espaço em branco separador (`' '`) entre os blocos e linhas conectadas.
   * **Regra Anti-Truncamento:** Jamais colar ou fundir o final de uma linha com o início da linha seguinte sem espaço (ex.: evitar concatenar `"DISTRIBUIÇÃO AO VARA FEDERAL"` com `"CÍVEL E CRIMINAL"` gerando `"FEDERALCÍVEL"`). Toda unificação de linhas deve assegurar espaçamento limpo e normalizado sem truncamento de palavras.
 
+### 6.4 Investigação de Seleção Dupla Cruzada / Efeito Fantasma Multi-Frame (Ex.: "Parnaíba-PI" e "Prevenção")
+- **Comportamento Estranho Observado:**
+  * Ao clicar no texto `"Parnaíba-PI"` (ou `"Distribuição"` dentro do documento PDF / área inferior), uma palavra distante no topo da tela (ex.: `"Prevenção"` ou `"ALMEIDA"` no cabeçalho `2297820154 - Informação de Prevenção`) também aparece destacada com contorno verde de seleção simultânea.
+- **Diagnóstico Técnico Preliminar para Correção Futura:**
+  * Ocorre quando a janela pai (`top window`) e o subframe do documento (iframe do PDF ou visualizador) mantêm seleções independentes no DOM simultaneamente, ou quando o evento de clique/mudança de foco não executa `sel.removeAllRanges()` na janela oposta antes de aplicar a nova seleção.
+  * Além disso, se o contorno visual temporizado (Flash Verde / `CSS.highlights` ou divs de overlay) da seleção anterior no cabeçalho não tiver sido desarmado (`limparFlashBorderImediatamente()`), ele permanece visível na tela enquanto a nova seleção no corpo do documento é efetuada.
+- **Diretriz de Correção Futura:**
+  * Ao registrar uma nova seleção em qualquer frame (seja na página principal ou dentro de um subframe/PDF), garantir a limpeza imediata e mútua de ranges e de sobreposições de Flash visual em todos os contextos (`broadcastDeselecionarGeral` / `removeAllRanges()` cruzado entre pai e filhos), impedindo qualquer seleção dupla ou contorno residual fantasma na tela.
+
+
 
 
