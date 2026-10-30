@@ -1732,6 +1732,44 @@
                     obtido: `tempoFlashBorderMs=${estadoAtual.tempoFlashBorderMs}, flashVisualOk=${flashVisualOk}`
                 }
             );
+
+            /* Contorno sem sobreposicao: spans aninhados na mesma linha = 1 caixa; paragrafo em varias linhas = 1 poligono */
+            if (typeof motorTeste.dispararFlashBorderVisual === 'function' && typeof motorTeste.limparFlashBorderImediatamente === 'function') {
+                const tempoOriginalFlash = estadoAtual.tempoFlashBorderMs;
+                if (typeof motorTeste.definirTempoFlashBorderMs === 'function') motorTeste.definirTempoFlashBorderMs(500);
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'position:fixed;top:10px;left:10px;width:180px;font:14px/20px Arial;';
+                wrap.innerHTML = '<p id="flashAninhado"><b><i>ABC</i> DEF</b> GHI</p><p id="flashMulti">Uma frase bem longa para quebrar em varias linhas dentro de uma caixa estreita de teste.</p>';
+                document.body.appendChild(wrap);
+
+                const r1 = document.createRange();
+                r1.selectNodeContents(wrap.querySelector('#flashAninhado'));
+                motorTeste.dispararFlashBorderVisual(r1);
+                const caixasAninhado = document.querySelectorAll('#jusgov-flash-contour-container .jusgov-flash-box').length;
+
+                const r2 = document.createRange();
+                r2.selectNodeContents(wrap.querySelector('#flashMulti'));
+                motorTeste.dispararFlashBorderVisual(r2);
+                const caixasMulti = document.querySelectorAll('#jusgov-flash-contour-container .jusgov-flash-box').length;
+                const ehPoligono = Boolean(document.querySelector('#jusgov-flash-contour-container svg.jusgov-flash-box path'));
+
+                motorTeste.limparFlashBorderImediatamente();
+                document.body.removeChild(wrap);
+                if (typeof motorTeste.definirTempoFlashBorderMs === 'function') motorTeste.definirTempoFlashBorderMs(tempoOriginalFlash);
+
+                const semSobreposicao = (caixasAninhado === 1 && caixasMulti === 1 && ehPoligono);
+                registrar(
+                    semSobreposicao,
+                    'CONTORNO_FLASH_SEM_SOBREPOSICAO_E_POLIGONO_MULTILINHA',
+                    'Contorno flash: elementos aninhados na mesma linha geram 1 caixa e texto em varias linhas gera 1 contorno continuo (sem caixas sobrepostas)',
+                    {
+                        textoTestado: 'Spans aninhados e paragrafo multilinha',
+                        idxCursor: 0,
+                        esperado: 'aninhado=1, multilinha=1 poligono',
+                        obtido: `aninhado=${caixasAninhado}, multilinha=${caixasMulti}, poligono=${ehPoligono}`
+                    }
+                );
+            }
         }
 
         /* 3.7) Modulo NAVEGADOR: Single Window, Segundo Plano, Anti-Duplicacao e Ordenacao de Guias */

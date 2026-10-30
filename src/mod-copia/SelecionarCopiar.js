@@ -2853,34 +2853,133 @@
         limparFlashBorderImediatamente();
     }
 
+    /*
+     * FUNCAO: calcularLinhasDoRange
+     * OBJETIVO: Obter somente os retangulos de TEXTO realmente selecionados (um por linha visual),
+     * eliminando os retangulos aninhados/sobrepostos dos elementos-pai que getClientRects() do Range
+     * devolve (causa do contorno duplicado/sobreposto). Fragmentos da mesma linha sao fundidos.
+     */
+    function calcularLinhasDoRange(rangeAlvo) {
+        const fragmentos = [];
+        const adicionar = (r) => {
+            if (r && r.width > 0.5 && r.height > 0.5) {
+                fragmentos.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+            }
+        };
+        try {
+            const raiz = rangeAlvo.commonAncestorContainer;
+            const nosTexto = [];
+            if (raiz && raiz.nodeType === 3) {
+                nosTexto.push(raiz);
+            } else if (raiz) {
+                const walker = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null);
+                let n;
+                while ((n = walker.nextNode())) {
+                    if (typeof rangeAlvo.intersectsNode === 'function' && !rangeAlvo.intersectsNode(n)) continue;
+                    nosTexto.push(n);
+                }
+            }
+            for (let i = 0; i < nosTexto.length; i++) {
+                const no = nosTexto[i];
+                const ini = (no === rangeAlvo.startContainer) ? rangeAlvo.startOffset : 0;
+                const fim = (no === rangeAlvo.endContainer) ? rangeAlvo.endOffset : no.length;
+                if (fim <= ini) continue;
+                if (!/\S/.test(no.data.substring(ini, fim))) continue;
+                const sub = document.createRange();
+                sub.setStart(no, ini);
+                sub.setEnd(no, fim);
+                const rs = sub.getClientRects();
+                for (let k = 0; k < rs.length; k++) adicionar(rs[k]);
+            }
+        } catch (_) {}
+
+        if (fragmentos.length === 0) {
+            /* Sem texto (ex.: imagem/elemento): usa o retangulo do proprio range */
+            try {
+                if (typeof rangeAlvo.getBoundingClientRect === 'function') adicionar(rangeAlvo.getBoundingClientRect());
+            } catch (_) {}
+        }
+        if (fragmentos.length === 0) return [];
+
+        /* Agrupa fragmentos por linha visual (centro vertical dentro de metade da altura) */
+        fragmentos.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        const linhas = [];
+        for (let i = 0; i < fragmentos.length; i++) {
+            const f = fragmentos[i];
+            const cy = (f.top + f.bottom) / 2;
+            let alvoLinha = null;
+            for (let j = linhas.length - 1; j >= 0 && j >= linhas.length - 4; j--) {
+                const l = linhas[j];
+                const h = Math.min(l.bottom - l.top, f.bottom - f.top);
+                if (cy >= l.top + (l.bottom - l.top) * 0.15 && cy <= l.bottom - (l.bottom - l.top) * 0.15 && Math.abs(((l.top + l.bottom) / 2) - cy) < h * 0.6) {
+                    alvoLinha = l;
+                    break;
+                }
+            }
+            if (alvoLinha) {
+                alvoLinha.frags.push(f);
+                alvoLinha.top = Math.min(alvoLinha.top, f.top);
+                alvoLinha.bottom = Math.max(alvoLinha.bottom, f.bottom);
+            } else {
+                linhas.push({ top: f.top, bottom: f.bottom, frags: [f] });
+            }
+        }
+
+        /* Em cada linha, funde fragmentos horizontalmente (lacunas de ate 12px = espacos entre palavras/tags) */
+        const segmentos = [];
+        for (let i = 0; i < linhas.length; i++) {
+            const l = linhas[i];
+            l.frags.sort((a, b) => a.left - b.left);
+            let atual = null;
+            for (let k = 0; k < l.frags.length; k++) {
+                const f = l.frags[k];
+                if (atual && (f.left - atual.right) <= 12) {
+                    atual.right = Math.max(atual.right, f.right);
+                } else {
+                    if (atual) segmentos.push(atual);
+                    atual = { left: f.left, right: f.right, top: l.top, bottom: l.bottom };
+                }
+            }
+            if (atual) segmentos.push(atual);
+        }
+        return segmentos;
+    }
+
+    /*
+     * FUNCAO: agruparLinhasEmBlocos
+     * OBJETIVO: Agrupar segmentos de linha verticalmente contiguos e com sobreposicao horizontal em um
+     * unico bloco, para desenhar UM contorno continuo (poligono) em vez de varias caixas empilhadas.
+     */
+    function agruparLinhasEmBlocos(segmentos) {
+        const ordenados = segmentos.slice().sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        const blocos = [];
+        for (let i = 0; i < ordenados.length; i++) {
+            const s = ordenados[i];
+            let destino = null;
+            for (let j = 0; j < blocos.length; j++) {
+                const ultima = blocos[j][blocos[j].length - 1];
+                const folga = Math.max(6, (s.bottom - s.top) * 0.6);
+                const contiguo = (s.top >= ultima.top) && ((s.top - ultima.bottom) <= folga);
+                const sobrepoe = (s.left < ultima.right) && (s.right > ultima.left);
+                if (contiguo && sobrepoe) { destino = blocos[j]; break; }
+            }
+            if (destino) destino.push(s); else blocos.push([s]);
+        }
+        return blocos;
+    }
+
     function dispararFlashBorderVisual(rangeAlvo) {
         /* Passo 5.4: Contorno visual temporario configuravel (0 a 5000ms, padrao 500ms e cor customizada)
          * desenhado como contorno real (borda externa nitida com fundo 100% transparente), sem escurecer
-         * ou criar segunda selecao sobre o texto. Desaparece automaticamente apos o tempo estipulado. */
+         * ou criar segunda selecao sobre o texto. Desaparece automaticamente apos o tempo estipulado.
+         * Um contorno por bloco de texto: sem caixas sobrepostas e, em varias linhas, um unico poligono. */
         limparFlashBorderImediatamente();
         const duracaoMs = tempoFlashBorderMs > 0 ? tempoFlashBorderMs : 0;
         if (duracaoMs <= 0 || !rangeAlvo) return;
         try {
-            let rawRects = null;
-            if (typeof rangeAlvo.getClientRects === 'function') {
-                rawRects = rangeAlvo.getClientRects();
-            }
-            const rects = [];
-            if (rawRects && rawRects.length > 0) {
-                for (let i = 0; i < rawRects.length; i++) {
-                    const r = rawRects[i];
-                    if (r && r.width > 0 && r.height > 0) {
-                        rects.push(r);
-                    }
-                }
-            }
-            if (rects.length === 0 && typeof rangeAlvo.getBoundingClientRect === 'function') {
-                const b = rangeAlvo.getBoundingClientRect();
-                if (b && b.width > 0 && b.height > 0) {
-                    rects.push(b);
-                }
-            }
-            if (rects.length === 0) return;
+            const segmentos = calcularLinhasDoRange(rangeAlvo);
+            if (segmentos.length === 0) return;
+            const blocos = agruparLinhasEmBlocos(segmentos);
 
             const idContainer = 'jusgov-flash-contour-container';
             let container = document.getElementById(idContainer);
@@ -2898,28 +2997,78 @@
                 ? corFlashBorder.trim().toLowerCase()
                 : '#0d9488';
 
-            for (let i = 0; i < rects.length; i++) {
-                const r = rects[i];
-                const box = document.createElement('div');
-                box.className = 'jusgov-flash-box';
-                box.setAttribute('data-jusgov-ignore', 'true');
-                box.style.cssText = [
-                    'position:fixed',
-                    `top:${Math.max(0, Math.round(r.top - 1))}px`,
-                    `left:${Math.max(0, Math.round(r.left - 2))}px`,
-                    `width:${Math.max(1, Math.round(r.width + 4))}px`,
-                    `height:${Math.max(1, Math.round(r.height + 2))}px`,
-                    `border:2px solid ${corBorda}`,
-                    'border-radius:3px',
-                    'background:transparent',
-                    'background-color:transparent',
-                    'pointer-events:none',
-                    'box-sizing:border-box',
-                    `box-shadow:0 0 0 1px rgba(255,255,255,0.45), 0 0 4px ${corBorda}`,
-                    'margin:0',
-                    'padding:0'
-                ].join(';') + ';';
-                container.appendChild(box);
+            for (let b = 0; b < blocos.length; b++) {
+                const linhas = blocos[b];
+                if (linhas.length === 1) {
+                    const r = linhas[0];
+                    const box = document.createElement('div');
+                    box.className = 'jusgov-flash-box';
+                    box.setAttribute('data-jusgov-ignore', 'true');
+                    box.style.cssText = [
+                        'position:fixed',
+                        `top:${Math.max(0, Math.round(r.top - 1))}px`,
+                        `left:${Math.max(0, Math.round(r.left - 2))}px`,
+                        `width:${Math.max(1, Math.round(r.right - r.left + 4))}px`,
+                        `height:${Math.max(1, Math.round(r.bottom - r.top + 2))}px`,
+                        `border:2px solid ${corBorda}`,
+                        'border-radius:3px',
+                        'background:transparent',
+                        'background-color:transparent',
+                        'pointer-events:none',
+                        'box-sizing:border-box',
+                        `box-shadow:0 0 0 1px rgba(255,255,255,0.45), 0 0 4px ${corBorda}`,
+                        'margin:0',
+                        'padding:0'
+                    ].join(';') + ';';
+                    container.appendChild(box);
+                    continue;
+                }
+
+                /* Varias linhas: normaliza as fronteiras verticais (sem frestas) e desenha um poligono unico */
+                const n = linhas.length;
+                const L = linhas.map(l => l.left - 2);
+                const R = linhas.map(l => l.right + 2);
+                const Y = [];
+                for (let i = 0; i < n - 1; i++) {
+                    Y.push((linhas[i].bottom + linhas[i + 1].top) / 2);
+                }
+                const topo = linhas[0].top - 1;
+                const base = linhas[n - 1].bottom + 1;
+                const pts = [[L[0], topo], [R[0], topo]];
+                for (let i = 0; i < n - 1; i++) {
+                    pts.push([R[i], Y[i]]);
+                    pts.push([R[i + 1], Y[i]]);
+                }
+                pts.push([R[n - 1], base]);
+                pts.push([L[n - 1], base]);
+                for (let i = n - 2; i >= 0; i--) {
+                    pts.push([L[i + 1], Y[i]]);
+                    pts.push([L[i], Y[i]]);
+                }
+                const d = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ') + ' Z';
+
+                const NS = 'http://www.w3.org/2000/svg';
+                const svg = document.createElementNS(NS, 'svg');
+                svg.setAttribute('class', 'jusgov-flash-box');
+                svg.setAttribute('data-jusgov-ignore', 'true');
+                svg.setAttribute('width', String(window.innerWidth || document.documentElement.clientWidth || 0));
+                svg.setAttribute('height', String(window.innerHeight || document.documentElement.clientHeight || 0));
+                svg.style.cssText = 'position:fixed;top:0;left:0;overflow:visible;pointer-events:none;background:transparent;margin:0;padding:0;';
+                const halo = document.createElementNS(NS, 'path');
+                halo.setAttribute('d', d);
+                halo.setAttribute('fill', 'none');
+                halo.setAttribute('stroke', 'rgba(255,255,255,0.45)');
+                halo.setAttribute('stroke-width', '4');
+                halo.setAttribute('stroke-linejoin', 'round');
+                const traco = document.createElementNS(NS, 'path');
+                traco.setAttribute('d', d);
+                traco.setAttribute('fill', 'none');
+                traco.setAttribute('stroke', corBorda);
+                traco.setAttribute('stroke-width', '2');
+                traco.setAttribute('stroke-linejoin', 'round');
+                svg.appendChild(halo);
+                svg.appendChild(traco);
+                container.appendChild(svg);
             }
 
             aguardandoDesselecaoFlash = true;
@@ -2930,7 +3079,6 @@
             }, duracaoMs);
         } catch (_) {}
     }
-
     function registrarEstatisticaOperacional(inconsistenciaDetectada = false) {
         /* Passo 5.4.1: Incrementar contadores estatisticos de copias e alertas exclusivamente em storage.local (sem gravar na nuvem) */
         try {
