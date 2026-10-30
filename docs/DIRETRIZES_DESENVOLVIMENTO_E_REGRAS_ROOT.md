@@ -458,6 +458,23 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * No tratador global de evento de arrasto/mouseup e `selectionchange`, verificar se o alvo da seleção originou-se em área de interface do sistema (`isContextoDeSistemaOuUi` ou contexto interativo).
   * Se o modificador `Alt` estiver ausente (`!e.altKey`) e o comprimento do texto selecionado for inferior ao limiar mínimo (`textoLimpo.length < 5`), abortar o fluxo de cópia, desarmar a seleção ativa no DOM (`window.getSelection().removeAllRanges()`) e suprimir o contorno visual do Flash Verde.
 
+### 6.10 Investigação de Lentidão / Percepção de Atraso no Carregamento de Páginas
+- **Sintoma Relatado:** Percepção de lentidão aumentada durante a abertura e carregamento de páginas e abas.
+- **Hipóteses Técnicas e Pontos de Verificação para Diagnóstico Futuro:**
+  1. **Injeção Redundante e Múltiplos Listeners (`webNavigation` vs `content_scripts` vs `MutationObserver`):**
+     * O monitoramento assíncrono em `background.js` (listeners de `onCommitted`, `onDOMContentLoaded`, `onCompleted`) combinando chamadas a `chrome.scripting.executeScript` com injeção estática declarada no `manifest.json` pode estar causando execuções repetidas dos scripts de conteúdo em cada frame/subframe.
+  2. **Sobrecarga de `MutationObserver` de Subframes e Iframes:**
+     * A observação ativa de mutações no DOM com `subtree: true` e checagem contínua de iframes recém-inseridos ou alteração de atributos `src`/`data` consome ciclos da thread principal do navegador logo nos momentos críticos de renderização inicial (fase de parsing do HTML).
+  3. **Disparos em Massa de `content_start` e Retentativas Temporizadas (`setTimeout` de 250ms / 800ms):**
+     * Múltiplos temporizadores concorrentes criados para subframes podem estar concorrendo com os scripts nativos pesados de páginas judiciais (PJe, Angular, RichFaces).
+  4. **Comunicação IPC Excessiva com Service Worker via `chrome.runtime.sendMessage`:**
+     * Verificações síncronas ou frequentes de configurações (`obterConfiguracoes`) no início do ciclo de vida de cada frame podem estar enfileirando mensagens no canal de runtime.
+- **Diretrizes de Investigação e Otimização:**
+  * **Profiling de Performance:** Medir o tempo de execução dos passos de inicialização (`performance.mark` / DevTools Performance panel) nos scripts de conteúdo.
+  * **Guarda de Idempotência Precoce:** Garantir que se a flag `window.__JUSGOVBR_INICIALIZADO__` já estiver ativa, a execução seja interrompida imediatamente no primeiro milissegundo, antes de qualquer query no DOM ou attach de listeners.
+  * **Otimização de Observers:** Ajustar o `MutationObserver` de subframes para ser disparado com debounce/throttling ou limitá-lo a contêineres específicos em vez de `document.documentElement` irrestrito durante o carregamento inicial.
+
+
 
 
 
