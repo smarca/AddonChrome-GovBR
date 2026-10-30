@@ -114,9 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const optColarBotaoMeio = document.getElementById('optColarBotaoMeio');
     const lblSwitchColarBotaoMeio = document.getElementById('lblSwitchColarBotaoMeio');
     const avisoPermissaoBotaoMeio = document.getElementById('avisoPermissaoBotaoMeio');
-    const containerSubopcoesMouse = document.getElementById('containerSubopcoesMouse');
-    const optUsarClipboardSistema = document.getElementById('optUsarClipboardSistema');
-    const optHistoricoClipboardCtrlMeio = document.getElementById('optHistoricoClipboardCtrlMeio') || document.getElementById('optHistoricoClipboardCtrlDireito');
     const optNavegacaoTecladoCampos = document.getElementById('optNavegacaoTecladoCampos');
     const optBloquearNovasJanelas = document.getElementById('optBloquearNovasJanelas');
     const optPreservarJanelasAutenticacao = document.getElementById('optPreservarJanelasAutenticacao');
@@ -605,16 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optColagemBotaoDireito) optColagemBotaoDireito.checked = false;
             if (optCapturaBotoesMouse4e5) optCapturaBotoesMouse4e5.checked = (dados.capturaBotoesMouse4e5Ativa !== false);
             if (optColarBotaoMeio) optColarBotaoMeio.checked = (dados.colarBotaoMeioAtivo !== false);
-            if (optUsarClipboardSistema) optUsarClipboardSistema.checked = Boolean(dados.usarClipboardSistemaAoColar);
             obterEstadoPermissaoClipboard().then((perm) => {
                 atualizarVisualAtencaoSwitches(perm);
             });
-            if (optHistoricoClipboardCtrlMeio) {
-                const ativoHist = (dados.historicoClipboardCtrlMeioAtivo !== undefined)
-                    ? (dados.historicoClipboardCtrlMeioAtivo !== false)
-                    : (dados.historicoClipboardCtrlDireitoAtivo !== false);
-                optHistoricoClipboardCtrlMeio.checked = ativoHist;
-            }
             if (optNavegacaoTecladoCampos) optNavegacaoTecladoCampos.checked = (dados.navegacaoTecladoCamposAtiva !== false);
             if (optBloquearNovasJanelas) optBloquearNovasJanelas.checked = (dados.bloquearNovasJanelas !== false);
             if (optPreservarJanelasAutenticacao) optPreservarJanelasAutenticacao.checked = (dados.preservarJanelasAutenticacao !== false);
@@ -769,9 +759,6 @@ document.addEventListener('DOMContentLoaded', () => {
             colagemBotaoDireitoAtiva: false,
             capturaBotoesMouse4e5Ativa: optCapturaBotoesMouse4e5 ? optCapturaBotoesMouse4e5.checked : true,
             colarBotaoMeioAtivo: optColarBotaoMeio ? optColarBotaoMeio.checked : true,
-            usarClipboardSistemaAoColar: Boolean(optColarBotaoMeio && optColarBotaoMeio.checked && optUsarClipboardSistema && optUsarClipboardSistema.checked),
-            historicoClipboardCtrlMeioAtivo: optHistoricoClipboardCtrlMeio ? optHistoricoClipboardCtrlMeio.checked : true,
-            historicoClipboardCtrlDireitoAtivo: optHistoricoClipboardCtrlMeio ? optHistoricoClipboardCtrlMeio.checked : true,
             navegacaoTecladoCamposAtiva: optNavegacaoTecladoCampos ? optNavegacaoTecladoCampos.checked : true,
             bloquearNovasJanelas: optBloquearNovasJanelas ? optBloquearNovasJanelas.checked : true,
             preservarJanelasAutenticacao: optPreservarJanelasAutenticacao ? optPreservarJanelasAutenticacao.checked : true,
@@ -830,25 +817,11 @@ document.addEventListener('DOMContentLoaded', () => {
     adicionarOuvinteSeguro(optSelecaoAutomaticaTextoEditavel, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(selectModoPlaceholdersMinutasHtml, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optColagemBotaoDireito, 'change', alternarColagemBotaoDireito);
-    adicionarOuvinteSeguro(avisoPermissaoBotaoDireito, 'click', tentarConcederPermissaoClipboard);
     adicionarOuvinteSeguro(optCapturaBotoesMouse4e5, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optColarBotaoMeio, 'change', () => {
-        if (!optColarBotaoMeio.checked && optUsarClipboardSistema) {
-            optUsarClipboardSistema.checked = false;
-        }
         atualizarEstadoVisualSubopcoesMouse();
         alternarColarBotaoMeio();
     });
-    adicionarOuvinteSeguro(optUsarClipboardSistema, 'change', () => {
-        salvarConfiguracoes();
-        obterEstadoPermissaoClipboard().then((perm) => {
-            atualizarVisualAtencaoSwitches(perm);
-            atualizarCoresEBotoesClipboard(perm);
-            atualizarVisorClipboardPassivo();
-        });
-    });
-    adicionarOuvinteSeguro(avisoPermissaoBotaoMeio, 'click', tentarConcederPermissaoClipboard);
-    adicionarOuvinteSeguro(optHistoricoClipboardCtrlMeio, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optNavegacaoTecladoCampos, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optBloquearNovasJanelas, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optPreservarJanelasAutenticacao, 'change', salvarConfiguracoes);
@@ -1207,11 +1180,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optColagemBotaoDireito) optColagemBotaoDireito.checked = false;
             if (optCapturaBotoesMouse4e5) optCapturaBotoesMouse4e5.checked = true;
             if (optColarBotaoMeio) optColarBotaoMeio.checked = true;
-            if (optUsarClipboardSistema) optUsarClipboardSistema.checked = true;
             obterEstadoPermissaoClipboard().then((perm) => {
                 atualizarVisualAtencaoSwitches(perm);
             });
-            if (optHistoricoClipboardCtrlMeio) optHistoricoClipboardCtrlMeio.checked = true;
             if (optNavegacaoTecladoCampos) optNavegacaoTecladoCampos.checked = true;
             if (optBloquearNovasJanelas) optBloquearNovasJanelas.checked = true;
             if (optPreservarJanelasAutenticacao) optPreservarJanelasAutenticacao.checked = true;
@@ -1256,9 +1227,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 colagemBotaoDireitoAtiva: false,
                 capturaBotoesMouse4e5Ativa: true,
                 colarBotaoMeioAtivo: true,
-                usarClipboardSistemaAoColar: false,
-                historicoClipboardCtrlMeioAtivo: true,
-                historicoClipboardCtrlDireitoAtivo: true,
                 navegacaoTecladoCamposAtiva: true,
                 bloquearNovasJanelas: true,
                 preservarJanelasAutenticacao: true,
@@ -1331,9 +1299,6 @@ document.addEventListener('DOMContentLoaded', () => {
             colagemBotaoDireitoAtiva: false,
             capturaBotoesMouse4e5Ativa: optCapturaBotoesMouse4e5 ? optCapturaBotoesMouse4e5.checked : true,
             colarBotaoMeioAtivo: optColarBotaoMeio ? optColarBotaoMeio.checked : true,
-            usarClipboardSistemaAoColar: Boolean(optColarBotaoMeio && optColarBotaoMeio.checked && optUsarClipboardSistema && optUsarClipboardSistema.checked),
-            historicoClipboardCtrlMeioAtivo: optHistoricoClipboardCtrlMeio ? optHistoricoClipboardCtrlMeio.checked : true,
-            historicoClipboardCtrlDireitoAtivo: optHistoricoClipboardCtrlMeio ? optHistoricoClipboardCtrlMeio.checked : true,
             navegacaoTecladoCamposAtiva: optNavegacaoTecladoCampos ? optNavegacaoTecladoCampos.checked : true,
             bloquearNovasJanelas: optBloquearNovasJanelas ? optBloquearNovasJanelas.checked : true,
             preservarJanelasAutenticacao: optPreservarJanelasAutenticacao ? optPreservarJanelasAutenticacao.checked : true,
@@ -1417,16 +1382,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (typeof json.colarBotaoMeioAtivo === 'boolean' && optColarBotaoMeio) {
                         optColarBotaoMeio.checked = json.colarBotaoMeioAtivo;
-                    }
-                    if (typeof json.usarClipboardSistemaAoColar === 'boolean' && optUsarClipboardSistema) {
-                        optUsarClipboardSistema.checked = json.usarClipboardSistemaAoColar;
-                    }
-                    if (optHistoricoClipboardCtrlMeio) {
-                        if (typeof json.historicoClipboardCtrlMeioAtivo === 'boolean') {
-                            optHistoricoClipboardCtrlMeio.checked = json.historicoClipboardCtrlMeioAtivo;
-                        } else if (typeof json.historicoClipboardCtrlDireitoAtivo === 'boolean') {
-                            optHistoricoClipboardCtrlMeio.checked = json.historicoClipboardCtrlDireitoAtivo;
-                        }
                     }
                     if (typeof json.navegacaoTecladoCamposAtiva === 'boolean' && optNavegacaoTecladoCampos) {
                         optNavegacaoTecladoCampos.checked = json.navegacaoTecladoCamposAtiva;
@@ -1512,117 +1467,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* Passo 4.6: Inspetor ao Vivo e Gestao de Permissao da Area de Transferencia */
-    function atualizarCoresEBotoesClipboard(estado) {
+    /* Passo 4.6: Visor "Ultima Selecao" (conteudo exato enviado por este addon a area de transferencia).
+     * Regra: o addon NUNCA le o clipboard do sistema (politicas corporativas podem proibir). */
+    function atualizarCoresEBotoesClipboard() {
         if (!btnAtualizarPreview) return;
-        const clipboardSistemaAtivo = Boolean(
-            optColarBotaoMeio && optColarBotaoMeio.checked &&
-            optUsarClipboardSistema && optUsarClipboardSistema.checked && !optUsarClipboardSistema.disabled
-        );
-
-        if (estado === 'granted') {
-            btnAtualizarPreview.classList.remove('btn-clip-bloqueado');
-            btnAtualizarPreview.classList.add('btn-clip-permitido');
-            btnAtualizarPreview.setAttribute('title', 'Acesso de leitura à área de transferência: PERMITIDO');
-            if (btnDownloadXMouse) {
-                btnDownloadXMouse.style.display = 'none';
-            }
-            if (avisoPermissaoClipboardInspector) {
-                avisoPermissaoClipboardInspector.style.display = 'none';
-            }
-        } else if (estado === 'denied') {
-            btnAtualizarPreview.classList.remove('btn-clip-permitido');
-            if (clipboardSistemaAtivo) {
-                btnAtualizarPreview.classList.add('btn-clip-bloqueado');
-                btnAtualizarPreview.setAttribute('title', 'Acesso de leitura à área de transferência: NEGADO / BLOQUEADO');
-                if (btnDownloadXMouse) {
-                    btnDownloadXMouse.style.display = 'inline-flex';
-                }
-                if (avisoPermissaoClipboardInspector) {
-                    avisoPermissaoClipboardInspector.style.display = 'flex';
-                }
-            } else {
-                btnAtualizarPreview.classList.remove('btn-clip-bloqueado');
-                btnAtualizarPreview.setAttribute('title', 'Operando com a memória interna do plugin (clipboard do sistema desativado)');
-                if (btnDownloadXMouse) {
-                    btnDownloadXMouse.style.display = 'none';
-                }
-                if (avisoPermissaoClipboardInspector) {
-                    avisoPermissaoClipboardInspector.style.display = 'none';
-                }
-            }
-        } else {
-            /* Estado 'prompt' ou indefinido (nada foi dito / ainda não solicitado) */
-            btnAtualizarPreview.classList.remove('btn-clip-permitido', 'btn-clip-bloqueado');
-            if (clipboardSistemaAtivo) {
-                btnAtualizarPreview.setAttribute('title', 'Acesso à área de transferência ainda não solicitado (Clique para autorizar)');
-                if (btnDownloadXMouse) {
-                    btnDownloadXMouse.style.display = 'inline-flex';
-                }
-                if (avisoPermissaoClipboardInspector) {
-                    avisoPermissaoClipboardInspector.style.display = 'flex';
-                }
-            } else {
-                btnAtualizarPreview.setAttribute('title', 'Operando com a memória interna do plugin (clipboard do sistema desativado)');
-                if (btnDownloadXMouse) {
-                    btnDownloadXMouse.style.display = 'none';
-                }
-                if (avisoPermissaoClipboardInspector) {
-                    avisoPermissaoClipboardInspector.style.display = 'none';
-                }
-            }
+        btnAtualizarPreview.classList.remove('btn-clip-permitido', 'btn-clip-bloqueado');
+        btnAtualizarPreview.setAttribute('title', 'Atualizar a exibição da Última Seleção (conteúdo enviado por este plugin à área de transferência)');
+        if (btnDownloadXMouse) {
+            btnDownloadXMouse.style.display = 'none';
         }
     }
 
-    function atualizarVisualAtencaoSwitches(estado) {
-        const concedido = (estado === 'granted');
-        const clipboardSistemaAtivo = Boolean(
-            optColarBotaoMeio && optColarBotaoMeio.checked &&
-            optUsarClipboardSistema && optUsarClipboardSistema.checked && !optUsarClipboardSistema.disabled
-        );
-
-        /* Switch Colagem Botão Direito */
-        if (lblSwitchColagemBotaoDireito) {
-            lblSwitchColagemBotaoDireito.classList.remove('slider-atencao');
-        }
-        if (avisoPermissaoBotaoDireito) {
-            avisoPermissaoBotaoDireito.style.display = 'none';
-        }
-
-        /* Switch Colar Botão do Meio */
-        const deveExibirAvisoMeio = (!concedido && clipboardSistemaAtivo);
-        if (lblSwitchColarBotaoMeio) {
-            if (deveExibirAvisoMeio) {
-                lblSwitchColarBotaoMeio.classList.add('slider-atencao');
-            } else {
-                lblSwitchColarBotaoMeio.classList.remove('slider-atencao');
-            }
-        }
-        if (avisoPermissaoBotaoMeio) {
-            avisoPermissaoBotaoMeio.style.display = deveExibirAvisoMeio ? 'flex' : 'none';
-        }
+    function atualizarVisualAtencaoSwitches() {
+        if (lblSwitchColagemBotaoDireito) lblSwitchColagemBotaoDireito.classList.remove('slider-atencao');
+        if (lblSwitchColarBotaoMeio) lblSwitchColarBotaoMeio.classList.remove('slider-atencao');
+        if (avisoPermissaoBotaoDireito) avisoPermissaoBotaoDireito.style.display = 'none';
+        if (avisoPermissaoBotaoMeio) avisoPermissaoBotaoMeio.style.display = 'none';
     }
 
     function atualizarEstadoVisualSubopcoesMouse() {
         const ativo = optColarBotaoMeio ? optColarBotaoMeio.checked : true;
-        if (containerSubopcoesMouse) {
-            containerSubopcoesMouse.style.opacity = ativo ? '1' : '0.45';
-            containerSubopcoesMouse.style.pointerEvents = ativo ? 'auto' : 'none';
-        }
-        if (optUsarClipboardSistema) {
-            optUsarClipboardSistema.disabled = !ativo;
-            if (!ativo) {
-                optUsarClipboardSistema.checked = false;
-            }
-        }
         if (optColagemBotaoDireito) optColagemBotaoDireito.disabled = !ativo;
-        if (optHistoricoClipboardCtrlMeio) optHistoricoClipboardCtrlMeio.disabled = !ativo;
-
-        obterEstadoPermissaoClipboard().then((perm) => {
-            atualizarVisualAtencaoSwitches(perm);
-            atualizarCoresEBotoesClipboard(perm);
-            atualizarVisorClipboardPassivo();
-        });
+        atualizarVisualAtencaoSwitches();
+        atualizarCoresEBotoesClipboard();
+        atualizarVisorClipboardPassivo();
     }
 
     function atualizarEstadoVisualOpcoesDescarte() {
@@ -1637,58 +1505,23 @@ document.addEventListener('DOMContentLoaded', () => {
     async function alternarColagemBotaoDireito() {
         if (!optColagemBotaoDireito) return;
         salvarConfiguracoes();
-        obterEstadoPermissaoClipboard().then((perm) => {
-            atualizarVisualAtencaoSwitches(perm);
-        });
+        atualizarVisualAtencaoSwitches();
     }
 
     async function alternarColarBotaoMeio() {
         if (!optColarBotaoMeio) return;
         salvarConfiguracoes();
-        obterEstadoPermissaoClipboard().then((perm) => {
-            atualizarVisualAtencaoSwitches(perm);
-        });
+        atualizarVisualAtencaoSwitches();
     }
 
-    async function tentarConcederPermissaoClipboard() {
-        try {
-            if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
-                await navigator.clipboard.readText();
-            }
-        } catch (_) { }
-        const perm = await obterEstadoPermissaoClipboard();
-        atualizarCoresEBotoesClipboard(perm);
-        atualizarVisualAtencaoSwitches(perm);
-        atualizarVisorClipboardPassivo();
-    }
-
+    /* Mantida por compatibilidade: nao existe mais permissao de leitura a ser solicitada. */
     async function obterEstadoPermissaoClipboard() {
-        try {
-            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                const status = await navigator.permissions.query({ name: 'clipboard-read' });
-                return status.state;
-            }
-        } catch (_) { }
-        return 'prompt';
+        return 'granted';
     }
 
     async function inicializarMonitorPermissaoClipboard() {
-        try {
-            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                const status = await navigator.permissions.query({ name: 'clipboard-read' });
-                atualizarCoresEBotoesClipboard(status.state);
-                atualizarVisualAtencaoSwitches(status.state);
-                atualizarVisorClipboardPassivo();
-                status.onchange = () => {
-                    atualizarCoresEBotoesClipboard(status.state);
-                    atualizarVisualAtencaoSwitches(status.state);
-                    atualizarVisorClipboardPassivo();
-                };
-                return;
-            }
-        } catch (_) { }
-        atualizarCoresEBotoesClipboard('prompt');
-        atualizarVisualAtencaoSwitches('prompt');
+        atualizarCoresEBotoesClipboard();
+        atualizarVisualAtencaoSwitches();
         atualizarVisorClipboardPassivo();
     }
 
@@ -1702,73 +1535,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             previewAreaTransferencia.textContent = String(origem || '(vazio)');
         }
-    }
-
-    /* Leitura assincrona avancada multi-MIME com deteccao de tipos nao textuais (100% REAL - SEM EMULACAO) */
-    async function inspecionarClipboardNativo() {
-        if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
-            try {
-                const items = await navigator.clipboard.read();
-                if (!items || items.length === 0) {
-                    return { sucesso: true, itens: [] };
-                }
-                const lista = [];
-                for (const item of items) {
-                    const tipos = item.types || [];
-                    for (const tipo of tipos) {
-                        try {
-                            const blob = await item.getType(tipo);
-                            const ehTexto = tipo.startsWith('text/') || tipo === 'application/rtf' || tipo === 'application/json';
-                            if (ehTexto) {
-                                const txt = await blob.text();
-                                lista.push({ type: tipo, data: txt, size: blob.size, isTextual: true });
-                            } else {
-                                lista.push({ type: tipo, data: null, size: blob.size, isTextual: false });
-                            }
-                        } catch (errBlob) {
-                            lista.push({
-                                type: tipo,
-                                data: null,
-                                size: null,
-                                isTextual: !tipo.startsWith('image/') && !tipo.startsWith('audio/') && !tipo.startsWith('video/'),
-                                detalhe: errBlob.message || 'Falha ao ler dados'
-                            });
-                        }
-                    }
-                }
-                return { sucesso: true, itens: lista };
-            } catch (erroRead) {
-                const estado = await obterEstadoPermissaoClipboard();
-                if (estado === 'denied') {
-                    return { sucesso: false, negado: true };
-                }
-                /* Se read() falhar, tenta readText() apenas para checar se ha texto simples */
-                if (typeof navigator.clipboard.readText === 'function') {
-                    try {
-                        const txt = await navigator.clipboard.readText();
-                        if (typeof txt === 'string' && txt.length > 0) {
-                            return { sucesso: true, itens: [{ type: 'text/plain', data: txt, isTextual: true }] };
-                        }
-                    } catch (_) { }
-                }
-                return { sucesso: false, negado: false, erro: erroRead.message || 'Falha ao acessar area de transferencia' };
-            }
-        }
-
-        if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
-            try {
-                const txt = await navigator.clipboard.readText();
-                return { sucesso: true, itens: txt ? [{ type: 'text/plain', data: txt, isTextual: true }] : [] };
-            } catch (erroText) {
-                const estado = await obterEstadoPermissaoClipboard();
-                if (estado === 'denied') {
-                    return { sucesso: false, negado: true };
-                }
-                return { sucesso: false, negado: false, erro: erroText.message || 'Falha ao acessar area de transferencia' };
-            }
-        }
-
-        return { sucesso: false, negado: false, erro: 'API de area de transferencia indisponivel' };
     }
 
     function obterClipboardInternoParaVisor() {
@@ -1785,7 +1551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return '';
     }
 
-    /* Ao clicar no botão de ler área de transferência: solicita autorização / lê clipboard real */
+    /* Botao "Atualizar": exibe a Ultima Selecao (sem qualquer leitura do clipboard do sistema) */
     async function acionarLeituraClipboardComPrompt(e) {
         if (e) {
             e.preventDefault();
@@ -1794,33 +1560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!previewAreaTransferencia) return;
         leituraManualEmAndamento = true;
         try {
-            const clipboardSistemaAtivo = Boolean(
-                optColarBotaoMeio && optColarBotaoMeio.checked &&
-                optUsarClipboardSistema && optUsarClipboardSistema.checked && !optUsarClipboardSistema.disabled
-            );
-
-            if (!clipboardSistemaAtivo) {
-                const clipInterno = obterClipboardInternoParaVisor();
-                renderizarNoVisorClipboard(clipInterno);
-                return;
-            }
-
-            const res = await inspecionarClipboardNativo();
-            if (res.sucesso) {
-                atualizarCoresEBotoesClipboard('granted');
-                renderizarNoVisorClipboard(res.itens);
-            } else if (res.negado) {
-                atualizarCoresEBotoesClipboard('denied');
-                renderizarNoVisorClipboard({ negado: true, interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-            } else {
-                const estado = await obterEstadoPermissaoClipboard();
-                atualizarCoresEBotoesClipboard(estado);
-                if (estado === 'denied') {
-                    renderizarNoVisorClipboard({ negado: true, interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                } else {
-                    renderizarNoVisorClipboard({ erro: res.erro || 'Falha na leitura da área de transferência', interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                }
-            }
+            renderizarNoVisorClipboard(obterClipboardInternoParaVisor());
         } finally {
             setTimeout(() => {
                 leituraManualEmAndamento = false;
@@ -1830,44 +1570,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarVisorClipboardPassivo() {
         if (!previewAreaTransferencia || leituraManualEmAndamento) return;
-        const clipboardSistemaAtivo = Boolean(
-            optColarBotaoMeio && optColarBotaoMeio.checked &&
-            optUsarClipboardSistema && optUsarClipboardSistema.checked && !optUsarClipboardSistema.disabled
-        );
-
-        if (!clipboardSistemaAtivo) {
-            const clipInterno = obterClipboardInternoParaVisor();
-            renderizarNoVisorClipboard(clipInterno);
-            return;
-        }
-
-        obterEstadoPermissaoClipboard().then((estado) => {
-            if (leituraManualEmAndamento) return;
-            atualizarCoresEBotoesClipboard(estado);
-            if (estado !== 'granted') {
-                /* Sem permissão: exibe mensagem de sem acesso e o buffer interno em amarelo abaixo */
-                renderizarNoVisorClipboard({ negado: true, interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                return;
-            }
-            inspecionarClipboardNativo().then((res) => {
-                if (leituraManualEmAndamento) return;
-                if (res.sucesso) {
-                    renderizarNoVisorClipboard(res.itens);
-                } else if (res.negado) {
-                    renderizarNoVisorClipboard({ negado: true, interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                } else {
-                    renderizarNoVisorClipboard({ erro: res.erro || 'Falha na leitura da área de transferência', interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                }
-            }).catch(() => {
-                if (!leituraManualEmAndamento) {
-                    renderizarNoVisorClipboard({ negado: true, interno: window.__JUSGOV_ULTIMO_CLIPBOARD__ });
-                }
-            });
-        });
+        renderizarNoVisorClipboard(obterClipboardInternoParaVisor());
     }
 
     adicionarOuvinteSeguro(btnAtualizarPreview, 'click', acionarLeituraClipboardComPrompt);
-    adicionarOuvinteSeguro(avisoPermissaoClipboardInspector, 'click', acionarLeituraClipboardComPrompt);
 
     /* Botao de download do utilitario X-Mouse Button Control */
     if (btnDownloadXMouse) {
@@ -2104,25 +1810,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     optColarBotaoMeio.checked = (changes.colarBotaoMeioAtivo.newValue !== false);
                     atualizarEstadoVisualSubopcoesMouse();
                 }
-                if (changes.usarClipboardSistemaAoColar !== undefined && optUsarClipboardSistema) {
-                    optUsarClipboardSistema.checked = Boolean(changes.usarClipboardSistemaAoColar.newValue);
-                    obterEstadoPermissaoClipboard().then((perm) => {
-                        atualizarVisualAtencaoSwitches(perm);
-                        atualizarCoresEBotoesClipboard(perm);
-                        atualizarVisorClipboardPassivo();
-                    });
-                }
                 if (changes.colagemBotaoDireitoAtiva !== undefined || changes.colarBotaoMeioAtivo !== undefined) {
                     obterEstadoPermissaoClipboard().then((perm) => {
                         atualizarVisualAtencaoSwitches(perm);
                         atualizarCoresEBotoesClipboard(perm);
                         atualizarVisorClipboardPassivo();
                     });
-                }
-                if (changes.historicoClipboardCtrlMeioAtivo !== undefined && optHistoricoClipboardCtrlMeio) {
-                    optHistoricoClipboardCtrlMeio.checked = (changes.historicoClipboardCtrlMeioAtivo.newValue !== false);
-                } else if (changes.historicoClipboardCtrlDireitoAtivo !== undefined && optHistoricoClipboardCtrlMeio) {
-                    optHistoricoClipboardCtrlMeio.checked = (changes.historicoClipboardCtrlDireitoAtivo.newValue !== false);
                 }
                 if (changes.navegacaoTecladoCamposAtiva !== undefined && optNavegacaoTecladoCampos) {
                     optNavegacaoTecladoCampos.checked = (changes.navegacaoTecladoCamposAtiva.newValue !== false);

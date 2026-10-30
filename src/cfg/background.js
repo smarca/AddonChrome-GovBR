@@ -315,9 +315,6 @@ async function injetarRetroativamenteNasAbasAbertas(config) {
                 colagemBotaoDireitoAtiva: Boolean(config.colagemBotaoDireitoAtiva),
                 capturaBotoesMouse4e5Ativa: config.capturaBotoesMouse4e5Ativa !== false,
                 colarBotaoMeioAtivo: config.colarBotaoMeioAtivo !== false,
-                usarClipboardSistemaAoColar: Boolean(config.usarClipboardSistemaAoColar),
-                historicoClipboardCtrlMeioAtivo: (config.historicoClipboardCtrlMeioAtivo !== undefined) ? (config.historicoClipboardCtrlMeioAtivo !== false) : (config.historicoClipboardCtrlDireitoAtivo !== false),
-                historicoClipboardCtrlDireitoAtivo: (config.historicoClipboardCtrlMeioAtivo !== undefined) ? (config.historicoClipboardCtrlMeioAtivo !== false) : (config.historicoClipboardCtrlDireitoAtivo !== false),
                 navegacaoTecladoCamposAtiva: config.navegacaoTecladoCamposAtiva !== false,
                 validacaoMatematicaAtiva: config.validacaoMatematicaAtiva !== false,
                 tempoFlashBorderMs: typeof config.tempoFlashBorderMs === 'number' ? config.tempoFlashBorderMs : 500,
@@ -499,20 +496,6 @@ async function sincronizarEstado() {
         config.colarBotaoMeioAtivo = true;
         precisaSalvar = true;
     }
-    if (config.usarClipboardSistemaAoColar === undefined) {
-        config.usarClipboardSistemaAoColar = false;
-        precisaSalvar = true;
-    }
-    if (config.historicoClipboardCtrlMeioAtivo === undefined) {
-        config.historicoClipboardCtrlMeioAtivo = (config.historicoClipboardCtrlDireitoAtivo !== undefined)
-            ? config.historicoClipboardCtrlDireitoAtivo
-            : true;
-        precisaSalvar = true;
-    }
-    if (config.historicoClipboardCtrlDireitoAtivo === undefined) {
-        config.historicoClipboardCtrlDireitoAtivo = config.historicoClipboardCtrlMeioAtivo;
-        precisaSalvar = true;
-    }
     if (config.navegacaoTecladoCamposAtiva === undefined) {
         config.navegacaoTecladoCamposAtiva = true;
         precisaSalvar = true;
@@ -585,9 +568,6 @@ async function sincronizarEstado() {
             colagemBotaoDireitoAtiva: false,
             capturaBotoesMouse4e5Ativa: config.capturaBotoesMouse4e5Ativa,
             colarBotaoMeioAtivo: config.colarBotaoMeioAtivo !== false,
-            usarClipboardSistemaAoColar: config.usarClipboardSistemaAoColar !== false,
-            historicoClipboardCtrlMeioAtivo: (config.historicoClipboardCtrlMeioAtivo !== undefined) ? (config.historicoClipboardCtrlMeioAtivo !== false) : (config.historicoClipboardCtrlDireitoAtivo !== false),
-            historicoClipboardCtrlDireitoAtivo: (config.historicoClipboardCtrlMeioAtivo !== undefined) ? (config.historicoClipboardCtrlMeioAtivo !== false) : (config.historicoClipboardCtrlDireitoAtivo !== false),
             navegacaoTecladoCamposAtiva: config.navegacaoTecladoCamposAtiva,
             bloquearNovasJanelas: config.bloquearNovasJanelas,
             preservarJanelasAutenticacao: config.preservarJanelasAutenticacao,
@@ -894,9 +874,6 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             'colagemBotaoDireitoAtiva',
             'capturaBotoesMouse4e5Ativa',
             'colarBotaoMeioAtivo',
-            'usarClipboardSistemaAoColar',
-            'historicoClipboardCtrlMeioAtivo',
-            'historicoClipboardCtrlDireitoAtivo',
             'navegacaoTecladoCamposAtiva',
             'bloquearNovasJanelas',
             'preservarJanelasAutenticacao',

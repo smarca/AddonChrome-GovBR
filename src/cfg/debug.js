@@ -1416,80 +1416,29 @@
                 );
             }
 
-            if (typeof motorTeste.definirHistoricoRollback === 'function' && typeof motorTeste.simularRollbackClipboard === 'function' && typeof motorTeste.obterHistoricoRollback === 'function') {
-                const itemA = { texto: 'Texto Anterior A', html: '', formatado: false };
-                const itemB = { texto: 'Texto Recente B', html: '', formatado: false };
-
-                motorTeste.definirHistoricoRollback(itemB, itemA);
-                const swap1Ok = motorTeste.simularRollbackClipboard();
-                const hist1 = motorTeste.obterHistoricoRollback();
-                const primeiroPassoOk = swap1Ok && hist1.ultimo && hist1.ultimo.texto === 'Texto Anterior A' && hist1.penultimo && hist1.penultimo.texto === 'Texto Recente B';
-
-                const swap2Ok = motorTeste.simularRollbackClipboard();
-                const hist2 = motorTeste.obterHistoricoRollback();
-                const segundoPassoOk = swap2Ok && hist2.ultimo && hist2.ultimo.texto === 'Texto Recente B' && hist2.penultimo && hist2.penultimo.texto === 'Texto Anterior A';
-
-                const rollbackOk = Boolean(primeiroPassoOk && segundoPassoOk);
+            if (typeof motorTeste.emularTeclasWinV === 'function') {
+                /* Ctrl + Botao do Meio envia Win+V (historico do Windows) e nao faz mais rollback interno */
+                const estadoOrigMeioWV = (typeof motorTeste.obterColarBotaoMeioAtivo === 'function') ? motorTeste.obterColarBotaoMeioAtivo() : true;
+                if (typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(true);
+                const campoWV = document.createElement('input');
+                campoWV.type = 'text';
+                document.body.appendChild(campoWV);
+                let recebeuWinV = false;
+                campoWV.addEventListener('keydown', (ev) => { if (ev.metaKey && ev.key === 'v') recebeuWinV = true; });
+                const evtCtrlMeio = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1, ctrlKey: true });
+                campoWV.dispatchEvent(evtCtrlMeio);
+                const valorInalterado = (campoWV.value === '');
+                document.body.removeChild(campoWV);
+                if (typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(estadoOrigMeioWV);
                 registrar(
-                    rollbackOk,
-                    'ROLLBACK_CLIPBOARD_ALTERNANCIA_SWAP',
-                    'Rollback do clipboard e colagem direta (Ctrl + Botao do Meio): alternancia continua entre ultimo e penultimo item',
+                    Boolean(recebeuWinV && valorInalterado && evtCtrlMeio.defaultPrevented),
+                    'CTRL_MEIO_ENVIA_WIN_V',
+                    'Ctrl + Botao do Meio envia as teclas Win+V ao sistema, sem colar nem fazer rollback interno',
                     {
-                        textoTestado: 'Alternancia entre item A e item B',
+                        textoTestado: 'Ctrl + Botao do Meio',
                         idxCursor: 0,
-                        esperado: 'passo1=A, passo2=B',
-                        obtido: rollbackOk ? 'passo1=A, passo2=B' : 'falha no swap'
-                    }
-                );
-            }
-
-            if (typeof motorTeste.definirHistoricoRollback === 'function' && typeof motorTeste.simularRollbackEColagem === 'function') {
-                const itemA = { texto: 'Texto Anterior A', html: '', formatado: false };
-                const itemB = { texto: 'Texto Recente B', html: '', formatado: false };
-                motorTeste.definirHistoricoRollback(itemB, itemA);
-
-                const inputTeste = document.createElement('input');
-                inputTeste.type = 'text';
-                inputTeste.value = '';
-                document.body.appendChild(inputTeste);
-
-                motorTeste.simularRollbackEColagem(inputTeste);
-                const valorAposPrimeiro = inputTeste.value;
-
-                motorTeste.simularRollbackEColagem(inputTeste);
-                const valorAposSegundo = inputTeste.value;
-
-                document.body.removeChild(inputTeste);
-
-                const colagemRollbackOk = (valorAposPrimeiro === 'Texto Anterior A' && valorAposSegundo === 'Texto Recente B');
-                registrar(
-                    colagemRollbackOk,
-                    'ROLLBACK_COLAGEM_DIRETA_INPUT_SWAP',
-                    'Rollback com Colagem Direta em Campo Editavel (Ctrl + Botao do Meio): cola e substitui em sequencia entre item A e B',
-                    {
-                        esperado: 'passo1=Texto Anterior A, passo2=Texto Recente B',
-                        obtido: `passo1=${valorAposPrimeiro}, passo2=${valorAposSegundo}`
-                    }
-                );
-            }
-
-            if (typeof motorTeste.definirHistoricoClipboardCtrlMeioAtivo === 'function' || typeof motorTeste.definirHistoricoClipboardCtrlDireitoAtivo === 'function') {
-                const getFn = motorTeste.obterHistoricoClipboardCtrlMeioAtivo || motorTeste.obterHistoricoClipboardCtrlDireitoAtivo;
-                const setFn = motorTeste.definirHistoricoClipboardCtrlMeioAtivo || motorTeste.definirHistoricoClipboardCtrlDireitoAtivo;
-                const padraoAtivo = getFn();
-                setFn(false);
-                const desativado = getFn();
-                setFn(true);
-                const reativado = getFn();
-
-                registrar(
-                    padraoAtivo === true && desativado === false && reativado === true,
-                    'HISTORICO_CLIPBOARD_CTRL_MEIO_CONFIG',
-                    'Configuracao de Historico do Clipboard / Rollback (Ctrl + Botao do Meio): padrao ativo e alternancia dinamica',
-                    {
-                        padrao: padraoAtivo,
-                        desativado: desativado,
-                        reativado: reativado
+                        esperado: 'winV=true, valorInalterado=true',
+                        obtido: `winV=${recebeuWinV}, valorInalterado=${valorInalterado}`
                     }
                 );
             }
@@ -1906,7 +1855,6 @@
 
                 motorTeste.definirColarBotaoMeioAtivo(false);
                 motorTeste.definirColagemBotaoDireitoAtiva(true);
-                motorTeste.definirHistoricoClipboardCtrlMeioAtivo(true);
 
                 const campoEditavel = document.createElement('input');
                 campoEditavel.type = 'text';
@@ -1970,35 +1918,28 @@
                 }
             );
 
-            /* Validacao da alternancia visual do botao Ler Area de Transferencia e visibilidade do X-Mouse */
+            /* Visor "Ultima Selecao": botao Atualizar sem estados de permissao; X-Mouse oculto */
             let visualClipOk = true;
             if (window.JusGovOptions && typeof window.JusGovOptions.atualizarCoresEBotoesClipboard === 'function') {
                 const btnLer = document.getElementById('btnAtualizarPreview');
                 const btnX = document.getElementById('btnDownloadXMouse');
-                const avisoInspector = document.getElementById('avisoPermissaoClipboardInspector');
-                const optSis = document.getElementById('optUsarClipboardSistema');
                 if (btnLer && btnX) {
-                    const estadoOriginalSis = optSis ? optSis.checked : false;
-                    if (optSis) optSis.checked = true;
-                    window.JusGovOptions.atualizarCoresEBotoesClipboard('granted');
-                    const grantedOk = btnLer.classList.contains('btn-clip-permitido') && btnX.style.display === 'none' && (!avisoInspector || avisoInspector.style.display === 'none');
-
-                    window.JusGovOptions.atualizarCoresEBotoesClipboard('denied');
-                    const deniedOk = btnLer.classList.contains('btn-clip-bloqueado') && btnX.style.display === 'inline-flex' && (!avisoInspector || avisoInspector.style.display === 'flex');
-
-                    window.JusGovOptions.atualizarCoresEBotoesClipboard('prompt');
-                    const promptOk = !btnLer.classList.contains('btn-clip-permitido') && !btnLer.classList.contains('btn-clip-bloqueado') && btnX.style.display === 'inline-flex' && (!avisoInspector || avisoInspector.style.display === 'flex');
-
-                    /* Quando clipboard do sistema estiver desligado, aviso e botao X-Mouse devem ficar ocultos */
-                    if (optSis) optSis.checked = false;
-                    window.JusGovOptions.atualizarCoresEBotoesClipboard('denied');
-                    const desativadoOk = !btnLer.classList.contains('btn-clip-bloqueado') && btnX.style.display === 'none' && (!avisoInspector || avisoInspector.style.display === 'none');
-                    if (optSis) optSis.checked = estadoOriginalSis;
-                    window.JusGovOptions.atualizarCoresEBotoesClipboard('granted');
-
-                    visualClipOk = Boolean(grantedOk && deniedOk && promptOk && desativadoOk);
+                    window.JusGovOptions.atualizarCoresEBotoesClipboard();
+                    visualClipOk = Boolean(!btnLer.classList.contains('btn-clip-permitido') && !btnLer.classList.contains('btn-clip-bloqueado') && btnX.style.display === 'none');
                 }
             }
+
+            registrar(
+                visualClipOk,
+                'VISUAL_VISOR_ULTIMA_SELECAO',
+                'Visor Ultima Selecao: botao Atualizar sem estados de permissao de clipboard',
+                {
+                    textoTestado: 'Botao Atualizar da Ultima Selecao',
+                    idxCursor: 0,
+                    esperado: 'sem classes de permissao',
+                    obtido: visualClipOk ? 'sem classes de permissao' : 'falha'
+                }
+            );
 
             registrar(
                 visualClipOk,
@@ -2012,28 +1953,49 @@
                 }
             );
 
-            /* Sub-opcao Usar area de transferencia do sistema (desmarcada por padrao) */
-            let subopcaoSistemaOk = false;
-            if (motorTeste && typeof motorTeste.definirUsarClipboardSistemaAoColar === 'function') {
-                const estIni = motorTeste.obterUsarClipboardSistemaAoColar ? motorTeste.obterUsarClipboardSistemaAoColar() : false;
-                motorTeste.definirUsarClipboardSistemaAoColar(false);
-                const desligou = (motorTeste.obterUsarClipboardSistemaAoColar() === false);
-                motorTeste.definirUsarClipboardSistemaAoColar(true);
-                const ligou = (motorTeste.obterUsarClipboardSistemaAoColar() === true);
-                motorTeste.definirUsarClipboardSistemaAoColar(estIni);
-                const optSis = document.getElementById('optUsarClipboardSistema');
-                const optSisOk = optSis ? (optSis.checked === false) : true;
-                subopcaoSistemaOk = Boolean(ligou && desligou && optSisOk);
+            /* Regra: o addon NUNCA le o clipboard do sistema. Colar com botao do meio usa a "Ultima Selecao". */
+            let colagemUltimaSelecaoOk = false;
+            let leiturasClipboard = 0;
+            {
+                const nav = window.navigator;
+                const clip = nav && nav.clipboard;
+                const origRead = clip && clip.read;
+                const origReadText = clip && clip.readText;
+                const estadoOrigMeio = (motorTeste && typeof motorTeste.obterColarBotaoMeioAtivo === 'function') ? motorTeste.obterColarBotaoMeioAtivo() : true;
+                const clipOrig = window.__JUSGOV_ULTIMO_CLIPBOARD__;
+                try {
+                    if (clip) {
+                        try { clip.read = () => { leiturasClipboard++; return Promise.reject(new Error('leitura proibida')); }; } catch (_) {}
+                        try { clip.readText = () => { leiturasClipboard++; return Promise.reject(new Error('leitura proibida')); }; } catch (_) {}
+                    }
+                    if (motorTeste && typeof motorTeste.definirColarBotaoMeioAtivo === 'function') {
+                        motorTeste.definirColarBotaoMeioAtivo(true);
+                        window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: 'ULTIMA_SELECAO_XYZ', html: '', formatado: false };
+                        const campoUS = document.createElement('input');
+                        campoUS.type = 'text';
+                        document.body.appendChild(campoUS);
+                        campoUS.dispatchEvent(new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1 }));
+                        colagemUltimaSelecaoOk = (campoUS.value === 'ULTIMA_SELECAO_XYZ');
+                        document.body.removeChild(campoUS);
+                    }
+                } finally {
+                    if (clip) {
+                        try { if (origRead) clip.read = origRead; } catch (_) {}
+                        try { if (origReadText) clip.readText = origReadText; } catch (_) {}
+                    }
+                    if (motorTeste && typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(estadoOrigMeio);
+                    window.__JUSGOV_ULTIMO_CLIPBOARD__ = clipOrig;
+                }
             }
             registrar(
-                subopcaoSistemaOk,
-                'USAR_CLIPBOARD_SISTEMA_SUBOPCAO',
-                'Sub-opcao Usar area de transferencia (clipboard) do sistema: padrao desmarcado (memoria interna), subordinado ao Botao do Meio',
+                Boolean(colagemUltimaSelecaoOk && leiturasClipboard === 0),
+                'COLAR_MEIO_USA_ULTIMA_SELECAO_SEM_LER_CLIPBOARD',
+                'Colar com botao do meio usa a Ultima Selecao e nunca le o clipboard do sistema',
                 {
-                    textoTestado: 'Sub-opcao optUsarClipboardSistema',
+                    textoTestado: 'ULTIMA_SELECAO_XYZ',
                     idxCursor: 0,
-                    esperado: 'padrao=false, controle=ok',
-                    obtido: subopcaoSistemaOk ? 'padrao=false, controle=ok' : 'falha'
+                    esperado: 'colou=true, leituras=0',
+                    obtido: `colou=${colagemUltimaSelecaoOk}, leituras=${leiturasClipboard}`
                 }
             );
 

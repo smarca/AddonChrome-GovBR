@@ -1531,21 +1531,7 @@
                             <div>
                                 <div class="setting-label">Colar com o botão do Meio (Scroll Click)</div>
                                 <div class="setting-help">
-                                    Permite colar o conteúdo da área de transferência diretamente em campos de texto e editores com 1 clique no botão do meio do mouse. Quando ativo, <strong>bloqueia a rolagem automática nativa (cursor de bússola/roda)</strong> e habilita os recursos de colagem e rollback abaixo. Se desativado, o clique do meio do mouse não é interceptado e retorna integralmente ao comportamento padrão do navegador (incluindo a rolagem automática nativa com cursor de bússola/roda).
-                                    <div id="avisoPermissaoBotaoMeio"
-                                        style="display: none; align-items: center; gap: 5px; margin-top: 6px; color: #d97706; font-size: 11.5px; font-weight: 500; cursor: pointer;"
-                                        title="Clique para solicitar permissão de leitura da área de transferência">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                            aria-hidden="true" style="color: #f59e0b; flex-shrink: 0;">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                        </svg>
-                                        <span>Atenção: operando com a memória interna do plugin (para
-                                            leitura de apps externos, autorize o clipboard na barra de
-                                            endereços)</span>
-                                    </div>
+                                    Cola, com <strong>1 clique no botão do meio</strong> do mouse, a <strong>Última Seleção</strong> (o conteúdo exato, TXT ou HTML conforme o nível de formatação, que este plugin enviou à área de transferência na última cópia) em campos de texto e editores, simulando <code>Ctrl+V</code>. Com <strong>Ctrl + botão do meio</strong>, envia ao sistema as teclas <code>Win+V</code> para abrir o histórico da área de transferência do Windows (se habilitado no sistema). O plugin <strong>não lê</strong> a área de transferência do sistema. Quando ativo, bloqueia a rolagem automática nativa (cursor de bússola/roda). Se desativado, o clique do meio não é interceptado e retorna integralmente ao comportamento padrão do navegador.
                                 </div>
                             </div>
                             <label class="switch" id="lblSwitchColarBotaoMeio" style="flex-shrink: 0;">
@@ -1554,34 +1540,6 @@
                             </label>
                         </div>
 
-                        <!-- Sub-opções subordinadas ao Colar com o Botão do Meio -->
-                        <div id="containerSubopcoesMouse" style="margin-left: 18px; padding-left: 14px; border-left: 2px solid var(--azul-claro, #bfdbfe); display: flex; flex-direction: column; gap: 12px; margin-top: 4px; transition: opacity 0.2s ease;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
-                                <div>
-                                    <div class="setting-label" style="font-size: 13px;">• Usar área de transferência (clipboard) do sistema</div>
-                                    <div class="setting-help">
-                                        Quando ativado, utiliza a área de transferência do sistema operacional ao colar com o mouse. Quando desativado (padrão), utiliza a memória interna do plugin e emula teclas de colagem para conteúdos estilizados. Ao copiar pelo mouse, o conteúdo copiado continua normalmente conectado e sendo enviado para a área de transferência do sistema.
-                                    </div>
-                                </div>
-                                <label class="switch" id="lblSwitchUsarClipboardSistema" style="flex-shrink: 0;">
-                                    <input type="checkbox" id="optUsarClipboardSistema">
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
-                                <div>
-                                    <div class="setting-label" style="font-size: 13px;">• Histórico da Área de Transferência / Rollback (Ctrl + Botão do Meio do Mouse)</div>
-                                    <div class="setting-help">
-                                        Ao pressionar <strong>Ctrl + Botão do Meio do Mouse</strong> (scroll click) em campos editáveis, cola imediatamente o conteúdo da área de transferência interna anteriormente copiado pelo plugin (ou tenta chamar o histórico avançado Win+V do Windows). Cliques sucessivos com <code>Ctrl</code> alternam e colam dinamicamente entre o último e o penúltimo conteúdo copiado (vai e volta a cada clique).
-                                    </div>
-                                </div>
-                                <label class="switch" style="flex-shrink: 0;">
-                                    <input type="checkbox" id="optHistoricoClipboardCtrlMeio" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="setting-item">
@@ -1851,12 +1809,11 @@
                         <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
                             Alternância circular contínua entre abas através dos botões
                             laterais físicos do mouse (Botão 4 Voltar e Botão 5 Avançar),
-                            colagem direta em campos editáveis com o botão do meio (scroll click) com
-                            verificação online e fallback emulado de memória interna,
+                            colagem direta em campos editáveis com o botão do meio (scroll click) usando a
+                            Última Seleção (sem ler o clipboard do sistema),
                             navegação vertical entre campos de entrada (<code>&lt;input&gt;</code>) pelas
-                            setas do teclado (↑/↓) e histórico/rollback contínuo do clipboard
-                            via <code>Ctrl + Botão do Meio</code> (colagem imediata do item anterior e
-                            alternância sequencial entre o último e o penúltimo).
+                            setas do teclado (↑/↓) e Win+V (histórico do Windows)
+                            via <code>Ctrl + Botão do Meio</code>.
                         </p>
                     </div>
                     <div
@@ -1964,11 +1921,10 @@
                                 <code>;</code>. Absorve a seleção anterior automaticamente, ordena na
                                 sequência do texto (ou no final da fila com <code>Shift</code>), remove item ao
                                 clicar de novo e desfaz com <code>Ctrl+Alt+Clique Direito</code>.</li>
-                            <li><strong>Rollback da Área de Transferência
-                                    (<code>Ctrl + Botão do Meio</code>):</strong> Restaura e cola imediatamente o
-                                conteúdo anteriormente copiado em campos editáveis. Cliques repetidos em
-                                sequência com <code>Ctrl</code> alternam e colam continuamente entre o
-                                último e o penúltimo conteúdo copiado (vai e volta a cada clique).
+                            <li><strong>Colar com o botão do Meio (<code>Scroll Click</code>):</strong> cola a Última Seleção
+                                (o que o plugin enviou à área de transferência na última cópia) simulando <code>Ctrl+V</code>.
+                                Com <code>Ctrl + Botão do Meio</code>, envia <code>Win+V</code> ao sistema (histórico do Windows).
+                                O plugin não lê a área de transferência do sistema.
                             </li>
                             <li><strong>Tabelas (Ctrl+Alt):</strong> Clique no cabeçalho da tabela (Coluna) ou na
                                 borda esquerda da linha (Linha).</li>
@@ -2162,11 +2118,10 @@
                                 <code>Ctrl+Alt+Clique Direito</code>. Em tabelas, <code>Ctrl+Alt+Clique</code> no
                                 cabeçalho (alto da coluna, ignorando a "mãozinha") copia a
                                 coluna inteira, e na borda esquerda copia a linha inteira.<br>
-                                • <strong>Rollback da Área de Transferência
-                                    (<code>Ctrl + Botão do Meio</code>):</strong> Restaura e cola imediatamente o
-                                conteúdo anteriormente copiado em campos editáveis. Clicar novamente em
-                                sequência com <code>Ctrl</code> pressionado alterna e cola continuamente entre o
-                                último e o penúltimo item copiado (vai e volta a cada acionamento).<br>
+                                • <strong>Colar com o botão do Meio (<code>Scroll Click</code>):</strong> cola a
+                                Última Seleção (conteúdo enviado por este plugin à área de transferência) simulando
+                                <code>Ctrl+V</code>; com <code>Ctrl + Botão do Meio</code> envia <code>Win+V</code> ao
+                                sistema (histórico do Windows). O plugin não lê a área de transferência do sistema.<br>
                                 • <strong>Filtro Shift (<code>Shift+Clique</code>):</strong> Copia apenas os
                                 números/letras sem pontuação (completando os 7 dígitos
                                 iniciais do processo CNJ com zeros), ou marca início e fim de um trecho.<br>
@@ -2465,12 +2420,11 @@
                                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1 2-2h2"></path>
                                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                             </svg>
-                            Conteúdo atual da Área de Transferência:
+                            Última Seleção:
                         </span>
                         <div class="clipboard-inspector-acoes">
                             <button type="button" id="btnAtualizarPreview" class="btn btn-secundario"
-                                data-jusgov-ignore="true" style="padding: 5px 12px; font-size: 12px;">Ler Área de
-                                Transferência</button>
+                                data-jusgov-ignore="true" style="padding: 5px 12px; font-size: 12px;">Atualizar</button>
                             <button type="button" id="btnDownloadXMouse" class="btn btn-secundario btn-download-xmouse"
                                 data-jusgov-ignore="true" style="cursor: help;"
                                 title="Dica de configuração recomendada (X-Mouse Button Control / Mouse de Hardware):&#10;• Botão do Meio (Scroll Click): {ACTIVATE}{CTRL}{SHIFT}v&#10;• Botão 4 (Voltar): {CTRL}{SHIFT}{TAB} (Aba anterior)&#10;• Botão 5 (Avançar): {CTRL}{TAB} (Próxima aba)&#10;&#10;• Se você deseja que os botões 4 e 5 funcionem inclusive com o cursor parado na tela interna chrome://newtab ou na barra de URLs do Chrome, a solução recomendada é configurar no X-Mouse Button Control (ou no software proprietário do seu mouse) a simulação de teclas em nível de hardware:&#10;  • Mouse Button 4 (Voltar): {CTRL}{SHIFT}{TAB}&#10;  • Mouse Button 5 (Avançar): {CTRL}{TAB}&#10;&#10;Clique para baixar o utilitário oficial.">
@@ -2486,18 +2440,6 @@
                     <div id="previewAreaTransferencia" class="clipboard-preview-box" data-jusgov-ignore="true"
                         role="region" aria-label="Pré-visualização da área de transferência" tabindex="0">
                         <span class="clip-status-vazio">&lt;vazio&gt;</span>
-                    </div>
-                    <div id="avisoPermissaoClipboardInspector"
-                        style="display: none; align-items: center; gap: 5px; margin-top: 8px; color: #d97706; font-size: 11.5px; font-weight: 500; cursor: pointer;"
-                        title="Clique para solicitar autorização de leitura da área de transferência">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            aria-hidden="true" style="color: #f59e0b; flex-shrink: 0;">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <span>Atenção: operando com a memória interna do plugin (para leitura de apps externos, autorize o clipboard na barra de endereços)</span>
                     </div>
                 </div>
 

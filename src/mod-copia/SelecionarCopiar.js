@@ -229,19 +229,6 @@
     let colagemBotaoDireitoAtiva = false;
     let capturaBotoesMouse4e5Ativa = true;
     let colarBotaoMeioAtivo = true;
-    let usarClipboardSistemaAoColar = false;
-    let historicoClipboardCtrlMeioAtivo = true;
-    let historicoRollbackClipboard = {
-        ultimo: null,
-        penultimo: null
-    };
-    let ultimoRollbackInsercao = {
-        alvo: null,
-        posicaoInicio: 0,
-        comprimento: 0,
-        timestamp: 0,
-        nodeInserido: null
-    };
     let navegacaoTecladoCamposAtiva = true;
     let ultimoTimestampNavegacaoAbas = 0;
     let botaoLateralEmProcessamento = 0;
@@ -2591,7 +2578,7 @@
                         });
                         await navigator.clipboard.write([dadosParaCopiar]);
                         window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPlanoMultilinha, html: codigoHTML, formatado: true };
-                        registrarHistoricoRollback(window.__JUSGOV_ULTIMO_CLIPBOARD__);
+                        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
                         console.log('Texto formatado copiado! HTML:', codigoHTML);
                         return true;
                     }
@@ -2614,7 +2601,7 @@
                     document.removeEventListener('copy', manipuladorCopy, { capture: true });
                     if (sucessoCopy || copiouViaEvento) {
                         window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPlanoMultilinha, html: codigoHTML, formatado: true };
-                        registrarHistoricoRollback(window.__JUSGOV_ULTIMO_CLIPBOARD__);
+                        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
                         console.log('Texto formatado copiado (fallback copy)! HTML:', codigoHTML);
                         return true;
                     }
@@ -2634,7 +2621,7 @@
                 : aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(textoFinal));
         }
         window.__JUSGOV_ULTIMO_CLIPBOARD__ = { texto: textoPuroFinal, html: '', formatado: false };
-        registrarHistoricoRollback(window.__JUSGOV_ULTIMO_CLIPBOARD__);
+        registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__);
 
         try {
             if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -2662,25 +2649,13 @@
     }
 
     /*
-     * FUNCAO: registrarHistoricoRollback
-     * OBJETIVO DE RECONSTRUCAO: Armazenar o historico de copia (ultimo e penultimo)
-     * para permitir alternancia instantanea via Ctrl + Botao Direito do Mouse.
+     * FUNCAO: registrarUltimaSelecao
+     * OBJETIVO DE RECONSTRUCAO: Persistir a "Ultima Selecao" (conteudo exato, TXT e/ou HTML, enviado por este
+     * addon a area de transferencia no momento da copia). E a unica fonte usada para colar com o botao do meio;
+     * o addon nunca le o clipboard do sistema.
      */
-    function registrarHistoricoRollback(novoItem) {
+    function registrarUltimaSelecao(novoItem) {
         if (!novoItem || (!novoItem.texto && !novoItem.html)) return;
-        const txtNovo = (novoItem.texto || '').trim();
-        const htmlNovo = (novoItem.html || '').trim();
-        const txtAtual = historicoRollbackClipboard.ultimo ? (historicoRollbackClipboard.ultimo.texto || '').trim() : null;
-        const htmlAtual = historicoRollbackClipboard.ultimo ? (historicoRollbackClipboard.ultimo.html || '').trim() : null;
-
-        if (txtAtual === txtNovo && htmlAtual === htmlNovo) return;
-
-        historicoRollbackClipboard.penultimo = historicoRollbackClipboard.ultimo;
-        historicoRollbackClipboard.ultimo = {
-            texto: novoItem.texto || '',
-            html: novoItem.html || '',
-            formatado: Boolean(novoItem.formatado)
-        };
         try {
             const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
             if (storageLocal) {
@@ -2839,201 +2814,6 @@
             }));
         } catch (_) {}
     }
-
-    /*
-     * FUNCAO: executarRollbackEColagem
-     * OBJETIVO DE RECONSTRUCAO: Rollback da Area de Transferencia com colagem direta via Ctrl + Botao do Meio.
-     * Restaura o conteudo anteriormente copiado (swap continuo entre ultimo e penultimo) e, quando acionado
-     * sobre um elemento editavel (<input>, <textarea>, [contenteditable]), cola imediatamente o texto restaurado.
-     * Cliques sucessivos em sequencia sobre o mesmo campo alternam dinamicamente substituindo o texto anterior.
-     */
-    async function executarRollbackEColagem(alvo, e) {
-        if (!historicoRollbackClipboard.ultimo) {
-            if (ultimoTextoSelecionadoLimpo) {
-                historicoRollbackClipboard.ultimo = { texto: ultimoTextoSelecionadoLimpo, html: '', formatado: false };
-            } else if (window.__JUSGOV_ULTIMO_CLIPBOARD__) {
-                historicoRollbackClipboard.ultimo = { ...window.__JUSGOV_ULTIMO_CLIPBOARD__ };
-            }
-        }
-
-        if (!historicoRollbackClipboard.penultimo) {
-            if (window.JusGovAvisoFlutuante && typeof window.JusGovAvisoFlutuante.exibirAvisoFlutuante === 'function') {
-                window.JusGovAvisoFlutuante.exibirAvisoFlutuante(
-                    'Sem conteudo anterior para rollback no Ctrl+C',
-                    tempoExibicaoAlertaMs,
-                    tempoFlashBorderMs,
-                    corFlashBorder,
-                    false
-                );
-            }
-            return false;
-        }
-
-        /* Swap continuo entre o ultimo e o penultimo */
-        const itemRestaurado = historicoRollbackClipboard.penultimo;
-        const itemAnteriorAntesDoSwap = historicoRollbackClipboard.ultimo;
-        historicoRollbackClipboard.penultimo = historicoRollbackClipboard.ultimo;
-        historicoRollbackClipboard.ultimo = itemRestaurado;
-        window.__JUSGOV_ULTIMO_CLIPBOARD__ = itemRestaurado;
-
-        /* Passo 2: Se tiver estilos, a colagem Rollback envia as teclas "Win + V" para a aplicacao/SO */
-        const ehHtml = Boolean(itemRestaurado.formatado && itemRestaurado.html);
-        if (ehHtml) {
-            emularTeclasWinV(alvo);
-        }
-
-        /* Passo 2.1: Colagem imediata se acionado sobre elemento editavel */
-        if (alvo) {
-            const ctx = classificarContextoElementoAlvo(alvo);
-            if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') {
-                const agora = Date.now();
-                const textoParaColar = itemRestaurado.texto || '';
-                const conteudoEfetivo = ehHtml ? itemRestaurado.html : textoParaColar;
-
-                try { alvo.focus(); } catch (_) {}
-
-                if (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA') {
-                    const textoAnterior = itemAnteriorAntesDoSwap ? (itemAnteriorAntesDoSwap.texto || '') : '';
-                    const ehSequencia = (
-                        ultimoRollbackInsercao.alvo === alvo &&
-                        (agora - ultimoRollbackInsercao.timestamp < 4500) &&
-                        alvo.value.substring(ultimoRollbackInsercao.posicaoInicio, ultimoRollbackInsercao.posicaoInicio + ultimoRollbackInsercao.comprimento) === textoAnterior
-                    );
-
-                    const start = ehSequencia ? ultimoRollbackInsercao.posicaoInicio : ((typeof alvo.selectionStart === 'number') ? alvo.selectionStart : alvo.value.length);
-                    const end = ehSequencia ? (ultimoRollbackInsercao.posicaoInicio + ultimoRollbackInsercao.comprimento) : ((typeof alvo.selectionEnd === 'number') ? alvo.selectionEnd : alvo.value.length);
-
-                    if (typeof alvo.setRangeText === 'function') {
-                        alvo.setRangeText(textoParaColar, start, end, 'end');
-                    } else {
-                        alvo.value = alvo.value.substring(0, start) + textoParaColar + alvo.value.substring(end);
-                        alvo.selectionStart = alvo.selectionEnd = start + textoParaColar.length;
-                    }
-
-                    ultimoRollbackInsercao = {
-                        alvo: alvo,
-                        posicaoInicio: start,
-                        comprimento: textoParaColar.length,
-                        timestamp: agora,
-                        nodeInserido: null
-                    };
-
-                    try {
-                        alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                        alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    } catch (_) {}
-                } else if (alvo.isContentEditable || (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') || alvo.closest('[contenteditable="true"]')) {
-                    const ehSequenciaContent = (
-                        ultimoRollbackInsercao.alvo === alvo &&
-                        (agora - ultimoRollbackInsercao.timestamp < 4500)
-                    );
-
-                    if (ehSequenciaContent && ultimoRollbackInsercao.nodeInserido && ultimoRollbackInsercao.nodeInserido.parentNode) {
-                        try {
-                            const nodeVelho = ultimoRollbackInsercao.nodeInserido;
-                            const range = document.createRange();
-                            range.selectNode(nodeVelho);
-                            const sel = window.getSelection();
-                            if (sel) {
-                                sel.removeAllRanges();
-                                sel.addRange(range);
-                            }
-                        } catch (_) {}
-                    }
-
-                    let executou = false;
-                    try {
-                        if (ehHtml) {
-                            executou = document.execCommand('insertHTML', false, conteudoEfetivo);
-                        } else {
-                            executou = document.execCommand('insertText', false, textoParaColar);
-                        }
-                    } catch (_) {}
-
-                    if (!executou) {
-                        const sel = window.getSelection();
-                        if (sel && sel.rangeCount > 0) {
-                            const range = sel.getRangeAt(0);
-                            range.deleteContents();
-                            const node = document.createTextNode(textoParaColar);
-                            range.insertNode(node);
-                            range.setStartAfter(node);
-                            range.setEndAfter(node);
-                            sel.removeAllRanges();
-                            sel.addRange(range);
-                            ultimoRollbackInsercao = {
-                                alvo: alvo,
-                                posicaoInicio: 0,
-                                comprimento: textoParaColar.length,
-                                timestamp: agora,
-                                nodeInserido: node
-                            };
-                        }
-                    } else {
-                        ultimoRollbackInsercao = {
-                            alvo: alvo,
-                            posicaoInicio: 0,
-                            comprimento: textoParaColar.length,
-                            timestamp: agora,
-                            nodeInserido: null
-                        };
-                    }
-
-                    try {
-                        alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                        alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    } catch (_) {}
-                }
-            }
-        }
-
-        /* Passo 3: Atualizar clipboard do sistema operacional */
-        let gravou = false;
-        try {
-            if (itemRestaurado.formatado && itemRestaurado.html && typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
-                const blobHtml = new Blob([envolverHtmlComResetDeCursorParaWord(itemRestaurado.html)], { type: 'text/html' });
-                const blobTexto = new Blob([itemRestaurado.texto], { type: 'text/plain' });
-                navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobTexto })]).catch(() => {});
-                gravou = true;
-            } else if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                navigator.clipboard.writeText(itemRestaurado.texto || '').catch(() => {});
-                gravou = true;
-            }
-        } catch (_) {}
-
-        if (!gravou) {
-            try {
-                const areaTemp = document.createElement('textarea');
-                areaTemp.setAttribute('data-jusgov-ignore', 'true');
-                areaTemp.value = itemRestaurado.texto || '';
-                areaTemp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-                document.body.appendChild(areaTemp);
-                areaTemp.select();
-                document.execCommand('copy');
-                document.body.removeChild(areaTemp);
-                gravou = true;
-            } catch (_) {}
-        }
-
-        if (window.JusGovAvisoFlutuante && typeof window.JusGovAvisoFlutuante.exibirAvisoFlutuante === 'function') {
-            const txtLimpo = (itemRestaurado.texto || '').trim();
-            const resumo = txtLimpo.length > 55 ? (txtLimpo.slice(0, 55) + '...') : txtLimpo;
-            const rotuloAlerta = ehHtml
-                ? `Rollback [Win+V]: ${resumo}`
-                : `Rollback Ctrl+C: ${resumo}`;
-            window.JusGovAvisoFlutuante.exibirAvisoFlutuante(
-                rotuloAlerta,
-                tempoExibicaoAlertaMs,
-                tempoFlashBorderMs,
-                corFlashBorder,
-                true
-            );
-        }
-
-        return true;
-    }
-
-    const executarRollbackClipboard = executarRollbackEColagem;
 
     function converterHexParaRgbaFlash(hexBruto, alfa = 0.28) {
         const hexLimpo = (typeof hexBruto === 'string' && /^#[0-9a-fA-F]{6}$/.test(hexBruto.trim()))
@@ -4841,8 +4621,8 @@
                 return;
             }
 
-            /* Rollback e colagem com Ctrl + Botao do Meio */
-            if (e.ctrlKey && !e.altKey && !e.shiftKey && historicoClipboardCtrlMeioAtivo) {
+            /* Ctrl + Botao do Meio (Win+V): apenas anula autoscroll e prepara foco */
+            if (e.ctrlKey && !e.altKey && !e.shiftKey) {
                 e.preventDefault();
                 try { e.target.focus(); } catch (_) {}
                 return;
@@ -5591,30 +5371,6 @@
     }
 
     /*
-     * FUNCAO: podeLerClipboard
-     * OBJETIVO DE RECONSTRUCAO: Consultar permissao nativa 'clipboard-read'. Em dominios
-     * do PJe/jus.br, se em estado 'prompt', permite tentar ler para exibir o dialogo de
-     * autorizacao nativo do Chrome; em outros sites, exige permissao previa 'granted'.
-     */
-    async function podeLerClipboard(ehPje) {
-        try {
-            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                const status = await navigator.permissions.query({ name: 'clipboard-read' });
-                if (status.state === 'granted') {
-                    return true;
-                }
-                if (status.state === 'prompt') {
-                    return ehPje;
-                }
-                return false;
-            }
-            return ehPje;
-        } catch (_) {
-            return ehPje;
-        }
-    }
-
-    /*
      * FUNCAO: inserirTextoEmElemento
      * OBJETIVO DE RECONSTRUCAO: Inserir texto ou fragmento HTML de forma segura e universal
      * em <input>, <textarea> ou conteudos com contenteditable / editores online.
@@ -5671,10 +5427,11 @@
 
     /*
      * FUNCAO: executarColagemBotaoDireito
-     * OBJETIVO DE RECONSTRUCAO: Executar colagem com verificacao online direta do clipboard do sistema:
-     * - Sempre tenta primeiro ler da area de transferencia nativa (HTML ou texto);
-     * - Em caso de erro ou falta de permissao, realiza fallback inteligente emulando com o ultimo item
-     *   copiado pelo plugin, exibindo previamente o erro e o aviso em amarelo "(emulando)".
+     * OBJETIVO DE RECONSTRUCAO: Executar colagem (botao do meio / botao direito) SEM jamais ler o
+     * clipboard do sistema (politicas corporativas podem proibir). Usa a "Ultima Selecao": o conteudo
+     * exato (TXT/HTML) que o proprio addon enviou ao clipboard no momento da copia.
+     * - Campo simples ou modo texto puro: insere texto puro;
+     * - Editor rico com HTML disponivel: simula Ctrl+V (emularTeclasColar).
      */
     async function executarColagemBotaoDireito(alvo, modo) {
         try {
@@ -5685,76 +5442,26 @@
             const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
 
             let colou = false;
-            let erroOcorrido = null;
             const ehEditorRico = Boolean(alvo.isContentEditable ||
                 (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
                 (alvo.closest && alvo.closest('[contenteditable="true"]')) ||
                 document.designMode === 'on');
             const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
 
-            /* 1. Verificacao online e direta da area de transferencia nativa (somente se habilitado) */
-            if (usarClipboardSistemaAoColar) {
-                if (modoEfetivo === 'normal' && ehEditorRico && navigator.clipboard && typeof navigator.clipboard.read === 'function') {
-                    try {
-                        const itens = await navigator.clipboard.read();
-                        if (itens && itens.length > 0) {
-                            for (let i = 0; i < itens.length; i++) {
-                                const item = itens[i];
-                                if (item.types && item.types.includes('text/html')) {
-                                    const blob = await item.getType('text/html');
-                                    const htmlTexto = await blob.text();
-                                    if (htmlTexto && htmlTexto.trim().length > 0) {
-                                        alvo.focus();
-                                        document.execCommand('insertHTML', false, htmlTexto);
-                                        colou = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } catch (errRead) {
-                        erroOcorrido = errRead.message || 'Acesso restrito ao clipboard';
-                    }
-                }
-
-                if (!colou && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
-                    try {
-                        const textoPuro = await navigator.clipboard.readText();
-                        if (typeof textoPuro === 'string' && textoPuro.length > 0) {
-                            inserirTextoEmElemento(alvo, textoPuro, false);
-                            colou = true;
-                        }
-                    } catch (errText) {
-                        erroOcorrido = errText.message || 'Falha ao ler area de transferencia';
-                    }
-                }
-            }
-
-            /* 2. Em caso de operacao interna (padrao) ou fallback apos erro nativo: utiliza clipboard interno do addon */
+            /* Regra: o addon NUNCA le o clipboard do sistema. A colagem usa exclusivamente a
+             * "Ultima Selecao" (conteudo que o proprio addon enviou ao clipboard no momento da copia). */
             if (!colou) {
                 const itemInterno = window.__JUSGOV_ULTIMO_CLIPBOARD__;
                 const textoEmulado = (itemInterno && itemInterno.texto) || ultimoTextoSelecionadoLimpo || '';
                 const htmlEmulado = (itemInterno && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
 
                 if (textoEmulado && textoEmulado.trim().length > 0) {
-                    if (usarClipboardSistemaAoColar) {
-                        const validador = window.JusGovAvisoFlutuante;
-                        const resumo = textoEmulado.trim().length > 40 ? (textoEmulado.trim().slice(0, 40) + '...') : textoEmulado.trim();
-                        const descErro = erroOcorrido ? `Erro de leitura (${erroOcorrido})` : 'Sem permissão na área de transferência';
-                        if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
-                            validador.projetarMiniTipGlobal(`${descErro}: (emulando) [${resumo}]`, '#f59e0b');
-                        }
-                    }
                     if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
                         /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
                         inserirTextoEmElemento(alvo, textoEmulado, false);
                     } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
-                        /* Editor Web / HTML / RTF / contenteditable: cola com formatacao */
-                        if (!usarClipboardSistemaAoColar) {
-                            emularTeclasColar(alvo, textoEmulado, htmlEmulado);
-                        } else {
-                            inserirTextoEmElemento(alvo, htmlEmulado, true);
-                        }
+                        /* Editor Web / HTML / RTF / contenteditable: cola com formatacao (simula Ctrl+V) */
+                        emularTeclasColar(alvo, textoEmulado, htmlEmulado);
                     } else {
                         inserirTextoEmElemento(alvo, textoEmulado, false);
                     }
@@ -5796,16 +5503,16 @@
                 ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
                 : e.target;
 
-            /* Rollback com Colagem: Ctrl + Botao do Meio */
+            /* Ctrl + Botao do Meio: envia Win+V ao sistema (historico nativo do Windows, se configurado) */
             if (e.ctrlKey && !e.altKey && !e.shiftKey) {
-                if (colarBotaoMeioAtivo && historicoClipboardCtrlMeioAtivo) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    try {
-                        executarRollbackEColagem(alvo, e);
-                    } catch (_) {}
-                    return;
-                }
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    if (typeof emularTeclasWinV === 'function') {
+                        emularTeclasWinV(alvo);
+                    }
+                } catch (_) {}
+                return;
             }
 
             /* Colagem normal com o botao do meio */
@@ -6476,7 +6183,6 @@
                     'colagemBotaoDireitoAtiva',
                     'capturaBotoesMouse4e5Ativa',
                     'colarBotaoMeioAtivo',
-                    'usarClipboardSistemaAoColar',
                     'navegacaoTecladoCamposAtiva',
                     'validacaoMatematicaAtiva',
                     'tempoFlashBorderMs',
@@ -6521,16 +6227,6 @@
                             colarBotaoMeioAtivo = cfg.colarBotaoMeioAtivo;
                         } else if (cfg.colarBotaoMeioAtivo === undefined) {
                             colarBotaoMeioAtivo = true;
-                        }
-                        if (typeof cfg.usarClipboardSistemaAoColar === 'boolean') {
-                            usarClipboardSistemaAoColar = cfg.usarClipboardSistemaAoColar;
-                        } else {
-                            usarClipboardSistemaAoColar = false;
-                        }
-                        if (typeof cfg.historicoClipboardCtrlMeioAtivo === 'boolean') {
-                            historicoClipboardCtrlMeioAtivo = cfg.historicoClipboardCtrlMeioAtivo;
-                        } else if (typeof cfg.historicoClipboardCtrlDireitoAtivo === 'boolean') {
-                            historicoClipboardCtrlMeioAtivo = cfg.historicoClipboardCtrlDireitoAtivo;
                         }
                         if (typeof cfg.navegacaoTecladoCamposAtiva === 'boolean') {
                             navegacaoTecladoCamposAtiva = cfg.navegacaoTecladoCamposAtiva;
@@ -6614,14 +6310,6 @@
                         }
                         if (changes.colarBotaoMeioAtivo !== undefined) {
                             colarBotaoMeioAtivo = (changes.colarBotaoMeioAtivo.newValue !== false);
-                        }
-                        if (changes.usarClipboardSistemaAoColar !== undefined) {
-                            usarClipboardSistemaAoColar = Boolean(changes.usarClipboardSistemaAoColar.newValue);
-                        }
-                        if (changes.historicoClipboardCtrlMeioAtivo !== undefined) {
-                            historicoClipboardCtrlMeioAtivo = (changes.historicoClipboardCtrlMeioAtivo.newValue !== false);
-                        } else if (changes.historicoClipboardCtrlDireitoAtivo !== undefined) {
-                            historicoClipboardCtrlMeioAtivo = (changes.historicoClipboardCtrlDireitoAtivo.newValue !== false);
                         }
                         if (changes.navegacaoTecladoCamposAtiva !== undefined) {
                             navegacaoTecladoCamposAtiva = (changes.navegacaoTecladoCamposAtiva.newValue !== false);
@@ -6711,14 +6399,6 @@
                         }
                         if (typeof msg.colarBotaoMeioAtivo === 'boolean') {
                             colarBotaoMeioAtivo = msg.colarBotaoMeioAtivo;
-                        }
-                        if (typeof msg.usarClipboardSistemaAoColar === 'boolean') {
-                            usarClipboardSistemaAoColar = msg.usarClipboardSistemaAoColar;
-                        }
-                        if (typeof msg.historicoClipboardCtrlMeioAtivo === 'boolean') {
-                            historicoClipboardCtrlMeioAtivo = msg.historicoClipboardCtrlMeioAtivo;
-                        } else if (typeof msg.historicoClipboardCtrlDireitoAtivo === 'boolean') {
-                            historicoClipboardCtrlMeioAtivo = msg.historicoClipboardCtrlDireitoAtivo;
                         }
                         if (typeof msg.navegacaoTecladoCamposAtiva === 'boolean') {
                             navegacaoTecladoCamposAtiva = msg.navegacaoTecladoCamposAtiva;
@@ -6823,53 +6503,13 @@
         obterColarBotaoMeioAtivo() {
             return colarBotaoMeioAtivo;
         },
-        definirUsarClipboardSistemaAoColar(valor) {
-            usarClipboardSistemaAoColar = Boolean(valor);
-        },
-        obterUsarClipboardSistemaAoColar() {
-            return usarClipboardSistemaAoColar;
-        },
         aoPressionarBotaoMouse,
         aoClicarAuxiliarMouse,
         aoAbrirMenuContexto,
         aoClicar,
         tratarNavegacaoAbasPorBotoesMouse,
-        definirHistoricoClipboardCtrlMeioAtivo(valor) {
-            historicoClipboardCtrlMeioAtivo = Boolean(valor);
-        },
-        obterHistoricoClipboardCtrlMeioAtivo() {
-            return historicoClipboardCtrlMeioAtivo;
-        },
-        definirHistoricoClipboardCtrlDireitoAtivo(valor) {
-            historicoClipboardCtrlMeioAtivo = Boolean(valor);
-        },
-        obterHistoricoClipboardCtrlDireitoAtivo() {
-            return historicoClipboardCtrlMeioAtivo;
-        },
-        executarRollbackEColagem,
         emularTeclasColar,
         emularTeclasWinV,
-        simularRollbackEColagem(alvo) {
-            return executarRollbackEColagem(alvo);
-        },
-        obterHistoricoRollback() {
-            return {
-                ultimo: historicoRollbackClipboard.ultimo ? { ...historicoRollbackClipboard.ultimo } : null,
-                penultimo: historicoRollbackClipboard.penultimo ? { ...historicoRollbackClipboard.penultimo } : null
-            };
-        },
-        definirHistoricoRollback(ultimo, penultimo) {
-            historicoRollbackClipboard.ultimo = ultimo ? { ...ultimo } : null;
-            historicoRollbackClipboard.penultimo = penultimo ? { ...penultimo } : null;
-        },
-        simularRollbackClipboard() {
-            if (!historicoRollbackClipboard.penultimo) return false;
-            const itemRestaurado = historicoRollbackClipboard.penultimo;
-            historicoRollbackClipboard.penultimo = historicoRollbackClipboard.ultimo;
-            historicoRollbackClipboard.ultimo = itemRestaurado;
-            window.__JUSGOV_ULTIMO_CLIPBOARD__ = itemRestaurado;
-            return true;
-        },
         definirNavegacaoTecladoCamposAtiva(valor) {
             navegacaoTecladoCamposAtiva = Boolean(valor);
         },
@@ -7011,7 +6651,6 @@
                 colagemBotaoDireitoAtiva,
                 capturaBotoesMouse4e5Ativa,
                 colarBotaoMeioAtivo,
-                usarClipboardSistemaAoColar,
                 navegacaoTecladoCamposAtiva,
                 validacaoMatematicaAtiva,
                 flashBorderAtivo: tempoFlashBorderMs > 0,
