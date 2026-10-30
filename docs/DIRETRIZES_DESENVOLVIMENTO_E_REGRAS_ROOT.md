@@ -498,6 +498,20 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * **Neutralização Contínua de Overlays Zumbis:** No CSS Anti-Ampulhetas e no monitoramento de lifecycle, neutralizar qualquer camada de bloqueio/escurecimento residual que permaneça visível sem atividade de rede real (`opacity: 0 !important; pointer-events: none !important; display: none !important;`).
   * **Tratamento Específico por Coluna:** Mapear os seletores de bloqueio de painel divido (painel lateral esquerdo vs container de visualização direito) para desbloquear pontualmente a coluna afetada sem quebrar eventuais modais legítimos abertos pelo usuário (como janelas ativas de digitação de despachos/decisões).
 
+### 6.13 Separação Modular Rígida dos Arquivos de Código-Fonte (Isolar Mudança de Interface vs. Selecionar/Copiar)
+- **Constatação e Diagnóstico Arquitetural:**
+  * Atualmente, rotinas de modificação e manipulação de interface (como comportamentos de mouse, teclado, atalhos de navegação e auto-seleção com foco em campos de formulários/inputs) encontram-se acopladas e misturadas dentro do mesmo fluxo e arquivos de código do módulo de seleção inteligente e cópia forense (`src/mod-copia/`).
+- **Diretriz de Reorganização e Refatoração Futura:**
+  1. **Desacoplamento Físico de Arquivos de Código:**
+     * Isolar rigorosamente o código-fonte por domínios de responsabilidade única:
+       - **Módulo de Seleção e Cópia Inteligente:** Responsável estritamente pelo ciclo de cópia, níveis de formatação, regex/máscaras, validações matemáticas (CPF/CNPJ/CNJ/Datas), contorno visual de Flash Verde e Área de Transferência.
+       - **Módulo de Mudança de Interface (UI / Interação):** Responsável isoladamente pelas rotinas de mouse (botões laterais 4 e 5, gestos), teclado (atalhos de sistema), tratamento de foco, clique em controles e auto-seleção específica em campos de formulários (`<input>`, `<textarea>`, editores e forms).
+     * O código de intervenção em formulários e interface não deve poluir a lógica de parsing e seleção de texto corrido.
+  2. **Preservação Unificada das Telas de Opções e Ajuda:**
+     * As páginas centrais de configuração ([options.html](../src/cfg/options.html)) e a Central de Ajuda ([ajuda.html](../src/cfg/ajuda.html)) devem **continuar centralizadas em arquivos únicos**, contendo todos os módulos integrados.
+     * Manter a excelente organização já consolidada, onde as preferências e documentações são agrupadas de forma clara e intuitiva em seções/abas temáticas por módulo.
+
+
 
 
 
