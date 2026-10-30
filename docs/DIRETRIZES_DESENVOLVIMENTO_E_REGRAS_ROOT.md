@@ -400,4 +400,11 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Permitir a auto seleção inteligente com 1 clique diretamente sobre blocos de texto, parágrafos, qualificações e dados contidos nas páginas de documentos PDF, espelhando o comportamento suave de seleção que já opera em páginas HTML comuns.
   * Garantir a reconstrução do mapa de texto contínuo mesmo com quebras virtuais de linhas geradas pela disposição CSS dos `<span>` posicionados da camada de texto (`textLayer`) do visualizador de PDF.
 
+### 6.3 Supressão de Quebras de Linha em Linha Única com Espaçamento Obrigatório Anti-Truncamento
+- **Contexto Operacional:** Em cards e painéis do PJe (ex.: listas de tarefas `col-sm-11`, cartões de processo com `dtPoloAtivo`, `dtPoloPassivo`, `ÚLTIMA MOVIMENTAÇÃO: REMETIDOS OS AUTOS...`, etiquetas e classes `col-sm-12 no-padding`), elementos irmãos ou `<span>`/`<div>` quebrados em múltiplas linhas visuais contêm trechos contíguos de texto.
+- **Comportamento Previsto para Futura Implementação:**
+  * Ao suprimir quebras de linha (`\n`, `<br>`) para condensar o conteúdo copiado em uma única linha (linha só), é **estritamente obrigatório** inserir um espaço em branco separador (`' '`) entre os blocos e linhas conectadas.
+  * **Regra Anti-Truncamento:** Jamais colar ou fundir o final de uma linha com o início da linha seguinte sem espaço (ex.: evitar concatenar `"DISTRIBUIÇÃO AO VARA FEDERAL"` com `"CÍVEL E CRIMINAL"` gerando `"FEDERALCÍVEL"`). Toda unificação de linhas deve assegurar espaçamento limpo e normalizado sem truncamento de palavras.
+
+
 
