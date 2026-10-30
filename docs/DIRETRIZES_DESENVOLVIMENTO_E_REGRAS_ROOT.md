@@ -548,6 +548,35 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
     2. **Fusão Horizontal de Retângulos na Mesma Linha (`mergeHorizontalRects`):** Retângulos adjacentes situados no mesmo alinhamento vertical (`Math.abs(r1.top - r2.top) < 3` e sobreposição ou proximidade horizontal `<= 6px`) devem ser fundidos em uma única caixa retangular unificada, eliminando completamente as bordas duplas internas.
     3. **Unificação Vertical Estética:** Em blocos contíguos de parágrafo, avaliar o uso de um contorno envolvente contíguo (`CSS Custom Highlight API` nativa onde suportada, ou uma máscara poligonal/envelope limpo) para evitar o aspecto de "gaiola de caixas empilhadas" com linhas desiguais.
 
+---
+
+## 7. RADAR AUTÔNOMO DE ANÁLISE DE ENGENHARIA (BUGS, BOAS PRÁTICAS E NOVAS FUNCIONALIDADES IDENTIFICADAS)
+
+> [!NOTE]
+> Esta seção é mantida em separado do backlog de demandas diretas do usuário (Seção 6). Ela registra ativamente e continuamente tudo o que for identificado de forma autônoma pela análise de engenharia durante o ciclo de inspeções, diagnósticos, logs e leitura de código.
+> Quando o usuário solicitar um levantamento de pendências de mudanças, correções/bugs ou previsibilidade de novas funcionalidades, esta seção somada à Seção 6 fornecerá a resposta estruturada completa e exaustiva.
+
+### 7.1 Bugs e Falhas Potenciais Identificados pela Análise de Engenharia
+- **BUG-01: Vazamento de Handlers Globais em Subframes Descarregados:**
+  * *Descrição:* Ao navegar ou substituir dinamicamente páginas em iframes sem reload completo da janela-mãe, listeners atachados diretamente em `window` ou `document` do subframe podem permanecer referenciados em memória antes do garbage collector atuar.
+  * *Ação Preventiva:* Adicionar rotina de teardown explícito em `beforeunload` ou via `AbortController` com `signal` compartilhado por ciclo de vida do frame.
+- **BUG-02: Sobrescrita de `z-index` de Overlays do PJe e PDPJ:**
+  * *Descrição:* O contorno do Flash Verde possui `z-index: 2147483647`. Caso surja um diálogo nativo de confirmação ou modal crítico do tribunal que necessite de foco modal estrito, o contorno pode sobrepor botões desse modal antes de seu timeout expirar.
+  * *Ação Preventiva:* O contorno visual deve possuir estritamente `pointer-events: none !important;` e ser destruído atômica e imediatamente ao detectar `keydown` (como Escape/Enter) ou clique externo.
+
+### 7.2 Oportunidades de Boas Práticas e Refatoração Arquitetural
+- **BP-01: Adoção Estruturada de Namespaces por Módulo (`JusGovBR.Copia`, `JusGovBR.UI`, `JusGovBR.PJe`):**
+  * *Descrição:* Em cumprimento à Diretriz Root 11 (POO e encapsulamento), converter todos os scripts de conteúdo e service worker para objetos selados (`Object.freeze`) com API pública explícita e métodos privados blindados via closures ou campos privados (`#metodoPrivado`).
+- **BP-02: Isolamento de Comunicação via EventBus Local / CustomEvents:**
+  * *Descrição:* Em vez de acoplamento direto entre arquivos de script que compartilham o mesmo frame, utilizar um barramento leve de eventos customizados (`document.dispatchEvent(new CustomEvent('jusgovbr:acao', ...))`), permitindo que módulos assinem eventos de forma 100% desacoplada e sem risco de quebra quando um módulo estiver ausente.
+
+### 7.3 Previsibilidade de Novas Funcionalidades e Evolução do Sistema
+- **FEAT-01: Modo Leitura Judicial Focado (Distraction-Free PJe):**
+  * *Descrição:* Capacidade de recolher com 1 atalho (ex.: Alt + Z) todas as barras laterais, cabeçalhos administrativos e menus do PJe para focar unicamente na leitura e conferência da petição/decisão em tela cheia.
+- **FEAT-02: Painel de Diagnóstico em Tempo Real do Motor de Cópia (Modo Auditor Forense):**
+  * *Descrição:* Exibição de um pequeno painel flutuante retrátil (acessível apenas em modo de depuração ou via atalho) que exibe instantaneamente o tipo de dado detectado (CPF válido, Processo CNJ íntegro, Data válida), nível de formatação aplicado e tamanho em bytes transferido para o clipboard.
+
+
 
 
 
