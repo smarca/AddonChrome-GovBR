@@ -415,6 +415,13 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
 - **Diretriz de Correção Futura:**
   * Ao registrar uma nova seleção em qualquer frame (seja na página principal ou dentro de um subframe/PDF), garantir a limpeza imediata e mútua de ranges e de sobreposições de Flash visual em todos os contextos (`broadcastDeselecionarGeral` / `removeAllRanges()` cruzado entre pai e filhos), impedindo qualquer seleção dupla ou contorno residual fantasma na tela.
 
+### 6.5 Garantia de Cópia e Seleção de Datas, Horários e Datas com Horário (Ex.: "23/10/2026 10:14:18")
+- **Contexto Operacional:** Em cabeçalhos de juntada, certidões e linhas de metadados forenses do PJe (ex.: `"Juntado por FRANCISCO NOGUEIRA ALMEIDA JUNIOR - SUPERVISOR DA DISTRIBUIÇÃO em 23/10/2026 10:14:18"`), a seleção do bloco temporal pode ocorrer por clique no corpo da data, no horário ou por arrasto/seleção manual sobre a expressão completa.
+- **Comportamento Previsto para Implementação/Ajuste Futuro:**
+  * **Permissão de Cópia Completa:** Assegurar que tanto a seleção automatizada por clique quanto a seleção nativa/manual de datas isoladas (`23/10/2026`), horários isolados (`10:14:18`) e blocos contíguos de data com horário (`23/10/2026 10:14:18`) sejam sempre copiados fielmente para a Área de Transferência.
+  * **Preservação de Formato:** Tratar a expressão combinada `DD/MM/AAAA HH:MM:SS` como entidade temporal forense de primeira classe no motor, garantindo que o clique simples, clique no espaço intermediário ou arrasto manual envie exatamente os dados limpos para a Área de Transferência com validação matemática e contorno visual verde imediato.
+
+
 
 
 
