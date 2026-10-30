@@ -532,6 +532,23 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
     * Ao clicar no espaço em branco imediatamente posterior ao caractere dois-pontos `:` (isto é, o espaço entre `:` e `confira`), o motor deve identificar os dois-pontos antecedentes imediatos como um conectivo de sentença direta.
     * Em vez de isolar apenas a palavra subsequente ou apenas o rótulo anterior, esse clique no espaço conectado aos dois-pontos expande e seleciona imediatamente a **sentença inteira** (`"Atenção: confira o processo antes de prosseguir."`), integrando o prefixo enfático ao corpo da proposição de forma atômica e fluida.
 
+### 6.15 Aperfeiçoamento do Flash Verde: Eliminação de Sobreposições Concorrentes e Redesenho em Múltiplas Linhas
+- **Sintomas Observados e Exemplos Práticos:**
+  1. **Sobreposição em Linha Única / Fragmentação Estranha:**
+     * No cabeçalho do processo `MSCiv 1007676-28.2026.4.01.4002 - [Civ] Certificar trânsito em julgado - Definir data`, ao destacar o bloco, surgem três retângulos sobrepostos/colados: uma caixa para o número do processo, uma caixa aninhada sobre o colchete/hífen intermediário `[ - [Civ] C` e outra caixa para o restante da descrição.
+     * Há colisão visual das bordas verticais gerando traços duplos e escurecimento na junção.
+  2. **Estranheza e Fragmentação em Múltiplas Linhas / Parágrafos Complexos:**
+     * Na seleção de parágrafos judiciais contendo rótulos e quebras de linha (`NÚMERO: 1007676...`, `PARTE(S): ...`, `UNIVERSIDADE FEDERAL... representada pelo membro da Advocacia-Geral da União... requer o que segue.`):
+     * O motor desenha retângulos vazios compridos em linhas intermediárias, pequenas caixas pontuais flutuantes (traços verticais isolados nos espaços ou entrelinhas) e caixas separadas que englobam a linha inteira até a borda direita mesmo sem texto preenchido.
+     * O aspecto visual fica desorganizado, excessivamente fragmentado e esteticamente poluído.
+- **Diretriz de Refatoração e Solução Arquitetural:**
+  * **Causa Raiz:** O motor utiliza `range.getClientRects()` iterando diretamente sobre fragmentos brutos de quebra de nó de texto (`TextNode`), nós invisíveis com quebras de linha (`\n` com altura de linha mas sem largura) e contêineres inline-block do DOM, desenhando uma `div` de overlay para cada `DOMRect` sem qualquer higienização geométrica.
+  * **Algoritmo de Higienização e Coalescência Geométrica (Bounding Coalescer):**
+    1. **Descarte de Caixas Vazias/Fantasmas:** Ignorar qualquer `DOMRect` com largura útil menor ou igual ao espaço em branco (`rect.width <= 4px` ou `rect.height <= 2px`) para eliminar traços verticais soltos e linhas vazias.
+    2. **Fusão Horizontal de Retângulos na Mesma Linha (`mergeHorizontalRects`):** Retângulos adjacentes situados no mesmo alinhamento vertical (`Math.abs(r1.top - r2.top) < 3` e sobreposição ou proximidade horizontal `<= 6px`) devem ser fundidos em uma única caixa retangular unificada, eliminando completamente as bordas duplas internas.
+    3. **Unificação Vertical Estética:** Em blocos contíguos de parágrafo, avaliar o uso de um contorno envolvente contíguo (`CSS Custom Highlight API` nativa onde suportada, ou uma máscara poligonal/envelope limpo) para evitar o aspecto de "gaiola de caixas empilhadas" com linhas desiguais.
+
+
 
 
 
