@@ -231,39 +231,45 @@ function enfileirarRegistro(urlsTurbo, urlsAmpuletas, modoTurbo, estadoAmpuletas
         try {
             /* Passo 3.2: Limpar todos os registros dinamicos anteriores */
             await chrome.scripting.unregisterContentScripts();
-            const scriptsParaRegistrar = [];
 
             /* Passo 3.3: Configurar registro do Modulo PJe Anti-Ampulhetas (CSS em document_start) */
             if (estadoAmpuletas !== false && Array.isArray(urlsAmpuletas) && urlsAmpuletas.length > 0) {
                 const matchesPje = sanitizarParaMatches(urlsAmpuletas);
                 if (matchesPje.length > 0) {
-                    scriptsParaRegistrar.push({
-                        id: 'modulo-PJE-anti_ampuletas',
-                        matches: matchesPje,
-                        css: [...ARQUIVOS_MODULO_CSS_PJE],
-                        runAt: 'document_start',
-                        allFrames: true,
-                        matchAboutBlank: true
-                    });
+                    try {
+                        await chrome.scripting.registerContentScripts([{
+                            id: 'modulo-PJE-anti_ampuletas',
+                            matches: matchesPje,
+                            css: [...ARQUIVOS_MODULO_CSS_PJE],
+                            runAt: 'document_start',
+                            allFrames: true
+                        }]);
+                    } catch (errCss) {
+                        console.warn('[JusGovBR] Aviso ao registrar CSS PJe:', errCss);
+                    }
                 }
             }
 
             /* Passo 3.4: Configurar registro dos modulos JS do Motor de Selecao, Copia e Navegacao */
             if (modoTurbo !== 'desligado') {
-                scriptsParaRegistrar.push({
-                    id: 'modulo-SelecionarCopiar-Suite',
-                    matches: ['<all_urls>'],
-                    js: [...ARQUIVOS_MODULO_COPIA],
-                    runAt: 'document_start',
-                    allFrames: true,
-                    matchAboutBlank: true,
-                    matchOriginAsFallback: true
-                });
-            }
-
-            /* Passo 3.5: Efetivar o registro no navegador se houver ao menos 1 modulo ativo */
-            if (scriptsParaRegistrar.length > 0) {
-                await chrome.scripting.registerContentScripts(scriptsParaRegistrar);
+                try {
+                    await chrome.scripting.registerContentScripts([{
+                        id: 'modulo-SelecionarCopiar-Suite',
+                        matches: ['<all_urls>'],
+                        js: [...ARQUIVOS_MODULO_COPIA],
+                        runAt: 'document_start',
+                        allFrames: true,
+                        matchOriginAsFallback: true
+                    }]);
+                } catch (_) {
+                    await chrome.scripting.registerContentScripts([{
+                        id: 'modulo-SelecionarCopiar-Suite',
+                        matches: ['<all_urls>'],
+                        js: [...ARQUIVOS_MODULO_COPIA],
+                        runAt: 'document_start',
+                        allFrames: true
+                    }]);
+                }
             }
         } catch (err) {
             console.warn('[JusGovBR] Aviso ao atualizar registro de scripts:', err);

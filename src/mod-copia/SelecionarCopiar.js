@@ -607,12 +607,12 @@
 
         /* DIRETRIZ PDF E DOCUMENTOS: Visualizadores de PDF (PDF.js, PJe, eproc, textLayer)
          * e camadas de texto de paginas de documentos pertencem estritamente a LEITURA_COMUM,
-         * NUNCA a controles de sistema ou menus de interface. */
+         * NUNCA a controles de sistema ou menus de interface (exceto se o proprio alvo for link ou botao). */
         if (typeof el.closest === 'function') {
             const ehVisualizadorPdf = el.closest('.textLayer, .pdfViewer, .page[data-page-number], #viewerContainer, .pdf-container, embed[type*="pdf"], object[type*="pdf"]');
             if (ehVisualizadorPdf) {
-                const ehBarraFerramentas = el.closest('.toolbar, #toolbarViewer, #toolbarContainer, button, .toolbarButton');
-                if (!ehBarraFerramentas) {
+                const ehControleDentroDePdf = el.closest('.toolbar, #toolbarViewer, #toolbarContainer, button, .toolbarButton, a, [role="link"], [role="button"], select, input');
+                if (!ehControleDentroDePdf) {
                     return false;
                 }
             }
@@ -636,7 +636,7 @@
             'aria-haspopup', 'aria-expanded', 'aria-controls', 'aria-pressed',
             'aria-checked', 'aria-selected', 'jsaction', 'jsname', 'jscontroller',
             'data-action', 'data-toggle', 'data-bs-toggle', 'data-trigger',
-            'ng-click', 'v-on:click'
+            'ng-click', 'v-on:click', 'routerlink'
         ];
 
         let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
@@ -710,16 +710,42 @@
                     }
                 }
 
-                if (atual.onclick || atual.hasAttribute('onclick')) {
+                /* Inspecao de propriedades e atributos de eventos de mouse e clique (onclick, onmouse*, etc.) */
+                if (
+                    atual.onclick ||
+                    atual.onmousedown ||
+                    atual.onmouseup ||
+                    atual.onmouseover ||
+                    atual.onmouseenter ||
+                    atual.onmouseleave ||
+                    atual.onpointerdown ||
+                    atual.onpointerup ||
+                    atual.ondblclick
+                ) {
                     return true;
                 }
 
-                /* Inspecao de Estilos Computados: cursor pointer/grab e user-select none */
+                if (atual.attributes && atual.attributes.length > 0) {
+                    for (let a = 0; a < atual.attributes.length; a++) {
+                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
+                        if (
+                            attrNome.startsWith('on') ||
+                            attrNome === '(click)' ||
+                            attrNome === '@click' ||
+                            attrNome.startsWith('v-on:') ||
+                            attrNome.startsWith('ng-')
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+
+                /* Inspecao de Estilos Computados: cursor pointer ("maozinha"), help ("ajuda"), grab e user-select none */
                 try {
                     const st = window.getComputedStyle(atual);
                     if (st) {
                         const cur = st.cursor;
-                        if (cur === 'pointer' || cur === 'grab' || cur === 'grabbing') {
+                        if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
                             return true;
                         }
                         const us = st.userSelect || st.webkitUserSelect;
@@ -738,6 +764,181 @@
     }
 
     /*
+     * FUNCAO: isElementoInterativoClicavelDireto
+     * DIRETRIZ ROOT 2.17: Identifica elementos clicaveis diretos (links <a href>, botoes,
+     * controles de formulario, icones "maozinha" cursor:pointer ou "help" cursor:help,
+     * ou elementos com eventos onclick/onmouse*) nos quais um clique simples SEM teclas
+     * modificadoras JAMAIS deve selecionar ou copiar (nem mesmo se contiver datas ou numeros).
+     */
+    function isElementoInterativoClicavelDireto(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+
+        const TAGS_CLICAVEIS = new Set([
+            'A', 'BUTTON', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
+            'SUMMARY', 'DETAILS', 'LABEL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU'
+        ]);
+        const ROLES_CLICAVEIS = new Set([
+            'button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+            'tab', 'switch', 'combobox', 'listbox', 'option', 'checkbox', 'radio', 'treeitem'
+        ]);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_CLICAVEIS.has(tagUpper)) return true;
+
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_CLICAVEIS.has(role)) return true;
+
+                if (
+                    atual.onclick ||
+                    atual.onmousedown ||
+                    atual.onmouseup ||
+                    atual.onmouseover ||
+                    atual.onmouseenter ||
+                    atual.onmouseleave ||
+                    atual.onpointerdown ||
+                    atual.onpointerup ||
+                    atual.ondblclick
+                ) {
+                    return true;
+                }
+
+                if (atual.attributes && atual.attributes.length > 0) {
+                    for (let a = 0; a < atual.attributes.length; a++) {
+                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
+                        if (
+                            attrNome.startsWith('on') ||
+                            attrNome === '(click)' ||
+                            attrNome === '@click' ||
+                            attrNome.startsWith('v-on:') ||
+                            attrNome === 'ng-click' ||
+                            attrNome === 'jsaction' ||
+                            attrNome === 'routerlink'
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+
+                try {
+                    const st = window.getComputedStyle(atual);
+                    if (st) {
+                        const cur = st.cursor;
+                        if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
+                            return true;
+                        }
+                    }
+                } catch (_) {}
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isElementoOcultoNoDom
+     * DIRETRIZ ROOT: Verifica se um elemento esta oculto na tela (display: none, visibility: hidden,
+     * [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, opacity: 0 ou font-size: 0px)
+     * para garantir que textos ocultos dentro de links ou blocos nunca sejam copiados.
+     */
+    function isElementoOcultoNoDom(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+        if (el.hidden || el.hasAttribute('hidden')) return true;
+        if (el.getAttribute('aria-hidden') === 'true') return true;
+        if (el.hasAttribute('data-jusgov-ignore')) return true;
+
+        const cls = (typeof el.className === 'string') ? el.className.toLowerCase() : '';
+        if (cls && (
+            /\bsr-only\b/.test(cls) ||
+            /\bvisually-hidden\b/.test(cls) ||
+            /\bscreen-reader-text\b/.test(cls) ||
+            /\bd-none\b/.test(cls) ||
+            /\bhidden\b/.test(cls) ||
+            /\bui-helper-hidden\b/.test(cls)
+        )) {
+            return true;
+        }
+
+        const stInline = (el.getAttribute('style') || '').toLowerCase().replace(/\s+/g, '');
+        if (
+            stInline.includes('display:none') ||
+            stInline.includes('visibility:hidden') ||
+            stInline.includes('visibility:collapse') ||
+            stInline.includes('opacity:0;') ||
+            stInline.endsWith('opacity:0') ||
+            stInline.includes('font-size:0px') ||
+            stInline.includes('font-size:0;')
+        ) {
+            return true;
+        }
+
+        if (el.isConnected && typeof window.getComputedStyle === 'function') {
+            try {
+                const comp = window.getComputedStyle(el);
+                if (comp) {
+                    if (comp.display === 'none' || comp.visibility === 'hidden' || comp.visibility === 'collapse') {
+                        return true;
+                    }
+                    if (comp.opacity === '0' || comp.fontSize === '0px') {
+                        return true;
+                    }
+                }
+            } catch (_) {}
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: extrairTextoVisivelLimpoDeElemento
+     * DIRETRIZ ROOT: Extrai exclusivamente o texto visivel de um link, botao ou controle
+     * ignorando completamente filhos ocultos (display:none, visibility:hidden, aria-hidden, sr-only, etc.)
+     * e aplicando os filtros de higienizacao.
+     */
+    function extrairTextoVisivelLimpoDeElemento(el) {
+        if (!el) return '';
+        try {
+            let partes = [];
+            const percorrer = (no) => {
+                if (!no) return;
+                if (no.nodeType === Node.ELEMENT_NODE) {
+                    const tag = (no.tagName || '').toUpperCase();
+                    if (
+                        tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
+                        tag === 'SVG' || tag === 'CANVAS' || tag === 'TEMPLATE' ||
+                        isElementoOcultoNoDom(no)
+                    ) {
+                        return;
+                    }
+                    if (tag === 'BR') {
+                        partes.push(' ');
+                        return;
+                    }
+                    const filhos = no.childNodes;
+                    for (let i = 0; i < filhos.length; i++) {
+                        percorrer(filhos[i]);
+                    }
+                } else if (no.nodeType === Node.TEXT_NODE) {
+                    const val = no.nodeValue || '';
+                    if (val) partes.push(val);
+                }
+            };
+            percorrer(el);
+            const bruto = partes.join('').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim();
+            if (bruto) {
+                return higienizarTextoParaCopia(bruto) || bruto;
+            }
+            const fallbackInner = (typeof el.innerText === 'string') ? el.innerText.replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim() : '';
+            return fallbackInner ? (higienizarTextoParaCopia(fallbackInner) || fallbackInner) : '';
+        } catch (_) {
+            return (el.innerText || '').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim();
+        }
+    }
+
+    /*
      * FUNCAO: isContextoDeSistemaOuUi
      * DIRETRIZ ROOT 2.17: Identifica se um elemento ou qualquer de seus ancestrais pertence
      * a telas de sistema / controles (modais, caixas de dialogo, dropdowns, menus contextuais,
@@ -746,6 +947,42 @@
     function isContextoDeSistemaOuUi(el) {
         if (!el) return false;
         return isElementoInterativoOuUi(el);
+    }
+
+    function isTelaSistemaEstritaParaDesselecao(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+        const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU']);
+        const ROLES_ESTRITOS = new Set(['button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option', 'dialog', 'alertdialog', 'toolbar']);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 30) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_ESTRITAS.has(tagUpper)) return true;
+                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') return true;
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_ESTRITOS.has(role)) return true;
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (cls && (
+                    cls.includes('modal') ||
+                    cls.includes('dialog') ||
+                    cls.includes('dropdown') ||
+                    cls.includes('popover') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('context-menu') ||
+                    cls.includes('mat-dialog') ||
+                    cls.includes('p-dialog') ||
+                    cls.includes('pje-modal')
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
     }
 
     /*
@@ -805,9 +1042,9 @@
                 }
 
                 /* Se o elemento ou qualquer ancestral imediato tem contenteditable explicitamente "false",
-                 * e o proprio elemento alvo nao e editavel, trata como texto comum/leitura */
+                 * e o proprio elemento alvo nao e editavel, encerra a busca de editores (mas ainda verifica isElementoInterativoOuUi abaixo!) */
                 if (atual.getAttribute('contenteditable') === 'false' && !el.isContentEditable) {
-                    return 'LEITURA_COMUM';
+                    break;
                 }
 
                 if (atual.classList && (
@@ -820,17 +1057,17 @@
                 )) {
                     /* So e classificado como editor se for de fato editavel pelo usuario.
                      * Documentos ou visualizadores com classes do CKEditor/Quill/ProseMirror
-                     * mas somente-leitura pertencem estritamente a LEITURA_COMUM! */
+                     * mas somente-leitura nao sao editores ativos! */
                     if (atual.isContentEditable || (document.body && document.body.isContentEditable) || document.designMode === 'on') {
                         return 'EDITOR_MULTILINHA_EDITAVEL';
                     }
-                    return 'LEITURA_COMUM';
+                    break;
                 }
 
                 const role = atual.getAttribute('role');
                 if (role === 'textbox' || role === 'searchbox') {
                     if (atual.getAttribute('aria-readonly') === 'true' || atual.getAttribute('contenteditable') === 'false') {
-                        return 'LEITURA_COMUM';
+                        break;
                     }
                     if (atual.isContentEditable || tag === 'TEXTAREA' || tag === 'INPUT') {
                         const ehMulti = atual.getAttribute('aria-multiline') === 'true' || tag === 'TEXTAREA';
@@ -1169,10 +1406,13 @@
                 acceptNode(node) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         const tag = node.tagName;
-                        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') {
+                        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEMPLATE') {
                             return NodeFilter.FILTER_REJECT;
                         }
                         if (node.hasAttribute && node.hasAttribute('data-jusgov-ignore')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        if (node !== bloco && isElementoOcultoNoDom(node)) {
                             return NodeFilter.FILTER_REJECT;
                         }
                         if (tag === 'BR') {
@@ -1567,8 +1807,15 @@
                 const elPai = noTexto.parentElement;
                 if (elPai) {
                     const tagPai = elPai.tagName ? elPai.tagName.toUpperCase() : '';
-                    if (tagPai === 'SCRIPT' || tagPai === 'STYLE' || tagPai === 'NOSCRIPT') {
+                    if (tagPai === 'SCRIPT' || tagPai === 'STYLE' || tagPai === 'NOSCRIPT' || tagPai === 'TEMPLATE') {
                         return;
+                    }
+                    let ancOculto = elPai;
+                    while (ancOculto && ancOculto !== document.body && ancOculto !== document.documentElement) {
+                        if (isElementoOcultoNoDom(ancOculto)) {
+                            return;
+                        }
+                        ancOculto = ancOculto.parentElement;
                     }
                 }
 
@@ -1713,12 +1960,18 @@
                 return aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(String(origem || '')));
             }
 
-            /* Passo 0.1: Eliminar scripts, estilos, iframes e nos perigosos/invisiveis */
+            /* Passo 0.1: Eliminar scripts, estilos, iframes e nos perigosos/invisiveis/ocultos */
             const nosPerigosos = container.querySelectorAll(
-                'script, style, iframe, object, embed, applet, noscript, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore]'
+                'script, style, iframe, object, embed, applet, noscript, template, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore], [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, .screen-reader-text, .d-none, .ui-helper-hidden'
             );
             for (let i = 0; i < nosPerigosos.length; i++) {
                 nosPerigosos[i].remove();
+            }
+            const todosParaInspecaoOculta = container.querySelectorAll('[style]');
+            for (let i = 0; i < todosParaInspecaoOculta.length; i++) {
+                if (isElementoOcultoNoDom(todosParaInspecaoOculta[i])) {
+                    todosParaInspecaoOculta[i].remove();
+                }
             }
 
             /* Passo 0.2: Inserir quebras de linha explicitas para elementos de bloco e quebras */
@@ -1869,12 +2122,18 @@
             return container;
         }
 
-        /* Passo 1: Eliminar nos executaveis e invisiveis */
+        /* Passo 1: Eliminar nos executaveis e invisiveis/ocultos */
         const nosPerigosos = container.querySelectorAll(
-            'script, style, iframe, object, embed, applet, noscript, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore]'
+            'script, style, iframe, object, embed, applet, noscript, template, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore], [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, .screen-reader-text, .d-none, .ui-helper-hidden'
         );
         for (let i = 0; i < nosPerigosos.length; i++) {
             nosPerigosos[i].remove();
+        }
+        const todosComEstiloOculto = container.querySelectorAll('[style]');
+        for (let i = 0; i < todosComEstiloOculto.length; i++) {
+            if (isElementoOcultoNoDom(todosComEstiloOculto[i])) {
+                todosComEstiloOculto[i].remove();
+            }
         }
 
         /* Passo 2: Desenrolar links (<a>) */
@@ -4950,25 +5209,24 @@
             return;
         }
 
-        /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou selecao ativa na tela (PDF / texto)
-         * Preservacao integral da selecao por arrasto/manual em texto comum e visualizadores de PDF.
+        /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou com Acumulador (Ctrl+Alt)
+         * Preservacao integral da selecao por arrasto em texto comum e visualizadores de PDF.
          * Em telas de sistema/interface: copia e remove a selecao visual da tela (removeAllRanges) imediatamente! */
         isMousePressionado = false;
         coordsMouseDown = { x: 0, y: 0 };
-        const selAtualNoMouseUp = window.getSelection();
-        const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && selAtualNoMouseUp.toString().trim().length > 0);
-        const ehArrastoOuSelecaoManual = houveArrastoMouse || (temTextoSelecionadoEfetivo && !e.altKey && !e.shiftKey);
 
-        if (ehArrastoOuSelecaoManual) {
+        if (houveArrastoMouse) {
             houveArrastoMouse = false;
             pontoAncoraArrastoAlt = null;
+            const selAtualNoMouseUp = window.getSelection();
+            const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && selAtualNoMouseUp.toString().trim().length > 0);
             if (temTextoSelecionadoEfetivo) {
                 ignorarProximoClick = true;
                 const rangeArrastado = selAtualNoMouseUp.getRangeAt(0).cloneRange();
-                const ehSistema = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target) || (rangeArrastado && isContextoDeSistemaOuUi(rangeArrastado.commonAncestorContainer));
+                const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(e.target) || (rangeArrastado && isTelaSistemaEstritaParaDesselecao(rangeArrastado.commonAncestorContainer));
                 await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador);
-                if (ehSistema) {
-                    /* Em tela de sistema/interface: NUNCA manter selecao visual residual */
+                if (ehSistemaEstrito) {
+                    /* Em tela de sistema/interface (modais, menus, botoes, links): NUNCA manter selecao visual residual */
                     const selAtual = window.getSelection();
                     if (selAtual) selAtual.removeAllRanges();
                     flashExclusivoSemSelecao = true;
@@ -4980,6 +5238,14 @@
         pontoAncoraArrastoAlt = null;
 
         const temModificadorTeclado = temModificadorTecladoAtivo(e);
+
+        /* Passo 9.6: Regra da Maozinha (cursor: pointer), Help (cursor: help), Links, Controles e Eventos (onclick, onmouse*):
+         * Cliques sem teclas modificadoras sobre links, botoes, controles, elementos com cursor "maozinha"/"help"
+         * ou eventos associados JAMAIS devem selecionar ou copiar de cara — preservam 100% a acao nativa! */
+        if (!temModificadorTeclado && isElementoInterativoClicavelDireto(e.target)) {
+            ignorarProximoClick = false;
+            return;
+        }
 
         /* Passo 9.7: Shift + Clique e Solta (Filtro de Digitos/Alfanumericos Corridos c/ Zero-Pad CNJ OU Cursor Inicial -> Final) */
         if (e.shiftKey && !modoAcumulador) {
@@ -5064,17 +5330,20 @@
         }
 
         /* Passo 9.7.1: Alt + Clique (sem arrasto) sobre links, botoes, menus, abas ou controles de interface:
-         * DIRETRIZ ROOT 2.17: Copia o texto integral do elemento com Flash Verde temporizado,
-         * mas NUNCA forca nem mantem selecao visual azul residual na interface! */
+         * DIRETRIZ ROOT 2.17: Copia apenas o texto VISIVEL do elemento com Flash Verde temporizado,
+         * descartando textos ocultos (display:none, visibility:hidden, aria-hidden, sr-only) e
+         * NUNCA forca nem mantem selecao visual azul residual na interface! */
         if (e.altKey && !e.ctrlKey && !e.shiftKey && e.detail === 1) {
             let textoParaCopiar = '';
             let rangeParaFlash = null;
+            let usarRangeNaGravacao = true;
             const elInterativo = obterObjetoInterativoParaSelecaoCompleta(e.target);
 
             if (elInterativo) {
                 ignorarProximoClick = true;
                 e.preventDefault();
                 e.stopPropagation();
+                usarRangeNaGravacao = false;
 
                 if (elInterativo.tagName === 'INPUT') {
                     textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
@@ -5085,9 +5354,7 @@
                     rangeParaFlash = document.createRange();
                     rangeParaFlash.selectNode(elInterativo);
                 } else {
-                    textoParaCopiar = (elInterativo.innerText || elInterativo.textContent || '')
-                        .replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ')
-                        .trim();
+                    textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
                     rangeParaFlash = document.createRange();
                     rangeParaFlash.selectNodeContents(elInterativo);
                 }
@@ -5116,7 +5383,7 @@
             }
 
             if (textoParaCopiar && textoParaCopiar.length > 0) {
-                await gravarNaAreaDeTransferencia(textoParaCopiar, rangeParaFlash);
+                await gravarNaAreaDeTransferencia(textoParaCopiar, usarRangeNaGravacao ? rangeParaFlash : null);
                 await cederControleAoCompositorBlink();
                 if (tempoFlashBorderMs > 0 && rangeParaFlash) {
                     flashExclusivoSemSelecao = true;
@@ -5128,33 +5395,38 @@
             }
         }
 
-        /* Passo 9.7.1b: Clique Simples sem Modificadores em Tela de Sistema / Interface:
+        /* Passo 9.7.1b: Clique Simples sem Modificadores em Tela de Sistema / Interface (modais, caixas de dialogo):
          * DIRETRIZ ROOT 2.17:
-         * - Se for mascara util / bloco estruturado (data/hora completa, processo CNJ, CPF, CNPJ, moedas):
-         *   COPIA para a Area de Transferencia e exibe Flash Verde temporizado, SEM manter selecao na tela.
+         * - Se for link, botao, controle, icone maozinha/help ou tiver eventos (isElementoInterativoClicavelDireto):
+         *   ja retornou no Passo 9.6 sem fazer nada.
+         * - Se for texto estatico dentro de tela de sistema (ex: corpo de modal) e contiver mascara util / bloco estruturado
+         *   (data/hora completa, processo CNJ, CPF, CNPJ, moedas): COPIA para a Area de Transferencia e exibe Flash Verde
+         *   temporizado, SEM manter selecao na tela.
          * - Se for palavra avulsa ou rotulo de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
         const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target);
-        if (ehSistemaOuUi && !temModificadorTeclado && e.detail === 1) {
-            const ponto = obterPontoDoClique(e.clientX, e.clientY);
-            if (ponto) {
-                const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
-                if (mapa) {
-                    const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
-                    if (resComposto) {
-                        const rangeComposto = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
-                        if (rangeComposto) {
-                            const textoLimpo = extrairTextoPuroSanitizado(rangeComposto) || rangeComposto.toString().trim();
-                            if (textoLimpo && textoLimpo.length > 0) {
-                                await gravarNaAreaDeTransferencia(textoLimpo, rangeComposto);
-                                await cederControleAoCompositorBlink();
-                                if (tempoFlashBorderMs > 0) {
-                                    flashExclusivoSemSelecao = true;
-                                    dispararFlashBorderVisual(rangeComposto);
+        if (ehSistemaOuUi && !temModificadorTeclado) {
+            if (e.detail === 1 && !isElementoInterativoClicavelDireto(e.target)) {
+                const ponto = obterPontoDoClique(e.clientX, e.clientY);
+                if (ponto) {
+                    const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                    if (mapa) {
+                        const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
+                        if (resComposto) {
+                            const rangeComposto = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
+                            if (rangeComposto) {
+                                const textoLimpo = extrairTextoPuroSanitizado(rangeComposto) || rangeComposto.toString().trim();
+                                if (textoLimpo && textoLimpo.length > 0) {
+                                    await gravarNaAreaDeTransferencia(textoLimpo, rangeComposto);
+                                    await cederControleAoCompositorBlink();
+                                    if (tempoFlashBorderMs > 0) {
+                                        flashExclusivoSemSelecao = true;
+                                        dispararFlashBorderVisual(rangeComposto);
+                                    }
+                                    const sel = window.getSelection();
+                                    if (sel) sel.removeAllRanges();
+                                    ignorarProximoClick = false;
+                                    return;
                                 }
-                                const sel = window.getSelection();
-                                if (sel) sel.removeAllRanges();
-                                ignorarProximoClick = false;
-                                return;
                             }
                         }
                     }
@@ -5959,18 +6231,23 @@
             const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
             if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
 
+            // Em links, botoes, icones maozinha/help ou controles clicaveis, nunca seleciona nem copia via selectionchange sem teclas modificadoras
+            if (isElementoInterativoClicavelDireto(range.commonAncestorContainer)) {
+                return;
+            }
+
             // Assinatura única para evitar re-execução em loop da mesma seleção exata
             const assinatura = `${range.startOffset}_${range.endOffset}_${textoSel}`;
             if (assinatura === ultimoRangeAssinaturaGlobal) return;
             ultimoRangeAssinaturaGlobal = assinatura;
 
             const rangeClone = range.cloneRange();
-            const ehSistema = (ctx === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(range.commonAncestorContainer);
+            const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(range.commonAncestorContainer);
 
             selecaoSendoAplicadaPeloAddon = true;
             try {
                 await aplicarSelecaoECopiar(rangeClone, false);
-                if (ehSistema) {
+                if (ehSistemaEstrito) {
                     sel.removeAllRanges();
                     flashExclusivoSemSelecao = true;
                 }
@@ -6717,7 +6994,9 @@
         },
         classificarContextoElementoAlvo,
         isElementoInterativoOuUi,
+        isElementoInterativoClicavelDireto,
         isContextoDeSistemaOuUi,
+        extrairTextoVisivelLimpoDeElemento,
         dispararFlashBorderVisual,
         limparFlashBorderImediatamente,
         localizarCampoSimbolosSobCursor,

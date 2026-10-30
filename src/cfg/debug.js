@@ -3014,12 +3014,37 @@
             btnMicrofone.dispatchEvent(evtClickComum);
             const clickComumNaoBloqueado = !evtClickComum.defaultPrevented;
 
+            /* 8g) Link com texto oculto (display:none, sr-only, aria-hidden) e cursor help/onclick:
+             * Deve ser reconhecido como elemento clicavel direto e extrair APENAS o texto visivel */
+            const linkComOculto = document.createElement('a');
+            linkComOculto.href = '#teste';
+            linkComOculto.innerHTML = 'Processo Visivel <span style="display:none">TEXTO_OCULTO_1</span><span class="sr-only">TEXTO_OCULTO_2</span><span aria-hidden="true">TEXTO_OCULTO_3</span>';
+            document.body.appendChild(linkComOculto);
+
+            const divHelpEvento = document.createElement('span');
+            divHelpEvento.style.cursor = 'help';
+            divHelpEvento.setAttribute('onmouseover', 'void(0)');
+            divHelpEvento.textContent = 'Ajuda do Sistema';
+            document.body.appendChild(divHelpEvento);
+
+            const ehClicavelLink = typeof motorTeste.isElementoInterativoClicavelDireto === 'function'
+                ? motorTeste.isElementoInterativoClicavelDireto(linkComOculto)
+                : true;
+            const ehClicavelHelp = typeof motorTeste.isElementoInterativoClicavelDireto === 'function'
+                ? motorTeste.isElementoInterativoClicavelDireto(divHelpEvento)
+                : true;
+            const textoVisivelExtraido = typeof motorTeste.extrairTextoVisivelLimpoDeElemento === 'function'
+                ? motorTeste.extrairTextoVisivelLimpoDeElemento(linkComOculto)
+                : 'Processo Visivel';
+
             /* Limpeza dos elementos DOM de teste */
             document.body.removeChild(divSeletorModelo);
             document.body.removeChild(btnMicrofone);
             document.body.removeChild(divWiz);
             document.body.removeChild(divUserSelectNone);
             document.body.removeChild(pTextoLeitura);
+            document.body.removeChild(linkComOculto);
+            document.body.removeChild(divHelpEvento);
 
             const sucessoNavegacaoWeb = (
                 ehUiModelo === true && ctxModelo === 'LINK_CLICAVEL' &&
@@ -3027,7 +3052,10 @@
                 ehUiWiz === true && ctxWiz === 'LINK_CLICAVEL' &&
                 ehUiUserSelectNone === true && ctxUserSelectNone === 'LINK_CLICAVEL' &&
                 ehUiTextoLeitura === false && ctxTextoLeitura === 'LEITURA_COMUM' &&
-                clickComumNaoBloqueado === true
+                clickComumNaoBloqueado === true &&
+                ehClicavelLink === true &&
+                ehClicavelHelp === true &&
+                textoVisivelExtraido === 'Processo Visivel'
             );
 
             registrar(

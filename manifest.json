@@ -63,8 +63,6 @@
  *   configuracao em tempo real para todas as abas abertas sem exigir F5.
  * - "tabGroups": Permite organizar visualmente as abas da mesma origem/tribunal
  *   em Grupos de Abas nativos coloridos do Google Chrome (Tab Groups API).
- * - "webNavigation": Permite detectar navegacoes e carregamentos de subframes,
- *   iframes e visualizadores de PDF em tempo real para injecao confiavel.
  * - "host_permissions": ["<all_urls>"] -> Necessario para que o modo "Todos os
  *   Sites" e os dominios customizados adicionados pelo usuario em Opcoes possam
  *   receber a injecao dinamica sem recompilar a extensao.
@@ -92,8 +90,7 @@
     "scripting",
     "storage",
     "tabs",
-    "tabGroups",
-    "webNavigation"
+    "tabGroups"
   ],
   "host_permissions": [
     "<all_urls>"
