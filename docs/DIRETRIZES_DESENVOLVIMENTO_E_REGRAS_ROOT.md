@@ -449,6 +449,16 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Garantir a limpeza atômica imediata (`limparFlashBorderImediatamente()`) antes de desenhar qualquer novo contorno.
   * Empregar fusão geométrica (coalescência) de `DOMRects` contíguos na mesma linha horizontal ou aplicar contorno por `range.getBoundingClientRect()` unificado quando se tratar de uma mesma entidade/bloco textual, prevenindo caixas sobrepostas e saturação de cor.
 
+### 6.9 Ignorar Seleção / Cópia por Arrasto Curto (< 5 Caracteres) em Elementos de Interface sem Tecla Alt
+- **Contexto Operacional:** Em locais que são claramente elementos de interface gráfica do sistema e não áreas de leitura de texto corrido (conforme a classificação e diferenciação de contexto de UI já existente no motor), o usuário pode acidentalmente clicar e arrastar o cursor ao interagir com componentes, abas, botões, cabeçalhos ou divisórias.
+- **Regra de Negócio Estabelecida:**
+  * Nos casos de clicar e arrastar o mouse em locais que correspondam categoricamente a elementos de interface (e não textos de leitura/conteúdo), ignorar completamente as seleções ou cópias caso a tecla `Alt` NÃO esteja pressionada e o texto selecionado resultante tenha menos de 5 caracteres (`selection.trim().length < 5`).
+  * Caso o usuário queira expressamente selecionar ou copiar pequenos fragmentos ou labels curtos dentro de áreas de interface, ele deverá manter a tecla `Alt` pressionada durante a ação, ou a seleção por arrasto deverá possuir 5 ou mais caracteres para ser considerada intencional.
+- **Diretriz de Ajuste Futuro:**
+  * No tratador global de evento de arrasto/mouseup e `selectionchange`, verificar se o alvo da seleção originou-se em área de interface do sistema (`isContextoDeSistemaOuUi` ou contexto interativo).
+  * Se o modificador `Alt` estiver ausente (`!e.altKey`) e o comprimento do texto selecionado for inferior ao limiar mínimo (`textoLimpo.length < 5`), abortar o fluxo de cópia, desarmar a seleção ativa no DOM (`window.getSelection().removeAllRanges()`) e suprimir o contorno visual do Flash Verde.
+
+
 
 
 
