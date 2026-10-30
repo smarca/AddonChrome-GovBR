@@ -98,6 +98,8 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
   - Delimitadores Simetricos ("( algo )"): 1 clique no espaco colado a borda pega o miolo "algo"; 2 cliques pega o bloco incluindo os delimitadores "( algo )"!
   - Sequencia em Caixa Alta ("REGULAR PROSSEGUIMENTO DO FEITO"): 1 clique no espaco interno OU 2 cliques seleciona todo o conjunto contiguo de palavras em maiusculas (inclusive com quebras suaves <br>)!
   - Sequencia Formatada em Destaque (negrito, italico, sublinhado, mark): 1 clique no espaco interno OU 2 cliques seleciona o bloco continuo com a mesma formatacao!
+  - Conectivo de Dois-Pontos e Sentença Completa ("Atenção: confira o processo antes de prosseguir."): 1 clique sobre o espaço em branco imediatamente posterior aos dois-pontos `:` (ex.: espaço entre `:` e `confira`) atua como conectivo sintático entre a chamada anterior e a proposição seguinte, selecionando imediatamente a sentença/proposição inteira!
+
 
 ### 2.5 O Switch de Ida e Volta: Expansao, Minoracao e Ciclo Circular Continuo
 O motor opera um ciclo deterministico de transicao dinamica de estados baseado no principio de zoom concentrico circular:
@@ -522,6 +524,14 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
      * Manter a excelente organização já consolidada, onde as preferências e documentações são agrupadas de forma clara e intuitiva em seções/abas temáticas por módulo.
   3. **Aderência Obrigatória aos Princípios de Engenharia (Item 11 das Diretrizes Root):**
      * Estruturação de cada arquivo `.js` por Orientação a Objetos com encapsulamento de estado interno e guardas defensivas (`typeof ... === 'function'`) antes de qualquer chamada intermodular, garantindo que o desligamento de qualquer módulo de UI ou cópia jamais aborte ou quebre os demais módulos em execução.
+
+### 6.14 Regra de Bloco: Conectivo de Dois-Pontos com Espaço Posterior Expandindo Sentença Completa
+- **Contexto e Regra de Negócio Estabelecida:**
+  * Em frases estruturadas com dois-pontos precedendo uma proposição ou instrução (exemplo canônico: `"Atenção: confira o processo antes de prosseguir."`, `"Importante: verifique os prazos."`, `"Despacho: cumpra-se imediatamente."`).
+  * **Comportamento da Ação de Clique:**
+    * Ao clicar no espaço em branco imediatamente posterior ao caractere dois-pontos `:` (isto é, o espaço entre `:` e `confira`), o motor deve identificar os dois-pontos antecedentes imediatos como um conectivo de sentença direta.
+    * Em vez de isolar apenas a palavra subsequente ou apenas o rótulo anterior, esse clique no espaço conectado aos dois-pontos expande e seleciona imediatamente a **sentença inteira** (`"Atenção: confira o processo antes de prosseguir."`), integrando o prefixo enfático ao corpo da proposição de forma atômica e fluida.
+
 
 
 
