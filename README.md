@@ -106,3 +106,4 @@ AddonChrome-GovBR/
 * **Projeto:** JusGovBR — Seleção/Cópia Inteligente & PJe Turbo
 * **Autor / Contato:** `smarca@gmail.com`
 
+LINHA_LOCAL
