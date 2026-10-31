@@ -10,8 +10,8 @@
         "C:/Program Files (x86)/Git/cmd/git.exe",
         "git"
     ],
+    "git.commitTemplate": "sincronizar",
     "git.useEditorAsCommitInput": false,
-    "git.commitTemplate": "Sincronismo Manual",
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.postCommitCommand": "sync",
