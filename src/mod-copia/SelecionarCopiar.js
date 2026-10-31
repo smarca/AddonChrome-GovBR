@@ -157,7 +157,7 @@
  *   (incluindo copia de coluna inteira no alto da tabela) ocorre normalmente!
  * ========================================================================== */
 
-(function() {
+(function () {
     'use strict';
 
     /* Passo 1.1: Guarda de idempotencia global O(1): se o motor ja estiver inicializado
@@ -171,7 +171,7 @@
     if (window.__JUSGOV_ABORT_CONTROLLER__) {
         try {
             window.__JUSGOV_ABORT_CONTROLLER__.abort();
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /* ==========================================================================
@@ -436,7 +436,7 @@
                 }
             });
             observadorBlindagem.observe(alvo, { childList: true });
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function blindarCSS() {
@@ -445,7 +445,7 @@
             if (el) el.remove();
             cssBlindado = false;
             if (observadorBlindagem) {
-                try { observadorBlindagem.disconnect(); } catch (_) {}
+                try { observadorBlindagem.disconnect(); } catch (_) { }
                 observadorBlindagem = null;
             }
             return;
@@ -473,16 +473,16 @@
                 dominio = (window.top.location && window.top.location.hostname) ? window.top.location.hostname.toLowerCase() : dominio;
                 urlCompleta = (window.top.location && window.top.location.href) ? window.top.location.href.toLowerCase() : urlCompleta;
             }
-        } catch (_) {}
+        } catch (_) { }
 
         let ehPJeOuTribunal = (dominio.includes('pje') && dominio.includes('.jus.br')) ||
-                              dominio.includes('.jus.br') ||
-                              urlCompleta.includes('pje') ||
-                              dominio.includes('eproc') ||
-                              dominio.includes('projudi') ||
-                              dominio.includes('prevjud') ||
-                              urlCompleta.includes('prevjud') ||
-                              (typeof window !== 'undefined' && window.__JUSGOV_TESTE_BLINDAR_CSS__ === true);
+            dominio.includes('.jus.br') ||
+            urlCompleta.includes('pje') ||
+            dominio.includes('eproc') ||
+            dominio.includes('projudi') ||
+            dominio.includes('prevjud') ||
+            urlCompleta.includes('prevjud') ||
+            (typeof window !== 'undefined' && window.__JUSGOV_TESTE_BLINDAR_CSS__ === true);
 
         // Se estiver em iframe de popup/modal e o modulo estiver ativo, garante a blindagem no subdocumento
         if (!ehPJeOuTribunal && typeof window !== 'undefined' && window.self !== window.top && ativoAmpuletas) {
@@ -562,7 +562,7 @@
         if (typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function') {
             try {
                 await scheduler.yield();
-            } catch (_) {}
+            } catch (_) { }
         }
     }
 
@@ -778,7 +778,7 @@
                                 return true;
                             }
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
 
@@ -859,7 +859,7 @@
                                 return true;
                             }
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
             atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
@@ -1045,7 +1045,7 @@
                         return true;
                     }
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
         return false;
     }
@@ -1346,7 +1346,7 @@
             if (document.body) {
                 document.body.setAttribute('data-jusgov-selecionavel', 'true');
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function obterObjetoInterativoParaSelecaoCompleta(alvo) {
@@ -1389,7 +1389,7 @@
                             return atual;
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
             atual = atual.parentElement;
         }
@@ -1424,7 +1424,7 @@
                 const dxNo = x < rectNo.left ? (rectNo.left - x) : (x > rectNo.right ? (x - rectNo.right) : 0);
                 const dyNo = y < rectNo.top ? (rectNo.top - y) : (y > rectNo.bottom ? (y - rectNo.bottom) : 0);
                 if ((dxNo + dyNo * 2) > 48 && len > 24) continue;
-            } catch (_) {}
+            } catch (_) { }
 
             for (let i = 0; i < len; i++) {
                 if (++totalTestesRect > LIMITE_TESTES_RECT) break;
@@ -1445,7 +1445,7 @@
                             return { no: melhorNo, offset: melhorOffset };
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
             if (totalTestesRect > LIMITE_TESTES_RECT) break;
         }
@@ -1546,7 +1546,7 @@
                     }
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         return { no, offset };
     }
@@ -1907,7 +1907,7 @@
                         if (disp === 'block' || disp === 'flex' || disp === 'grid' || disp === 'list-item' || disp === 'table-row') {
                             return atual;
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
             atual = atual.parentElement;
@@ -1962,7 +1962,7 @@
                             if (dec.indexOf('underline') !== -1) u = true;
                             if (dec.indexOf('line-through') !== -1) s = true;
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
             atual = atual.parentElement;
@@ -2787,7 +2787,7 @@
                 formatado: Boolean(novoPayload.formatado)
             };
             registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__, window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__);
-        } catch (_) {}
+        } catch (_) { }
     }
 
     async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null) {
@@ -2922,7 +2922,7 @@
                 }
                 storageLocal.set(payloadStorage);
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /*
@@ -2937,7 +2937,7 @@
         try {
             if (!alvo) return false;
             if (typeof alvo.focus === 'function') {
-                try { alvo.focus(); } catch (_) {}
+                try { alvo.focus(); } catch (_) { }
             }
 
             // 1. Despacha KeyDown de Ctrl+V
@@ -2969,19 +2969,19 @@
                     });
                     pasteTratadoPeloEditor = !alvo.dispatchEvent(evtPaste);
                 }
-            } catch (_) {}
+            } catch (_) { }
 
             // 3. Se o editor nao tratou por conta propria, aciona execCommand de insercao
             if (!pasteTratadoPeloEditor) {
                 let colouExec = false;
                 try {
                     colouExec = document.execCommand('paste');
-                } catch (_) {}
+                } catch (_) { }
                 if (!colouExec) {
                     if (html && ehEditorRico) {
                         try {
                             colouExec = document.execCommand('insertHTML', false, html);
-                        } catch (_) {}
+                        } catch (_) { }
                     }
                     if (!colouExec) {
                         const conteudoParaInserir = (ehEditorRico && html) ? html : (texto || '');
@@ -3018,7 +3018,7 @@
             const el = alvo || (typeof document !== 'undefined' ? (document.activeElement || document.body) : null);
             if (!el) return;
             if (typeof el.focus === 'function') {
-                try { el.focus(); } catch (_) {}
+                try { el.focus(); } catch (_) { }
             }
 
             // 1. Keydown tecla Windows (MetaLeft, key="Meta")
@@ -3066,7 +3066,7 @@
                 bubbles: true,
                 composed: true
             }));
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function converterHexParaRgbaFlash(hexBruto, alfa = 0.28) {
@@ -3097,7 +3097,7 @@
             if (typeof CSS !== 'undefined' && CSS.highlights) {
                 CSS.highlights.delete('jusgov-flash-copy');
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function agendarRetiradaFlashAposDesselecao() {
@@ -3145,13 +3145,13 @@
                 const rs = sub.getClientRects();
                 for (let k = 0; k < rs.length; k++) adicionar(rs[k]);
             }
-        } catch (_) {}
+        } catch (_) { }
 
         if (fragmentos.length === 0) {
             /* Sem texto (ex.: imagem/elemento): usa o retangulo do proprio range */
             try {
                 if (typeof rangeAlvo.getBoundingClientRect === 'function') adicionar(rangeAlvo.getBoundingClientRect());
-            } catch (_) {}
+            } catch (_) { }
         }
         if (fragmentos.length === 0) return [];
 
@@ -3331,7 +3331,7 @@
             timerFlashBorder = setTimeout(() => {
                 limparFlashBorderImediatamente();
             }, duracaoMs);
-        } catch (_) {}
+        } catch (_) { }
     }
     function registrarEstatisticaOperacional(inconsistenciaDetectada = false) {
         /* Passo 5.4.1: Incrementar contadores estatisticos de copias e alertas exclusivamente em storage.local (sem gravar na nuvem) */
@@ -3364,7 +3364,7 @@
                     storageLocal.set(novoPayload);
                 });
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /*
@@ -3407,7 +3407,7 @@
                     sel.addRange(rangeAlvo);
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         if (opcoes.dispararFlash !== false) {
             if (tempoFlashBorderMs > 0) {
@@ -3425,7 +3425,7 @@
                 const selLimpar = window.getSelection();
                 if (selLimpar) selLimpar.removeAllRanges();
                 flashExclusivoSemSelecao = true;
-            } catch (_) {}
+            } catch (_) { }
         }
 
         return { ok: true, manterSelecao, manterSelecaoNoDom: manterSelecao };
@@ -3503,7 +3503,7 @@
             } else if (rangeAlvo) {
                 ultimoRangeAssinaturaGlobal = `${rangeAlvo.startOffset}_${rangeAlvo.endOffset}_${textoLimpo}`;
             }
-        } catch (_) {}
+        } catch (_) { }
 
         await cederControleAoCompositorBlink();
         let alertaInvalido = false;
@@ -3560,7 +3560,7 @@
                     const sel = window.getSelection();
                     if (sel) sel.removeAllRanges();
                     flashExclusivoSemSelecao = true;
-                } catch (_) {}
+                } catch (_) { }
             }
 
             return true;
@@ -3641,7 +3641,7 @@
                     if (spanSimbolo) {
                         alvo.setSelectionRange(spanSimbolo.inicio, spanSimbolo.fim);
                     }
-                } catch (_) {}
+                } catch (_) { }
             }, 10);
             return true;
         }
@@ -3773,7 +3773,7 @@
                     sel.removeAllRanges();
                     sel.addRange(rangeParaSelecionar);
                 }
-            } catch (_) {}
+            } catch (_) { }
         }, 15);
         return true;
     }
@@ -3898,7 +3898,7 @@
                     bgBase = stBase.backgroundColor || '';
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         const verificarDestaqueSegmento = (seg) => {
             if (!seg || seg.ehBr || !seg.no) return { destacado: false, porTagInline: false };
@@ -3938,7 +3938,7 @@
                         return { destacado: true, porTagInline: false };
                     }
                 }
-            } catch (_) {}
+            } catch (_) { }
 
             return { destacado: false, porTagInline: false };
         };
@@ -4558,7 +4558,7 @@
             if (pos > 0 && (eAlfanumericoUnicode(texto[pos - 1]) || eSimboloRepetivel(texto[pos - 1]))) {
                 pos--;
             } else if ((texto[pos] === '+' || texto[pos] === '-' || texto[pos] === '\u2212' || texto[pos] === '\u2013') &&
-                       (pos + 1) < texto.length && eAlfanumericoUnicode(texto[pos + 1])) {
+                (pos + 1) < texto.length && eAlfanumericoUnicode(texto[pos + 1])) {
                 pos++;
             }
         }
@@ -4871,7 +4871,7 @@
 
             selection.removeAllRanges();
             selection.addRange(novoRange);
-        } catch (_) {}
+        } catch (_) { }
     }
 
     async function tentarSelecionarTabelaLinhaOuColuna(e) {
@@ -4985,7 +4985,7 @@
             if (typeof e.stopImmediatePropagation === 'function') {
                 e.stopImmediatePropagation();
             }
-        } catch (_) {}
+        } catch (_) { }
 
         // Em eventos de soltura (up) ou auxclick, resetamos o estado do botao para o proximo clique
         if (e.type === 'mouseup' || e.type === 'pointerup' || e.type === 'keyup' || e.type === 'auxclick') {
@@ -5011,7 +5011,7 @@
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                 chrome.runtime.sendMessage({ acao: 'navegarAba', direcao });
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /**
@@ -5059,7 +5059,7 @@
                     proximoInput.setSelectionRange(tam, tam);
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
         return true;
     }
 
@@ -5099,7 +5099,7 @@
                         target.select();
                         ultimoTempoSelecaoInteligente = Date.now();
                     }
-                } catch (_) {}
+                } catch (_) { }
             }, 50);
         }
     }
@@ -5173,7 +5173,7 @@
             /* Ctrl + Botao do Meio (Win+V): apenas anula autoscroll e prepara foco */
             if (e.ctrlKey && !e.altKey && !e.shiftKey) {
                 e.preventDefault();
-                try { e.target.focus(); } catch (_) {}
+                try { e.target.focus(); } catch (_) { }
                 return;
             }
 
@@ -5183,7 +5183,7 @@
             e.preventDefault();
             const ctxMeio = classificarContextoElementoAlvo(e.target);
             if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
-                try { e.target.focus(); } catch (_) {}
+                try { e.target.focus(); } catch (_) { }
             }
             return;
         }
@@ -5192,7 +5192,7 @@
         if (e.button === 2) {
             const ctxDireito = classificarContextoElementoAlvo(e.target);
             if (colarBotaoMeioAtivo && colagemBotaoDireitoAtiva && (ctxDireito === 'CAMPO_SIMPLES_EDITAVEL' || ctxDireito === 'EDITOR_MULTILINHA_EDITAVEL')) {
-                try { e.target.focus(); } catch (_) {}
+                try { e.target.focus(); } catch (_) { }
             }
             return;
         }
@@ -5219,7 +5219,7 @@
                     tinhaSelecao = (typeof inputAlvoMouseDown.selectionStart === 'number' &&
                         typeof inputAlvoMouseDown.selectionEnd === 'number' &&
                         inputAlvoMouseDown.selectionStart !== inputAlvoMouseDown.selectionEnd);
-                } catch (_) {}
+                } catch (_) { }
                 inputJaEstavaSelecionadoNoMouseDown = Boolean(eraAtivo && tinhaSelecao);
             } else {
                 inputJaEstavaSelecionadoNoMouseDown = false;
@@ -5366,7 +5366,7 @@
 
             selection.removeAllRanges();
             selection.addRange(novoRange);
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function aoMoverMouse(e) {
@@ -5447,7 +5447,7 @@
                 if (e.detail === 2) {
                     /* Regra 3: Se der dois cliques ele seleciona tudo novamente */
                     setTimeout(() => {
-                        try { inputAlvo.select(); } catch (_) {}
+                        try { inputAlvo.select(); } catch (_) { }
                     }, 10);
                 } else if (e.detail === 1) {
                     const valLen = (inputAlvo.value || '').length;
@@ -5461,7 +5461,7 @@
                             delete inputAlvo.dataset.autoselected;
                         }, { once: true });
                         setTimeout(() => {
-                            try { inputAlvo.select(); } catch (_) {}
+                            try { inputAlvo.select(); } catch (_) { }
                         }, 50);
                     } else if (inputJaEstavaSelecionadoNoMouseDown) {
                         /* 2º clique consecutivo em campo ja focado com texto: permite posicionar o cursor pontualmente */
@@ -5470,7 +5470,7 @@
                                 if (inputAlvo.selectionStart !== inputAlvo.selectionEnd) {
                                     inputAlvo.setSelectionRange(inputAlvo.selectionStart, inputAlvo.selectionStart);
                                 }
-                            } catch (_) {}
+                            } catch (_) { }
                         }, 10);
                     }
                 }
@@ -5632,7 +5632,7 @@
                         rColapsado.setStart(pontoClique.no, pontoClique.offset);
                         rColapsado.setEnd(pontoClique.no, pontoClique.offset);
                         sel.addRange(rColapsado);
-                    } catch (_) {}
+                    } catch (_) { }
                 }
                 return;
             } else {
@@ -5659,7 +5659,7 @@
                         rangeExpandido.setEnd(ancoraCursorShift.no, ancoraCursorShift.offset);
                     }
                     await aplicarSelecaoECopiar(rangeExpandido, false);
-                } catch (_) {}
+                } catch (_) { }
                 return;
             }
         }
@@ -5982,7 +5982,7 @@
                 try {
                     alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
                     alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                } catch (_) {}
+                } catch (_) { }
                 return;
             }
 
@@ -5993,7 +5993,7 @@
                 } else {
                     executou = document.execCommand('insertText', false, texto);
                 }
-            } catch (_) {}
+            } catch (_) { }
 
             if (!executou) {
                 const sel = window.getSelection();
@@ -6011,8 +6011,8 @@
             try {
                 alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
                 alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-            } catch (_) {}
-        } catch (_) {}
+            } catch (_) { }
+        } catch (_) { }
     }
 
     /*
@@ -6053,7 +6053,7 @@
                     inserirTextoEmElemento(alvo, textoEmulado, false);
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /*
@@ -6098,7 +6098,7 @@
                     if (typeof emularTeclasWinV === 'function') {
                         emularTeclasWinV(alvo);
                     }
-                } catch (_) {}
+                } catch (_) { }
                 return;
             }
 
@@ -6109,7 +6109,7 @@
                 if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
                     try {
                         executarColagemBotaoDireito(alvo, 'normal', false);
-                    } catch (_) {}
+                    } catch (_) { }
                 }
                 /* Se der qualquer erro ou elemento nao for editavel: 'fazer nada' silenciosamente */
                 return;
@@ -6184,33 +6184,33 @@
             const s = (typeof win.getSelection === 'function') ? win.getSelection() : null;
             if (s) {
                 if (typeof s.empty === 'function') {
-                    try { s.empty(); } catch (_) {}
+                    try { s.empty(); } catch (_) { }
                 }
                 if (typeof s.removeAllRanges === 'function') {
-                    try { s.removeAllRanges(); } catch (_) {}
+                    try { s.removeAllRanges(); } catch (_) { }
                 }
                 if (s.rangeCount > 0 && typeof s.collapseToStart === 'function') {
-                    try { s.collapseToStart(); } catch (_) {}
+                    try { s.collapseToStart(); } catch (_) { }
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         try {
             /* 2. Funcao Nativa do Documento execCommand('unselect') */
             if (typeof doc.execCommand === 'function') {
-                try { doc.execCommand('unselect'); } catch (_) {}
+                try { doc.execCommand('unselect'); } catch (_) { }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         try {
             /* 3. Limpeza de Elemento Ativo e Desselecao de Inputs/Textareas */
             const elemAtivo = doc.activeElement;
             if (elemAtivo) {
                 if (typeof elemAtivo.setSelectionRange === 'function') {
-                    try { elemAtivo.setSelectionRange(0, 0); } catch (_) {}
+                    try { elemAtivo.setSelectionRange(0, 0); } catch (_) { }
                 }
                 if (elemAtivo.blur && (elemAtivo.tagName === 'INPUT' || elemAtivo.tagName === 'TEXTAREA' || elemAtivo.isContentEditable)) {
-                    try { elemAtivo.blur(); } catch (_) {}
+                    try { elemAtivo.blur(); } catch (_) { }
                 }
             }
             if (doc.querySelectorAll) {
@@ -6218,11 +6218,11 @@
                 for (let i = 0; i < campos.length; i++) {
                     const c = campos[i];
                     if (c && typeof c.selectionStart === 'number' && c.selectionStart !== c.selectionEnd) {
-                        try { c.setSelectionRange(0, 0); } catch (_) {}
+                        try { c.setSelectionRange(0, 0); } catch (_) { }
                     }
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         try {
             /* 4. Shadow Roots Acessiveis no Documento (somente elementos customizados com hifen para evitar varredura O(N) de todo o DOM) */
@@ -6233,7 +6233,7 @@
                     if (typeof sShAtivo.removeAllRanges === 'function') sShAtivo.removeAllRanges();
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function executarDeselecaoUniversal(origemRemota = false) {
@@ -6261,26 +6261,26 @@
                                         if (subWin && subDoc) {
                                             deselecionarTudoEmContexto(subWin, subDoc);
                                         }
-                                    } catch (_) {}
+                                    } catch (_) { }
                                 }
                             }
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         /* Passo 9.9.8: Se executado dentro de iframe, desseleciona parent e top */
         try {
             if (window.parent && window.parent !== window) {
                 deselecionarTudoEmContexto(window.parent, window.parent.document);
             }
-        } catch (_) {}
+        } catch (_) { }
         try {
             if (window.top && window.top !== window && window.top !== window.parent) {
                 deselecionarTudoEmContexto(window.top, window.top.document);
             }
-        } catch (_) {}
+        } catch (_) { }
 
         /* Passo 9.9.9: Limpeza de estados internos, acumulador, alertas e contornos flash */
         ancoraCursorShift = null;
@@ -6300,10 +6300,10 @@
             try {
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                     chrome.runtime.sendMessage({ acao: 'broadcastDeselecionarGeral' }, () => {
-                        if (chrome.runtime && chrome.runtime.lastError) {}
+                        if (chrome.runtime && chrome.runtime.lastError) { }
                     });
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
     }
 
@@ -6362,14 +6362,14 @@
                     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                         chrome.runtime.sendMessage({ acao: 'abrirGeminiLateral', modo: 'flash', prompt: promptF1 }, () => {
                             if (chrome.runtime && chrome.runtime.lastError) {
-                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) {}
+                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) { }
                             }
                         });
                     } else {
                         window.open('https://gemini.google.com/app', '_blank');
                     }
                 } catch (_) {
-                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) {}
+                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) { }
                 }
 
                 if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
@@ -6380,14 +6380,14 @@
                     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                         chrome.runtime.sendMessage({ acao: 'abrirGeminiLateral', modo: 'flash', prompt: '' }, () => {
                             if (chrome.runtime && chrome.runtime.lastError) {
-                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) {}
+                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) { }
                             }
                         });
                     } else {
                         window.open('https://gemini.google.com/app', '_blank');
                     }
                 } catch (_) {
-                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) {}
+                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) { }
                 }
 
                 if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
@@ -6429,7 +6429,7 @@
                 if (tipoEl === 'CAMPO_SIMPLES_EDITAVEL') {
                     inputsJaSelecionadosInicialmente.delete(elAtivo);
                     elAtivo.__jusgovSelecionadoInicial = false;
-                    try { elAtivo.blur(); } catch (_) {}
+                    try { elAtivo.blur(); } catch (_) { }
                 }
             }
 
@@ -6445,9 +6445,9 @@
 
                 try {
                     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                        chrome.storage.sync.set({ manterFormatacaoBasica }).catch(() => {});
+                        chrome.storage.sync.set({ manterFormatacaoBasica }).catch(() => { });
                     }
-                } catch (_) {}
+                } catch (_) { }
 
                 if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
                     const norm = normalizarNivelFiltro(nivelFiltroFormatacao);
@@ -6517,7 +6517,7 @@
             if (!selReset || selReset.rangeCount === 0 || selReset.isCollapsed) {
                 ultimoRangeAssinaturaGlobal = '';
             }
-        } catch (_) {}
+        } catch (_) { }
         if (selecaoSendoAplicadaPeloAddon) return;
         if (timerDebounceSelecaoGlobal) {
             clearTimeout(timerDebounceSelecaoGlobal);
@@ -6590,16 +6590,16 @@
      */
     function observarFramesDinamicos() {
         if (observerFrames) {
-            try { observerFrames.disconnect(); } catch (_) {}
+            try { observerFrames.disconnect(); } catch (_) { }
             observerFrames = null;
         }
         try {
             const notificarInjecao = () => {
                 try {
                     if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => {});
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => { });
                     }
-                } catch (_) {}
+                } catch (_) { }
             };
 
             const inspecionarIframeLocal = (el) => {
@@ -6618,7 +6618,7 @@
                             }, { capture: true });
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             };
 
             // Inspecionar iframes ja existentes no DOM no momento da carga
@@ -6682,7 +6682,7 @@
                     attributeFilter: ['src', 'data']
                 });
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /* ==========================================================================
@@ -6690,10 +6690,10 @@
      * ========================================================================== */
     function registrarListenersDOM() {
         if (controladorCicloVida) {
-            try { controladorCicloVida.abort(); } catch (_) {}
+            try { controladorCicloVida.abort(); } catch (_) { }
         }
         if (window.__JUSGOV_ABORT_CONTROLLER__) {
-            try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) {}
+            try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) { }
         }
         controladorCicloVida = new AbortController();
         window.__JUSGOV_ABORT_CONTROLLER__ = controladorCicloVida;
@@ -6701,7 +6701,7 @@
 
         signal.addEventListener('abort', () => {
             if (observerFrames) {
-                try { observerFrames.disconnect(); } catch (_) {}
+                try { observerFrames.disconnect(); } catch (_) { }
                 observerFrames = null;
             }
             if (timerDebounceSelecaoGlobal) {
@@ -6734,7 +6734,7 @@
                     ? (e.target.closest('input') || e.target)
                     : e.target;
                 if (inp && typeof inp.select === 'function') {
-                    try { inp.select(); } catch (_) {}
+                    try { inp.select(); } catch (_) { }
                 }
             }
         }, { capture: true, signal });
@@ -6761,9 +6761,9 @@
             if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
                 try {
                     if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => {});
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => { });
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
         }, { capture: true, passive: true, signal });
         document.addEventListener('mouseup', () => {
@@ -6771,7 +6771,7 @@
             /* Rede de seguranca: a selecao feita com o mouse (ex.: duplo clique) que ainda nao foi copiada
              * por outro caminho e copiada agora. A assinatura evita copiar duas vezes a mesma selecao. */
             setTimeout(() => {
-                try { tratarMudancaSelecaoGlobal(); } catch (_) {}
+                try { tratarMudancaSelecaoGlobal(); } catch (_) { }
             }, 200);
         }, { capture: true, passive: true, signal });
         window.addEventListener('blur', () => {
@@ -7077,7 +7077,7 @@
                     }
                 });
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     /* Passo 10.2: Expor interface de homologacao para a bateria automatizada (debug.js) */

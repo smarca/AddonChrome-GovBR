@@ -725,6 +725,17 @@ function desenharIconeVetorialFallback(modoAtivo, comportamento) {
 /* Passo 6.1: Ao instalar ou atualizar a extensao, inicializar estado e injetar nas abas */
 chrome.runtime.onInstalled.addListener(async () => {
     await sincronizarEstado();
+    /* Passo 6.1.1: Criar menus de contexto na ordem exata solicitada (exige permissao no manifest) */
+    if (chrome.contextMenus) {
+        const config = await chrome.storage.sync.get(['comportamentoCliqueIcone']);
+        const isAcoesRapidas = config.comportamentoCliqueIcone === 'acoes_rapidas';
+        
+        chrome.contextMenus.removeAll(() => {
+            chrome.contextMenus.create({ id: 'toggle-comportamento-icone', type: 'checkbox', title: 'Ações Rápidas no Ícone', checked: isAcoesRapidas, contexts: ['action'] }, () => {});
+            chrome.contextMenus.create({ id: 'configurar-extensao', title: 'Configurar Extensão', contexts: ['action'] }, () => {});
+            chrome.contextMenus.create({ id: 'abrir-painel-extensao', title: 'Desenvolvimento (Página do Plugin)', contexts: ['action'] }, () => {});
+        });
+    }
 });
 
 /* Passo 6.2: Ao iniciar o perfil do navegador, garantir sincronizacao e icone */
@@ -873,6 +884,10 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
         const mudouConfiguracao = chavesConfig.some(chave => Object.prototype.hasOwnProperty.call(changes, chave));
         if (mudouConfiguracao) {
             await sincronizarEstado();
+        }
+        /* Atualizar marcação visual do checkbox no menu de contexto se alterado em outra tela */
+        if (changes.comportamentoCliqueIcone && chrome.contextMenus) {
+            chrome.contextMenus.update('toggle-comportamento-icone', { checked: changes.comportamentoCliqueIcone.newValue === 'acoes_rapidas' }).catch(() => {});
         }
     }
 });
@@ -1237,6 +1252,19 @@ if (msg.acao === 'abrirGeminiLateral' || msg.acao === 'abrirAssistenteIaLateral'
 }
 
 return false;
+});
+
+/* Passo 6.5: Escutar cliques no menu de contexto nativo do icone da extensao */
+if (chrome.contextMenus) chrome.contextMenus.onClicked.addListener(async (info) => {
+    if (info.menuItemId === 'toggle-comportamento-icone') {
+        const novoComportamento = info.checked ? 'acoes_rapidas' : 'popup';
+        await chrome.storage.sync.set({ comportamentoCliqueIcone: novoComportamento });
+    } else if (info.menuItemId === 'configurar-extensao') {
+        /* Abre a aba padrao de opcoes da extensao nativamente */
+        chrome.runtime.openOptionsPage();
+    } else if (info.menuItemId === 'abrir-painel-extensao') {
+		chrome.tabs.create({ url: 'https://github.com/smarca/AddonChrome-GovBR.git', active: true });
+    }
 });
 
 // =====================================================================

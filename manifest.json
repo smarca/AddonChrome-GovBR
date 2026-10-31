@@ -33,7 +33,7 @@
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
  * (Espelho integral da Central de Ajuda / Options para reconstrucao mutua)
  *
- * 1. ARQUITETURA MANIFEST V3 (CHROMIUM 116+):
+ * ARQUITETURA MANIFEST V3 (CHROMIUM 116+):
  * - "manifest_version": 3 -> Adota o padrao moderno de seguranca e isolamento
  *   do Google Chrome, substituindo Background Pages persistentes pelo Service
  *   Worker orientado a eventos ("background.js").
@@ -42,75 +42,30 @@
  *   Popover API (showPopover/hidePopover), OffscreenCanvas no Service Worker e
  *   chrome.storage.session em memoria RAM.
  *
- * 2. JUSTIFICATIVA TECNICA DAS PERMISSOES DECLARADAS:
- * - "clipboardWrite": Permite gravar o texto higienizado (ou HTML basico com
- *   negrito, italico e sublinhado quando configurado) diretamente na area de
- *   transferencia do sistema operacional sem exibir prompts de permissao.
- * - "scripting": Permite ao Service Worker registrar, atualizar e injetar
- *   dinamicamente o CSS Anti-Ampulhetas (em "document_start") e os 4 modulos JS
- *   do motor de selecao (em "document_idle"), aplicando filtragem nativa em C++
- *   por Match Patterns quando no modo "So Sites da Lista".
- * - "storage": Permite persistir na nuvem (chrome.storage.sync) e em RAM rapida
- *   (chrome.storage.session) as listas de URLs, o estado de ativacao dos modulos
- *   e a preferencia de formatacao ("Remover Formatacoes / Somente Texto" vs.
- *   "Manter Formatacoes Basicas: Negrito, Italico e Sublinhado").
- * - Permissao "activeTab" intencionalmente omitida: Como a extensao ja possui
- *   declarada "host_permissions": ["<all_urls>"] e permissao "tabs", o uso de
- *   "activeTab" era redundante e provocava a adicao automatica pelo Chrome da
- *   mensagem indesejada "Quer ter acesso a este site" no tooltip do icone.
- * - "tabs": Permite consultar a URL da aba ativa no Popup, abrir links em nova
- *   aba com Alt+Clique, acionar o painel Gemini com F1 e propagar mudancas de
- *   configuracao em tempo real para todas as abas abertas sem exigir F5.
- * - "tabGroups": Permite organizar visualmente as abas da mesma origem/tribunal
- *   em Grupos de Abas nativos coloridos do Google Chrome (Tab Groups API).
- * - "host_permissions": ["<all_urls>"] -> Necessario para que o modo "Todos os
- *   Sites" e os dominios customizados adicionados pelo usuario em Opcoes possam
- *   receber a injecao dinamica sem recompilar a extensao.
- *
- * 3. DECLARACAO ESTRITA DE CONTENT SCRIPTS (CHROME 116+):
- * - "content_scripts": Injeta os modulos da suite diretamente em todas as paginas,
- *   subframes, iframes, about:blank e blobs de visualizadores de PDF (all_frames,
- *   match_about_blank e match_origin_as_fallback), garantindo operacao imediata
- *   durante a navegacao sem depender de acionamento do Service Worker.
- *
  * NOTA DE PRODUCAO: Caso o carregador de extensoes descompactadas do Chrome
  * exija JSON estrito sem comentarios no topo, salve no disco apenas o objeto
  * delimitado entre as chaves { ... } abaixo.
  * ========================================================================== */
 {
   "manifest_version": 3,
-  "name": "Sele\u00e7\u00e3o/C\u00f3pia de Textos Aprimorada",
-  "short_name": "Sele\u00e7\u00e3o/C\u00f3pia Aprimorada",
-  "version": "2026.10.28.1",
-  "description": "Sele\u00e7\u00e3o, Valida\u00e7\u00e3o e C\u00f3pia de Textos Aprimorada.",
+  "name": "JusGovBR — Seleção/Cópia Inteligente",
+  "short_name": "JusGovBR",
+  "version": "2026.10.31.1",
+  "description": "JusGovBR — Seleção/Cópia Inteligente",
   "author": "smarca@gmail.com",
   "minimum_chrome_version": "116",
   "permissions": [
     "clipboardWrite",
     "scripting",
-    "storage",
     "tabs",
-    "tabGroups"
+    "tabGroups",	
+    "contextMenus",
+    "storage",
+	"windows", 
+	"webNavigation"	
   ],
   "host_permissions": [
-    "<all_urls>"
-  ],
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/mod-copia/ConstantesPadroes.js",
-        "src/mod-copia/AvisoFlutuante.js",
-        "src/mod-copia/AcumuladorCopia.js",
-        "src/mod-copia/SelecionarCopiar.js"
-      ],
-      "all_frames": true,
-      "match_about_blank": true,
-      "match_origin_as_fallback": true,
-      "run_at": "document_start"
-    }
+    "https://*/*"
   ],
   "background": {
     "service_worker": "src/cfg/background.js"
@@ -121,7 +76,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "Sele\u00e7\u00e3o/C\u00f3pia Aprimorada \u2014 Ativo (Global)\n(1 clique: abrir popup)",
+    "default_title": "JusGovBR — Seleção/Cópia Inteligente",
     "default_popup": "src/cfg/popup.html"
   },
   "icons": {
