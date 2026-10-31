@@ -11,6 +11,7 @@
         "git"
     ],
     "git.useEditorAsCommitInput": false,
+    "git.commitTemplate": "Sincronismo Manual",
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.postCommitCommand": "sync",
