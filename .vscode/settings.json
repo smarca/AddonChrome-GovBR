@@ -16,5 +16,9 @@
     "git.postCommitCommand": "sync",
     "git.suggestSmartCommit": false,
     "git.terminalGitEditor": false,
-    "git.autofetch": true
+    "git.autofetch": true,
+    "files.autoGuessEncoding": true,
+    "files.candidateGuessEncodings": [
+        "windows1252"
+    ]
 }

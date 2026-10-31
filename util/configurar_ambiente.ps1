@@ -59,3 +59,4 @@ if (Test-Path $origemGlobal) {
 }
 
 Write-Host "Ambiente configurado. Reinicie a IDE (Reload Window) para aplicar." -ForegroundColor Green
+
