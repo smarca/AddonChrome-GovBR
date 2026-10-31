@@ -3557,6 +3557,173 @@
                 'Separação formal entre aplicarSelecaoDOM e executarCopiaDeSelecao, distinção Leitura/PDF vs UI estrita e backup do clipboard simulado (Ctrl + Botão do Meio)',
                 { falhas: falhasSeparacaoUiPdfClip }
             );
+
+            /* ==============================================================
+             * TESTE DE AUTO-SELEÇÃO DE DATAS, HORAS, COMBINAÇÕES E NÚMEROS EM INTERFACES (REGRA SEMIFLEXÍVEL)
+             * ============================================================== */
+            let falhasAutoSelecaoInterface = 0;
+            if (!motorTeste ||
+                typeof motorTeste.isComponenteBotaoOuFormularioEstrito !== 'function' ||
+                typeof motorTeste.localizarBlocoForenseAutoSelecionavelEmInterface !== 'function') {
+                falhasAutoSelecaoInterface++;
+            } else {
+                const containerPjeInterface = document.createElement('div');
+                containerPjeInterface.innerHTML = `
+                    <div id="detalheDocumento:j_id477" style="cursor: pointer;" onclick="void(0)">
+                        <div id="div-juntado-pje">Juntado por LUCIANO HENRIQUE SOARES DE OLIVEIRA AIRES - POLO ATIVO - ADVOGADO em 22/10/2026 13:27:16</div>
+                    </div>
+                    <h3><a href="#doc" id="link-titulo-pje"><span title="2297533315 - Pedido de homologação de acordo">2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16</span></a></h3>
+                    <div class="media-body" onclick="void(0)">
+                        <span id="span-data-abrev" class="text-muted data-interna">22 out. 2026</span>
+                        <span id="span-autuacao-abrev">06 abr. 2026</span>
+                        <span id="span-intimacao-num">PUBLICADO INTIMAÇÃO EM 29/10/2026</span>
+                        <small id="small-hora" class="text-muted pull-right">05:19</small>
+                    </div>
+                    <div id="poloAtivo"><table><tbody><tr><td><span><span id="span-polo-cpf">JOSE RENATO CONCEICAO NONATO - CPF: 258.198.013-34 (AUTOR)</span></span></td></tr></tbody></table></div>
+                    <button id="btn-acao-estrito" type="button">22/10/2026</button>
+                    <input id="input-form-estrito" type="text" value="29/10/2026" />
+                `;
+                document.body.appendChild(containerPjeInterface);
+
+                try {
+                    const divJuntado = containerPjeInterface.querySelector('#div-juntado-pje');
+                    const linkTitulo = containerPjeInterface.querySelector('#link-titulo-pje span');
+                    const spanDataAbrev = containerPjeInterface.querySelector('#span-data-abrev');
+                    const spanHora = containerPjeInterface.querySelector('#small-hora');
+                    const spanPoloCpf = containerPjeInterface.querySelector('#span-polo-cpf');
+                    const btnEstrito = containerPjeInterface.querySelector('#btn-acao-estrito');
+                    const inputEstrito = containerPjeInterface.querySelector('#input-form-estrito');
+
+                    /* 1. Elementos de texto/containers de interface NÃO são botões nem forms estritos */
+                    if (motorTeste.isComponenteBotaoOuFormularioEstrito(divJuntado)) falhasAutoSelecaoInterface++;
+                    if (motorTeste.isComponenteBotaoOuFormularioEstrito(linkTitulo)) falhasAutoSelecaoInterface++;
+                    if (motorTeste.isComponenteBotaoOuFormularioEstrito(spanDataAbrev)) falhasAutoSelecaoInterface++;
+                    if (motorTeste.isComponenteBotaoOuFormularioEstrito(spanHora)) falhasAutoSelecaoInterface++;
+                    if (motorTeste.isComponenteBotaoOuFormularioEstrito(spanPoloCpf)) falhasAutoSelecaoInterface++;
+
+                    /* 2. Botões e controles de formulário SÃO estritamente protegidos */
+                    if (!motorTeste.isComponenteBotaoOuFormularioEstrito(btnEstrito)) falhasAutoSelecaoInterface++;
+                    if (!motorTeste.isComponenteBotaoOuFormularioEstrito(inputEstrito)) falhasAutoSelecaoInterface++;
+
+                    /* 3. Datas, horas, combinações de data+hora, CPF, CNPJ e IDs em qualquer formato são auto-selecionados no clique simples
+                     *    respeitando as regras existentes:
+                     *    - clicar na data -> seleciona apenas a data;
+                     *    - clicar na hora -> seleciona apenas a hora;
+                     *    - clicar no espaço (ou 2 cliques) -> seleciona os dois (data + hora). */
+                    const casosInterface = [
+                        {
+                            texto: 'Juntado por LUCIANO HENRIQUE SOARES DE OLIVEIRA AIRES - POLO ATIVO - ADVOGADO em 22/10/2026 13:27:16',
+                            idx: 'Juntado por LUCIANO HENRIQUE SOARES DE OLIVEIRA AIRES - POLO ATIVO - ADVOGADO em 22/10/2026 13:27:16'.indexOf('22/10/2026') + 3,
+                            numCliques: 1,
+                            esperado: '22/10/2026'
+                        },
+                        {
+                            texto: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16',
+                            idx: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16'.indexOf('13:27:16') + 3,
+                            numCliques: 1,
+                            esperado: '13:27:16'
+                        },
+                        {
+                            texto: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16',
+                            idx: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16'.indexOf(' 13:27:16'),
+                            numCliques: 1,
+                            esperado: '22/10/2026 13:27:16'
+                        },
+                        {
+                            texto: 'Protocolado em 05/10/2026 20:38:19 nos autos',
+                            idx: 'Protocolado em 05/10/2026 20:38:19 nos autos'.indexOf('05/10/2026') + 2,
+                            numCliques: 1,
+                            esperado: '05/10/2026'
+                        },
+                        {
+                            texto: 'Protocolado em 05/10/2026 20:38:19 nos autos',
+                            idx: 'Protocolado em 05/10/2026 20:38:19 nos autos'.indexOf('20:38:19') + 2,
+                            numCliques: 1,
+                            esperado: '20:38:19'
+                        },
+                        {
+                            texto: 'Protocolado em 05/10/2026 20:38:19 nos autos',
+                            idx: 'Protocolado em 05/10/2026 20:38:19 nos autos'.indexOf(' 20:38:19'),
+                            numCliques: 1,
+                            esperado: '05/10/2026 20:38:19'
+                        },
+                        {
+                            texto: 'Protocolado em 05/10/2026 20:38:19 nos autos',
+                            idx: 'Protocolado em 05/10/2026 20:38:19 nos autos'.indexOf('05/10/2026') + 2,
+                            numCliques: 2,
+                            esperado: '05/10/2026 20:38:19'
+                        },
+                        {
+                            texto: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16',
+                            idx: '2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16'.indexOf('2297533315') + 1,
+                            numCliques: 1,
+                            esperado: '2297533315'
+                        },
+                        {
+                            texto: 'PUBLICADO INTIMAÇÃO EM 29/10/2026',
+                            idx: 'PUBLICADO INTIMAÇÃO EM 29/10/2026'.indexOf('29/10/2026') + 1,
+                            numCliques: 1,
+                            esperado: '29/10/2026'
+                        },
+                        {
+                            texto: '22 out. 2026',
+                            idx: '22 out. 2026'.indexOf('out.') + 1,
+                            numCliques: 1,
+                            esperado: '22 out. 2026'
+                        },
+                        {
+                            texto: 'Autuação 06 abr. 2026',
+                            idx: 'Autuação 06 abr. 2026'.indexOf('06 abr.') + 1,
+                            numCliques: 1,
+                            esperado: '06 abr. 2026'
+                        },
+                        {
+                            texto: '05:19',
+                            idx: '05:19'.indexOf('05:19') + 1,
+                            numCliques: 1,
+                            esperado: '05:19'
+                        },
+                        {
+                            texto: 'JOSE RENATO CONCEICAO NONATO - CPF: 258.198.013-34 (AUTOR)',
+                            idx: 'JOSE RENATO CONCEICAO NONATO - CPF: 258.198.013-34 (AUTOR)'.indexOf('258.198.013-34') + 1,
+                            numCliques: 1,
+                            esperado: '258.198.013-34'
+                        },
+                        {
+                            texto: 'INSTITUTO NACIONAL DO SEGURO SOCIAL - INSS - CNPJ: 29.979.036/0001-40 (REU)',
+                            idx: 'INSTITUTO NACIONAL DO SEGURO SOCIAL - INSS - CNPJ: 29.979.036/0001-40 (REU)'.indexOf('29.979.036/0001-40') + 1,
+                            numCliques: 1,
+                            esperado: '29.979.036/0001-40'
+                        }
+                    ];
+
+                    for (const c of casosInterface) {
+                        const res = motorTeste.localizarBlocoForenseAutoSelecionavelEmInterface(c.texto, c.idx, c.numCliques, false);
+                        const extraido = res ? c.texto.substring(res.inicio, res.fim).trim() : '';
+                        if (extraido !== c.esperado) {
+                            falhasAutoSelecaoInterface++;
+                        }
+                    }
+
+                    /* 4. Palavras comuns na interface (ex: "Juntado", "Pedido") retornam null no clique simples sem teclas */
+                    const txtGeral = 'Juntado por LUCIANO HENRIQUE SOARES DE OLIVEIRA AIRES - POLO ATIVO - ADVOGADO em 22/10/2026 13:27:16';
+                    const resPalavraComum = motorTeste.localizarBlocoForenseAutoSelecionavelEmInterface(txtGeral, 2, 1, false);
+                    if (resPalavraComum !== null) {
+                        falhasAutoSelecaoInterface++;
+                    }
+                } finally {
+                    if (containerPjeInterface.parentNode) {
+                        containerPjeInterface.parentNode.removeChild(containerPjeInterface);
+                    }
+                }
+            }
+
+            registrar(
+                falhasAutoSelecaoInterface === 0,
+                'AUTO_SELECAO_DATAS_HORAS_NUMEROS_EM_INTERFACES_SEMIFLEXIVEL',
+                'Auto-seleção por clique simples em datas, horas, combinações (22/10/2026 13:27:16, 22 out. 2026, 05:19), CPF, CNPJ e IDs em interfaces (exceto botões e forms)',
+                { falhas: falhasAutoSelecaoInterface }
+            );
         }
 
         /* ==================================================================

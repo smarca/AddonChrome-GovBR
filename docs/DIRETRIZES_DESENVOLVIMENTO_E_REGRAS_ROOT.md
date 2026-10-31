@@ -593,6 +593,58 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
   * Expandir a categorização e a máscara regex para **"Ato Adm:"** de forma universal, contemplando qualquer órgão, autarquia, tribunal ou ministério da administração pública.
   * O padrão deve suportar dinamicamente siglas e subdivisões fracionadas em barras de múltiplos níveis (ex.: `##`, `##/##`, `##/##/###/###`, como `PRES/INSS`, `DG/DPF`, `SAJ/SG/PR`, `SGP/SEGES/MGI`, etc.), reconhecendo número e ano (`nº 128/2022`) e capturando a menção do ato administrativo normativo de forma completa e íntegra.
 
+### 6.20 Identificação Única de Componentes (`Ctrl + Alt + Shift + Clique`) e Mapeamento Manual Avançado de Elementos (Interface vs. Textual)
+- **Contexto e Objetivo Operacional:**
+  * Permitir que usuários avançados identifiquem elementos do DOM com unicidade cirúrgica (similar às opções de "Copiar" do DevTools F12 do Chrome) e possam cadastrar regras locais explícitas para forçar o comportamento do elemento como **Interface** ou **Textual**, corrigindo manualmente casos específicos de funcionamento da aplicação web.
+- **1. Atalho de Inspeção e Captura de Identificador Único (`Ctrl + Alt + Shift + Clique`):**
+  * Ao pressionar `Ctrl + Alt + Shift` e clicar com o mouse sobre qualquer componente de tela ou elemento de texto, o addon identifica o elemento em sua unicidade e extrai/copia seu caminho/seletor único (nos moldes do menu *Copy* do Chrome DevTools F12).
+  * **Nota de Conciliação com Acumulador:** Verificar e harmonizar com o Modo Baralho atual do Acumulador (`Ctrl + Alt + Shift` em `SelecionarCopiar.js` / `AcumuladorCopia.js`), definindo se a captura de seletor atua quando não há fila de acumulação ativa, se abre um seletor/copia o caminho em formato configurável ou se substitui/complementa o gatilho.
+- **2. Formatos de Identificação e Motores de Resolução no DOM:**
+  * O sistema deve suportar os 4 estilos clássicos de identificação de elementos, resolvendo-os pelos motores nativos adequados do navegador:
+    1. **Seletor Simplificado (CSS Selector):** ex.: `#detalheDocumento\:j_id477 > div`, `body`, `menu`. Resolvido via `document.querySelector()` / `document.querySelectorAll()` ou `element.matches()` / `element.closest()`.
+    2. **Caminho JS (JS Path):** ex.: `document.querySelector("#detalheDocumento\\:j_id477 > div")`. Extraído/avaliado com segurança extraindo o seletor interno para `querySelector` (sem `eval` inseguro em páginas de terceiros, compatível com CSP do Manifest V3).
+    3. **XPath Simplificado (XPath Relativo por ID):** ex.: `//*[@id="detalheDocumento:j_id477"]/div`, `//div[@id="menu"]`. Resolvido via **segundo motor nativo**: `document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)`.
+    4. **XPath Completo (Full XPath Absoluto):** ex.: `/html/body/div[1]/div[2]/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/form[1]/form/div[3]/div[2]/div`, `/html/body`. Resolvido também via `document.evaluate(...)`.
+  * **Caso Real Imediato de Uso (Pré-cadastrado / Homologação Obrigatória como Tipo Textual ou Semiflexível para Clique Simples):**
+    * O motor deverá aceitar e categorizar imediatamente estes caminhos reais do PJe (permitindo seleção e cópia com 1 clique simples sobre dados/máscaras úteis ou palavras dentro deles e de seus filhos):
+      - `//*[@id="detalheDocumento:j_id477"]/div` (XPath Simplificado — Detalhe do Documento)
+      - `/html/body/div[1]/div[2]/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/form[1]/form/div[3]/div[2]/div` (XPath Completo — Detalhe do Documento)
+      - `//*[@id="poloAtivo"]/table/tbody/tr/td/span/span` (XPath Simplificado — Polo Ativo / Partes e CPF)
+      - `/html/body/div[1]/div[1]/div[1]/form[1]/ul/li/ul/li/div[3]/table/tbody/tr/td/span/span` (XPath Completo — Polo Ativo / Partes e CPF)
+- **3. Grupo Recolhido para Usuários Experientes em Configurações Avançadas (`options.html`):**
+  * Localizado dentro de **Configurações Avançadas**, posicionado **sempre como o último grupo**, **não numerado** e **sempre recolhido inicialmente** (mesmo ao expandir "Configurações Avançadas", este subgrupo permanece recolhido até que o usuário clique nele diretamente — idêntico ao comportamento da própria seção de Configurações Avançadas).
+  * **Estrutura de Cada Regra Cadastrada (Suporte a Múltiplas Regras):**
+    * **Campo de Expressão/Caminho:** Onde o usuário cola qualquer um dos 4 estilos (XPath Simplificado, XPath Completo, Caminho JS ou Seletor Simplificado), com detecção automática ou seleção do estilo.
+    * **Declaração Explícita de Tipo (3 Modos — Textual, Interface ou Regra Semiflexível):**
+      1. **Tipo Textual:** Aplicam-se rigorosamente todas as regras de conteúdo/leitura textual (1 clique seleciona/copia palavras ou blocos e mantém seleção ativa no DOM).
+      2. **Tipo Interface:** Aplicam-se rigorosamente todas as regras de sistema/interface (1 clique não copia palavras comuns; exige `Alt + Clique` ou arrasto; zero retenção de seleção azul).
+      3. **Regra Semiflexível (Restrita a Máscaras/Blocos Definidos):**
+         - Não é tratada nem como interface pura nem como texto corrido comum, mas sim **de acordo com o conteúdo exato onde foi clicado, restrito às máscaras/blocos definidos no catálogo forense** (ex.: datas completas `"22/10/2026 13:27:16"`, datas abreviadas `"22 out. 2026"`, horários `"05:19"`, IDs `"2297533315"`, CPFs `"258.198.013-34"` ou `"CPF: 258.198.013-34"`, processos CNJ, CNPJ, moedas, etc.).
+         - **Comportamento no 1 Clique Simples (sem teclas modificadoras):** O motor observa especificamente onde foi clicado (inclusive para qualquer `div`, `span`, `small` ou dentro de cabeçalhos/links `<a>`/`<h3>`). **Se o ponto clicado for um bloco/máscara definida**, **ele copia imediatamente para a Área de Transferência, exibe apenas o Flash Verde rápido e NÃO seleciona o texto via sistema (`removeAllRanges()`)**. **Se NÃO for bloco/máscara** (ex.: clicar em `"Juntado"`, `"LUCIANO"`, `"Pedido"`, `"Juntada"`), **não faz nada com clique único** (preservando 100% o clique nativo, copiando texto comum somente se `Alt` estiver pressionado).
+         - **Exemplos HTML Reais de Homologação Obrigatória para Regra Semiflexível e Mapeamento XPath:**
+           ```html
+           <div>Juntado por LUCIANO HENRIQUE SOARES DE OLIVEIRA AIRES - POLO ATIVO - ADVOGADO em 22/10/2026 13:27:16</div>
+           ```
+           ```html
+           <h3><a><span class="" title="2297533315 - Pedido de homologação de acordo">
+               2297533315 - Pedido de homologação de acordo em 22/10/2026 13:27:16
+           </span></a></h3>
+           ```
+           ```html
+           <span class="text-upper texto-movimento">Juntada de Pedido de homologação de acordo</span>
+           <span class="" title="">2297533315 - Pedido de homologação de acordo</span>
+           <div class="media-body">
+               <span class="text-muted data-interna">22 out. 2026</span>
+           </div>
+           <span class="text-muted data-interna">22 out. 2026</span>
+           <small class="text-muted pull-right">05:19</small>
+           <span class=""><span class="">JOSE RENATO CONCEICAO NONATO - CPF: 258.198.013-34 (AUTOR)</span></span>
+           ```
+    * **Escopo de Herança (Filhos):** Indicação (checkbox/switch) se a regra vale também para os **filhos** (objetos/elementos HTML descendentes do nó mapeado) ou estritamente para o elemento exato.
+    * **Estado da Regra:** Indicação (checkbox/switch) se a regra está **Ativa** ou **Inativa**.
+  * **Importação e Exportação em JSON:**
+    * Botões **bem pequenos e discretos**, contendo **apenas os símbolos** de **Exportar** (ex.: `📤` / `⬇️`) e **Importar** (ex.: `📥` / `⬆️`) no cabeçalho/barra do grupo, permitindo salvar e carregar essas definições locais em arquivo `.json`.
+
 ---
 
 ### 6.19 Status de Implementacao (2026-10-30)

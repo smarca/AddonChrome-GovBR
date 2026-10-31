@@ -868,6 +868,136 @@
     }
 
     /*
+     * FUNCAO: isComponenteBotaoOuFormularioEstrito
+     * DIRETRIZ ROOT 2.17 e 6.20: Identifica estritamente componentes de acao interativa
+     * que funcionam por clique de comando ou entrada de dados (botoes <button>, [role="button"],
+     * icones de acao, controles de formulario <input>, <select>, <textarea>, <option>, <label>,
+     * gatilhos de dropdown [aria-haspopup], switches, checkboxes, radios e toolbars).
+     * Permite distinguir botoes/forms estritos de containers/textos de interface (como <div>,
+     * <span>, <small>, <td>, <h3> ou links informativos no PJe) onde mascaras forenses
+     * (datas, horas, data+hora, CPF, CNPJ, processos CNJ, IDs) podem ser auto-copiadas no clique simples.
+     */
+    function isComponenteBotaoOuFormularioEstrito(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+
+        const TAGS_BOTAO_OU_FORM = new Set([
+            'BUTTON', 'INPUT', 'SELECT', 'OPTION', 'OPTGROUP', 'TEXTAREA',
+            'LABEL', 'SUMMARY', 'DETAILS', 'MAT-ICON', 'G-ICON', 'MD-ICON',
+            'SVG', 'PATH', 'CANVAS', 'AUDIO', 'VIDEO', 'MENU', 'DIALOG'
+        ]);
+        const ROLES_BOTAO_OU_FORM = new Set([
+            'button', 'switch', 'checkbox', 'radio', 'combobox', 'listbox',
+            'option', 'slider', 'spinbutton', 'scrollbar', 'toolbar', 'tab',
+            'menuitem', 'menuitemcheckbox', 'menuitemradio', 'searchbox', 'textbox'
+        ]);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 15) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_BOTAO_OU_FORM.has(tagUpper)) return true;
+
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_BOTAO_OU_FORM.has(role)) return true;
+
+                if (
+                    atual.hasAttribute('aria-haspopup') ||
+                    atual.hasAttribute('aria-expanded') ||
+                    atual.hasAttribute('aria-pressed') ||
+                    atual.hasAttribute('aria-checked')
+                ) {
+                    return true;
+                }
+
+                if (tagUpper.indexOf('-') !== -1) {
+                    const tagLower = tagUpper.toLowerCase();
+                    if (
+                        tagLower.indexOf('-button') !== -1 ||
+                        tagLower.indexOf('-btn') !== -1 ||
+                        tagLower.indexOf('-picker') !== -1 ||
+                        tagLower.indexOf('-switcher') !== -1 ||
+                        tagLower.indexOf('-selector') !== -1 ||
+                        tagLower.indexOf('-dropdown') !== -1 ||
+                        tagLower.indexOf('-toggle') !== -1 ||
+                        tagLower.indexOf('-icon') !== -1 ||
+                        tagLower.indexOf('-toolbar') !== -1 ||
+                        tagLower.indexOf('-menu') !== -1
+                    ) {
+                        return true;
+                    }
+                }
+
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (cls && (
+                    /\bbtn\b/.test(cls) ||
+                    /\bbutton\b/.test(cls) ||
+                    cls.includes('btn-') ||
+                    cls.includes('mat-button') ||
+                    cls.includes('mat-icon-button') ||
+                    cls.includes('mat-raised-button') ||
+                    cls.includes('mat-flat-button') ||
+                    cls.includes('mat-stroked-button') ||
+                    cls.includes('p-button') ||
+                    cls.includes('ui-button') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('dropdown-toggle') ||
+                    cls.includes('toolbarbutton') ||
+                    cls.includes('fa-') ||
+                    cls.includes('glyphicon') ||
+                    cls.includes('material-icons')
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: localizarBlocoForenseAutoSelecionavelEmInterface
+     * DIRETRIZ ROOT 6.20: Verifica se a posicao clicada dentro de um container de interface
+     * (como cabeçalho de documento PJe, arvore de timeline, <div>, <span>, <small>, <td> ou <a>)
+     * incide sobre uma mascara/bloco estruturado forense (datas em qualquer formato, horas,
+     * combinacoes de data+hora, CPF, CNPJ, processos CNJ, IDs numericos, protocolos, moedas, etc.).
+     * Respeita integralmente as regras de selecao do motor (Passo 7.2.4):
+     * - Em datas seguidas de horario (ex: "05/10/2026 20:38:19" ou "22/10/2026 13:27:16"):
+     *   * 1 clique sobre a data: seleciona apenas a data ("05/10/2026");
+     *   * 1 clique sobre a hora: seleciona apenas a hora ("20:38:19");
+     *   * 1 clique no espaco/separador entre data e hora (ou 2 cliques): seleciona os dois ("05/10/2026 20:38:19").
+     */
+    function localizarBlocoForenseAutoSelecionavelEmInterface(texto, idxCursor, numCliques = 1, combinarDataHoraNoCliqueUnico = false) {
+        if (typeof texto !== 'string' || texto.length === 0) return null;
+        if (idxCursor < 0 || idxCursor > texto.length) return null;
+
+        const ehDuplo = numCliques >= 2;
+        const charNoCursor = texto[idxCursor] || '';
+        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+
+        let res = tentarExpandirPadraoComposto(texto, idxCursor, ehDuplo || clicouEmEspaco, ehDuplo);
+
+        /* Somente se combinarDataHoraNoCliqueUnico for explicitamente solicitado como true,
+         * forca a combinacao no clique simples; por padrao (false), respeita 100% a regra de
+         * data isolada / hora isolada / espaco ou 2 cliques para ambos. */
+        if (combinarDataHoraNoCliqueUnico && (!res || res.grupo === 'DATA_COM_HORARIO_CONTIGUO' || res.grupo === 'DATAS_E_HORARIOS')) {
+            const resCompostoIntegral = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
+            if (resCompostoIntegral && resCompostoIntegral.grupo === 'DATA_COM_HORARIO_CONTIGUO') {
+                res = resCompostoIntegral;
+            }
+        }
+
+        if (!res) return null;
+        const trecho = texto.substring(res.inicio, res.fim).trim();
+        if (!trecho || trecho.length < 2) return null;
+        return res;
+    }
+
+    /*
      * FUNCAO: isElementoOcultoNoDom
      * DIRETRIZ ROOT: Verifica se um elemento esta oculto na tela (display: none, visibility: hidden,
      * [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, opacity: 0 ou font-size: 0px)
@@ -1351,10 +1481,11 @@
 
         if (!no || no.nodeType !== Node.TEXT_NODE) {
             const containerInterativo = (elSobPonto && typeof elSobPonto.closest === 'function')
-                ? elSobPonto.closest('a, button, summary, select, option, li, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
+                ? elSobPonto.closest('a, button, summary, select, option, li, div, span, small, td, th, h1, h2, h3, h4, h5, h6, p, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
                 : null;
-            if (containerInterativo) {
-                const pt = localizarPontoTextoDentroDeElemento(containerInterativo, x, y);
+            const containerAlvo = containerInterativo || elSobPonto;
+            if (containerAlvo) {
+                const pt = localizarPontoTextoDentroDeElemento(containerAlvo, x, y);
                 if (pt) return pt;
             }
         }
@@ -3297,7 +3428,7 @@
             } catch (_) {}
         }
 
-        return { ok: true, manterSelecao };
+        return { ok: true, manterSelecao, manterSelecaoNoDom: manterSelecao };
     }
 
     /*
@@ -5450,8 +5581,12 @@
 
         /* Passo 9.6: Regra da Maozinha (cursor: pointer), Help (cursor: help), Links, Controles e Eventos (onclick, onmouse*):
          * Cliques sem teclas modificadoras sobre links, botoes, controles, elementos com cursor "maozinha"/"help"
-         * ou eventos associados JAMAIS devem selecionar ou copiar de cara — preservam 100% a acao nativa! */
-        if (!temModificadorTeclado && isElementoInterativoClicavelDireto(e.target)) {
+         * ou eventos associados JAMAIS devem selecionar ou copiar palavras comuns — preservam 100% a acao nativa!
+         * Excecao Regra Semiflexivel (Diretriz Root 6.20): Se NAO for um botao ou controle de formulario estrito
+         * (isComponenteBotaoOuFormularioEstrito === false), permite prosseguir para o Passo 9.7.1b a fim de
+         * verificar se o clique incidiu sobre uma mascara/bloco forense (datas, horas, combinacoes data+hora,
+         * CPF, CNPJ, processos CNJ, IDs), copiando-o com Flash Verde rapido e sem manter selecao do sistema. */
+        if (!temModificadorTeclado && isElementoInterativoClicavelDireto(e.target) && isComponenteBotaoOuFormularioEstrito(e.target)) {
             ignorarProximoClick = false;
             return;
         }
@@ -5623,21 +5758,28 @@
         }
 
         /* Passo 9.7.1b: Clique Simples sem Modificadores em Tela de Sistema / Interface (modais, caixas de dialogo):
-         * DIRETRIZ ROOT 2.17:
-         * - Se for link, botao, controle, icone maozinha/help ou tiver eventos (isElementoInterativoClicavelDireto):
+         * DIRETRIZ ROOT 2.17 e 6.20 (Regra Semiflexivel em Interfaces):
+         * - Se for botao ou controle de formulario estrito (isComponenteBotaoOuFormularioEstrito):
          *   ja retornou no Passo 9.6 sem fazer nada.
-         * - Se for texto estatico dentro de tela de sistema (ex: corpo de modal) e contiver mascara util / bloco estruturado
-         *   (data/hora completa, processo CNJ, CPF, CNPJ, moedas): COPIA para a Area de Transferencia e exibe Flash Verde
-         *   temporizado, SEM manter selecao na tela.
-         * - Se for palavra avulsa ou rotulo de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
-        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target);
+         * - Se for texto dentro de tela de sistema ou container de interface (ex: corpo de modal, cabecalho PJe,
+         *   arvore de timeline, <div>, <span>, <small>, <td>, <h3>, <a>) e o ponto clicado contiver mascara util /
+         *   bloco estruturado (datas em qualquer formato, horas, combinacoes de data+hora, processo CNJ, CPF, CNPJ,
+         *   IDs numericos, moedas): COPIA para a Area de Transferencia e exibe Flash Verde temporizado,
+         *   SEM manter selecao na tela.
+         * - Se for palavra avulsa ou rotulo comum de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
+        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(e.target) || isElementoInterativoClicavelDireto(e.target);
         if (ehSistemaOuUi && !temModificadorTeclado) {
-            if (e.detail === 1 && !isElementoInterativoClicavelDireto(e.target)) {
+            if ((e.detail === 1 || e.detail === 2) && !isComponenteBotaoOuFormularioEstrito(e.target)) {
                 const ponto = obterPontoDoClique(e.clientX, e.clientY);
                 if (ponto) {
                     const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
                     if (mapa) {
-                        const resComposto = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
+                        const resComposto = localizarBlocoForenseAutoSelecionavelEmInterface(
+                            mapa.texto,
+                            mapa.idxCursor,
+                            e.detail,
+                            false
+                        );
                         if (resComposto) {
                             const rangeComposto = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
                             if (rangeComposto) {
@@ -6399,9 +6541,15 @@
             const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
             if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
 
-            // Em links, botoes, icones maozinha/help ou controles clicaveis, nunca seleciona nem copia via selectionchange sem teclas modificadoras
-            if (isElementoInterativoClicavelDireto(range.commonAncestorContainer)) {
+            // Em botoes ou controles de formulario estritos, nunca seleciona nem copia via selectionchange sem teclas modificadoras
+            if (isComponenteBotaoOuFormularioEstrito(range.commonAncestorContainer)) {
                 return;
+            }
+            if (isElementoInterativoClicavelDireto(range.commonAncestorContainer)) {
+                const resBlocoSel = localizarBlocoForenseAutoSelecionavelEmInterface(textoSel, 0, 1, true);
+                if (!resBlocoSel || resBlocoSel.inicio !== 0 || resBlocoSel.fim < textoSel.length) {
+                    return;
+                }
             }
 
             // Assinatura única para evitar re-execução em loop da mesma seleção exata
@@ -7113,6 +7261,8 @@
         classificarContextoElementoAlvo,
         isElementoInterativoOuUi,
         isElementoInterativoClicavelDireto,
+        isComponenteBotaoOuFormularioEstrito,
+        localizarBlocoForenseAutoSelecionavelEmInterface,
         isContextoDeSistemaOuUi,
         isAreaLeituraOuPdfConteudo,
         isTelaSistemaEstritaParaDesselecao,
