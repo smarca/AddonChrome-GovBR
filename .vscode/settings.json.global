@@ -1,0 +1,19 @@
+{
+    "workbench.editorAssociations": {
+        "*.docx": "default"
+    },
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "workbench.editor.enablePreview": false,
+    "antigravity.autoOpenFiles": false,
+    "antigravity.autoAcceptOnChat": true,
+    "chat.editing.autoAcceptDelay": 1,
+    "jetski-web.autoOpenFiles": false,
+    "disableAutoOpenEditedFiles": true,
+    "git.autofetch": true,
+    "git.useEditorAsCommitInput": false,
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "git.postCommitCommand": "sync",
+    "git.suggestSmartCommit": false,
+    "git.terminalGitEditor": false
+}

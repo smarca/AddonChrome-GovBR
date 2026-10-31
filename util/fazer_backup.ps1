@@ -26,6 +26,16 @@ if (Test-Path $tmpDir) {
     New-Item -Path $tmpDir -ItemType Directory -Force | Out-Null
 }
 
+# 1.1 Copia do settings.json global da IDE (pasta User) para .vscode/settings.json.global
+# (garante que as configuracoes globais entrem no backup e no Git)
+$settingsGlobal = Join-Path $env:APPDATA "Antigravity IDE\User\settings.json"
+$vscodeDir = Join-Path $baseDir ".vscode"
+if (Test-Path $settingsGlobal) {
+    if (-not (Test-Path $vscodeDir)) { New-Item -Path $vscodeDir -ItemType Directory -Force | Out-Null }
+    Copy-Item -Path $settingsGlobal -Destination (Join-Path $vscodeDir "settings.json.global") -Force
+    Write-Host "settings.json global copiado para .vscode\settings.json.global" -ForegroundColor DarkGray
+}
+
 # 2. Seleciona todos os itens da raiz, aplicando os filtros estritos:
 # - Inclui arquivos e pastas de configuracao iniciados por '.' (ex: .vscode, .gitignore, etc.)
 # - Exclui apenas a pasta interna de controle do Git (.git)
