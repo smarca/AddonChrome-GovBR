@@ -18,13 +18,15 @@ $zipDestino = Join-Path $bkpDir $zipNome
 Write-Host "Iniciando backup em: $zipDestino"
 
 # Seleciona todos os itens da raiz, aplicando os filtros estritos:
+# - Inclui obrigatoriamente o diretorio .vscode
 # - Exclui a pasta bkp
-# - Exclui arquivos e pastas iniciados por '.'
+# - Exclui outros arquivos e pastas iniciados por '.' (ex: .git, .gitignore)
 # - Exclui arquivos e pastas iniciados por 'leia-me' (case-insensitive)
 # - Exclui arquivos temporarios e pastas 'tmp' (nao sujeitos a backup)
 # - Exclui pastas 'outros' (fora do backup)
-$itens = Get-ChildItem -Path $baseDir | Where-Object {
+$itens = Get-ChildItem -Path $baseDir -Force | Where-Object {
     $nome = $_.Name
+    if ($nome -ieq ".vscode") { return $true }
     if ($nome -ieq "bkp") { return $false }
     if ($nome.StartsWith(".")) { return $false }
     if ($nome -ilike "leia-me*") { return $false }

@@ -29,11 +29,12 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
    - Destino estrito: bkp/ (relativo a raiz do projeto).
    - Nomenclatura: bkp_AAAA-MM-DD_HH-MM.zip
    - Conteudo: Todos os arquivos e subdiretorios da raiz, aplicando filtros estritos:
-     (a) Exclui a propria pasta bkp;
-     (b) Exclui arquivos e pastas iniciados por '.' (ex: .vscode, .git);
-     (c) Exclui arquivos e pastas iniciados por 'leia-me' (case-insensitive);
-     (d) Exclui a pasta 'tmp' (arquivos temporarios nao sujeitos a backup);
-     (e) Exclui a pasta 'outros' (pasta auxiliar fora do backup).
+     (a) Inclui obrigatoriamente o diretorio `.vscode`;
+     (b) Exclui a propria pasta `bkp`;
+     (c) Exclui outros arquivos e pastas iniciados por `.` (ex: `.git`, `.gitignore`);
+     (d) Exclui arquivos e pastas iniciados por `leia-me` (case-insensitive);
+     (e) Exclui a pasta `tmp` (arquivos temporarios nao sujeitos a backup);
+     (f) Exclui a pasta `outros` (pasta auxiliar fora do backup).
    - Gatilhos de Execucao (Media de ~5 backups/dia em trabalho intenso):
      (a) Inicio do dia de trabalho / primeira sessao;
      (b) Periodico a cada 3 horas de trabalho ativo continuo;
