@@ -17,21 +17,13 @@ $zipDestino = Join-Path $bkpDir $zipNome
 
 Write-Host "Iniciando backup em: $zipDestino"
 
-# 1. Limpeza automatica de arquivos temporarios (pasta tmp e sobras temporarias em testes)
+# 1. Limpeza automatica de arquivos temporarios (pasta tmp)
 $tmpDir = Join-Path $baseDir "tmp"
 if (Test-Path $tmpDir) {
     Write-Host "Limpando arquivos temporarios em: $tmpDir" -ForegroundColor DarkGray
     Get-ChildItem -Path $tmpDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 } else {
     New-Item -Path $tmpDir -ItemType Directory -Force | Out-Null
-}
-
-$testesDir = Join-Path $baseDir "testes"
-if (Test-Path $testesDir) {
-    $arquivosOficiaisTestes = @("executar_auditoria.ps1", "executar_testes.html", "verificar_codificacao.ps1")
-    Get-ChildItem -Path $testesDir -Force -ErrorAction SilentlyContinue | Where-Object {
-        $arquivosOficiaisTestes -notcontains $_.Name
-    } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # 2. Seleciona todos os itens da raiz, aplicando os filtros estritos:

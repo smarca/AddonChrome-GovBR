@@ -34,7 +34,8 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
      (c) Exclui arquivos e pastas iniciados por `leia-me` (case-insensitive);
      (d) Exclui a pasta `tmp` (arquivos temporarios nao sujeitos a backup);
      (e) Exclui a pasta `outros` (pasta auxiliar fora do backup).
-   - Limpeza Automatica no Backup: Ao executar `util/fazer_backup.ps1`, todos os arquivos temporarios em `tmp/` (e eventuais sobras em `testes/`) sao limpos automaticamente antes de gerar o pacote.
+   - Limpeza Automatica no Backup: Ao executar `util/fazer_backup.ps1`, todos os arquivos temporarios em `tmp/` sao limpos automaticamente antes de gerar o pacote.
+   - Scripts Essenciais em `util/`: Todos os scripts essenciais de apoio (`executar_auditoria.ps1`, `executar_testes.html`, `verificar_codificacao.ps1`, backup, diff e patch) residem exclusivamente em `util/`. A antiga pasta `testes/` foi extinta.
    - Regra de Criacao de Arquivos Temporarios/Lixo: Qualquer arquivo temporario, log de saida de teste (como `chrome_output.txt`), rascunho de diagnostico ou arquivo diff intermediario deve ser criado exclusivamente dentro de `tmp/`.
    - Gatilhos de Execucao (Media de ~5 backups/dia em trabalho intenso):
      (a) Inicio do dia de trabalho / primeira sessao;
