@@ -10,9 +10,8 @@
         "C:/Program Files (x86)/Git/cmd/git.exe",
         "git"
     ],
-    "git-commit-template.template": "Sincronismo Manual + ${date}",
-    "gitlens.gitCommands.presets.commitMessage": "${date}",
     "git.useEditorAsCommitInput": false,
+    "git.commitTemplate": "Sincronismo Manual",
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.postCommitCommand": "sync",
