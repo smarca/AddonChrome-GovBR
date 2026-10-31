@@ -4,7 +4,12 @@
     "chat.editing.autoAcceptDelay": 1,
     "jetski-web.autoOpenFiles": false,
     "disableAutoOpenEditedFiles": true,
-    "git.path": "C:/Users/smarc/AppData/Local/Microsoft/WinGet/Packages/Git.MinGit_Microsoft.Winget.Source_8wekyb3d8bbwe/cmd/git.exe",
+    "git.path": [
+        "C:/Users/smarc/AppData/Local/Microsoft/WinGet/Packages/Git.MinGit_Microsoft.Winget.Source_8wekyb3d8bbwe/cmd/git.exe",
+        "C:/Program Files/Git/cmd/git.exe",
+        "C:/Program Files (x86)/Git/cmd/git.exe",
+        "git"
+    ],
     "git.useEditorAsCommitInput": false,
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
