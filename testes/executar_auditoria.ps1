@@ -1,8 +1,13 @@
 $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 $testesDir = $PSScriptRoot
+$baseDir = (Get-Item $testesDir).Parent.FullName
+$tmpDir = Join-Path $baseDir 'tmp'
+if (-not (Test-Path $tmpDir)) {
+    New-Item -Path $tmpDir -ItemType Directory -Force | Out-Null
+}
 $htmlFile = Join-Path $testesDir 'executar_testes.html'
 $htmlPath = 'file:///' + ($htmlFile -replace '\\', '/')
-$txtOut = Join-Path $testesDir 'chrome_output.txt'
+$txtOut = Join-Path $tmpDir 'chrome_output.txt'
 
 if (Test-Path $txtOut) {
     Remove-Item $txtOut -Force

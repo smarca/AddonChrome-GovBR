@@ -42,7 +42,7 @@ if ($ContraUltimoBackup -or (-not $Arquivo1 -and -not $Arquivo2)) {
         Expand-Archive -Path $ultimoZip.FullName -DestinationPath $tmpExtracao -Force
         
         Write-Host "Executando diff..." -ForegroundColor Cyan
-        $argsDiff = @("-u", "-r", "-N", "--strip-trailing-cr", "-x", "*.zip", "-x", "tmp", "-x", "bkp", "-x", ".vscode", $tmpExtracao, $baseDir)
+        $argsDiff = @("-u", "-r", "-N", "--strip-trailing-cr", "-x", "*.zip", "-x", "tmp", "-x", "bkp", "-x", ".git", $tmpExtracao, $baseDir)
         $diffOutput = & $diffExe @argsDiff
         
         if ($diffOutput) {
@@ -50,7 +50,9 @@ if ($ContraUltimoBackup -or (-not $Arquivo1 -and -not $Arquivo2)) {
             $diffFormatado = $diffOutput -replace [regex]::Escape($tmpExtracao), 'a' -replace [regex]::Escape($baseDir), 'b'
             
             if ($SalvarEmArquivo) {
-                $diffFile = Join-Path $baseDir "mudancas_projeto.diff"
+                $tmpDirDiff = Join-Path $baseDir "tmp"
+                if (-not (Test-Path $tmpDirDiff)) { New-Item -Path $tmpDirDiff -ItemType Directory -Force | Out-Null }
+                $diffFile = Join-Path $tmpDirDiff "mudancas_projeto.diff"
                 [System.IO.File]::WriteAllText($diffFile, ($diffFormatado -join "`n"), [System.Text.Encoding]::UTF8)
                 Write-Host "Diff salvo em: $diffFile" -ForegroundColor Green
             } else {
@@ -81,7 +83,9 @@ if ($Arquivo1 -and $Arquivo2) {
     $diffOutput = & $diffExe -u --strip-trailing-cr $Arquivo1 $Arquivo2
     if ($diffOutput) {
         if ($SalvarEmArquivo) {
-            $diffFile = Join-Path $baseDir "comparacao.diff"
+            $tmpDirDiff = Join-Path $baseDir "tmp"
+            if (-not (Test-Path $tmpDirDiff)) { New-Item -Path $tmpDirDiff -ItemType Directory -Force | Out-Null }
+            $diffFile = Join-Path $tmpDirDiff "comparacao.diff"
             [System.IO.File]::WriteAllText($diffFile, ($diffOutput -join "`n"), [System.Text.Encoding]::UTF8)
             Write-Host "Diff salvo em: $diffFile" -ForegroundColor Green
         } else {

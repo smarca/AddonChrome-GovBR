@@ -28,13 +28,14 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
 8. Backup Padronizado Obrigatorio (Politica Inteligente de Cadencia Operacional):
    - Destino estrito: bkp/ (relativo a raiz do projeto).
    - Nomenclatura: bkp_AAAA-MM-DD_HH-MM.zip
-   - Conteudo: Todos os arquivos e subdiretorios da raiz, aplicando filtros estritos:
-     (a) Inclui obrigatoriamente o diretorio `.vscode`;
-     (b) Exclui a propria pasta `bkp`;
-     (c) Exclui outros arquivos e pastas iniciados por `.` (ex: `.git`, `.gitignore`);
-     (d) Exclui arquivos e pastas iniciados por `leia-me` (case-insensitive);
-     (e) Exclui a pasta `tmp` (arquivos temporarios nao sujeitos a backup);
-     (f) Exclui a pasta `outros` (pasta auxiliar fora do backup).
+   - Conteudo: Todos os arquivos e subdiretorios da raiz (incluindo arquivos e pastas iniciados por `.`, como `.vscode` e `.gitignore`), aplicando apenas os filtros de exclusao:
+     (a) Exclui a propria pasta `bkp`;
+     (b) Exclui o repositorio interno `.git`;
+     (c) Exclui arquivos e pastas iniciados por `leia-me` (case-insensitive);
+     (d) Exclui a pasta `tmp` (arquivos temporarios nao sujeitos a backup);
+     (e) Exclui a pasta `outros` (pasta auxiliar fora do backup).
+   - Limpeza Automatica no Backup: Ao executar `util/fazer_backup.ps1`, todos os arquivos temporarios em `tmp/` (e eventuais sobras em `testes/`) sao limpos automaticamente antes de gerar o pacote.
+   - Regra de Criacao de Arquivos Temporarios/Lixo: Qualquer arquivo temporario, log de saida de teste (como `chrome_output.txt`), rascunho de diagnostico ou arquivo diff intermediario deve ser criado exclusivamente dentro de `tmp/`.
    - Gatilhos de Execucao (Media de ~5 backups/dia em trabalho intenso):
      (a) Inicio do dia de trabalho / primeira sessao;
      (b) Periodico a cada 3 horas de trabalho ativo continuo;
