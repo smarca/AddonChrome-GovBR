@@ -1,4 +1,4 @@
-﻿# âš–ï¸ JusGovBR â€” SeleÃ§Ã£o/CÃ³pia Inteligente & PJe Turbo
+# âš–ï¸ JusGovBR â€” SeleÃ§Ã£o/CÃ³pia Inteligente & PJe Turbo
 
 **JusGovBR (SeleÃ§Ã£o, ValidaÃ§Ã£o e CÃ³pia de Textos Aprimorada)** Ã© uma extensÃ£o de alta performance para navegadores baseados em Chromium (Google Chrome, Microsoft Edge, Brave â€” versÃ£o 116+ / Manifest V3), projetada especificamente para acelerar a rotina de **magistrados, assessores, servidores pÃºblicos, advogados e operadores do Direito** que atuam diariamente em sistemas judiciais e governamentais brasileiros (como **PJe**, **SEI!**, **e-Proc**, **Projudi** e portais `.jus.br` / `.gov.br`), alÃ©m de funcionar em qualquer pÃ¡gina web ou visualizador de PDF.
 
