@@ -1,5 +1,5 @@
 # Antigravity Agent Guidelines for JusGovBR
-
+ 
 ## Automated Code Changes and Editor Non-Intrusiveness
 - Never request manual approval or open file review tabs in the IDE for routine code modifications.
 - Apply all changes directly and automatically to the workspace files.
@@ -11,6 +11,6 @@
 - Portability: every preference (IDE, Git, project) must work when the folder is opened on another computer. Machine-level settings (global Git config, user environment variables, global IDE settings) are restored by `util/configurar_ambiente.ps1` (run once per new PC, idempotent). Any new machine-level preference added must also be added to that script. Never put machine-specific absolute paths in `.vscode/settings.json` without fallbacks.
 - All essential helper scripts (audit runner, encoding verifier, backup, diff, patch) live strictly in `util/`; the old `testes/` folder no longer exists.
 - All temporary/scratch/log files (including headless Chrome test outputs like `chrome_output.txt`) must be created strictly within `tmp/` (excluded from backups). Any folder named `outros` is also excluded from backups. Running `util/fazer_backup.ps1` automatically cleans `tmp/` and includes all dot-prefixed configuration files/folders (such as `.vscode/` and `.gitignore`, excluding only `.git/`).
-- **Visual Format Standard for Pending & Implemented Actions:** Whenever presenting pending actions, implementation plans, or completed action summaries to the user, ALWAYS use the structured Markdown table format (`📋 Próximas ações pendentes` / `✅ Ações implementadas` with columns `# | Descrição | Área`) followed by a concise bulleted summary of key details.
+- **Visual Format Standard for Pending & Implemented Actions:** Whenever presenting pending actions, implementation plans, or completed action summaries to the user, ALWAYS use the structured Markdown table format (`📋 Próximas ações pendentes` / `✅ Ações implementadas` with columns `# | Descrição | Ýrea`) followed by a concise bulleted summary of key details.
 
 
