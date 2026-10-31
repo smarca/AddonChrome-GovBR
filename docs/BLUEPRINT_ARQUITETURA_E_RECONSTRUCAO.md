@@ -3,7 +3,7 @@ Projeto: JusGovBR - Copia Inteligente & PJe Turbo (Manifest V3 - Chromium 116+)
 Autor / Contato: smarca@gmail.com
 Finalidade: Fonte unica da verdade (Single Source of Truth) para arquitetura, regras root imutaveis e integridade dos 10 modulos.
 Documento Complementar: [DIRETRIZES_DESENVOLVIMENTO_E_REGRAS_ROOT.md](DIRETRIZES_DESENVOLVIMENTO_E_REGRAS_ROOT.md) (Diretrizes de Desenvolvimento, Logs, Regras Root e Suite de Testes).
-
+ 
 ---
 
 ## 1. DIRETIVAS ROOT DE ENGENHARIA E OPERACAO
