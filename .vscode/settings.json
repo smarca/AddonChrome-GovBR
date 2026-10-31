@@ -3,9 +3,13 @@
     "antigravity.autoAcceptOnChat": true,
     "chat.editing.autoAcceptDelay": 1,
     "jetski-web.autoOpenFiles": false,
+    "disableAutoOpenEditedFiles": true,
     "git.path": "C:/Users/smarc/AppData/Local/Microsoft/WinGet/Packages/Git.MinGit_Microsoft.Winget.Source_8wekyb3d8bbwe/cmd/git.exe",
     "git.useEditorAsCommitInput": false,
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
+    "git.postCommitCommand": "sync",
+    "git.suggestSmartCommit": false,
+    "git.terminalGitEditor": false,
     "git.autofetch": true
 }
