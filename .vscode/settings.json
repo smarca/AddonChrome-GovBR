@@ -1,0 +1,110 @@
+// ==============================================================================
+// ARQUIVO: .vscode/settings.json (Configurações Locais do Workspace JusGovBR)
+// LOCALIZAÇÃO NO PROJETO: Z:\AddonChrome-GovBR\.vscode\settings.json
+// ==============================================================================
+
+{
+    // Impede a IDE de abrir automaticamente abas de arquivos modificados pela IA
+    "antigravity.autoOpenFiles": false,
+
+    // Aceita automaticamente edições sugeridas pela IA no chat
+    "antigravity.autoAcceptOnChat": true,
+
+    // Aceita automaticamente edições aplicadas no editor sem exigir Accept All manual
+    "antigravity.autoAcceptEdits": true,
+
+    // Tempo de delay (em segundos) para auto-aceite de edições no chat (0 = imediato)
+    "chat.editing.autoAcceptDelay": 0,
+
+    // Salva automaticamente arquivos com edições geradas pela IA
+    "chat.editing.alwaysSaveWithGeneratedChanges": true,
+
+    // Desativa abertura automática de arquivos no módulo web jetski
+    "jetski-web.autoOpenFiles": false,
+
+    // Bloqueia a abertura automática de abas no editor para arquivos editados pela IA
+    "disableAutoOpenEditedFiles": true,
+
+    // Abre arquivos em modo pré-visualização (reutiliza a mesma aba até edição fixa)
+    "workbench.editor.enablePreview": true,
+
+    // Habilita limite rígido de abas abertas simultaneamente na IDE
+    "workbench.editor.limit.enabled": true,
+
+    // Quantidade máxima de abas abertas no editor (evita acúmulo e poluição)
+    "workbench.editor.limit.value": 3,
+
+    // Aplica o limite de abas individualmente por grupo de editores
+    "workbench.editor.limit.perEditorGroup": true,
+
+    // Fecha automaticamente a aba do arquivo no editor quando ele for excluído no disco
+    "workbench.editor.closeOnFileDelete": true,
+
+    // Lista de caminhos para resolução do executável git.exe
+    "git.path": [
+        "C:/Users/smarc/AppData/Local/Microsoft/WinGet/Packages/Git.MinGit_Microsoft.Winget.Source_8wekyb3d8bbwe/cmd/git.exe",
+        "C:/Program Files/Git/cmd/git.exe",
+        "C:/Program Files (x86)/Git/cmd/git.exe",
+        "git"
+    ],
+
+    // Usa a barra lateral integrada do Git em vez de abrir aba de texto para mensagens de commit
+    "git.useEditorAsCommitInput": false,
+
+    // Template padrão para mensagem de commit manual
+    "git.commitTemplate": "Sincronismo Manual",
+
+    // Habilita Smart Commit (commita automaticamente todas as alterações rastreadas se nenhuma estiver em stage)
+    "git.enableSmartCommit": true,
+
+    // Não solicita confirmação ao sincronizar (pull/push) com o repositório remoto
+    "git.confirmSync": false,
+
+    // Executa sincronização automática com o repositório remoto logo após o commit
+    "git.postCommitCommand": "sync",
+
+    // Não exibe avisos sugerindo ativar smart commit (já configurado)
+    "git.suggestSmartCommit": false,
+
+    // Desativa o editor de terminal para mensagens do Git
+    "git.terminalGitEditor": false,
+
+    // Busca automática periódica de commits remotos no Git (fetch em segundo plano)
+    "git.autofetch": true,
+
+    // Codificação padrão obrigatória em UTF-8 nativo para o projeto
+    "files.encoding": "utf8",
+
+    // Desativa adivinhação automática de encoding no workspace para assegurar UTF-8 estrito
+    "files.autoGuessEncoding": false,
+
+    // Não abre abas para novos arquivos gerados pelo agente de IA
+    "antigravity.ai.openFilesOnGeneration": false,
+
+    // Não abre janela de preview antes de aplicar código gerado pela IA
+    "antigravity.ai.previewGeneratedCode": false,
+
+    // Aceita e grava alterações da IA automaticamente sem exigir clique manual
+    "antigravity.ai.autoAcceptChanges": true,
+
+    // Permite que a IA execute commits inteligentes ao concluir entregas
+    "antigravity.ai.smartCommit": true,
+
+    // Modelo padrão de conversação para velocidade e raciocínio equilibrado
+    "antigravity.ai.defaultConversationMode": "flash-medium",
+
+    // Política de execução de comandos de terminal pela IA: execução automática
+    "antigravity.ai.terminalExecutionPolicy": "autoRun",
+
+    // Inclui automaticamente o contexto do arquivo ativo aberto no editor
+    "antigravity.ai.autoIncludeActiveEditor": true,
+
+    // Retorna a saída do terminal automaticamente para a IA em caso de falha de comando
+    "antigravity.ai.includeTerminalOutputOnFailure": true,
+
+    // Permite à IA tentar autofixar erros de compilação ou execução automaticamente
+    "antigravity.ai.autoFixErrors": true,
+
+    // Mantém indexação em segundo plano do workspace para respostas contextuais rápidas
+    "antigravity.ai.indexWorkspace": true
+}

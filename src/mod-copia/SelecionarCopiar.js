@@ -1,0 +1,8697 @@
+/* ==========================================================================
+ * Nome do arquivo: modulo-SelecionarCopiar.js
+ * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * DIRETIVAS DE GERACAO E MANUTENCAO IA [DEV - ENGENHARIA DE CODIGO]:
+ * 1) DELIBERACAO PREVIA OBRIGATORIA: Jamais gerar codigo sem comando expresso;
+ *    sugerir preliminarmente e na ordem exata: (a) Eventuais Correcoes,
+ *    (b) Mudancas de Boas Praticas e (c) Novas Features.
+ * 2) PRESERVACAO DOCUMENTAL ABSOLUTA: E terminantemente proibido apagar,
+ *    resumir, ocultar ou encurtar comentarios no codigo-fonte. Todo comentario
+ *    deve explicar exaustivamente o *porque* (regras de negocio, falhas do
+ *    framework alvo, arquitetura em 6 estagios, isolamento DOM, protecao do V8)
+ *    e nao apenas o *o que*.
+ * 3) INTRA-COMENTARIOS DE RECONSTRUCAO (PSEUDOCODIGO INTERCALADO / BLUEPRINT):
+ *    O fluxo de dados ("Passos") deve estar obrigatoriamente INTERCALADO
+ *    dentro do corpo de cada metodo, permitindo recriar 100% do modulo do zero
+ *    caso o codigo-fonte deixasse de existir.
+ * 4) CODIFICACAO UTF-8 NATIVA DIRETA (ACENTOS E CEDILHAS REAIS): O codigo-fonte
+ *    e os arquivos de interface utilizam a codificacao padrao UTF-8 com suporte
+ *    nativo a acentos e cedilhas (ç, ã, é, etc.) diretamente no texto. E
+ *    terminantemente PROIBIDO o uso de entidades HTML (como &ccedil;, &otilde;, &eacute;)
+ *    no codigo ou em templates visuais; entidades HTML devem ser extirpadas,
+ *    sendo admitidas exclusivamente dentro de mascaras regex ou parsers de HTML bruto.
+ * 5) INTEGRIDADE FUNCIONAL E COPIA SILENCIOSA: Proibido simplificar a base de 6
+ *    estagios, remover suporte a Ctrl/Alt/Shift, exibir popups de "Copiado!" em
+ *    copias simples ou copiar qualquer texto dentro de campos editaveis.
+ * 6) SINCRONIZACAO OBRIGATORIA DE BLUE PRINT E SANDBOX: Toda alteracao de regra
+ *    de negocio, mascara ou validacao deve manter obrigatoriamente atualizados e
+ *    sincronizados o Blue Print (especificacao documental interna nos cabecalhos
+ *    e na Central de Ajuda) e o SandBox (area de Testes interativos em
+ *    options.html e bateria automatizada em debug.js), garantindo paridade entre
+ *    exemplos validos e invalidos para homologacao imediata.
+ *
+ * ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * (Espelho integral da Central de Ajuda / Options para reconstrucao mutua)
+ *
+ * 1. PROGRESSAO LOGICA EM 6 ESTAGIOS DE SELECAO INTELIGENTE:
+ * - Estagio 1 (1 Clique na Palavra ou Numero -> Unidade ou Entidade Contigua):
+ *   * Em texto comum, 1 clique seleciona e copia apenas a palavra clicada. A
+ *     virgula "," e o ponto e virgula ";" atuam como separadores intermediarios
+ *     e NUNCA colam na palavra (clicar em "Brasilia," seleciona so "Brasilia").
+ *   * Em entidades contiguas e datas simples (Processos CNJ, SEI!, CPF, CNPJ
+ *     tradicional e Novo CNPJ Alfanumerico, PIS, RG, CEP, Datas DD/MM/AAAA,
+ *     Datas abreviadas/extenso como "17 ago. 2026" e "29 de fevereiro de 2025",
+ *     Competencias Mes/Ano como "out. 26", Horarios HH:MM:SS, Percentuais "100%",
+ *     E-mails, Handles @usuario, Placas Mercosul, UUID/PIX e blocos numericos
+ *     pontuados como "0000.0000-0000"), 1 clique captura a entidade inteira
+ *     automaticamente.
+ *   * Em valores monetarios ("R$ 1.500,00"), 1 clique sobre o numero "1.500,00"
+ *     seleciona apenas "1.500,00"; 1 clique sobre "R$" ou no espaco entre "R$" e
+ *     "1.500,00" seleciona "R$ 1.500,00".
+ *   * Em protocolos com barra de ano ("136/2025"), 1 clique em "136" seleciona
+ *     "136"; 1 clique na barra "/" ou 2 cliques seleciona "136/2025".
+ *   * Em sequencias numericas espacadas ("215 7014 6992 8831"), 1 clique em um
+ *     numero seleciona apenas aquele numero ("6992").
+ *   * Excecao de Rotulos Designadores e Conectores: 1 clique direto sobre o
+ *     rotulo inicial ("id", "fls.", "pag.", "art.", "Sumula", "Portaria", "no")
+ *     ou sobre conectores de intervalo ("a", "ate", "as", "c/c") captura
+ *     imediatamente a referencia completa.
+ *   * Excecao de Blocos em MAIUSCULAS com Quebra Suave (<br> / Shift+Enter):
+ *     Se o usuario der 1 clique no espaco interno de um nome ou titulo todo em
+ *     CAIXA ALTA dividido em multiplas linhas por <br>, o motor une as linhas
+ *     adjacentes em maiusculas num unico bloco continuo.
+ *   * Conversao Automatica de Cabecalhos de ID do PJe: Ao selecionar cabecalhos
+ *     nativos do PJe no formato "Num. 2297820154 - Pag. 1", converte a saida da
+ *     area de transferencia automaticamente para "id 2297820154, pg. 1".
+ *
+ * - Estagio 2 (1 Clique no Espaco Interno OU 2 Cliques Rapidos -> Expressao Composta ou Bloco Destacado):
+ *   * Expande para toda a expressao composta: Citacoes de Legislacao e Emendas,
+ *     Atos com Orgaos Compostos, Intervalos de Datas/Horas/Moedas, Datas por
+ *     extenso ou abreviadas ("17 ago. 2026", "out. 26"), Numeros e Moedas com
+ *     Extenso ("65 (sessenta e cinco)" e "R$ 65,00 (sessenta e cinco reais)")
+ *     e Multiplos Numeros Espacados / Boletos ("215 7014 6992 8831").
+ *   * Sequencia de Palavras em LETRAS MAIUSCULAS: 1 clique no espaco interno ou
+ *     2 cliques seleciona todo o conjunto contiguo de palavras em CAIXA ALTA
+ *     ("VARIAS PALAVRAS DO TEXTO EM LETRAS MAIUSCULAS", "REGULAR PROSSEGUIMENTO
+ *     DO FEITO"), inclusive dentro de paragrafos mistos ou com quebra suave.
+ *   * Sequencia de Palavras com Formatacao de Destaque: 1 clique no espaco interno
+ *     ou 2 cliques seleciona todo o bloco contiguo de palavras destacadas em
+ *     negrito (<b>/<strong>), italico (<i>/<em>), sublinhado (<u>/<ins>),
+ *     marca-texto (<mark>), tachado (<s>/<del>), codigo (<code>) ou combinacoes.
+ *
+ * - Estagio 3 (2 Cliques em Texto Comum ou Pontuacao -> Frase / Clausula).
+ * - Estagio 4 (Delimitadores Simetricos -> Parenteses, Colchetes, Chaves e Aspas):
+ *   * 1 Clique na borda do delimitador ou no espaco interno adjacente: seleciona
+ *     apenas o conteudo interno "( algo )" -> "algo".
+ *   * 2 Cliques Rapidos no abre/fecha ou no espaco interno: amplia a selecao para
+ *     englobar tambem os proprios delimitadores "( algo )".
+ * - Estagio 5 (3 Cliques Rapidos -> Minoracao de Blocos ou Paragrafo Localizado):
+ *   * Em blocos compostos ou pontuados ("12.016/2009", "136/2025", "10/01/2026",
+ *     "11.222.333/0001-81", "1.325.256.019-75"), 3 cliques tendencia a MINORAR a
+ *     selecao, capturando apenas a sub-parte clicada (ex: "12.016" antes da barra
+ *     ou "2009" apos a barra).
+ *   * No inicio de um paragrafo (numerado ou nao, ex: "3. Ordenar..."), 3 cliques
+ *     seleciona exclusivamente o paragrafo localizado em questao, sem invadir
+ *     paragrafos anteriores ou posteriores.
+ * - Estagio 6 (Tabelas e Modo Acumulador com Ponto e Virgula ";"):
+ *   * No Modo Acumulador ("Ctrl + Alt"), os avisos visuais exibem EXCLUSIVAMENTE
+ *     as estatisticas (numero de intervalos, palavras/celulas/linhas e caracteres),
+ *     jamais exibindo as palavras acumuladas no popup.
+ *   * Padrao ("Ctrl + Alt" sem Shift): Insere em ordem crescente natural do texto,
+ *     posicionando a carta ordenada antes das eventuais cartas desordenadas e apos
+ *     a carta ordenada antecedente.
+ *   * Modo Baralho ("Ctrl + Alt + Shift"): Insere estritamente no final da lista.
+ *   * Proibida re-selecao duplicada; clicar novamente sobre selecao ja acumulada
+ *     remove o item (toggle off). Clique com botao direito com "Ctrl + Alt"
+ *     desfaz a ultima carta adicionada.
+ *
+ * 2. SELECAO ELASTICA (CTRL) E SELECAO DE OBJETOS / NOVA SELECAO (ALT):
+ * - Tecla "Ctrl" (isolada): Opera em Modo Elastico, continuando, expandindo ou
+ *   retraindo a selecao existente por palavras/blocos (clique ou arrasto).
+ * - Tecla "Alt" (isolada): Inicia SEMPRE uma nova selecao (nao continua a selecao
+ *   anterior como Ctrl):
+ *   * "Alt + Clique" sobre links (<a>), botoes (<button>, <input type="button">),
+ *     menus, abas ou itens clicaveis seleciona e copia imediatamente o texto
+ *     inteiro do objeto (bloqueando a navegacao ou acao do botao).
+ *   * "Alt + Arrastar" sobre links, botoes, menus, itens ou textos seleciona e
+ *     copia apenas a parte arrastada do texto.
+ *
+ * 3. ESTILO SHIFT DE SELECAO E FILTRO DE DIGITOS COM ZERO-PADDING CNJ:
+ * - Pressionar "Shift" exclusivamente quando ja houver selecao limpa tudo na tela
+ *   para iniciar nova marcacao de cursor inicial e final.
+ * - Sem selecao previa, "Shift + Clique" em texto comum posiciona o cursor inicial
+ *   (sem marcar nada); o segundo "Shift + Clique" expande ate a palavra final.
+ * - "Shift + Clique e Solta" sobre entidade contigua numerica/alfanumerica (CPF,
+ *   CNPJ tradicional ou alfanumerico, CNJ, Telefone, Data DD/MM/AAAA, CEP) extrai
+ *   apenas os caracteres puros sem pontuacao, preenchendo zeros a esquerda em
+ *   processos CNJ ("991234-55.2024.4.01.4002" -> "09912345520244014002").
+ *
+ * 4. PROTECAO ABSOLUTA DE CAMPOS EDITAVEIS E MARCADORES DE SIMBOLOS:
+ * - Em campos editaveis quaisquer (inputs simples ou editores multilinhas), NADA
+ *   e copiado automaticamente para o clipboard, NUNCA, preservando o que o usuario
+ *   trouxe para colar.
+ * - Em editores multilinhas (textarea, contenteditable, CKEditor, ProseMirror, etc.),
+ *   jamais seleciona tudo; ao clicar em sequencias de simbolos ou placeholders
+ *   delimitados por simbolos ("##########", "$$$$$$$$", "@@@@", "#[digite aqui]#",
+ *   "##Funcionalidade##", "@@ Qualquer coisa @@", "### Texto ##"), apenas
+ *   pre-seleciona o marcador na tela sem copiar, pronto para receber Ctrl+V.
+ *
+ * 5. ATALHO INTELIGENTE F1 (PROMPT DE IA / PAINEL LATERAL):
+ * - Com texto selecionado: formata o comando juridico estruturado, copia e solicita
+ *   abertura do painel lateral ou aba do assistente de IA.
+ * - Sem texto selecionado: solicita a abertura imediata do assistente de IA.
+ *
+ * 6. TECLA ESCAPE E REGRA DA MAOZINHA (LINKS, BOTOES E CABECALHOS DE COLUNA):
+ * - Escape: Limpa selecoes visuais, acumulador e alertas logo no primeiro acionamento,
+ *   mas JAMAIS zera ou altera o conteudo atual do clipboard.
+ * - Regra da Maozinha (cursor: pointer), Links e Botoes: A protecao para nao copiar
+ *   o texto de links (<a href>), botoes (<button>, [role="button"], [role="tab"]) ou
+ *   elementos com cursor "pointer" (como cabecalhos de colunas <th>) aplica-se
+ *   EXCLUSIVAMENTE ao clique simples isolado do mouse (1 clique unico, sem arrastar
+ *   o mouse e sem nenhuma tecla modificadora pressionada no teclado). Caso o usuario
+ *   arraste o mouse ou mantenha qualquer tecla do teclado pressionada (Ctrl, Alt,
+ *   Shift, Ctrl+Alt ou qualquer outra tecla), a maozinha e ignorada e a selecao/copia
+ *   (incluindo copia de coluna inteira no alto da tabela) ocorre normalmente!
+ * ========================================================================== */
+
+(function () {
+    'use strict';
+
+    /* Passo 1.1: Guarda de idempotencia global O(1): se o motor ja estiver inicializado
+     * e ativo neste frame, evita destruir e recriar listeners e MutationObserver
+     * em reinjecoes automaticas do Service Worker. */
+    if (window.__JUSGOV_MOTOR_SELECAO_ATIVO__ && window.JusGovMotorSelecaoTeste) {
+        return;
+    }
+    window.__JUSGOV_MOTOR_SELECAO_ATIVO__ = true;
+
+    if (window.__JUSGOV_ABORT_CONTROLLER__) {
+        try {
+            window.__JUSGOV_ABORT_CONTROLLER__.abort();
+        } catch (_) { }
+    }
+
+    /* ==========================================================================
+     * SECAO 1: IMPORTACAO SEGURA DE CONSTANTES E REGEXPS PRE-COMPILADAS
+     * ========================================================================== */
+    const C_EXT = window.JusGovConstantes || {};
+
+    const MASCARA_CARACTERE = C_EXT.MASCARA_CARACTERE || Object.freeze({
+        DIGITO: 1,
+        LETRA_ASCII: 2,
+        ESPACO_BRANCO: 4,
+        DELIMITADOR_PAR: 8,
+        DELIMITADOR_ASPAS: 16,
+        PONTUACAO_FIM: 32,
+        SIMBOLO_CONECTOR: 64,
+        SIMBOLO_REPETIVEL: 128
+    });
+
+    const TABELA_MASCARA_ASCII = C_EXT.TABELA_MASCARA_ASCII || (() => {
+        const tab = new Uint8Array(128);
+        for (let i = 48; i <= 57; i++) tab[i] |= 1;
+        for (let i = 65; i <= 90; i++) tab[i] |= 2;
+        for (let i = 97; i <= 122; i++) tab[i] |= 2;
+        [32, 9, 10, 13].forEach(c => { tab[c] |= 4; });
+        ['(', ')', '[', ']', '{', '}', '<', '>'].forEach(ch => { tab[ch.charCodeAt(0)] |= 8; });
+        ['"', "'"].forEach(ch => { tab[ch.charCodeAt(0)] |= 16; });
+        [',', ';', '.', '!', '?'].forEach(ch => { tab[ch.charCodeAt(0)] |= 32; });
+        ['/', '-', '_', '@', '+', '$', ':', '%'].forEach(ch => { tab[ch.charCodeAt(0)] |= 64; });
+        ['#', '*', '=', '~', '$', '@'].forEach(ch => { tab[ch.charCodeAt(0)] |= 128; });
+        return tab;
+    })();
+
+    const CONFIGURACAO_MOTOR = Object.assign({
+        RAIO_JANELA_DESLIZANTE: 1000,
+        LIMITE_CARACTERES_JANELA_MINIMA: 2200,
+        DISTANCIA_MINIMA_ARRASTO_PX: 4,
+        JANELA_COALESCENCIA_CLIQUES_MS: 220,
+        JANELA_DUPLO_ESC_MS: 420,
+        TEMPO_EXIBICAO_ALERTA_MS: 3500
+    }, C_EXT.CONFIGURACAO_MOTOR || {});
+
+    const PARES_ABERTURA = C_EXT.PARES_ABERTURA || Object.freeze({ '(': ')', '[': ']', '{': '}', '<': '>' });
+    const PARES_FECHAMENTO = C_EXT.PARES_FECHAMENTO || Object.freeze({ ')': '(', ']': '[', '}': '{', '>': '<' });
+    const CARACTERES_ASPAS_TODOS = C_EXT.CARACTERES_ASPAS_TODOS || String.fromCharCode(34, 39, 8220, 8221, 8216, 8217, 171, 187);
+
+    /* Consome diretamente o dicionario estatico pre-compilado em modulo-ConstantesPadroes.js */
+    const EXPRESSOES_REGULARES = C_EXT.EXPRESSOES_REGULARES || {};
+    const REGEX_AUDITORIA = C_EXT.REGEX_AUDITORIA || {};
+    const CATALOGO_PADROES_JURIDICOS = C_EXT.CATALOGO_PADROES_JURIDICOS || [];
+
+    const validador = window.JusGovAvisoFlutuante ? new window.JusGovAvisoFlutuante() : null;
+    const acumulador = window.JusGovAcumulador ? new window.JusGovAcumulador() : null;
+
+    /* Passo 1.2: Variaveis de controle de estado monomorficas em tempo real */
+    let modoExecucao = 'global';
+    let listaUrlsPermitidas = [];
+    let manterFormatacaoBasica = false;
+    let nivelFiltroFormatacao = 'basico';
+    let selecaoEditavelAtiva = true;
+    let placeholdersMinutasHtmlAtivo = true;
+    let modoPlaceholdersMinutasHtml = 'placeholders';
+    let colagemBotaoDireitoAtiva = false;
+    let capturaBotoesMouse4e5Ativa = true;
+    let colarBotaoMeioAtivo = true;
+    let navegacaoTecladoCamposAtiva = true;
+    let ultimoTimestampNavegacaoAbas = 0;
+    let botaoLateralEmProcessamento = 0;
+    const DEBOUNCE_NAVEGACAO_ABAS_MS = 280;
+    let timerCliqueDireitoColagem = null;
+    let ultimoCliqueDireitoTimestamp = 0;
+    let ultimoAlvoCliqueDireito = null;
+    let validacaoMatematicaAtiva = true;
+    let tempoFlashBorderMs = 500;
+    let corFlashBorder = '#0d9488';
+    let minimoCaracteresInterface = 5;
+    let modoRetirarSelecao = 'total_exceto_arrasto'; // 'total_exceto_arrasto' (padrao), 'total', 'interface', 'nenhuma'
+    let timerFlashBorder = null;
+    let aguardandoDesselecaoFlash = false;
+    let flashExclusivoSemSelecao = false;
+    let selecaoSendoAplicadaPeloAddon = false;
+    let timerDebounceSelecaoGlobal = null;
+    let ultimoRangeAssinaturaGlobal = '';
+    let ultimaSelecaoManualTexto = '';
+    let ultimoTimestampSelecaoManual = 0;
+    let isMousePressionado = false;
+    let observerFrames = null;
+    let timestampCriacaoFlash = 0;
+    const LIMITE_MAXIMO_CONTADOR_OPERACIONAL = 900000000;
+    let converterCabecalhoPjeAtivo = true;
+    let atalhoF1GeminiAtivo = true;
+    let modoShiftCnj = '20digitos';
+    let incluirSeparadorFinalAcumulador = true;
+    let separadorTabelas = ';';
+    const PROMPT_F1_GEMINI_PADRAO = "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
+    let promptF1Gemini = PROMPT_F1_GEMINI_PADRAO;
+    let ativoAmpuletas = true;
+    let cssBlindado = false;
+
+    // =====================================================================
+    // === INJEÇÃO CSS PJE ANTI-AMPULHETAS (MOTOR MULTI-GATILHO COM TRAVA DE RAM) ===
+    // =====================================================================
+    const turboCSS = `
+        /* ANIQUILAÇÃO DOS LOADERS E SPINNERS
+           O PORQUÊ: O PJe bloqueia a tela inteira a cada requisição AJAX.
+           O 'pointer-events: none' garante que o usuário possa continuar clicando através do fantasma do spinner. */
+        [id="movimentarRegion:status.stop"],
+        [id="movimentarRegion:status.start"],
+        [id$=":status.start"],
+        [id*="mploading" i],
+        [class*="mploading" i],
+        [id*="painelAguarde" i],
+        [id*="modalAguarde" i],
+        [class*="rich-mpnl-mask" i]:not([id*="mpProgresso" i]):not([id*="lote" i]),
+        ngx-loading,
+        .ngx-loading-backdrop,
+        .loading-foreground,
+        .block-ui-wrapper:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .block-ui-overlay:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .p-blockui:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .p-blockui-document:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .p-component-overlay:not(:has([role="dialog"], [role="alertdialog"], mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .ui-blockui:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
+        .ui-widget-overlay.ui-blockui,
+        .swal2-Delta-loading,
+        #divInfraAviso,
+        #divInfraAvisoFundo,
+        .infraAviso,
+        .infraAvisoFundo,
+        #divCarregando,
+        .blockUI.blockOverlay,
+        #disabledZone,
+        #messageZone,
+        #divAguarde,
+        #mascaraAguarde,
+        #divLoading,
+        .seeu-loading,
+        #bloqueioTela,
+        .saj-loading,
+        .k-loading-mask,
+        .loadmask,
+        pdpj-loading,
+        ngx-spinner,
+        .ngx-spinner-overlay,
+        .br-loading-mask,
+        #div_aguarde,
+        #tela_bloqueio,
+        #carregando_dados,
+        mat-progress-spinner,
+        mat-spinner,
+        mat-mdc-progress-spinner,
+        mat-mdc-spinner,
+        .mat-progress-spinner,
+        .mat-spinner,
+        .mat-mdc-progress-spinner,
+        .mat-mdc-spinner,
+        p-progressspinner,
+        p-progressSpinner,
+        .p-progress-spinner,
+        .p-progress-spinner-svg,
+        .p-progress-spinner-circle,
+        .spinner-border,
+        .spinner-grow,
+        [class*="progress-spinner" i],
+        [class*="progressspinner" i],
+        [class*="loading-spinner" i],
+        .loading-overlay:not([id*="lote" i]):not([class*="lote" i]),
+        .loader-overlay:not([id*="lote" i]):not([class*="lote" i]),
+        .spinner-overlay:not([id*="lote" i]):not([class*="lote" i]),
+        .pje-loading:not([id*="lote" i]):not([class*="lote" i]),
+        [class*="pje-loading" i]:not([id*="lote" i]):not([class*="lote" i]),
+        pdpj-spinner,
+        pje-spinner,
+        app-loading,
+        app-spinner,
+        [id*="spinner" i]:not([id*="lote" i]),
+        [class*="spinner" i]:not([class*="lote" i]),
+        [id*="carregando" i]:not([id*="lote" i]),
+        [class*="carregando" i]:not([class*="lote" i]),
+        .rf-st-mp,
+        #toast-container,
+        .toast-container,
+        .toastr,
+        .ui-growl,
+        .p-toast,
+        .cdk-overlay-backdrop.cdk-overlay-dark-backdrop:empty {
+            pointer-events: none !important;
+            cursor: auto !important;
+            opacity: 0.01 !important;
+            z-index: -99999 !important;
+        }
+
+        /* PRESERVAÇÃO ESTRITA DE OPERAÇÕES EM LOTE / LOOP E BARRAS DE PROGRESSO REAIS (Diretriz Root 6.21) */
+        [id*="mpProgresso" i],
+        [id*="lote" i][class*="modal" i],
+        [id*="lote" i][class*="panel" i],
+        [class*="lote" i][class*="modal" i],
+        pje-assinatura-lote,
+        pje-movimentacao-lote,
+        mat-progress-bar,
+        p-progressbar,
+        .rich-progress-bar,
+        .progress-bar,
+        [role="progressbar"],
+        [role="dialog"]:has(mat-progress-bar, p-progressbar, .rich-progress-bar, .progress-bar, [role="progressbar"]),
+        .rich-modalpanel:has(.rich-progress-bar, [id*="mpProgresso" i], [role="progressbar"]) {
+            pointer-events: auto !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        /* ANIQUILAÇÃO TOTAL DE SPINNERS CIRCULARES MODERNOS (ANGULAR MATERIAL / PRIMENG / PJE 2.X / PREVJUD)
+           O PORQUÊ: Loaders giratórios bloqueiam a visão e travam o foco do teclado nos modais de intimação. */
+        mat-progress-spinner,
+        mat-spinner,
+        mat-mdc-progress-spinner,
+        mat-mdc-spinner,
+        .mat-progress-spinner,
+        .mat-spinner,
+        .mat-mdc-progress-spinner,
+        .mat-mdc-spinner,
+        p-progressspinner,
+        p-progressSpinner,
+        .p-progress-spinner,
+        .p-progress-spinner-svg,
+        .p-progress-spinner-circle,
+        .spinner-border,
+        .spinner-grow,
+        [class*="progress-spinner" i],
+        [class*="progressspinner" i],
+        [class*="loading-spinner" i],
+        .loading-spinner,
+        .pje-loading,
+        [class*="pje-loading" i],
+        pdpj-spinner,
+        pje-spinner,
+        app-loading,
+        app-spinner {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* ANIQUILAÇÃO GLOBAL DE TEMPO E ANIMAÇÃO
+           O PORQUÊ: O framework Angular/JSF do PJe injeta atrasos artificiais (0.3s a 0.5s)
+           em modais e transições para criar "suavidade". Isso destrói a produtividade de quem
+           digita rápido. Esta regra força o navegador a ignorar todos os delays, fazendo a interface
+           responder instantaneamente aos comandos de teclado e mouse. */
+        *, *::before, *::after {
+            animation-delay: 0s !important;
+            transition: none !important;
+            transition-delay: 0s !important;
+            transition-duration: 0s !important;
+        }
+
+        /* Destravamento de cursores de espera */
+        html[style*="wait" i],
+        body[style*="wait" i],
+        html[style*="progress" i],
+        body[style*="progress" i],
+        *[style*="cursor: wait" i],
+        *[style*="cursor:wait" i],
+        *[style*="cursor: progress" i],
+        *[style*="cursor:progress" i],
+        .wait-cursor,
+        .busy-cursor {
+            cursor: auto !important;
+        }
+    `;
+
+    // FUNÇÃO: Injetar o CSS turbo de forma segura e não redundante.
+    // O PORQUÊ: Ambientes de iframes duplos (comuns no PJe) podem causar injeções múltiplas do mesmo CSS,
+    // o que causa vazamento de memória e lentidão de renderização (re-paint/re-flow excessivos).
+    let observadorBlindagem = null;
+    function garantirObservadorBlindagem() {
+        if (observadorBlindagem || typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
+        try {
+            const alvo = document.head || document.documentElement;
+            if (!alvo) return;
+            observadorBlindagem = new MutationObserver(() => {
+                if (ativoAmpuletas && !document.getElementById('pje-turbo-lock')) {
+                    cssBlindado = false;
+                    blindarCSS();
+                }
+            });
+            observadorBlindagem.observe(alvo, { childList: true });
+        } catch (_) { }
+    }
+
+    function blindarCSS() {
+        if (ativoAmpuletas === false) {
+            const el = (typeof document !== 'undefined') ? document.getElementById('pje-turbo-lock') : null;
+            if (el) el.remove();
+            cssBlindado = false;
+            if (observadorBlindagem) {
+                try { observadorBlindagem.disconnect(); } catch (_) { }
+                observadorBlindagem = null;
+            }
+            return;
+        }
+
+        if (typeof document === 'undefined') return;
+
+        // Fallback no DOM: Verifica se outro script paralelo injetou a tag e se ainda está conectada.
+        const tagExistente = document.getElementById('pje-turbo-lock');
+        if (tagExistente && tagExistente.isConnected) {
+            cssBlindado = true;
+            garantirObservadorBlindagem();
+            return;
+        }
+
+        // Controle Jurisdicional Flexível
+        // O PORQUÊ: Limita a atuação do motor pesado apenas ao escopo do PJe, Tribunais e PREVJUD,
+        // poupando processamento em abas irrelevantes abertas pelo usuário.
+        let dominio = '';
+        let urlCompleta = '';
+        try {
+            dominio = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
+            urlCompleta = (typeof window !== 'undefined' && window.location && window.location.href) ? window.location.href.toLowerCase() : '';
+            if ((!dominio || urlCompleta === 'about:blank') && typeof window !== 'undefined' && window.top && window.top !== window) {
+                dominio = (window.top.location && window.top.location.hostname) ? window.top.location.hostname.toLowerCase() : dominio;
+                urlCompleta = (window.top.location && window.top.location.href) ? window.top.location.href.toLowerCase() : urlCompleta;
+            }
+        } catch (_) { }
+
+        let ehPJeOuTribunal = (dominio.includes('pje') && dominio.includes('.jus.br')) ||
+            dominio.includes('.jus.br') ||
+            urlCompleta.includes('pje') ||
+            dominio.includes('eproc') ||
+            dominio.includes('projudi') ||
+            dominio.includes('prevjud') ||
+            urlCompleta.includes('prevjud') ||
+            (typeof window !== 'undefined' && window.__JUSGOV_TESTE_BLINDAR_CSS__ === true);
+
+        // Se estiver em iframe de popup/modal e o modulo estiver ativo, garante a blindagem no subdocumento
+        if (!ehPJeOuTribunal && typeof window !== 'undefined' && window.self !== window.top && ativoAmpuletas) {
+            ehPJeOuTribunal = true;
+        }
+
+        if (!ehPJeOuTribunal) return;
+
+        // Cria a folha de estilo de forma isolada.
+        const style = tagExistente || document.createElement('style');
+        style.id = 'pje-turbo-lock';
+        style.textContent = turboCSS;
+
+        // Injeta preferencialmente no <head> para evitar flash de conteúdo não estilizado (FOUC).
+        const alvo = document.head || document.documentElement;
+        if (alvo) {
+            if (!style.isConnected) {
+                alvo.appendChild(style);
+            }
+            cssBlindado = true;
+            garantirObservadorBlindagem();
+        }
+    }
+
+    /* Gatilho 1: Injeção imediata na carga do script (document_start) */
+    blindarCSS();
+
+    /* Gatilho 2: Injeção na conclusão do parsing da árvore DOM */
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', blindarCSS);
+        } else {
+            blindarCSS();
+        }
+    }
+
+    /* Gatilho 3: Injeção após carga completa de sub-recursos e iframes */
+    if (typeof window !== 'undefined') {
+        window.addEventListener('load', blindarCSS);
+    }
+    let ultimoTimestampEsc = 0;
+    let ultimoTextoSelecionadoLimpo = '';
+    let ultimoRangeSelecionadoSimples = null;
+    let coordsMouseDown = { x: 0, y: 0 };
+    let houveArrastoMouse = false;
+    let inputAlvoMouseDown = null;
+    let inputJaEstavaSelecionadoNoMouseDown = false;
+    const inputsJaSelecionadosInicialmente = new WeakSet();
+    let selecaoElasticaAtivaNoClique = false;
+    let rangeAncoraArrastoElastico = null;
+    let pontoAncoraArrastoAlt = null;
+    let ancoraCursorShift = null;
+    let ignorarProximoClick = false;
+    let controladorCicloVida = null;
+    const teclasPressionadasAtivas = new Set();
+
+    function obterElementoAlvoEfetivo(e) {
+        if (!e) return null;
+        if (typeof e.composedPath === 'function') {
+            try {
+                const path = e.composedPath();
+                if (path && path.length > 0) {
+                    for (let i = 0; i < path.length; i++) {
+                        const no = path[i];
+                        if (no && no.nodeType === Node.ELEMENT_NODE) {
+                            return no;
+                        }
+                    }
+                }
+            } catch (_) { }
+        }
+        return e.target || null;
+    }
+
+    function temModificadorTecladoAtivo(e) {
+        /* Passo 1.3: Verificar se ha qualquer modificador de teclado ativo (Ctrl, Alt,
+         * Shift, Meta ou tecla modificadora mantida pressionada no teclado). */
+        if (e && (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
+            return true;
+        }
+        if (teclasPressionadasAtivas.has('control') ||
+            teclasPressionadasAtivas.has('alt') ||
+            teclasPressionadasAtivas.has('shift') ||
+            teclasPressionadasAtivas.has('meta')) {
+            return true;
+        }
+        return false;
+    }
+
+    /* ==========================================================================
+     * SECAO 2: COOPERACAO COM O SCHEDULER DO CHROME E VERIFICACAO DE ESCOPO
+     * ========================================================================== */
+    async function cederControleAoCompositorBlink() {
+        /* Passo 2.1: Ceder thread principal ao navegador antes de operacoes pesadas */
+        if (typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function') {
+            try {
+                await scheduler.yield();
+            } catch (_) { }
+        }
+    }
+
+    function verificarUrlPermitida() {
+        /* Passo 2.2: Validar se o motor esta ativo globalmente ou na lista de sites */
+        if (modoExecucao === 'desligado') return false;
+        if (modoExecucao === 'global') return true;
+
+        const urlAtual = window.location.href || '';
+        if (urlAtual.startsWith('chrome-extension://')) return true;
+        if (!Array.isArray(listaUrlsPermitidas) || listaUrlsPermitidas.length === 0) return false;
+
+        for (let i = 0; i < listaUrlsPermitidas.length; i++) {
+            const padrao = listaUrlsPermitidas[i];
+            if (!padrao || padrao === '' || padrao === '<all_urls>') continue;
+            if (padrao === '*://*/*') return true;
+            try {
+                const regexStr = '^' + padrao.trim()
+                    .replace(EXPRESSOES_REGULARES.ESCAPE_META_REGEX, '\\$&')
+                    .replace(EXPRESSOES_REGULARES.CURINGA_ASTERISCO, '.*') + '$';
+                if (new RegExp(regexStr, 'i').test(urlAtual)) return true;
+            } catch (_) {
+                continue;
+            }
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isElementoInterativoOuUi
+     * DIRETRIZ ROOT IMUTAVEL: Preservacao Absoluta da Navegacao e Interacao Nativa Web.
+     * Identifica se um elemento DOM (ou qualquer de seus ancestrais na hierarquia,
+     * incluindo travessia de Shadow DOM e Hosts de Web Components) pertence a uma
+     * interface interativa do navegador ou da aplicacao web.
+     * Quando o usuario interage SEM teclas modificadoras ativas, o addon DEVE
+     * abster-se completamente de intervir sobre elementos de interface, garantindo
+     * que cliques em botoes, dropdowns (ex: seletor de modelos 'Flash' no Gemini),
+     * icones (ex: microfone), menus, abas, links e controles web sejam repassados
+     * 100% nativos, sem selecoes indesejadas, sem copias espurias e sem bloqueios.
+     */
+    /*
+     * FUNCAO: isElementoControlePdf
+     * DIRETRIZ ROOT 6.32: Identifica se o elemento alvo pertence a barra de ferramentas,
+     * painel lateral ou botoes/menus de controle de um visualizador de PDF embutido
+     * (<viewer-toolbar>, div#toolbar, cr-icon-button, #sidenav-container, etc.).
+     */
+    function isElementoControlePdf(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 20) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tag = (atual.tagName || '').toLowerCase();
+                const idElem = (atual.id || '').toLowerCase();
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+
+                if (
+                    tag === 'viewer-toolbar' ||
+                    tag === 'viewer-page-selector' ||
+                    tag === 'viewer-pdf-sidenav' ||
+                    tag === 'cr-icon-button' ||
+                    idElem === 'toolbar' ||
+                    idElem === 'toolbarviewer' ||
+                    idElem === 'toolbarcontainer' ||
+                    idElem === 'secondarytoolbar' ||
+                    idElem === 'sidenav-container' ||
+                    idElem === 'sidebarcontainer' ||
+                    idElem === 'zoom-controls' ||
+                    idElem === 'sidenavtoggle' ||
+                    idElem === 'pageselector'
+                ) {
+                    return true;
+                }
+
+                if (cls && (
+                    cls.includes('toolbar') ||
+                    cls.includes('toolbarbutton') ||
+                    cls.includes('doorhanger')
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isCelulaTabelaDadosLeitura
+     * DIRETRIZ ROOT 6.39: Identifica celulas de tabelas de dados (TD, TH, .rich-table-cell,
+     * [role="cell"], [role="gridcell"]) em sistemas como PJe, eproc e plataformas JSF/RichFaces/PrimeFaces.
+     * Celulas de dados que contem texto direto (processos CNJ, datas, horarios, nomes, valores)
+     * pertencem a LEITURA_COMUM, neutralizando eventos onmouseover/onmouseout/onclick cosmeticos
+     * injetados na tag <tr> ou <table> que erroneamente as rotulavam como controles de interface.
+     * EXCECAO: Se o alvo clicado for um controle interativo explicito (<a>, <button>, <input>, etc.)
+     * contido dentro da celula, o controle prevalece.
+     */
+    function isCelulaTabelaDadosLeitura(el) {
+        if (!el) return false;
+        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!base) return false;
+
+        const tagBase = (base.tagName || '').toUpperCase();
+        if (
+            tagBase === 'BUTTON' || tagBase === 'A' || tagBase === 'INPUT' ||
+            tagBase === 'SELECT' || tagBase === 'TEXTAREA' || tagBase === 'LABEL'
+        ) {
+            return false;
+        }
+        if (base.getAttribute && (base.getAttribute('role') === 'button' || base.getAttribute('role') === 'link')) {
+            return false;
+        }
+
+        const celula = (typeof base.closest === 'function')
+            ? base.closest('td, th, [role="cell"], [role="gridcell"], .rich-table-cell')
+            : null;
+        if (!celula) return false;
+
+        let curr = base;
+        while (curr && curr !== celula) {
+            if (curr.nodeType === Node.ELEMENT_NODE) {
+                const t = (curr.tagName || '').toUpperCase();
+                if (t === 'BUTTON' || t === 'A' || t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') {
+                    return false;
+                }
+                const r = (curr.getAttribute && curr.getAttribute('role')) || '';
+                if (r === 'button' || r === 'link') {
+                    return false;
+                }
+            }
+            curr = curr.parentElement;
+        }
+
+        return true;
+    }
+
+    /*
+     * FUNCAO: isAreaLeituraOuPdfConteudo
+     * DIRETRIZ ROOT 6.16 e 6.32: Identifica se o elemento alvo pertence ao conteudo textual de um
+     * visualizador de PDF no Chrome (PDF.js / .textLayer / .pdfViewer / .page / <pdf-viewer> /
+     * div#scroller / div#content / embed[type*="pdf"] / embed#plugin) ou area de leitura documental
+     * e celulas de tabelas de dados (Diretriz 6.39), excluindo expressamente barras de ferramentas e controles do PDF.
+     */
+    function isAreaLeituraOuPdfConteudo(el) {
+        if (!el) return false;
+        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!base) return false;
+
+        if (isCelulaTabelaDadosLeitura(base)) {
+            return true;
+        }
+
+        if (isElementoControlePdf(base)) {
+            return false;
+        }
+
+        let atual = base;
+        let profundidade = 0;
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 20) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tag = (atual.tagName || '').toLowerCase();
+                const idElem = (atual.id || '').toLowerCase();
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                const tipoAttr = (atual.getAttribute('type') || '').toLowerCase();
+
+                if (
+                    tag === 'pdf-viewer' ||
+                    tag === 'embed' ||
+                    tag === 'object' ||
+                    idElem === 'viewer' ||
+                    idElem === 'scroller' ||
+                    idElem === 'content' ||
+                    idElem === 'plugin' ||
+                    idElem === 'viewercontainer' ||
+                    tipoAttr.includes('pdf') ||
+                    tipoAttr === 'application/x-google-chrome-pdf'
+                ) {
+                    return true;
+                }
+
+                if (cls && (
+                    cls.includes('textlayer') ||
+                    cls.includes('pdfviewer') ||
+                    cls.includes('pdf-container') ||
+                    (cls.includes('page') && atual.hasAttribute('data-page-number'))
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+
+        if (typeof document !== 'undefined' && document.contentType === 'application/pdf') {
+            return true;
+        }
+        return false;
+    }
+
+    function isElementoInterativoOuUi(el) {
+        if (!el) return false;
+
+        /* DIRETRIZ PDF E DOCUMENTOS: Visualizadores de PDF (PDF.js, PJe, eproc, textLayer)
+         * e camadas de texto de paginas de documentos pertencem estritamente a LEITURA_COMUM,
+         * NUNCA a controles de sistema ou menus de interface (exceto se o proprio alvo for link ou botao). */
+        if (isAreaLeituraOuPdfConteudo(el)) {
+            return false;
+        }
+
+        const TAGS_INTERATIVAS = new Set([
+            'BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
+            'SUMMARY', 'DETAILS', 'LABEL', 'AUDIO', 'VIDEO', 'CANVAS', 'DIALOG',
+            'EMBED', 'OBJECT', 'SVG', 'PATH', 'G', 'CIRCLE', 'RECT', 'POLYGON',
+            'LINE', 'USE', 'SYMBOL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU', 'DATALIST'
+        ]);
+
+        const ROLES_INTERATIVOS = new Set([
+            'button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+            'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option',
+            'checkbox', 'radio', 'radiogroup', 'slider', 'spinbutton', 'scrollbar',
+            'toolbar', 'tree', 'treeitem', 'searchbox', 'dialog', 'alertdialog'
+        ]);
+
+        const ATRIBUTOS_ESTADO_INTERATIVO = [
+            'aria-haspopup', 'aria-expanded', 'aria-controls', 'aria-pressed',
+            'aria-checked', 'aria-selected', 'jsaction', 'jsname', 'jscontroller',
+            'data-action', 'data-toggle', 'data-bs-toggle', 'data-trigger',
+            'ng-click', 'v-on:click', 'routerlink'
+        ];
+
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                if (atual.hasAttribute('data-jusgov-ignore')) return true;
+
+                const tagUpper = (atual.tagName || '').toUpperCase();
+
+                if (TAGS_INTERATIVAS.has(tagUpper)) {
+                    return true;
+                }
+
+                /* Inspecao de Modais, Dialogos, Popovers, Etiquetas PJe, Interface de Editores (cke_*, cke_*editor) e Menus Suspensos WAI-ARIA */
+                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') {
+                    return true;
+                }
+
+                const idElemLower = (typeof atual.id === 'string') ? atual.id.toLowerCase() : '';
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (
+                    ((/\bcke_[a-z0-9_-]*/i.test(cls) || /^cke_/i.test(idElemLower) || /cke_[a-z0-9_-]*editor/i.test(cls) || /cke_[a-z0-9_-]*editor/i.test(idElemLower)) && !/\bcke_editable\b/i.test(cls)) ||
+                    /\b(editor-toolbar-main|ql-toolbar|tox-toolbar|tox-editor-header|mce-toolbar)\b/i.test(cls)
+                ) {
+                    return true;
+                }
+                if (cls && (
+                    cls.includes('modal') ||
+                    cls.includes('dialog') ||
+                    cls.includes('dropdown') ||
+                    cls.includes('popover') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('context-menu') ||
+                    cls.includes('mat-dialog') ||
+                    cls.includes('p-dialog') ||
+                    cls.includes('pje-modal') ||
+                    cls.includes('pje-etiquetas') ||
+                    cls.includes('label-etiqueta') ||
+                    cls.includes('label-info') ||
+                    cls.includes('badge') ||
+                    cls.includes('chip') ||
+                    cls.includes('tag') ||
+                    cls.includes('toolbar')
+                )) {
+                    return true;
+                }
+
+                /* Custom Elements de UI (tags contendo hifen, ex: bard-mode-switcher, mat-icon-button) */
+                if (tagUpper.indexOf('-') !== -1) {
+                    const tagLower = tagUpper.toLowerCase();
+                    if (
+                        tagLower.indexOf('-button') !== -1 ||
+                        tagLower.indexOf('-btn') !== -1 ||
+                        tagLower.indexOf('-picker') !== -1 ||
+                        tagLower.indexOf('-switcher') !== -1 ||
+                        tagLower.indexOf('-selector') !== -1 ||
+                        tagLower.indexOf('-dropdown') !== -1 ||
+                        tagLower.indexOf('-toggle') !== -1 ||
+                        tagLower.indexOf('-item') !== -1 ||
+                        tagLower.indexOf('-icon') !== -1 ||
+                        tagLower.indexOf('-toolbar') !== -1 ||
+                        tagLower.indexOf('-menu') !== -1 ||
+                        tagLower.indexOf('-tab') !== -1 ||
+                        tagLower.startsWith('bard-') ||
+                        tagLower.startsWith('mat-') ||
+                        tagLower.startsWith('mdc-') ||
+                        tagLower.startsWith('gws-')
+                    ) {
+                        return true;
+                    }
+                }
+
+                const role = atual.getAttribute('role');
+                if (role && ROLES_INTERATIVOS.has(role.toLowerCase())) {
+                    return true;
+                }
+
+                for (let i = 0; i < ATRIBUTOS_ESTADO_INTERATIVO.length; i++) {
+                    if (atual.hasAttribute(ATRIBUTOS_ESTADO_INTERATIVO[i])) {
+                        return true;
+                    }
+                }
+
+                /* Inspecao de propriedades e atributos de eventos de mouse e clique (onclick, onmouse*, etc.) */
+                if (
+                    atual.onclick ||
+                    atual.onmousedown ||
+                    atual.onmouseup ||
+                    atual.onmouseover ||
+                    atual.onmouseenter ||
+                    atual.onmouseleave ||
+                    atual.onpointerdown ||
+                    atual.onpointerup ||
+                    atual.ondblclick
+                ) {
+                    return true;
+                }
+
+                if (atual.attributes && atual.attributes.length > 0) {
+                    for (let a = 0; a < atual.attributes.length; a++) {
+                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
+                        if (
+                            attrNome.startsWith('on') ||
+                            attrNome === '(click)' ||
+                            attrNome === '@click' ||
+                            attrNome.startsWith('v-on:') ||
+                            attrNome.startsWith('ng-')
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+
+                /* Inspecao de Estilos Computados (limitada aos 6 ancestrais mais proximos para evitar Layout Thrashing):
+                 * cursor pointer ("maozinha"), help ("ajuda"), grab e user-select none */
+                if (profundidade <= 6) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st) {
+                            const cur = st.cursor;
+                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
+                                return true;
+                            }
+                            const us = st.userSelect || st.webkitUserSelect;
+                            if (us === 'none') {
+                                return true;
+                            }
+                        }
+                    } catch (_) { }
+                }
+            }
+
+            /* Subida na arvore atravessando Shadow DOM para o Host do componente */
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+
+        return false;
+    }
+
+    /*
+     * FUNCAO: isElementoInterativoClicavelDireto
+     * DIRETRIZ ROOT 2.17: Identifica elementos clicaveis diretos (links <a href>, botoes,
+     * controles de formulario, icones "maozinha" cursor:pointer ou "help" cursor:help,
+     * ou elementos com eventos onclick/onmouse*) nos quais um clique simples SEM teclas
+     * modificadoras JAMAIS deve selecionar ou copiar (nem mesmo se contiver datas ou numeros).
+     */
+    function isElementoInterativoClicavelDireto(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!atual) return false;
+        if (isAreaLeituraOuPdfConteudo(atual) || isCelulaTabelaDadosLeitura(atual)) {
+            return false;
+        }
+        let profundidade = 0;
+
+        const TAGS_CLICAVEIS = new Set([
+            'A', 'BUTTON', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
+            'SUMMARY', 'DETAILS', 'LABEL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU'
+        ]);
+        const ROLES_CLICAVEIS = new Set([
+            'button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+            'tab', 'switch', 'combobox', 'listbox', 'option', 'checkbox', 'radio', 'treeitem'
+        ]);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_CLICAVEIS.has(tagUpper)) return true;
+
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_CLICAVEIS.has(role)) return true;
+
+                if (
+                    atual.onclick ||
+                    atual.onmousedown ||
+                    atual.onmouseup ||
+                    atual.onmouseover ||
+                    atual.onmouseenter ||
+                    atual.onmouseleave ||
+                    atual.onpointerdown ||
+                    atual.onpointerup ||
+                    atual.ondblclick
+                ) {
+                    return true;
+                }
+
+                if (atual.attributes && atual.attributes.length > 0) {
+                    for (let a = 0; a < atual.attributes.length; a++) {
+                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
+                        if (
+                            attrNome.startsWith('on') ||
+                            attrNome === '(click)' ||
+                            attrNome === '@click' ||
+                            attrNome.startsWith('v-on:') ||
+                            attrNome === 'ng-click' ||
+                            attrNome === 'jsaction' ||
+                            attrNome === 'routerlink'
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+
+                if (profundidade <= 6) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st) {
+                            const cur = st.cursor;
+                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
+                                return true;
+                            }
+                        }
+                    } catch (_) { }
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isComponenteBotaoOuFormularioEstrito
+     * DIRETRIZ ROOT 2.17 e 6.20: Identifica estritamente componentes de acao interativa
+     * que funcionam por clique de comando ou entrada de dados (botoes <button>, [role="button"],
+     * icones de acao, controles de formulario <input>, <select>, <textarea>, <option>, <label>,
+     * gatilhos de dropdown [aria-haspopup], switches, checkboxes, radios e toolbars).
+     * Permite distinguir botoes/forms estritos de containers/textos de interface (como <div>,
+     * <span>, <small>, <td>, <h3> ou links informativos no PJe) onde mascaras forenses
+     * (datas, horas, data+hora, CPF, CNPJ, processos CNJ, IDs) podem ser auto-copiadas no clique simples.
+     */
+    function isComponenteBotaoOuFormularioEstrito(el) {
+        if (!el) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+
+        const TAGS_BOTAO_OU_FORM = new Set([
+            'BUTTON', 'INPUT', 'SELECT', 'OPTION', 'OPTGROUP', 'TEXTAREA',
+            'LABEL', 'SUMMARY', 'DETAILS', 'MAT-ICON', 'G-ICON', 'MD-ICON',
+            'SVG', 'PATH', 'CANVAS', 'AUDIO', 'VIDEO', 'MENU', 'DIALOG'
+        ]);
+        const ROLES_BOTAO_OU_FORM = new Set([
+            'button', 'switch', 'checkbox', 'radio', 'combobox', 'listbox',
+            'option', 'slider', 'spinbutton', 'scrollbar', 'toolbar', 'tab',
+            'menuitem', 'menuitemcheckbox', 'menuitemradio', 'searchbox', 'textbox'
+        ]);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 15) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_BOTAO_OU_FORM.has(tagUpper)) return true;
+
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_BOTAO_OU_FORM.has(role)) return true;
+
+                if (
+                    atual.hasAttribute('aria-haspopup') ||
+                    atual.hasAttribute('aria-expanded') ||
+                    atual.hasAttribute('aria-pressed') ||
+                    atual.hasAttribute('aria-checked')
+                ) {
+                    return true;
+                }
+
+                if (tagUpper.indexOf('-') !== -1) {
+                    const tagLower = tagUpper.toLowerCase();
+                    if (
+                        tagLower.indexOf('-button') !== -1 ||
+                        tagLower.indexOf('-btn') !== -1 ||
+                        tagLower.indexOf('-picker') !== -1 ||
+                        tagLower.indexOf('-switcher') !== -1 ||
+                        tagLower.indexOf('-selector') !== -1 ||
+                        tagLower.indexOf('-dropdown') !== -1 ||
+                        tagLower.indexOf('-toggle') !== -1 ||
+                        tagLower.indexOf('-icon') !== -1 ||
+                        tagLower.indexOf('-toolbar') !== -1 ||
+                        tagLower.indexOf('-menu') !== -1
+                    ) {
+                        return true;
+                    }
+                }
+
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (cls && (
+                    /\bbtn\b/.test(cls) ||
+                    /\bbutton\b/.test(cls) ||
+                    cls.includes('btn-') ||
+                    cls.includes('mat-button') ||
+                    cls.includes('mat-icon-button') ||
+                    cls.includes('mat-raised-button') ||
+                    cls.includes('mat-flat-button') ||
+                    cls.includes('mat-stroked-button') ||
+                    cls.includes('p-button') ||
+                    cls.includes('ui-button') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('dropdown-toggle') ||
+                    cls.includes('toolbarbutton') ||
+                    cls.includes('fa-') ||
+                    cls.includes('glyphicon') ||
+                    cls.includes('material-icons')
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: localizarBlocoForenseAutoSelecionavelEmInterface
+     * DIRETRIZ ROOT 6.20: Verifica se a posicao clicada dentro de um container de interface
+     * (como cabeçalho de documento PJe, arvore de timeline, <div>, <span>, <small>, <td> ou <a>)
+     * incide sobre uma mascara/bloco estruturado forense (datas em qualquer formato, horas,
+     * combinacoes de data+hora, CPF, CNPJ, processos CNJ, IDs numericos, protocolos, moedas, etc.).
+     * Respeita integralmente as regras de selecao do motor (Passo 7.2.4):
+     * - Em datas seguidas de horario (ex: "05/10/2026 20:38:19" ou "22/10/2026 13:27:16"):
+     *   * 1 clique sobre a data: seleciona apenas a data ("05/10/2026");
+     *   * 1 clique sobre a hora: seleciona apenas a hora ("20:38:19");
+     *   * 1 clique no espaco/separador entre data e hora (ou 2 cliques): seleciona os dois ("05/10/2026 20:38:19").
+     */
+    function localizarBlocoForenseAutoSelecionavelEmInterface(texto, idxCursor, numCliques = 1, combinarDataHoraNoCliqueUnico = false) {
+        if (typeof texto !== 'string' || texto.length === 0) return null;
+        if (idxCursor < 0 || idxCursor > texto.length) return null;
+
+        const ehDuplo = numCliques >= 2;
+        const charNoCursor = texto[idxCursor] || '';
+        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+
+        let res = tentarExpandirPadraoComposto(texto, idxCursor, ehDuplo || clicouEmEspaco, ehDuplo);
+
+        /* Somente se combinarDataHoraNoCliqueUnico for explicitamente solicitado como true,
+         * forca a combinacao no clique simples; por padrao (false), respeita 100% a regra de
+         * data isolada / hora isolada / espaco ou 2 cliques para ambos. */
+        if (combinarDataHoraNoCliqueUnico && (!res || res.grupo === 'DATA_COM_HORARIO_CONTIGUO' || res.grupo === 'DATAS_E_HORARIOS')) {
+            const resCompostoIntegral = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
+            if (resCompostoIntegral && resCompostoIntegral.grupo === 'DATA_COM_HORARIO_CONTIGUO') {
+                res = resCompostoIntegral;
+            }
+        }
+
+        if (!res) return null;
+        const trecho = texto.substring(res.inicio, res.fim).trim();
+        if (!trecho || trecho.length < 2) return null;
+        return res;
+    }
+
+    /*
+     * FUNCAO: isElementoOcultoNoDom
+     * DIRETRIZ ROOT: Verifica se um elemento esta oculto na tela (display: none, visibility: hidden,
+     * [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, opacity: 0 ou font-size: 0px)
+     * para garantir que textos ocultos dentro de links ou blocos nunca sejam copiados.
+     */
+    function isElementoOcultoNoDom(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+        if (el.hidden || el.hasAttribute('hidden')) return true;
+        if (el.getAttribute('aria-hidden') === 'true') return true;
+        if (el.hasAttribute('data-jusgov-ignore')) return true;
+
+        const cls = (typeof el.className === 'string') ? el.className.toLowerCase() : '';
+        if (cls && (
+            /\bsr-only\b/.test(cls) ||
+            /\bvisually-hidden\b/.test(cls) ||
+            /\bscreen-reader-text\b/.test(cls) ||
+            /\bd-none\b/.test(cls) ||
+            /\bhidden\b/.test(cls) ||
+            /\bui-helper-hidden\b/.test(cls)
+        )) {
+            return true;
+        }
+
+        const stInline = (el.getAttribute('style') || '').toLowerCase().replace(/\s+/g, '');
+        if (
+            stInline.includes('display:none') ||
+            stInline.includes('visibility:hidden') ||
+            stInline.includes('visibility:collapse') ||
+            stInline.includes('opacity:0;') ||
+            stInline.endsWith('opacity:0') ||
+            stInline.includes('font-size:0px') ||
+            stInline.includes('font-size:0;')
+        ) {
+            return true;
+        }
+
+        if (el.isConnected && typeof window.getComputedStyle === 'function') {
+            try {
+                const comp = window.getComputedStyle(el);
+                if (comp) {
+                    if (comp.display === 'none' || comp.visibility === 'hidden' || comp.visibility === 'collapse') {
+                        return true;
+                    }
+                    if (comp.opacity === '0' || comp.fontSize === '0px') {
+                        return true;
+                    }
+                }
+            } catch (_) { }
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: extrairTextoVisivelLimpoDeElemento
+     * DIRETRIZ ROOT: Extrai exclusivamente o texto visivel de um link, botao ou controle
+     * ignorando completamente filhos ocultos (display:none, visibility:hidden, aria-hidden, sr-only, etc.)
+     * e aplicando os filtros de higienizacao.
+     */
+    function extrairTextoVisivelLimpoDeElemento(el) {
+        if (!el) return '';
+        try {
+            let partes = [];
+            const percorrer = (no) => {
+                if (!no) return;
+                if (no.nodeType === Node.ELEMENT_NODE) {
+                    const tag = (no.tagName || '').toUpperCase();
+                    if (
+                        tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
+                        tag === 'SVG' || tag === 'CANVAS' || tag === 'TEMPLATE' ||
+                        isElementoOcultoNoDom(no)
+                    ) {
+                        return;
+                    }
+                    if (typeof no.matches === 'function' && no.matches('[class*="desvincular"], [class*="icon-desvincular"], .fa-times, .fa-close, [title*="Excluir"], [title*="Remover"], [title*="Desvincular"]')) {
+                        return;
+                    }
+                    if (tag === 'BR') {
+                        partes.push(' ');
+                        return;
+                    }
+                    const filhos = no.childNodes;
+                    for (let i = 0; i < filhos.length; i++) {
+                        percorrer(filhos[i]);
+                    }
+                } else if (no.nodeType === Node.TEXT_NODE) {
+                    const val = no.nodeValue || '';
+                    if (val) partes.push(val);
+                }
+            };
+            percorrer(el);
+            const bruto = partes.join('')
+                .replace(/[\r\n\t]+/g, ' ')
+                .replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ')
+                .trim();
+            if (bruto) {
+                return higienizarTextoParaCopia(bruto) || bruto;
+            }
+            const fallbackInner = (typeof el.innerText === 'string')
+                ? el.innerText.replace(/[\r\n\t]+/g, ' ').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim()
+                : '';
+            return fallbackInner ? (higienizarTextoParaCopia(fallbackInner) || fallbackInner) : '';
+        } catch (_) {
+            return (el.innerText || '').replace(/[\r\n\t]+/g, ' ').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim();
+        }
+    }
+
+    /*
+     * FUNCAO: extrairTextoLinkUmaLinha
+     * DIRETRIZ ROOT 6.28 (Alt + 3 Cliques em Links):
+     * Seleciona e extrai TODO O TEXTO VISIVEL de um link (<a> ou [role="link"]),
+     * mesmo que ele ocupe duas ou mais linhas visuais, possua <br>, \r\n, \n ou
+     * multiplos blocos/spans internos, unificando tudo em UMA UNICA LINHA
+     * devidamente separada por espacos simples (' ').
+     */
+    function extrairTextoLinkUmaLinha(elLink) {
+        if (!elLink) return '';
+        try {
+            let partes = [];
+            const TAGS_SEPARACAO_LINHA = new Set([
+                'DIV', 'P', 'LI', 'TR', 'TD', 'TH', 'SECTION', 'ARTICLE',
+                'HEADER', 'FOOTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE'
+            ]);
+            const percorrer = (no) => {
+                if (!no) return;
+                if (no.nodeType === Node.ELEMENT_NODE) {
+                    const tag = (no.tagName || '').toUpperCase();
+                    if (
+                        tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
+                        tag === 'SVG' || tag === 'CANVAS' || tag === 'TEMPLATE' ||
+                        isElementoOcultoNoDom(no)
+                    ) {
+                        return;
+                    }
+                    if (typeof no.matches === 'function' && no.matches('[class*="desvincular"], [class*="icon-desvincular"], .fa-times, .fa-close, [title*="Excluir"], [title*="Remover"], [title*="Desvincular"]')) {
+                        return;
+                    }
+                    if (tag === 'BR') {
+                        partes.push(' ');
+                        return;
+                    }
+                    const ehBlocoSeparador = TAGS_SEPARACAO_LINHA.has(tag);
+                    if (ehBlocoSeparador && partes.length > 0) {
+                        partes.push(' ');
+                    }
+                    const filhos = no.childNodes;
+                    for (let i = 0; i < filhos.length; i++) {
+                        percorrer(filhos[i]);
+                    }
+                    if (ehBlocoSeparador) {
+                        partes.push(' ');
+                    }
+                } else if (no.nodeType === Node.TEXT_NODE) {
+                    const val = no.nodeValue || '';
+                    if (val) partes.push(val);
+                }
+            };
+            percorrer(elLink);
+            const brutoUmaLinha = partes
+                .join('')
+                .replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
+                .trim();
+            if (brutoUmaLinha) {
+                const higienizado = higienizarTextoParaCopia(brutoUmaLinha) || brutoUmaLinha;
+                return higienizado
+                    .replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
+                    .trim();
+            }
+            const fallbackInner = (typeof elLink.innerText === 'string' ? elLink.innerText : (elLink.textContent || ''))
+                .replace(/[\r\n\t\f\v \u00A0]+/gu, ' ')
+                .trim();
+            if (!fallbackInner) return '';
+            const higFallback = higienizarTextoParaCopia(fallbackInner) || fallbackInner;
+            return higFallback.replace(/[\r\n\t\f\v \u00A0]+/gu, ' ').trim();
+        } catch (_) {
+            return ((elLink && (elLink.innerText || elLink.textContent)) || '')
+                .replace(/[\r\n\t\f\v \u00A0]+/gu, ' ')
+                .trim();
+        }
+    }
+
+    /*
+     * FUNCAO: isContextoDeSistemaOuUi
+     * DIRETRIZ ROOT 2.17: Identifica se um elemento ou qualquer de seus ancestrais pertence
+     * a telas de sistema / controles (modais, caixas de dialogo, dropdowns, menus contextuais,
+     * listas de selecao tipo select/option, botoes e formulários de controle).
+     */
+    function isContextoDeSistemaOuUi(el) {
+        if (!el) return false;
+        return isElementoInterativoOuUi(el);
+    }
+
+    function isTelaSistemaEstritaParaDesselecao(el) {
+        if (!el) return false;
+        if (isAreaLeituraOuPdfConteudo(el)) return false;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+        const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU']);
+        const ROLES_ESTRITOS = new Set(['button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option', 'dialog', 'alertdialog', 'toolbar']);
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (TAGS_ESTRITAS.has(tagUpper)) return true;
+                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') return true;
+                const role = (atual.getAttribute('role') || '').toLowerCase();
+                if (role && ROLES_ESTRITOS.has(role)) return true;
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                if (cls && (
+                    cls.includes('modal') ||
+                    cls.includes('dialog') ||
+                    cls.includes('dropdown') ||
+                    cls.includes('popover') ||
+                    cls.includes('ui-selectonemenu') ||
+                    cls.includes('select2') ||
+                    cls.includes('context-menu') ||
+                    cls.includes('mat-dialog') ||
+                    cls.includes('p-dialog') ||
+                    cls.includes('pje-modal') ||
+                    cls.includes('pje-etiquetas') ||
+                    cls.includes('label-etiqueta') ||
+                    cls.includes('label-info') ||
+                    cls.includes('badge') ||
+                    cls.includes('chip') ||
+                    cls.includes('tag') ||
+                    cls.includes('toolbar')
+                )) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return false;
+    }
+
+    function normalizarModoRetirarSelecao(val) {
+        const v = String(val || '').trim().toLowerCase();
+        if (v === 'total' || v === 'interface' || v === 'nenhuma') return v;
+        return 'total_exceto_arrasto';
+    }
+
+    /*
+     * FUNCAO: deveManterSelecaoAtivaNoDom
+     * DIRETRIZ ROOT 6.16 e 6.27: Regra de Retencao / Remocao da Selecao do Sistema:
+     * - Se modoRetirarSelecao === 'nenhuma': MANTEM a selecao ativa sempre (nao retira de nada).
+     * - Se modoRetirarSelecao === 'total': REMOVE a selecao sempre (tanto interface web quanto texto de leitura).
+     * - Se modoRetirarSelecao === 'total_exceto_arrasto':
+     *   - Se for arrasto de mouse (eraArrasto === true): MANTEM a selecao ativa.
+     *   - Se for clique simples, duplo, triplo, Alt, Shift, etc.: REMOVE a selecao.
+     * - Se modoRetirarSelecao === 'interface' (padrao):
+     *   - Se pertencer a area de leitura/texto judicial ou documento PDF aberto no Chrome
+     *     (excluindo barras de ferramentas e controles do PDF): MANTEM a selecao ativa no sistema.
+     *   - Se for elemento de interface grafica/controle/modal estrito: REMOVE imediatamente a selecao do sistema.
+     */
+    function deveManterSelecaoAtivaNoDom(noOuElemento, eraArrasto = false) {
+        if (modoRetirarSelecao === 'nenhuma') return true;
+        if (modoRetirarSelecao === 'total') return false;
+        if (modoRetirarSelecao === 'total_exceto_arrasto') {
+            return (eraArrasto === true);
+        }
+        if (!noOuElemento) return true;
+        if (isElementoControlePdf(noOuElemento)) return false;
+        if (isAreaLeituraOuPdfConteudo(noOuElemento)) return true;
+        if (isTelaSistemaEstritaParaDesselecao(noOuElemento)) return false;
+        return true;
+    }
+
+    /*
+     * FUNCAO SENSORA: Sensor de Campo de Digitacao (Validador Rapido O(1))
+     * O PORQUE: Permite identificar rapidamente se um elemento e um campo de digitacao
+     * ativo (input de texto, data, busca, email, numero, etc. ou textarea) que nao seja
+     * somente-leitura ou desabilitado, espelhando o comportamento comprovado do JusGovBR.
+     */
+    function isCampoDeTextoValido(target) {
+        if (!target || target.nodeType !== Node.ELEMENT_NODE) return false;
+        const tag = (target.tagName || '').toUpperCase();
+        if (tag === 'INPUT') {
+            const type = (target.getAttribute('type') || target.type || 'text').toLowerCase();
+            const tiposNaoTexto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'file', 'image', 'range', 'color'];
+            return !tiposNaoTexto.includes(type) && !target.readOnly && !target.disabled;
+        }
+        if (tag === 'TEXTAREA') {
+            return !target.readOnly && !target.disabled;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isElementoInterfaceDeEditorRico
+     * DIRETRIZ ROOT 6.31: Identifica se o elemento clicado (ou qualquer ancestral na cadeia pai/avo)
+     * pertence a INTERFACE DE CONTROLE / BARRA DE FERRAMENTAS de um editor rico (ex.: CKEditor cke_*,
+     * cke_*editor, cke_top, cke_toolbox, cke_toolbar, cke_combo, cke_button, TinyMCE mce-toolbar/tox-toolbar,
+     * Quill ql-toolbar, toolbar do editor demo) e NAO ao corpo editavel do documento (cke_editable /
+     * contenteditable="true").
+     */
+    function isElementoInterfaceDeEditorRico(target) {
+        if (!target) return false;
+        let atual = (target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
+        if (!atual || atual.nodeType !== Node.ELEMENT_NODE) return false;
+
+        const docOwner = atual.ownerDocument || document;
+        let profundidade = 0;
+
+        while (atual && atual !== docOwner && profundidade < 25) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const attrCe = (atual.getAttribute('contenteditable') || '').toLowerCase();
+                if (attrCe === 'true') {
+                    return false;
+                }
+                const cls = (typeof atual.className === 'string') ? atual.className : '';
+                const id = (typeof atual.id === 'string') ? atual.id : '';
+                const clsLower = cls.toLowerCase();
+                const idLower = id.toLowerCase();
+
+                /* Se alcancou a raiz editavel do documento CKEditor/Quill/TinyMCE/ProseMirror,
+                 * significa que o elemento esta DENTRO da folha de edicao e nao na barra de interface */
+                if (
+                    /\b(cke_editable|mce-content-body|ql-editor|prosemirror|editor-content-area)\b/i.test(clsLower) &&
+                    attrCe !== 'false'
+                ) {
+                    return false;
+                }
+
+                /* Checa se o elemento, pai ou avo pertence a interface de ferramentas/chrome do editor (cke_*, cke_*editor, etc.) */
+                const ehClasseOuIdCkeUi = (
+                    (/\bcke_[a-z0-9_-]*/i.test(clsLower) && !/\bcke_editable\b/i.test(clsLower)) ||
+                    (/^cke_/i.test(idLower) && !/\bcke_editable\b/i.test(clsLower)) ||
+                    /cke_[a-z0-9_-]*editor/i.test(clsLower) ||
+                    /cke_[a-z0-9_-]*editor/i.test(idLower)
+                );
+                const ehOutraToolbarEditor = /\b(editor-toolbar-main|ql-toolbar|tox-toolbar|tox-editor-header|tox-menubar|tox-statusbar|mce-toolbar|mce-menubar|mce-statusbar)\b/i.test(clsLower);
+
+                if (ehClasseOuIdCkeUi || ehOutraToolbarEditor) {
+                    return true;
+                }
+            }
+            atual = atual.parentElement;
+        }
+        return false;
+    }
+
+    /*
+     * FUNCAO: isElementoOuAncestralContentEditable
+     * DIRETRIZ ROOT 6.31: Verifica se o elemento clicado, seu pai, seu avo ou qualquer ancestral
+     * ate o <body> do documento (inclusive <body> com contenteditable="true" como no CKEditor do PJe)
+     * possui contenteditable="true" (ou isContentEditable / designMode="on"), garantindo a excecao
+     * estrita para os elementos da interface dos editores (cke_*, cke_*editor, barras de ferramentas).
+     */
+    function isElementoOuAncestralContentEditable(target) {
+        if (!target) return false;
+        try {
+            const el = (target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+
+            /* Excecao obrigatoria: interface de ferramentas/chrome do editor (cke_*, cke_*editor, toolbars) */
+            if (isElementoInterfaceDeEditorRico(el)) {
+                return false;
+            }
+
+            const docOwner = el.ownerDocument || document;
+            let atual = el;
+            let profundidade = 0;
+
+            /* Percorre o proprio elemento, o pai, o avo e os demais ancestrais ate o <body> e <html> */
+            while (atual && atual !== docOwner && profundidade < 35) {
+                profundidade++;
+                if (atual.nodeType === Node.ELEMENT_NODE) {
+                    const attrCe = (atual.getAttribute('contenteditable') || '').toLowerCase();
+                    if (attrCe === 'false') {
+                        return false;
+                    }
+                    if (
+                        attrCe === 'true' ||
+                        attrCe === 'plaintext-only' ||
+                        atual.contentEditable === 'true' ||
+                        atual.isContentEditable === true
+                    ) {
+                        return true;
+                    }
+                    const cls = (typeof atual.className === 'string') ? atual.className : '';
+                    if (cls && /\b(cke_editable|mce-content-body|ql-editor|ProseMirror|editor-content-area)\b/.test(cls)) {
+                        if (
+                            atual.isContentEditable ||
+                            attrCe === 'true' ||
+                            (docOwner.body && (docOwner.body.isContentEditable || (docOwner.body.getAttribute && docOwner.body.getAttribute('contenteditable') === 'true'))) ||
+                            docOwner.designMode === 'on'
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+            }
+
+            if (docOwner && (
+                docOwner.designMode === 'on' ||
+                (docOwner.body && (
+                    docOwner.body.isContentEditable === true ||
+                    docOwner.body.contentEditable === 'true' ||
+                    (docOwner.body.getAttribute && docOwner.body.getAttribute('contenteditable') === 'true')
+                ))
+            )) {
+                return true;
+            }
+
+            return false;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /*
+     * FUNCAO: isEditorMultilinhaValido
+     * OBJETIVO DE RECONSTRUCAO: Identificar de forma robusta e segura se o elemento alvo
+     * ou seu container ancestral (pai, avo, etc.) e um editor de texto multilinha ativo
+     * (textarea editavel ou contenteditable/CKEditor/ProseMirror/Quill), excluindo a interface
+     * de ferramentas do editor (cke_*, cke_*editor).
+     */
+    function isEditorMultilinhaValido(target) {
+        if (!target) return false;
+        try {
+            const el = (target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+            if (isElementoInterfaceDeEditorRico(el)) return false;
+            if (el.tagName === 'TEXTAREA') {
+                return !el.readOnly && !el.disabled;
+            }
+            if (isElementoOuAncestralContentEditable(el)) {
+                return true;
+            }
+            if (typeof el.closest === 'function') {
+                const edTextarea = el.closest('textarea');
+                if (edTextarea) {
+                    return !edTextarea.readOnly && !edTextarea.disabled;
+                }
+            }
+            return false;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /*
+     * FUNCAO: isTextoCampoEstruturadoForense
+     * OBJETIVO DE RECONSTRUCAO: Identificar se o texto fornecido corresponde a um campo
+     * estruturado forense conhecido (Data, Hora, Data+Hora, CPF, CNPJ, Processo CNJ,
+     * Beneficio INSS / NB, Moeda, Telefone, CEP, Dispositivo Legal, etc.), isentando-o
+     * da restricao de tamanho minimo em interfaces.
+     */
+    function isTextoCampoEstruturadoForense(texto) {
+        if (!texto || typeof texto !== 'string') return false;
+        const t = texto.trim();
+        if (!t) return false;
+
+        // 1. Verificacao matematica / validacao estrita de dados forenses (CPF, CNPJ, CNJ, PIS/NIT, Data, Hora, INSS)
+        try {
+            if (validador && typeof validador.auditarEAlerta === 'function') {
+                const resValidacao = validador.auditarEAlerta(t, null);
+                if (resValidacao && (resValidacao.tipo || resValidacao.tipoDado)) return true;
+            }
+        } catch (_) { }
+
+        // 2. Catalogo oficial de padroes juridicos (todas as categorias compostas)
+        if (typeof CATALOGO_PADROES_JURIDICOS !== 'undefined' && Array.isArray(CATALOGO_PADROES_JURIDICOS)) {
+            for (let i = 0; i < CATALOGO_PADROES_JURIDICOS.length; i++) {
+                const entry = CATALOGO_PADROES_JURIDICOS[i];
+                if (!entry || !entry.regexes) continue;
+                for (let j = 0; j < entry.regexes.length; j++) {
+                    const rx = entry.regexes[j];
+                    if (!rx) continue;
+                    try {
+                        const rxGlobal = new RegExp('^(?:' + rx.source + ')$', rx.flags.replace(/[gy]/g, ''));
+                        if (rxGlobal.test(t)) return true;
+                    } catch (_) { }
+                }
+            }
+        }
+
+        // 3. Mascaras pontuais adicionais (PIS/NIT, NB INSS, formatos data/hora compostos, etc.)
+        if (
+            /^\d{2}\/\d{10}$/.test(t) ||
+            /^\d{10}$/.test(t) ||
+            /^\d{1,3}\.\d{3}\.\d{3}-\d$/.test(t) ||
+            /^\d{2}\/(?:\d{1,3}\.\d{3}\.\d{3}-\d)$/.test(t) ||
+            /^\d{3}\.\d{5}\.\d{2}-\d$/.test(t) ||
+            /^\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4}(?:\s*[-–—]?\s*\d{2}:\d{2}(?::\d{2})?)?$/.test(t) ||
+            /^\d{2}:\d{2}(?::\d{2})?$/.test(t) ||
+            /^R\$\s*[\d\.,]+$/.test(t) ||
+            /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/.test(t) ||
+            /^\d{20}$/.test(t)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /*
+     * FUNCAO: verificarProtecaoTamanhoMinimoInterface
+     * OBJETIVO DE RECONSTRUCAO: Em textos da pagina ou elementos de interface, caso nao seja
+     * um campo estruturado, evita a perda acidental do conteudo da Area de Transferencia
+     * quando inexistem teclas modificadoras (clique unico, duplo ou arrasto sem combinacoes
+     * das teclas Ctrl ou Alt).
+     * Assim, se nao for campo estruturado (data, CPF, etc.), exige no minimo esta quantidade
+     * de caracteres (minimoCaracteresInterface: 0, 1, 2, 3, 4, 5, 10; padrao = 5) para
+     * confirmar a copia e o contorno, medidos apos filtrar e eliminar espacos em branco.
+     */
+    function verificarProtecaoTamanhoMinimoInterface(texto, elAlvo, temModificadorTeclado) {
+        if (temModificadorTeclado) return true;
+        if (typeof minimoCaracteresInterface !== 'number' || minimoCaracteresInterface <= 0) return true;
+
+        // Se for um 'campo' estruturado (data, CPF, CNPJ, NB, etc.), sempre aprova sem exigencia de tamanho
+        if (isTextoCampoEstruturadoForense(texto)) {
+            return true;
+        }
+
+        // Nao e campo estruturado: exige no minimo a quantidade configurada de caracteres uteis
+        const textoSemEspacos = (texto || '').replace(/\s+/g, '');
+        if (textoSemEspacos.length < minimoCaracteresInterface) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /*
+     * FUNCAO: classificarContextoElementoAlvo
+     * OBJETIVO DE RECONSTRUCAO: Distinguir com precisao cirurgica entre:
+     * - 'IGNORAR': elementos do proprio plugin ou controles marcados;
+     * - 'CAMPO_SIMPLES_EDITAVEL': inputs de linha unica (<input type="text">, etc.);
+     * - 'EDITOR_MULTILINHA_EDITAVEL': <textarea>, contenteditable, CKEditor, ProseMirror, etc.;
+     * - 'LINK_CLICAVEL': botoes, links, menus, dropdowns e controles de interface interativa;
+     * - 'LEITURA_COMUM': texto estatico da pagina onde a copia automatica atua.
+     */
+    function classificarContextoElementoAlvo(el) {
+        if (!el) return 'IGNORAR';
+
+        /* Passo 2.3: Inspecao de interface de controle de editores ricos (cke_*, cke_*editor, toolbars)
+         * e controles de visualizadores de PDF (<viewer-toolbar>, div#toolbar, etc.):
+         * Excecao estrita (Diretrizes 6.31 e 6.32): Barras de ferramentas de editores e do PDF
+         * NUNCA sao classificados como conteudo editavel nem como leitura comum, mas como LINK_CLICAVEL. */
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (atual && isElementoInterfaceDeEditorRico(atual)) {
+            if (atual.hasAttribute && atual.hasAttribute('data-jusgov-ignore')) return 'IGNORAR';
+            return 'LINK_CLICAVEL';
+        }
+
+        /* Seletor de pagina do PDF (<viewer-page-selector> / input#pageSelector): CAMPO_SIMPLES_EDITAVEL */
+        if (atual) {
+            const ehInputSeletorPaginaPdf = (atual.tagName === 'INPUT' && (
+                atual.id === 'pageSelector' ||
+                atual.getAttribute('aria-label') === 'Número da página' ||
+                (typeof atual.closest === 'function' && atual.closest('viewer-page-selector'))
+            ));
+            if (ehInputSeletorPaginaPdf) {
+                return 'CAMPO_SIMPLES_EDITAVEL';
+            }
+        }
+
+        /* Demais controles do PDF embutido pertencem a interface LINK_CLICAVEL */
+        if (atual && isElementoControlePdf(atual)) {
+            return 'LINK_CLICAVEL';
+        }
+
+        /* Se pertencer a area documental/camada de leitura do PDF, e LEITURA_COMUM */
+        if (atual && isAreaLeituraOuPdfConteudo(atual)) {
+            return 'LEITURA_COMUM';
+        }
+
+        const docOwner = (atual && atual.ownerDocument) ? atual.ownerDocument : document;
+
+        /* Passo 2.4: Inspecao de campos editaveis (Inputs de texto, Textareas e hierarquia pai/avo contenteditable) */
+        while (atual && atual !== docOwner) {
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                if (atual.hasAttribute('data-jusgov-ignore')) return 'IGNORAR';
+
+                const tag = atual.tagName;
+                if (tag === 'TEXTAREA') {
+                    return (!atual.readOnly && !atual.disabled) ? 'EDITOR_MULTILINHA_EDITAVEL' : 'LEITURA_COMUM';
+                }
+
+                if (tag === 'INPUT') {
+                    const tipoInput = (atual.getAttribute('type') || atual.type || 'text').toLowerCase();
+                    const tiposNaoTexto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'file', 'image', 'range', 'color'];
+                    if (!tiposNaoTexto.includes(tipoInput) && !atual.readOnly && !atual.disabled) {
+                        return 'CAMPO_SIMPLES_EDITAVEL';
+                    }
+                    return 'LINK_CLICAVEL';
+                }
+
+                const attrCe = (atual.getAttribute('contenteditable') || '').toLowerCase();
+                if (
+                    atual.isContentEditable ||
+                    atual.contentEditable === 'true' ||
+                    attrCe === 'true' ||
+                    attrCe === 'plaintext-only'
+                ) {
+                    return 'EDITOR_MULTILINHA_EDITAVEL';
+                }
+
+                /* Se o elemento ou qualquer ancestral imediato tem contenteditable explicitamente "false",
+                 * e o proprio elemento alvo nao e editavel, encerra a busca de editores (mas ainda verifica isElementoInterativoOuUi abaixo!) */
+                if (attrCe === 'false' && !el.isContentEditable) {
+                    break;
+                }
+
+                if (atual.classList && (
+                    atual.classList.contains('cke_editable') ||
+                    atual.classList.contains('mce-content-body') ||
+                    atual.classList.contains('ql-editor') ||
+                    atual.classList.contains('ProseMirror') ||
+                    atual.classList.contains('CodeMirror') ||
+                    atual.classList.contains('monaco-editor')
+                )) {
+                    /* So e classificado como editor se for de fato editavel pelo usuario (no proprio elemento, pai/avo ou body).
+                     * Documentos ou visualizadores com classes do CKEditor/Quill/ProseMirror
+                     * mas somente-leitura nao sao editores ativos! */
+                    if (
+                        atual.isContentEditable ||
+                        attrCe === 'true' ||
+                        (docOwner.body && (docOwner.body.isContentEditable || (docOwner.body.getAttribute && docOwner.body.getAttribute('contenteditable') === 'true'))) ||
+                        docOwner.designMode === 'on'
+                    ) {
+                        return 'EDITOR_MULTILINHA_EDITAVEL';
+                    }
+                    break;
+                }
+
+                const role = atual.getAttribute('role');
+                if (role === 'textbox' || role === 'searchbox') {
+                    if (atual.getAttribute('aria-readonly') === 'true' || attrCe === 'false') {
+                        break;
+                    }
+                    if (atual.isContentEditable || attrCe === 'true' || tag === 'TEXTAREA' || tag === 'INPUT') {
+                        const ehMulti = atual.getAttribute('aria-multiline') === 'true' || tag === 'TEXTAREA';
+                        return ehMulti ? 'EDITOR_MULTILINHA_EDITAVEL' : 'CAMPO_SIMPLES_EDITAVEL';
+                    }
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+
+        /* Inspecao de Editores HTML onde document.body e contenteditable (ex: iframe ativo do CKEditor/PJe) */
+        if (docOwner && docOwner.body && (
+            docOwner.body.isContentEditable ||
+            docOwner.body.contentEditable === 'true' ||
+            (docOwner.body.getAttribute && docOwner.body.getAttribute('contenteditable') === 'true') ||
+            docOwner.designMode === 'on'
+        )) {
+            return 'EDITOR_MULTILINHA_EDITAVEL';
+        }
+
+        /* Inspecao de Interface Interativa (Botoes, Dropdowns, Menus, Abas, Controles) */
+        if (isElementoInterativoOuUi(el)) {
+            return 'LINK_CLICAVEL';
+        }
+
+        return 'LEITURA_COMUM';
+    }
+
+    /* ==========================================================================
+     * SECAO 3: CLASSIFICADORES DE CARACTERES EM TEMPO CONSTANTE O(1) (BITMASK)
+     * ========================================================================== */
+    function eAlfanumericoUnicode(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) {
+            return (TABELA_MASCARA_ASCII[c] & (MASCARA_CARACTERE.DIGITO | MASCARA_CARACTERE.LETRA_ASCII)) !== 0;
+        }
+        return EXPRESSOES_REGULARES.CHAR_ALFANUMERICO_UNICODE.test(ch);
+    }
+
+    function eEspacoBranco(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.ESPACO_BRANCO) !== 0;
+        return c === 160 || EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE.test(ch);
+    }
+
+    function ePontuacaoFim(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.PONTUACAO_FIM) !== 0;
+        return c === 8212 || c === 8211 || c === 8230;
+    }
+
+    function eDelimitadorPar(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        return c < 128 && (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.DELIMITADOR_PAR) !== 0;
+    }
+
+    function eCaractereAspas(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.DELIMITADOR_ASPAS) !== 0;
+        return CARACTERES_ASPAS_TODOS.indexOf(ch) !== -1;
+    }
+
+    function eSimboloRepetivel(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128 && (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.SIMBOLO_REPETIVEL) !== 0) {
+            return true;
+        }
+        return EXPRESSOES_REGULARES.CHAR_SIMBOLO_REPETIVEL.test(ch);
+    }
+
+    function eQuebraDeLinha(ch) {
+        return ch === '\n' || ch === '\r';
+    }
+
+    /* ==========================================================================
+     * SECAO 4: RESOLUCAO DO PONTO DE CLIQUE E EXTRACAO DE TEXTO COM JANELA O(1)
+     * ========================================================================== */
+    function garantirSelecaoForcadaEmElemento(alvo) {
+        /* Passo 4.0: Liberar user-select: text !important em botoes, abas, links e textos
+         * bloqueados quando o usuario seleciona com Alt ou Ctrl, impedindo que user-select: none
+         * oculte a marcacao azul da Selection API do navegador. */
+        if (!alvo || alvo.nodeType !== Node.ELEMENT_NODE) return;
+        try {
+            const idEstiloForcado = 'jusgov-estilo-selecao-forcada';
+            if (document.head && !document.getElementById(idEstiloForcado)) {
+                const st = document.createElement('style');
+                st.id = idEstiloForcado;
+                st.setAttribute('data-jusgov-ignore', 'true');
+                st.textContent = '[data-jusgov-selecionavel="true"], [data-jusgov-selecionavel="true"] * { -webkit-user-select: text !important; user-select: text !important; -webkit-user-drag: none !important; }';
+                document.head.appendChild(st);
+            }
+            const containerInterativo = (typeof alvo.closest === 'function')
+                ? (alvo.closest('button, input[type="button"], input[type="submit"], input[type="reset"], a, summary, label, th, td, nav, header, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="switch"], [role="link"]') || alvo)
+                : alvo;
+            containerInterativo.setAttribute('data-jusgov-selecionavel', 'true');
+            const linkAncestral = (typeof alvo.closest === 'function') ? alvo.closest('a') : null;
+            if (linkAncestral) {
+                linkAncestral.setAttribute('draggable', 'false');
+            }
+        } catch (_) { }
+    }
+
+    function isContainerComposto(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return true;
+        const tag = (el.tagName || '').toUpperCase();
+        if (['BODY', 'HTML', 'MAIN', 'ARTICLE', 'SECTION', 'TABLE', 'TBODY', 'THEAD', 'TR', 'UL', 'OL', 'FORM', 'FIELDSET', 'HEADER', 'FOOTER', 'NAV', 'ASIDE', 'P', 'PRE', 'BLOCKQUOTE'].includes(tag)) {
+            return true;
+        }
+        const cls = (typeof el.className === 'string') ? el.className.toLowerCase() : '';
+        if (cls && (
+            cls.includes('card') ||
+            cls.includes('tarefa') ||
+            cls.includes('timeline') ||
+            cls.includes('pje-task') ||
+            cls.includes('panel') ||
+            cls.includes('row') ||
+            cls.includes('container') ||
+            cls.includes('list-group')
+        )) {
+            return true;
+        }
+        if (el.querySelector('table, tr, td, p, h1, h2, h3, h4, h5, h6, [class*="card"], [class*="tarefa"], [class*="timeline"], [class*="row"]')) {
+            return true;
+        }
+        // Descarta botoes/icones de exclusao de tags para nao contar indevidamente como multiplos controles
+        const controles = Array.from(el.querySelectorAll('button, a, input, select, [role="button"], [class*="label-etiqueta"], [class*="badge"], [class*="chip"]'))
+            .filter(c => !c.closest('[class*="desvincular"], [class*="icon-desvincular"], [class*="close"], [class*="remove"], [class*="delete"], [class*="excluir"], [title*="Excluir"], [title*="Remover"], [title*="Desvincular"], .fa-times, .fa-close, .fa-remove, mat-icon'));
+        if (controles.length > 1) {
+            return true;
+        }
+        const txt = (el.innerText || el.textContent || '').trim();
+        if (txt.length > 120) {
+            return true;
+        }
+        return false;
+    }
+
+    function obterObjetoInterativoParaSelecaoCompleta(alvo) {
+        /* Passo 4.0.0: Identificar se o alvo clicado com Alt pertence a um controle de acao/interface
+         * (etiqueta/badge/chip [sem botoes de remocao irmaos], botao, link, aba, switch, menu, option)
+         * para que Alt + Clique selecione e copie o texto do objeto com Flash Verde.
+         * DIRETRIZ RESTRICAO DE CONTAINER: Jamais sobe para capturar containers inteiros (cards, linhas
+         * de tarefa, paineis). Se nao for controle pontual de interface, retorna null para que
+         * Alt + Clique selecione exclusivamente a palavra sob o cursor! */
+        if (!alvo) return null;
+        const elBase = alvo.nodeType === Node.ELEMENT_NODE ? alvo : alvo.parentElement;
+        if (!elBase || typeof elBase.closest !== 'function') return null;
+
+        // Se o proprio elemento foi explicitamente marcado como selecionavel de interface pelo addon:
+        if (elBase.hasAttribute('data-jusgov-selecionavel') && elBase.getAttribute('data-jusgov-selecionavel') === 'true') {
+            return elBase;
+        }
+
+        // 1. Caso Especial: Etiquetas, Badges, Chips, Tags com botoes irmaos de acao/desvinculacao
+        const SELETOR_ETIQUETA_OU_BADGE = [
+            '[class*="label-etiqueta"]', '[class*="label-info"]', '[class*="label-warning"]',
+            '[class*="label-success"]', '[class*="label-danger"]', '[class*="label-primary"]',
+            '[class*="label-default"]', '[class*="label-secondary"]', '[class*="badge"]',
+            '[class*="chip"]', '[class*="tag"]', '[class*="pill"]', '[pmr-cor-padrao-etiqueta]',
+            '[class*="etiqueta"]', '.label'
+        ].join(', ');
+
+        const SELETOR_BOTAO_EXCLUSAO_ETIQUETA = [
+            '[class*="desvincular"]', '[class*="icon-desvincular"]', '[class*="close"]',
+            '[class*="remove"]', '[class*="delete"]', '[class*="excluir"]',
+            '[title*="Excluir"]', '[title*="Remover"]', '[title*="Desvincular"]',
+            '.fa-times', '.fa-close', '.fa-remove', 'mat-icon'
+        ].join(', ');
+
+        const containerEtiqueta = elBase.closest(SELETOR_ETIQUETA_OU_BADGE);
+        if (containerEtiqueta) {
+            // Se o clique incidiu no botao de excluir/desvincular a tag, ignora para permitir acao nativa
+            if (elBase.closest(SELETOR_BOTAO_EXCLUSAO_ETIQUETA)) {
+                return null;
+            }
+            // Se o elemento clicado for um span/texto interno da etiqueta:
+            if (elBase !== containerEtiqueta && (elBase.tagName === 'SPAN' || elBase.tagName === 'B' || elBase.tagName === 'STRONG' || elBase.tagName === 'EM')) {
+                return elBase;
+            }
+            // Se o usuario clicou no containerEtiqueta diretamente, localiza o span de texto excluindo botoes de remocao
+            const spans = Array.from(containerEtiqueta.querySelectorAll('span, b, strong, em'));
+            const spanTexto = spans.find(sp => {
+                return !sp.closest(SELETOR_BOTAO_EXCLUSAO_ETIQUETA) && (sp.innerText || sp.textContent || '').trim().length > 0;
+            });
+            if (spanTexto) {
+                return spanTexto;
+            }
+            if (!isContainerComposto(containerEtiqueta)) {
+                return containerEtiqueta;
+            }
+        }
+
+        // 2. Controles Semanticos Reais (Botoes, Links, Abas, Switches, Menus, Selects/Options)
+        const elSemantico = elBase.closest(
+            'a[href], a, button, input[type="button"], input[type="submit"], input[type="reset"], summary, option, select, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="tab"], [role="option"], [role="switch"], [role="link"], [role="treeitem"], [role="combobox"], [aria-haspopup], [aria-expanded], [class*="menu-item"], [class*="menuitem"], [class*="dropdown-item"], [class*="ui-selectonemenu-item"], [class*="select2-results__option"], li'
+        );
+        if (elSemantico) {
+            // Rejeita containers compostos falsos (ex: <a> ou [role="button"] que envelopa um card inteiro)
+            if (!isContainerComposto(elSemantico)) {
+                if (elSemantico.tagName === 'LI') {
+                    const parenteLista = elSemantico.closest('[role="listbox"], [role="menu"], ul, ol');
+                    const ehItemInterativo = parenteLista && (
+                        isElementoInterativoOuUi(parenteLista) ||
+                        (elSemantico.className && (elSemantico.className.includes('item') || elSemantico.className.includes('option')))
+                    );
+                    if (ehItemInterativo) {
+                        return elSemantico;
+                    }
+                } else {
+                    return elSemantico;
+                }
+            }
+        }
+
+        // 3. Controles Customizados Estritos (div ou span com acao explicita ou role de botao)
+        // Profundidade restrita a no maximo 1 nivel acima para JAMAIS capturar cards, linhas ou paineis!
+        let atual = elBase;
+        let profundidade = 0;
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 2) {
+            profundidade++;
+            if (!isContainerComposto(atual)) {
+                const tagUpper = (atual.tagName || '').toUpperCase();
+                if (['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE'].includes(tagUpper)) {
+                    break;
+                }
+                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
+                const temClasseBotao = cls && (
+                    /\bbtn\b/.test(cls) || /\bbutton\b/.test(cls) || cls.includes('btn-') ||
+                    cls.includes('ui-button') || cls.includes('mat-button') || cls.includes('toolbarbutton')
+                );
+                const temAcaoExplicita = atual.hasAttribute('onclick') || atual.hasAttribute('jsaction') ||
+                    atual.hasAttribute('data-action') || atual.hasAttribute('ng-click');
+
+                if (temClasseBotao || temAcaoExplicita) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st && st.cursor === 'pointer') {
+                            const txt = (atual.innerText || atual.textContent || '').trim();
+                            if (txt.length > 0 && txt.length <= 60 && !txt.includes('\n')) {
+                                return atual;
+                            }
+                        }
+                    } catch (_) { }
+                }
+            }
+            atual = atual.parentElement;
+        }
+
+        return null;
+    }
+
+    function localizarPontoTextoDentroDeElemento(elRaiz, x, y) {
+        /* Passo 4.0.1: Resolver com exatidao o TextNode e o offset do caractere sob (x, y)
+         * mesmo dentro de controles encapsulados como <button>, <summary> ou abas onde
+         * caretRangeFromPoint retorna apenas o ELEMENT_NODE pai.
+         * Otimizacao anti-Layout-Thrashing: verifica a caixa do TextNode primeiro e limita
+         * o total de leituras de caracteres para nunca travar a thread principal. */
+        if (!elRaiz) return null;
+        const walker = document.createTreeWalker(elRaiz, NodeFilter.SHOW_TEXT, null);
+        let melhorNo = null;
+        let melhorOffset = 0;
+        let menorDist = Infinity;
+        let n;
+        let totalTestesRect = 0;
+        const LIMITE_TESTES_RECT = 160;
+        const r = document.createRange();
+
+        while ((n = walker.nextNode())) {
+            const txt = n.nodeValue || '';
+            const len = txt.length;
+            if (len === 0) continue;
+
+            try {
+                r.selectNodeContents(n);
+                const rectNo = r.getBoundingClientRect();
+                if (!rectNo || (rectNo.width === 0 && rectNo.height === 0)) continue;
+                const dxNo = x < rectNo.left ? (rectNo.left - x) : (x > rectNo.right ? (x - rectNo.right) : 0);
+                const dyNo = y < rectNo.top ? (rectNo.top - y) : (y > rectNo.bottom ? (y - rectNo.bottom) : 0);
+                if ((dxNo + dyNo * 2) > 48 && len > 24) continue;
+            } catch (_) { }
+
+            for (let i = 0; i < len; i++) {
+                if (++totalTestesRect > LIMITE_TESTES_RECT) break;
+                try {
+                    r.setStart(n, i);
+                    r.setEnd(n, i + 1);
+                    const rect = r.getBoundingClientRect();
+                    if (!rect || (rect.width === 0 && rect.height === 0)) continue;
+
+                    const dx = x < rect.left ? (rect.left - x) : (x > rect.right ? (x - rect.right) : 0);
+                    const dy = y < rect.top ? (rect.top - y) : (y > rect.bottom ? (y - rect.bottom) : 0);
+                    const dist = dx + dy * 2;
+                    if (dist < menorDist) {
+                        menorDist = dist;
+                        melhorNo = n;
+                        melhorOffset = i;
+                        if (dx === 0 && dy === 0) {
+                            return { no: melhorNo, offset: melhorOffset };
+                        }
+                    }
+                } catch (_) { }
+            }
+            if (totalTestesRect > LIMITE_TESTES_RECT) break;
+        }
+
+        if (melhorNo && menorDist <= 48) {
+            return { no: melhorNo, offset: melhorOffset };
+        }
+        return null;
+    }
+
+    function obterPontoDoClique(x, y, docRef = null) {
+        /* Passo 4.1: Localizar o TextNode e o offset exato sob as coordenadas (x, y) */
+        const doc = docRef || document;
+        const elSobPonto = (doc && typeof doc.elementFromPoint === 'function')
+            ? doc.elementFromPoint(x, y)
+            : null;
+
+        let no = null;
+        let offset = 0;
+
+        if (doc && typeof doc.caretRangeFromPoint === 'function') {
+            const r = doc.caretRangeFromPoint(x, y);
+            if (r) {
+                no = r.startContainer;
+                offset = r.startOffset;
+            }
+        } else if (doc && typeof doc.caretPositionFromPoint === 'function') {
+            const pos = doc.caretPositionFromPoint(x, y);
+            if (pos) {
+                no = pos.offsetNode;
+                offset = pos.offset;
+            }
+        }
+
+        if (!no || no.nodeType !== Node.TEXT_NODE) {
+            const containerInterativo = (elSobPonto && typeof elSobPonto.closest === 'function')
+                ? elSobPonto.closest('a, button, summary, select, option, li, div, span, small, td, th, h1, h2, h3, h4, h5, h6, p, [role="tab"], [role="button"], [role="menuitem"], [role="option"], [role="link"]')
+                : null;
+            const containerAlvo = containerInterativo || elSobPonto;
+            if (containerAlvo) {
+                const pt = localizarPontoTextoDentroDeElemento(containerAlvo, x, y);
+                if (pt) return pt;
+            }
+        }
+
+        if (!no) return null;
+
+        if (no.nodeType === Node.ELEMENT_NODE) {
+            const ptInterno = localizarPontoTextoDentroDeElemento(elSobPonto || no, x, y);
+            if (ptInterno) return ptInterno;
+
+            const filhos = no.childNodes;
+            if (offset < filhos.length && filhos[offset].nodeType === Node.TEXT_NODE) {
+                no = filhos[offset];
+                offset = 0;
+            } else if (offset > 0 && filhos[offset - 1].nodeType === Node.TEXT_NODE) {
+                no = filhos[offset - 1];
+                offset = no.textContent.length;
+            } else {
+                return null;
+            }
+        }
+
+        if (no.nodeType !== Node.TEXT_NODE) return null;
+        const tamanhoTexto = no.textContent.length;
+        if (tamanhoTexto === 0) return null;
+
+        /* Passo 4.2: Descartar cliques distantes em margens vazias fora da caixa do glifo */
+        try {
+            const rangeTeste = document.createRange();
+            const idxInicio = offset < tamanhoTexto ? offset : Math.max(0, tamanhoTexto - 1);
+            const idxFim = Math.min(tamanhoTexto, idxInicio + 1);
+            rangeTeste.setStart(no, idxInicio);
+            rangeTeste.setEnd(no, idxFim);
+            const rect = rangeTeste.getBoundingClientRect();
+
+            if (rect && (rect.width > 0 || rect.height > 0)) {
+                const distX = x < rect.left ? (rect.left - x) : (x > rect.right ? (x - rect.right) : 0);
+                const distY = y < rect.top ? (rect.top - y) : (y > rect.bottom ? (y - rect.bottom) : 0);
+                if (distX > 36 || distY > 22) {
+                    return null;
+                }
+                if (x > rect.right && offset < tamanhoTexto) {
+                    offset++;
+                } else if (x < rect.left && offset > 0) {
+                    /* Quando o clique ocorre na metade direita de um caractere (ex: no espaco ' '
+                     * imediatamente antes de '(' em "R$ 65,00 (sessenta e cinco reais)"),
+                     * caretRangeFromPoint arredonda o offset para a fronteira seguinte ('(').
+                     * Se a coordenada X real do mouse estiver a esquerda de rect.left e dentro da
+                     * caixa do caractere anterior (offset - 1), recuamos o offset para apontar
+                     * exatamente para o caractere sob o ponteiro do mouse. */
+                    const rangeAnt = document.createRange();
+                    rangeAnt.setStart(no, offset - 1);
+                    rangeAnt.setEnd(no, offset);
+                    const rectAnt = rangeAnt.getBoundingClientRect();
+                    if (rectAnt && x >= rectAnt.left && x <= rectAnt.right &&
+                        y >= (rectAnt.top - 6) && y <= (rectAnt.bottom + 6)) {
+                        offset--;
+                    }
+                }
+            }
+        } catch (_) { }
+
+        return { no, offset };
+    }
+
+    function obterBlocoAncestralContextual(no) {
+        const docOwner = (no && no.ownerDocument) ? no.ownerDocument : document;
+        let atual = no.nodeType === Node.ELEMENT_NODE ? no : no.parentElement;
+        const TAGS_BLOCO = new Set([
+            'P', 'DIV', 'TD', 'TH', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE',
+            'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'ARTICLE', 'SECTION', 'HEADER', 'FOOTER', 'DD', 'DT', 'TR',
+            'BUTTON', 'SUMMARY', 'LABEL', 'NAV', 'MAIN', 'ASIDE'
+        ]);
+
+        while (atual && atual !== docOwner.body && atual !== docOwner.documentElement) {
+            if (TAGS_BLOCO.has(atual.tagName)) {
+                return atual;
+            }
+            atual = atual.parentElement;
+        }
+        return docOwner.body || document.body;
+    }
+
+    function construirMapaTextoBlocoComJanela(noAlvo, offsetNoAlvo) {
+        /* Passo 4.3: Construir mapa linearizado com janela deslizante O(1) de +-1000 caracteres */
+        const bloco = obterBlocoAncestralContextual(noAlvo);
+        const segmentos = [];
+        let textoCompleto = '';
+        let indiceGlobalClique = -1;
+        const TAGS_SUBBLOCO_QUEBRA = new Set([
+            'P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+            'BLOCKQUOTE', 'PRE', 'TR', 'HR', 'SECTION', 'ARTICLE', 'DD', 'DT'
+        ]);
+
+        const adicionarSeparadorVirtual = (strSep, elRef) => {
+            if (!strSep) return;
+            const iniSep = textoCompleto.length;
+            textoCompleto += strSep;
+            segmentos.push({
+                no: null,
+                ehBr: true,
+                elementoBr: elRef || null,
+                inicioGlobal: iniSep,
+                fimGlobal: iniSep + strSep.length,
+                comprimento: strSep.length
+            });
+        };
+
+        const walker = document.createTreeWalker(
+            bloco,
+            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+            {
+                acceptNode(node) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const tag = node.tagName;
+                        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEMPLATE') {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        if (node.hasAttribute && node.hasAttribute('data-jusgov-ignore')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        if (node !== bloco && isElementoOcultoNoDom(node)) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        if (tag === 'BR') {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        if (node !== bloco && TAGS_SUBBLOCO_QUEBRA.has(tag)) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            }
+        );
+
+        let n;
+        let ultimoTopSpanPosicionado = null;
+        let ultimaAlturaSpanPosicionado = 16;
+
+        while ((n = walker.nextNode())) {
+            if (n.nodeType === Node.ELEMENT_NODE) {
+                if (n.tagName === 'BR') {
+                    adicionarSeparadorVirtual('\n', n);
+                } else if (n !== bloco && TAGS_SUBBLOCO_QUEBRA.has(n.tagName)) {
+                    if (textoCompleto.length > 0 && !textoCompleto.endsWith('\n\n')) {
+                        adicionarSeparadorVirtual(textoCompleto.endsWith('\n') ? '\n' : '\n\n', n);
+                    }
+                }
+                continue;
+            }
+
+            const valor = n.nodeValue || '';
+            if (valor.length === 0) continue;
+
+            /* Deteccao de mudanca de linha ou salto de paragrafo vertical em camadas PDF.js (textLayer) */
+            const elPai = n.parentElement;
+            if (elPai && elPai !== bloco && elPai.style && elPai.style.top) {
+                const topAtual = parseFloat(elPai.style.top);
+                const fontAtual = parseFloat(elPai.style.fontSize) || ultimaAlturaSpanPosicionado;
+                if (!Number.isNaN(topAtual)) {
+                    if (ultimoTopSpanPosicionado !== null && valor.trim().length > 0) {
+                        const deltaTop = Math.abs(topAtual - ultimoTopSpanPosicionado);
+                        if (deltaTop > Math.max(24, fontAtual * 1.68)) {
+                            if (textoCompleto.length > 0 && !textoCompleto.endsWith('\n\n')) {
+                                adicionarSeparadorVirtual(textoCompleto.endsWith('\n') ? '\n' : '\n\n', elPai);
+                            }
+                        } else if (deltaTop > 3) {
+                            const ultimoCh = textoCompleto.length > 0 ? textoCompleto[textoCompleto.length - 1] : '';
+                            if (ultimoCh && !eEspacoBranco(ultimoCh) && !eQuebraDeLinha(ultimoCh) && !eEspacoBranco(valor[0])) {
+                                adicionarSeparadorVirtual(' ', elPai);
+                            }
+                        }
+                    }
+                    if (valor.trim().length > 0) {
+                        ultimoTopSpanPosicionado = topAtual;
+                        ultimaAlturaSpanPosicionado = fontAtual;
+                    }
+                }
+            }
+
+            const inicioSeg = textoCompleto.length;
+            const fimSeg = inicioSeg + valor.length;
+
+            if (n === noAlvo) {
+                indiceGlobalClique = inicioSeg + Math.min(offsetNoAlvo, valor.length);
+            }
+
+            segmentos.push({
+                no: n,
+                ehBr: false,
+                inicioGlobal: inicioSeg,
+                fimGlobal: fimSeg,
+                comprimento: valor.length
+            });
+            textoCompleto += valor;
+        }
+
+        if (indiceGlobalClique === -1 || textoCompleto.length === 0) {
+            return null;
+        }
+
+        const raio = CONFIGURACAO_MOTOR.RAIO_JANELA_DESLIZANTE;
+        let deslocamentoJanela = 0;
+        let textoJanela = textoCompleto;
+
+        if (textoCompleto.length > CONFIGURACAO_MOTOR.LIMITE_CARACTERES_JANELA_MINIMA) {
+            const iniJanela = Math.max(0, indiceGlobalClique - raio);
+            const fimJanela = Math.min(textoCompleto.length, indiceGlobalClique + raio);
+            deslocamentoJanela = iniJanela;
+            textoJanela = textoCompleto.substring(iniJanela, fimJanela);
+        }
+
+        return {
+            bloco,
+            texto: textoJanela,
+            idxCursor: indiceGlobalClique - deslocamentoJanela,
+            deslocamentoJanela,
+            segmentos,
+            tamanhoTotalBloco: textoCompleto.length
+        };
+    }
+
+    function obterPontoDOMNoMapa(mapa, indiceLocal) {
+        if (!mapa) return null;
+        const indiceGlobal = Math.max(0, Math.min(mapa.tamanhoTotalBloco, indiceLocal + mapa.deslocamentoJanela));
+
+        for (let i = 0; i < mapa.segmentos.length; i++) {
+            const seg = mapa.segmentos[i];
+            if (seg.ehBr) continue;
+            if (indiceGlobal >= seg.inicioGlobal && indiceGlobal <= seg.fimGlobal) {
+                return { no: seg.no, offset: indiceGlobal - seg.inicioGlobal };
+            }
+        }
+        return null;
+    }
+
+    function criarRangeDOMAPartirDeIndices(mapa, inicioLocal, fimLocal) {
+        if (!mapa || inicioLocal >= fimLocal) return null;
+
+        let iniLimpo = inicioLocal;
+        let fimLimpo = fimLocal;
+        if (typeof mapa.texto === 'string') {
+            while (iniLimpo < fimLimpo && (eEspacoBranco(mapa.texto[iniLimpo]) || eQuebraDeLinha(mapa.texto[iniLimpo]))) {
+                iniLimpo++;
+            }
+            while (fimLimpo > iniLimpo && (eEspacoBranco(mapa.texto[fimLimpo - 1]) || eQuebraDeLinha(mapa.texto[fimLimpo - 1]))) {
+                fimLimpo--;
+            }
+        }
+        if (iniLimpo >= fimLimpo) return null;
+
+        const inicioGlobal = Math.max(0, iniLimpo + mapa.deslocamentoJanela);
+        const fimGlobal = Math.min(mapa.tamanhoTotalBloco, fimLimpo + mapa.deslocamentoJanela);
+        if (inicioGlobal >= fimGlobal) return null;
+
+        let noIni = null, offIni = 0;
+        let noFim = null, offFim = 0;
+
+        for (let i = 0; i < mapa.segmentos.length; i++) {
+            const seg = mapa.segmentos[i];
+            if (seg.ehBr) continue;
+
+            if (!noIni && inicioGlobal >= seg.inicioGlobal && inicioGlobal <= seg.fimGlobal) {
+                if (inicioGlobal < seg.fimGlobal || i === mapa.segmentos.length - 1) {
+                    noIni = seg.no;
+                    offIni = inicioGlobal - seg.inicioGlobal;
+                }
+            }
+
+            if (!noFim && fimGlobal >= seg.inicioGlobal && fimGlobal <= seg.fimGlobal) {
+                if (fimGlobal > seg.inicioGlobal || i === 0) {
+                    noFim = seg.no;
+                    offFim = fimGlobal - seg.inicioGlobal;
+                    break;
+                }
+            }
+        }
+
+        if (!noIni) {
+            for (let i = 0; i < mapa.segmentos.length; i++) {
+                const seg = mapa.segmentos[i];
+                if (!seg.ehBr && seg.fimGlobal > inicioGlobal) {
+                    noIni = seg.no;
+                    offIni = Math.max(0, inicioGlobal - seg.inicioGlobal);
+                    break;
+                }
+            }
+        }
+        if (!noFim) {
+            for (let i = mapa.segmentos.length - 1; i >= 0; i--) {
+                const seg = mapa.segmentos[i];
+                if (!seg.ehBr && seg.inicioGlobal < fimGlobal) {
+                    noFim = seg.no;
+                    offFim = Math.min(seg.comprimento, fimGlobal - seg.inicioGlobal);
+                    break;
+                }
+            }
+        }
+
+        if (!noIni || !noFim) return null;
+
+        try {
+            const range = document.createRange();
+            range.setStart(noIni, offIni);
+            range.setEnd(noFim, offFim);
+            return range;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /* ==========================================================================
+     * SECAO 5: ARQUITETURA DE FILTRAGEM PROGRESSIVA (3 FILTROS: DADOS, ESTRUTURA, INFORMACOES)
+     *          E GRAVACAO NO CLIPBOARD COM CASCATA TRY/CATCH
+     * ========================================================================== */
+
+    /*
+     * FILTRO 1: DADOS (Higienizacao Inicial de Caracteres e Anti-Lixo PDF)
+     * Remove caracteres zero-width (\u200B-\u200D, \uFEFF, \u2060), soft-hyphens (\u00AD),
+     * caracteres de controle ASCII estranhos (< 32 exceto \r, \n, \t) e normaliza espacos
+     * nao-quebraveis (\u00A0, &nbsp;) para espaco comum ' '.
+     */
+    function aplicarFiltro1DadosLixo(textoBruto) {
+        if (!textoBruto || typeof textoBruto !== 'string') return '';
+        const rxLixo = (typeof EXPRESSOES_REGULARES !== 'undefined' && EXPRESSOES_REGULARES.CARACTERES_LIXO_PDF)
+            ? EXPRESSOES_REGULARES.CARACTERES_LIXO_PDF
+            : /[\u200B-\u200D\uFEFF\u2060\u00AD\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+        return textoBruto
+            .replace(rxLixo, '')
+            .replace(/\u00A0/g, ' ')
+            .replace(/&nbsp;/gi, ' ');
+    }
+
+    /*
+     * FILTRO 3: INFORMACOES (Normalizacao de Linhas, Espacos e Supressao de Linhas em Branco)
+     * - Preserva estritamente novas linhas reais (\n) entre linhas de conteudo.
+     * - Suprime linhas em branco (seja via paragrafo, br ou quebras consecutivas).
+     * - Remove espacos em branco/tabs no inicio e no fim de cada linha (trim por linha).
+     * - Reduz espacos horizontais duplicados indefinidamente no interior da linha para um unico espaco,
+     *   corrigindo tabulacoes incorretas manuais.
+     * - Em blocos de linha unica, aplica conversao de cabecalhos do PJe e remocao de pontuacao de borda.
+     */
+    function aplicarFiltro3InformacoesELinhas(textoBruto) {
+        if (!textoBruto || typeof textoBruto !== 'string') return '';
+
+        const normalizado = textoBruto
+            .replace(/\r\n/g, '\n')
+            .replace(/\r/g, '\n');
+
+        const linhasBrutas = normalizado.split('\n');
+        const linhasUteis = [];
+
+        for (let i = 0; i < linhasBrutas.length; i++) {
+            let linha = linhasBrutas[i]
+                .replace(/^[ \t]+|[ \t]+$/g, '')
+                .replace(/[ \t]{2,}/g, ' ');
+
+            if (linha.length > 0) {
+                linhasUteis.push(linha);
+            }
+        }
+
+        let resultado = linhasUteis.join('\n');
+
+        if (linhasUteis.length === 1) {
+            if (converterCabecalhoPjeAtivo && typeof EXPRESSOES_REGULARES !== 'undefined' && EXPRESSOES_REGULARES.CABECALHO_ID_PJE) {
+                const matchCabecalhoPje = resultado.match(EXPRESSOES_REGULARES.CABECALHO_ID_PJE);
+                if (matchCabecalhoPje) {
+                    const idDoc = matchCabecalhoPje[1];
+                    const pgDoc = matchCabecalhoPje[2];
+                    return pgDoc ? `id ${idDoc}, pg. ${pgDoc}` : `id ${idDoc}`;
+                }
+            }
+
+            if (resultado.length > 1 && typeof EXPRESSOES_REGULARES !== 'undefined' &&
+                EXPRESSOES_REGULARES.SUFIXO_FECHAMENTO_PRESERVADO &&
+                !EXPRESSOES_REGULARES.SUFIXO_FECHAMENTO_PRESERVADO.test(resultado) &&
+                EXPRESSOES_REGULARES.PONTUACAO_BORDA_EXTERNA) {
+                resultado = resultado.replace(EXPRESSOES_REGULARES.PONTUACAO_BORDA_EXTERNA, '').trim();
+            }
+        }
+
+        return resultado;
+    }
+
+    function higienizarTextoParaCopia(textoBruto) {
+        if (!textoBruto || typeof textoBruto !== 'string') return '';
+        let limpo = aplicarFiltro1DadosLixo(textoBruto);
+        if (limpo.indexOf('<') !== -1 && limpo.indexOf('>') !== -1) {
+            limpo = extrairTextoPuroSanitizado(limpo);
+        }
+        return aplicarFiltro3InformacoesELinhas(limpo);
+    }
+
+    function escaparTextoHtmlBasico(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function obterAncestralBlocoLinhaFormatacao(elInicial) {
+        let atual = elInicial;
+        while (atual && atual !== document.body && atual !== document.documentElement) {
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tag = atual.tagName ? atual.tagName.toUpperCase() : '';
+                if (
+                    tag === 'DIV' || tag === 'P' || tag === 'LI' || tag === 'TR' ||
+                    tag === 'H1' || tag === 'H2' || tag === 'H3' || tag === 'H4' ||
+                    tag === 'H5' || tag === 'H6' || tag === 'BLOCKQUOTE' ||
+                    tag === 'SECTION' || tag === 'ARTICLE' || tag === 'PRE'
+                ) {
+                    return atual;
+                }
+                if (atual.isConnected && typeof window.getComputedStyle === 'function') {
+                    try {
+                        const disp = window.getComputedStyle(atual).display;
+                        if (disp === 'block' || disp === 'flex' || disp === 'grid' || disp === 'list-item' || disp === 'table-row') {
+                            return atual;
+                        }
+                    } catch (_) { }
+                }
+            }
+            atual = atual.parentElement;
+        }
+        return document.body || elInicial;
+    }
+
+    function extrairFormatosBasicosDoElementoVivo(elInicial) {
+        let b = false, i = false, u = false, s = false, sup = false, sub = false;
+        let atual = elInicial;
+        while (atual && atual !== document.body && atual !== document.documentElement) {
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const tag = atual.tagName ? atual.tagName.toUpperCase() : '';
+                const st = (atual.getAttribute && atual.getAttribute('style') ? atual.getAttribute('style') : '').toLowerCase();
+
+                if (
+                    tag === 'B' || tag === 'STRONG' ||
+                    tag === 'H1' || tag === 'H2' || tag === 'H3' ||
+                    tag === 'H4' || tag === 'H5' || tag === 'H6' || tag === 'TH' ||
+                    EXPRESSOES_REGULARES.ESTILO_NEGRITO_CSS.test(st)
+                ) {
+                    b = true;
+                }
+                if (
+                    tag === 'I' || tag === 'EM' || tag === 'DFN' || tag === 'CITE' || tag === 'VAR' ||
+                    EXPRESSOES_REGULARES.ESTILO_ITALICO_CSS.test(st)
+                ) {
+                    i = true;
+                }
+                if (tag === 'U' || tag === 'INS' || EXPRESSOES_REGULARES.ESTILO_SUBLINHADO_CSS.test(st)) {
+                    u = true;
+                }
+                if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || st.indexOf('line-through') !== -1) {
+                    s = true;
+                }
+                if (tag === 'SUP' || st.indexOf('vertical-align:super') !== -1 || st.indexOf('vertical-align: super') !== -1) {
+                    sup = true;
+                }
+                if (tag === 'SUB' || st.indexOf('vertical-align:sub') !== -1 || st.indexOf('vertical-align: sub') !== -1) {
+                    sub = true;
+                }
+
+                if (atual.isConnected && typeof window.getComputedStyle === 'function') {
+                    try {
+                        const comp = window.getComputedStyle(atual);
+                        if (comp) {
+                            const peso = parseInt(comp.fontWeight, 10) ||
+                                (comp.fontWeight === 'bold' || comp.fontWeight === 'bolder' ? 700 : 400);
+                            if (peso >= 600) b = true;
+                            if (comp.fontStyle === 'italic' || comp.fontStyle === 'oblique') i = true;
+                            const dec = (comp.textDecorationLine || comp.textDecoration || '').toLowerCase();
+                            if (dec.indexOf('underline') !== -1) u = true;
+                            if (dec.indexOf('line-through') !== -1) s = true;
+                        }
+                    } catch (_) { }
+                }
+            }
+            atual = atual.parentElement;
+        }
+        return { b, i, u, s, sup, sub };
+    }
+
+    function construirHtmlFormatacaoBasica(rangeDOM) {
+        /* Passo 5.2: Preservar EXCLUSIVAMENTE os 5 formatos basicos (<b>, <i>, <u>, <s>, <mark>) e quebras de linha (<br>)
+         * inspecionando os nos vivos do DOM (incluindo multiplas linhas e classes CSS como font-weight: 600),
+         * descartando tamanhos de fonte, familias tipograficas, cores de texto, <code>, <span>, etc. */
+        if (!rangeDOM) {
+            return '';
+        }
+
+        try {
+            const raiz = rangeDOM.commonAncestorContainer;
+            if (!raiz) return '';
+
+            const linhasSegmentos = [[]];
+            let ultimoBlocoLinha = null;
+            let quebraLinhaPendente = false;
+
+            const adicionarTrechoTexto = (noTexto, textoTrecho) => {
+                if (!textoTrecho) return;
+                const limpo = textoTrecho
+                    .replace(EXPRESSOES_REGULARES.INVISIVEIS_ZERO_WIDTH, '')
+                    .replace(EXPRESSOES_REGULARES.ESPACO_NAO_QUEBRAVEL, ' ');
+                if (!limpo) return;
+
+                /* Ignorar nos de indentacao entre blocos HTML (apenas espacos contendo \r ou \n) */
+                if (limpo.trim().length === 0 && (limpo.indexOf('\n') !== -1 || limpo.indexOf('\r') !== -1)) {
+                    return;
+                }
+
+                const elPai = noTexto.parentElement;
+                if (elPai) {
+                    const tagPai = elPai.tagName ? elPai.tagName.toUpperCase() : '';
+                    if (tagPai === 'SCRIPT' || tagPai === 'STYLE' || tagPai === 'NOSCRIPT' || tagPai === 'TEMPLATE') {
+                        return;
+                    }
+                    let ancOculto = elPai;
+                    while (ancOculto && ancOculto !== document.body && ancOculto !== document.documentElement) {
+                        if (isElementoOcultoNoDom(ancOculto)) {
+                            return;
+                        }
+                        ancOculto = ancOculto.parentElement;
+                    }
+                }
+
+                const blocoAtual = obterAncestralBlocoLinhaFormatacao(elPai);
+                if (ultimoBlocoLinha !== null && blocoAtual !== ultimoBlocoLinha) {
+                    quebraLinhaPendente = true;
+                }
+                if (quebraLinhaPendente) {
+                    if (linhasSegmentos[linhasSegmentos.length - 1].length > 0) {
+                        linhasSegmentos.push([]);
+                    }
+                    quebraLinhaPendente = false;
+                }
+                if (limpo.trim().length > 0) {
+                    ultimoBlocoLinha = blocoAtual;
+                }
+
+                const textoNormalizado = limpo
+                    .replace(EXPRESSOES_REGULARES.QUEBRAS_E_TABS, ' ')
+                    .replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ');
+                if (!textoNormalizado) return;
+
+                const fmt = extrairFormatosBasicosDoElementoVivo(elPai);
+                const linhaAtual = linhasSegmentos[linhasSegmentos.length - 1];
+                const ultimoSeg = linhaAtual.length > 0 ? linhaAtual[linhaAtual.length - 1] : null;
+
+                if (
+                    ultimoSeg &&
+                    ultimoSeg.b === fmt.b &&
+                    ultimoSeg.i === fmt.i &&
+                    ultimoSeg.u === fmt.u &&
+                    ultimoSeg.s === fmt.s &&
+                    ultimoSeg.sup === fmt.sup &&
+                    ultimoSeg.sub === fmt.sub
+                ) {
+                    ultimoSeg.texto += textoNormalizado;
+                } else {
+                    linhaAtual.push({
+                        texto: textoNormalizado,
+                        b: fmt.b,
+                        i: fmt.i,
+                        u: fmt.u,
+                        s: fmt.s,
+                        sup: fmt.sup,
+                        sub: fmt.sub
+                    });
+                }
+            };
+
+            if (raiz.nodeType === Node.TEXT_NODE) {
+                const ini = rangeDOM.startOffset;
+                const fim = rangeDOM.endOffset;
+                const val = (raiz.nodeValue || '').substring(ini, fim);
+                adicionarTrechoTexto(raiz, val);
+            } else {
+                const walker = document.createTreeWalker(
+                    raiz,
+                    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                    null
+                );
+                let noAtual = walker.nextNode();
+                while (noAtual) {
+                    let intersecta = true;
+                    if (typeof rangeDOM.intersectsNode === 'function') {
+                        try { intersecta = rangeDOM.intersectsNode(noAtual); } catch (_) { intersecta = true; }
+                    }
+                    if (intersecta) {
+                        if (noAtual.nodeType === Node.ELEMENT_NODE) {
+                            const tName = noAtual.tagName ? noAtual.tagName.toUpperCase() : '';
+                            if (tName === 'BR') {
+                                quebraLinhaPendente = true;
+                            }
+                        } else if (noAtual.nodeType === Node.TEXT_NODE) {
+                            const valBruto = noAtual.nodeValue || '';
+                            const ini = (noAtual === rangeDOM.startContainer) ? rangeDOM.startOffset : 0;
+                            const fim = (noAtual === rangeDOM.endContainer) ? rangeDOM.endOffset : valBruto.length;
+                            if (fim > ini) {
+                                adicionarTrechoTexto(noAtual, valBruto.substring(ini, fim));
+                            }
+                        }
+                    }
+                    noAtual = walker.nextNode();
+                }
+            }
+
+            const linhasHtml = [];
+            for (let l = 0; l < linhasSegmentos.length; l++) {
+                const segs = linhasSegmentos[l];
+                if (!segs || segs.length === 0) continue;
+
+                /* Aparar espacos nas bordas inicial e final da linha preservando as tags */
+                segs[0].texto = segs[0].texto.replace(/^\s+/, '');
+                segs[segs.length - 1].texto = segs[segs.length - 1].texto.replace(/\s+$/, '');
+
+                let htmlLinha = '';
+                for (let sIdx = 0; sIdx < segs.length; sIdx++) {
+                    const seg = segs[sIdx];
+                    if (!seg.texto) continue;
+                    let trechoHtml = escaparTextoHtmlBasico(seg.texto);
+                    if (seg.sub) trechoHtml = `<sub>${trechoHtml}</sub>`;
+                    if (seg.sup) trechoHtml = `<sup>${trechoHtml}</sup>`;
+                    if (seg.s) trechoHtml = `<s>${trechoHtml}</s>`;
+                    if (seg.u) trechoHtml = `<u>${trechoHtml}</u>`;
+                    if (seg.i) trechoHtml = `<i>${trechoHtml}</i>`;
+                    if (seg.b) trechoHtml = `<b>${trechoHtml}</b>`;
+                    htmlLinha += trechoHtml;
+                }
+                htmlLinha = htmlLinha.replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim();
+                if (htmlLinha) {
+                    linhasHtml.push(htmlLinha);
+                }
+            }
+
+            return linhasHtml.join('<br>');
+        } catch (err) {
+            console.error('Erro ao construir HTML de formatacao basica:', err);
+            return '';
+        }
+    }
+
+    /*
+     * FUNCAO: extrairTextoPuroSanitizado
+     * REFERENCIA: Nivel 0 da Arquitetura Progressiva de Filtros HTML.
+     * ESCOPO: Remove 100% das tags HTML/XML, converte entidades (&nbsp; -> espaco,
+     * &amp; -> &, &lt; -> <, &gt; -> >), normaliza quebras de linha (\r\n -> \n)
+     * e sanitiza ativamente extraindo conteudo exclusivamente via no de texto DOM
+     * (node.textContent), evitando injecao de tags orfas ou caracteres invisiveis.
+     * ALVO: input, textarea, logs, variaveis de busca, campos legados sem markup.
+     */
+    function extrairTextoPuroSanitizado(origem) {
+        if (!origem) return '';
+        try {
+            const container = document.createElement('div');
+            if (typeof origem === 'string') {
+                container.innerHTML = origem;
+            } else if (origem instanceof Range) {
+                const frag = origem.cloneContents();
+                if (frag) container.appendChild(frag);
+            } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
+                container.appendChild(origem.cloneNode(true));
+            } else {
+                return aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(String(origem || '')));
+            }
+
+            /* Passo 0.1: Eliminar scripts, estilos, iframes e nos perigosos/invisiveis/ocultos */
+            const nosPerigosos = container.querySelectorAll(
+                'script, style, iframe, object, embed, applet, noscript, template, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore], [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, .screen-reader-text, .d-none, .ui-helper-hidden'
+            );
+            for (let i = 0; i < nosPerigosos.length; i++) {
+                nosPerigosos[i].remove();
+            }
+            const todosParaInspecaoOculta = container.querySelectorAll('[style]');
+            for (let i = 0; i < todosParaInspecaoOculta.length; i++) {
+                if (isElementoOcultoNoDom(todosParaInspecaoOculta[i])) {
+                    todosParaInspecaoOculta[i].remove();
+                }
+            }
+
+            /* Passo 0.15: Normalizar quebras suaves de linha e indentacao de codigo-fonte HTML
+             * Em conformidade com a especificacao W3C HTML, quebras de linha e tabulacoes no codigo-fonte
+             * dentro de elementos de texto inline ou bloco comum equivalem a espacos simples.
+             * Preserva estritamente <pre> e <textarea> que dependem de quebras literais de linha. */
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+            let noTexto;
+            while ((noTexto = walker.nextNode())) {
+                const pai = noTexto.parentElement;
+                const tagPai = pai ? pai.tagName : '';
+                if (tagPai !== 'PRE' && tagPai !== 'TEXTAREA') {
+                    if (noTexto.nodeValue) {
+                        noTexto.nodeValue = noTexto.nodeValue.replace(/[\r\n\t]+/g, ' ');
+                    }
+                }
+            }
+
+            /* Passo 0.2: Inserir quebras de linha explicitas para elementos de bloco e quebras */
+            const quebras = container.querySelectorAll('br, hr');
+            for (let i = 0; i < quebras.length; i++) {
+                quebras[i].replaceWith(document.createTextNode('\n'));
+            }
+            const celulas = container.querySelectorAll('td, th');
+            for (let i = 0; i < celulas.length; i++) {
+                celulas[i].appendChild(document.createTextNode('\t'));
+            }
+            const blocos = container.querySelectorAll('p, div, tr, li, h1, h2, h3, h4, h5, h6, blockquote, pre, header, footer, section, article');
+            for (let i = 0; i < blocos.length; i++) {
+                blocos[i].appendChild(document.createTextNode('\n'));
+            }
+
+            /* Passo 0.3: Sanitizacao ativa via node.textContent */
+            let texto = container.textContent || '';
+
+            /* Passo 0.4: Converter entidades restantes */
+            texto = texto
+                .replace(/&amp;/gi, '&')
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/&quot;/gi, '"')
+                .replace(/&#39;/g, "'");
+
+            /* Passo 0.5: Executar Filtro 1 (Dados) e Filtro 3 (Informacoes e Linhas) */
+            texto = aplicarFiltro1DadosLixo(texto);
+            texto = aplicarFiltro3InformacoesELinhas(texto);
+
+            return texto;
+        } catch (err) {
+            console.error('Erro em extrairTextoPuroSanitizado:', err);
+            return typeof origem === 'string' ? aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(origem.replace(/<[^>]+>/g, ''))) : '';
+        }
+    }
+
+    /*
+     * FUNCAO: limparPropriedadesWordEMso
+     * OBJETIVO DE RECONSTRUCAO: Higienizar strings HTML removendo sujeiras proprietarias
+     * do Microsoft Word (comentarios XML/MSO, tags <o:p>, <xml>, etc.) e estilos
+     * proprietarios "mso-*", garantindo compatibilidade plena com editores web.
+     */
+    function limparPropriedadesWordEMso(htmlBruto) {
+        if (!htmlBruto || typeof htmlBruto !== 'string') return '';
+        return htmlBruto
+            .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<o:p[\s\S]*?<\/o:p>/gi, '')
+            .replace(/<\/?(?:o|v|w|m|x):[^>]*>/gi, '')
+            .replace(/\s*mso-[a-zA-Z0-9\-]+:[^;"]+;?/gi, '')
+            .replace(/style="\s*"/gi, '');
+    }
+
+    /*
+     * FUNCAO: sanitizarEstilosCssSempreSemFonte
+     * OBJETIVO DE RECONSTRUCAO: Filtrar estilos CSS inline para SEMPRE descartar
+     * familias tipograficas (font-family), tamanhos de fonte (font-size), fundos (background)
+     * e propriedades proprietarias (mso-*), permitindo que o texto colado herde a tipografia
+     * nativa do documento de destino, preservando apenas regras permitidas pelo nivel ativo.
+     */
+    function sanitizarEstilosCssSempreSemFonte(styleStr, nivel = 3) {
+        if (!styleStr || typeof styleStr !== 'string') return '';
+        const regras = styleStr.split(';');
+        const permitidas = [];
+        const nivelNum = (typeof nivel === 'number') ? nivel : converterNivelFiltroParaIndice(nivel);
+
+        for (let i = 0; i < regras.length; i++) {
+            const regra = regras[i].trim();
+            if (!regra || regra.indexOf(':') === -1) continue;
+            const partes = regra.split(':');
+            const prop = partes[0].trim().toLowerCase();
+            const val = partes.slice(1).join(':').trim();
+
+            /* Descartar obrigatoriamente tipografia de origem, fundos poluentes e lixo do Word */
+            if (prop === 'font-family' || prop === 'font' || prop === 'font-size' ||
+                prop === 'background' || prop === 'background-color' || prop.startsWith('mso-')) {
+                continue;
+            }
+
+            /* Nivel 1+: Formatos basicos de caracteres (color, font-weight, font-style, text-decoration) */
+            if (prop === 'color' && !/^(transparent|inherit)$/i.test(val)) {
+                permitidas.push(`color: ${val}`);
+            } else if (prop === 'font-weight' && /^(bold|bolder|[5-9]00)$/i.test(val)) {
+                permitidas.push(`font-weight: ${val.toLowerCase()}`);
+            } else if (prop === 'font-style' && /^(italic|oblique)$/i.test(val)) {
+                permitidas.push(`font-style: ${val.toLowerCase()}`);
+            } else if (prop === 'text-decoration' || prop === 'text-decoration-line') {
+                if (/underline/i.test(val)) permitidas.push('text-decoration: underline');
+                else if (/line-through/i.test(val)) permitidas.push('text-decoration: line-through');
+            }
+
+            /* Nivel 2+: Alinhamento de paragrafo e recuo simples */
+            if (nivelNum >= 2) {
+                if (prop === 'text-align' && /^(left|right|center|justify)$/i.test(val)) {
+                    permitidas.push(`text-align: ${val.toLowerCase()}`);
+                } else if ((prop === 'margin-left' || prop === 'text-indent') && /^\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/i.test(val)) {
+                    permitidas.push(`${prop}: ${val.toLowerCase()}`);
+                }
+            }
+
+            /* Nivel 3+: Bordas, preenchimento e larguras de coluna / tabela */
+            if (nivelNum >= 3) {
+                if (prop === 'border' || prop === 'border-collapse' || prop.startsWith('border-')) {
+                    permitidas.push(`${prop}: ${val}`);
+                } else if (prop === 'padding' || prop.startsWith('padding-')) {
+                    permitidas.push(`${prop}: ${val}`);
+                } else if (prop === 'width' || prop === 'min-width' || prop === 'max-width') {
+                    permitidas.push(`${prop}: ${val}`);
+                }
+            }
+
+            /* Nivel 4: Metadados de pagina/secao e posicionamento controlado */
+            if (nivelNum >= 4) {
+                if (prop === 'page-break-before' || prop === 'page-break-after' || prop === 'page-break-inside') {
+                    permitidas.push(`${prop}: ${val.toLowerCase()}`);
+                } else if (prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-right' || prop === 'clear' || prop === 'float') {
+                    permitidas.push(`${prop}: ${val}`);
+                }
+            }
+        }
+        return permitidas.join('; ');
+    }
+
+    /*
+     * FUNCAO: preSanitizarDomBase
+     * OBJETIVO DE RECONSTRUCAO: CAMADA BASE UNIVERSAL E OBRIGATORIA DE HIGIENIZACAO RTF/WORD.
+     * Executada SEMPRE como passo previo ao processar qualquer HTML formatado:
+     * 1) Remove integralmente scripts, iframes, objetos e nos executaveis/invisiveis;
+     * 2) Desenrola links (<a>) mantendo estritamente o texto e formatos de estilo,
+     *    expurgando hiperlinks web e atributos associados;
+     * 3) Desenrola controles interativos e elementos de layout nao-estilo;
+     * 4) Limpa todos os manipuladores de evento on*, id, class, data-* e aria-*;
+     * 5) Elimina permanentemente font-family, font-size, background e propriedades mso-*.
+     */
+    function preSanitizarDomBase(origem) {
+        if (!origem) return document.createElement('div');
+        const container = document.createElement('div');
+        if (typeof origem === 'string') {
+            container.innerHTML = origem;
+        } else if (origem instanceof Range) {
+            const frag = origem.cloneContents();
+            if (frag) container.appendChild(frag);
+        } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
+            container.appendChild(origem.cloneNode(true));
+        } else {
+            return container;
+        }
+
+        /* Passo 1: Eliminar nos executaveis e invisiveis/ocultos */
+        const nosPerigosos = container.querySelectorAll(
+            'script, style, iframe, object, embed, applet, noscript, template, meta, link, base, svg, canvas, audio, video, source, track, [data-jusgov-ignore], [hidden], [aria-hidden="true"], .sr-only, .visually-hidden, .screen-reader-text, .d-none, .ui-helper-hidden'
+        );
+        for (let i = 0; i < nosPerigosos.length; i++) {
+            nosPerigosos[i].remove();
+        }
+        const todosComEstiloOculto = container.querySelectorAll('[style]');
+        for (let i = 0; i < todosComEstiloOculto.length; i++) {
+            if (isElementoOcultoNoDom(todosComEstiloOculto[i])) {
+                todosComEstiloOculto[i].remove();
+            }
+        }
+
+        /* Passo 2: Desenrolar links (<a>) */
+        const links = container.querySelectorAll('a');
+        for (let i = 0; i < links.length; i++) {
+            const a = links[i];
+            if (!a.parentNode) continue;
+            while (a.firstChild) {
+                a.parentNode.insertBefore(a.firstChild, a);
+            }
+            a.remove();
+        }
+
+        /* Passo 3: Desenrolar controles interativos e elementos nao-estilo */
+        const interativos = container.querySelectorAll(
+            'button, select, textarea, form, nav, header, footer, aside, section, article, figure, figcaption'
+        );
+        for (let i = 0; i < interativos.length; i++) {
+            const el = interativos[i];
+            if (!el.parentNode) continue;
+            while (el.firstChild) {
+                el.parentNode.insertBefore(el.firstChild, el);
+            }
+            el.remove();
+        }
+        const inputs = container.querySelectorAll('input');
+        for (let i = 0; i < inputs.length; i++) {
+            inputs[i].remove();
+        }
+
+        /* Passo 4: Limpar atributos perigosos e de rastreamento */
+        const todosElementos = container.querySelectorAll('*');
+        for (let i = 0; i < todosElementos.length; i++) {
+            const el = todosElementos[i];
+            if (!el.parentNode) continue;
+            const attrs = Array.from(el.attributes);
+            for (let a = 0; a < attrs.length; a++) {
+                const attrNome = attrs[a].name.toLowerCase();
+                if (
+                    attrNome.startsWith('on') ||
+                    attrNome === 'class' ||
+                    attrNome === 'id' ||
+                    attrNome.startsWith('data-') ||
+                    attrNome.startsWith('aria-') ||
+                    attrNome === 'action' ||
+                    attrNome === 'formaction' ||
+                    attrNome === 'href' ||
+                    attrNome === 'target'
+                ) {
+                    el.removeAttribute(attrs[a].name);
+                }
+            }
+        }
+
+        return container;
+    }
+
+    /*
+     * FUNCAO: construirHtmlNivel1Basico
+     * REFERENCIA: Nivel 1 (Basico - Inline).
+     * ESCOPO: Apenas formatacao de caracteres: b, strong, i, em, u, s, sub, sup, span, br.
+     * Proibido qualquer atributo CSS de bloco ou quebras estruturais.
+     * ALVO: Caixas de comentario, anotacoes rapidas, chats internos.
+     */
+    function construirHtmlNivel1Basico(origem) {
+        if (!origem) return '';
+        try {
+            if (origem instanceof Range) {
+                return construirHtmlFormatacaoBasica(origem);
+            }
+            const container = preSanitizarDomBase(origem);
+            const tagsPermitidas1 = new Set([
+                'B', 'STRONG', 'I', 'EM', 'U', 'INS', 'S', 'DEL', 'STRIKE', 'SUB', 'SUP', 'SPAN', 'BR'
+            ]);
+
+            const imgs = container.querySelectorAll('img');
+            for (let i = 0; i < imgs.length; i++) imgs[i].remove();
+
+            const elementos = Array.from(container.querySelectorAll('*'));
+            for (let i = 0; i < elementos.length; i++) {
+                const el = elementos[i];
+                if (!el.parentNode) continue;
+                const tag = el.tagName ? el.tagName.toUpperCase() : '';
+
+                if (!tagsPermitidas1.has(tag)) {
+                    const ehBloco = /^(?:P|DIV|TR|LI|H[1-6]|BLOCKQUOTE|PRE)$/.test(tag);
+                    while (el.firstChild) {
+                        el.parentNode.insertBefore(el.firstChild, el);
+                    }
+                    if (ehBloco) {
+                        el.parentNode.insertBefore(document.createElement('br'), el);
+                    }
+                    el.remove();
+                    continue;
+                }
+
+                const stBruto = el.getAttribute('style');
+                if (stBruto) {
+                    const stLimpo = sanitizarEstilosCssSempreSemFonte(stBruto, 1);
+                    if (stLimpo) el.setAttribute('style', stLimpo);
+                    else el.removeAttribute('style');
+                }
+            }
+
+            const spans = container.querySelectorAll('span');
+            for (let i = 0; i < spans.length; i++) {
+                const sp = spans[i];
+                if (!sp.parentNode) continue;
+                if (!sp.attributes.length) {
+                    while (sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp);
+                    sp.remove();
+                }
+            }
+
+            let html = limparPropriedadesWordEMso(container.innerHTML);
+            return html.replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>').trim();
+        } catch (err) {
+            console.error('Erro em construirHtmlNivel1Basico:', err);
+            return '';
+        }
+    }
+
+    /*
+     * FUNCAO: construirHtmlNivel2Intermediario
+     * REFERENCIA: Nivel 2 (Intermediario - Paragrafo/Fluxo).
+     * ESCOPO: Nivel 1 + p, blockquote, ul, ol, li, hr.
+     * CSS restrito a alinhamento (text-align) e recuo simples (margin-left / text-indent). Sem tabelas.
+     * ALVO: CKEditor / TinyMCE em modo padrao de redacao juridica (despachos simples, certidoes).
+     */
+    function construirHtmlNivel2Intermediario(origem) {
+        if (!origem) return '';
+        try {
+            const container = preSanitizarDomBase(origem);
+            const tagsPermitidas2 = new Set([
+                'B', 'STRONG', 'I', 'EM', 'U', 'INS', 'S', 'DEL', 'STRIKE', 'SUB', 'SUP', 'SPAN', 'BR',
+                'P', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'HR'
+            ]);
+
+            const imgs = container.querySelectorAll('img');
+            for (let i = 0; i < imgs.length; i++) imgs[i].remove();
+
+            const elementos = Array.from(container.querySelectorAll('*'));
+            for (let i = 0; i < elementos.length; i++) {
+                const el = elementos[i];
+                if (!el.parentNode) continue;
+                const tag = el.tagName ? el.tagName.toUpperCase() : '';
+
+                if (!tagsPermitidas2.has(tag)) {
+                    while (el.firstChild) {
+                        el.parentNode.insertBefore(el.firstChild, el);
+                    }
+                    if (tag === 'TR') {
+                        el.parentNode.insertBefore(document.createElement('br'), el);
+                    }
+                    el.remove();
+                    continue;
+                }
+
+                const stBruto = el.getAttribute('style');
+                if (stBruto) {
+                    const stLimpo = sanitizarEstilosCssSempreSemFonte(stBruto, 2);
+                    if (stLimpo) el.setAttribute('style', stLimpo);
+                    else el.removeAttribute('style');
+                }
+            }
+
+            let html = limparPropriedadesWordEMso(container.innerHTML);
+            return html.replace(/(?:<br\s*\/?>\s*)+$/gi, '').trim();
+        } catch (err) {
+            console.error('Erro em construirHtmlNivel2Intermediario:', err);
+            return '';
+        }
+    }
+
+    /*
+     * FUNCAO: construirHtmlNivel3Avancado
+     * REFERENCIA: Nivel 3 (Avancado - Documental / RTF classico).
+     * ESCOPO: Nivel 2 + h1-h6, pre, code, table, thead, tbody, tfoot, tr, th, td.
+     * CSS inline para bordas, preenchimento (padding) e larguras de coluna (width).
+     * ALVO: Editores RTF completos, relatorios formatados, minutas com tabelas de calculo.
+     */
+    function construirHtmlNivel3Avancado(origem) {
+        if (!origem) return '';
+        try {
+            const container = preSanitizarDomBase(origem);
+            const tagsPermitidas3 = new Set([
+                'B', 'STRONG', 'I', 'EM', 'U', 'INS', 'S', 'DEL', 'STRIKE', 'SUB', 'SUP', 'SPAN', 'BR',
+                'P', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'HR',
+                'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'CODE',
+                'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD'
+            ]);
+
+            const imgs = container.querySelectorAll('img');
+            for (let i = 0; i < imgs.length; i++) imgs[i].remove();
+
+            const elementos = Array.from(container.querySelectorAll('*'));
+            for (let i = 0; i < elementos.length; i++) {
+                const el = elementos[i];
+                if (!el.parentNode) continue;
+                const tag = el.tagName ? el.tagName.toUpperCase() : '';
+
+                if (!tagsPermitidas3.has(tag)) {
+                    while (el.firstChild) {
+                        el.parentNode.insertBefore(el.firstChild, el);
+                    }
+                    el.remove();
+                    continue;
+                }
+
+                if (tag === 'TD' || tag === 'TH') {
+                    el.removeAttribute('colspan');
+                    el.removeAttribute('rowspan');
+                }
+
+                const stBruto = el.getAttribute('style');
+                if (stBruto) {
+                    const stLimpo = sanitizarEstilosCssSempreSemFonte(stBruto, 3);
+                    if (stLimpo) el.setAttribute('style', stLimpo);
+                    else el.removeAttribute('style');
+                }
+            }
+
+            let html = limparPropriedadesWordEMso(container.innerHTML);
+            return html.replace(/(?:<br\s*\/?>\s*)+$/gi, '').trim();
+        } catch (err) {
+            console.error('Erro em construirHtmlNivel3Avancado:', err);
+            return '';
+        }
+    }
+
+    /*
+     * FUNCAO: construirHtmlNivel4Estendido
+     * REFERENCIA: Nivel 4 (Estendido - Suites Office / Canvas).
+     * ESCOPO: Nivel 3 + img, colspan, rowspan, metadados de pagina/secao,
+     * listas multinivel aninhadas, div com posicionamento controlado.
+     * ALVO: LibreOffice Online, Google Docs, DOCX, ODT.
+     */
+    function construirHtmlNivel4Estendido(origem) {
+        if (!origem) return '';
+        try {
+            const container = preSanitizarDomBase(origem);
+            const tagsPermitidas4 = new Set([
+                'B', 'STRONG', 'I', 'EM', 'U', 'INS', 'S', 'DEL', 'STRIKE', 'SUB', 'SUP', 'SPAN', 'BR',
+                'P', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'HR',
+                'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'CODE',
+                'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD',
+                'IMG', 'DIV'
+            ]);
+
+            const elementos = Array.from(container.querySelectorAll('*'));
+            for (let i = 0; i < elementos.length; i++) {
+                const el = elementos[i];
+                if (!el.parentNode) continue;
+                const tag = el.tagName ? el.tagName.toUpperCase() : '';
+
+                if (!tagsPermitidas4.has(tag)) {
+                    while (el.firstChild) {
+                        el.parentNode.insertBefore(el.firstChild, el);
+                    }
+                    el.remove();
+                    continue;
+                }
+
+                if (tag === 'TD' || tag === 'TH') {
+                    const cSpan = el.getAttribute('colspan');
+                    const rSpan = el.getAttribute('rowspan');
+                    if (cSpan && parseInt(cSpan, 10) > 1) {
+                        el.setAttribute('colspan', String(parseInt(cSpan, 10)));
+                    } else {
+                        el.removeAttribute('colspan');
+                    }
+                    if (rSpan && parseInt(rSpan, 10) > 1) {
+                        el.setAttribute('rowspan', String(parseInt(rSpan, 10)));
+                    } else {
+                        el.removeAttribute('rowspan');
+                    }
+                }
+
+                if (tag === 'IMG') {
+                    const src = el.getAttribute('src') || '';
+                    if (!/^(?:https?:|data:image\/)/i.test(src.trim())) {
+                        el.remove();
+                        continue;
+                    }
+                }
+
+                const stBruto = el.getAttribute('style');
+                if (stBruto) {
+                    const stLimpo = sanitizarEstilosCssSempreSemFonte(stBruto, 4);
+                    if (stLimpo) el.setAttribute('style', stLimpo);
+                    else el.removeAttribute('style');
+                }
+            }
+
+            let html = limparPropriedadesWordEMso(container.innerHTML);
+            return html.replace(/(?:<br\s*\/?>\s*)+$/gi, '').trim();
+        } catch (err) {
+            console.error('Erro em construirHtmlNivel4Estendido:', err);
+            return '';
+        }
+    }
+
+    /* Aliases para compatibilidade estrita */
+    const construirHtmlFormatacaoAvancada = construirHtmlNivel3Avancado;
+    const construirHtmlSemFiltroWord = construirHtmlNivel4Estendido;
+
+    function normalizarNivelFiltro(nivel) {
+        if (typeof nivel === 'number') {
+            if (nivel === 0) return 'texto_puro';
+            if (nivel === 1) return 'basico';
+            if (nivel === 2) return 'intermediario';
+            if (nivel === 3) return 'avancado';
+            if (nivel === 4) return 'estendido';
+        }
+        const s = String(nivel || '').toLowerCase().trim();
+        if (s === '0' || s === 'texto_puro' || s === 'puro' || s === 'texto') return 'texto_puro';
+        if (s === '1' || s === 'basico' || s === 'inline') return 'basico';
+        if (s === '2' || s === 'intermediario' || s === 'paragrafo' || s === 'fluxo') return 'intermediario';
+        if (s === '3' || s === 'avancado' || s === 'documental' || s === 'rtf') return 'avancado';
+        if (s === '4' || s === 'estendido' || s === 'extendido' || s === 'sem_filtro' || s === 'office') return 'estendido';
+        return 'basico';
+    }
+
+    function converterNivelFiltroParaIndice(nivel) {
+        const norm = normalizarNivelFiltro(nivel);
+        if (norm === 'texto_puro') return 0;
+        if (norm === 'basico') return 1;
+        if (norm === 'intermediario') return 2;
+        if (norm === 'avancado') return 3;
+        if (norm === 'estendido') return 4;
+        return 1;
+    }
+
+    function converterIndiceParaNivelFiltro(indice) {
+        const idx = Number(indice);
+        if (idx === 0) return 'texto_puro';
+        if (idx === 1) return 'basico';
+        if (idx === 2) return 'intermediario';
+        if (idx === 3) return 'avancado';
+        if (idx === 4) return 'estendido';
+        return 'basico';
+    }
+
+    function aplicarFiltroHtmlPorNivel(origem, nivel) {
+        const nivelNorm = normalizarNivelFiltro(nivel);
+        if (nivelNorm === 'texto_puro') {
+            return extrairTextoPuroSanitizado(origem);
+        } else if (nivelNorm === 'basico') {
+            return construirHtmlNivel1Basico(origem);
+        } else if (nivelNorm === 'intermediario') {
+            return construirHtmlNivel2Intermediario(origem);
+        } else if (nivelNorm === 'avancado') {
+            return construirHtmlNivel3Avancado(origem);
+        } else if (nivelNorm === 'estendido') {
+            return construirHtmlNivel4Estendido(origem);
+        }
+        return construirHtmlNivel1Basico(origem);
+    }
+
+    function envolverHtmlComResetDeCursorParaWord(codigoHTML) {
+        /* Passo 5.2.1: Garantir que ao colar no Word ou editores rich-text o cursor no final (e no inicio)
+         * esteja com a formatacao 100% limpa (sem herdar negrito, italico, sublinhado, tachado etc). */
+        if (!codigoHTML) return '';
+        const spanResetLimpo = '<span style="font-weight:normal;font-style:normal;text-decoration:none;background-color:transparent;mso-highlight:none;">&#8203;</span>';
+        return `${spanResetLimpo}${codigoHTML}${spanResetLimpo}`;
+    }
+
+    /*
+     * FUNCAO: verificarSeTextoEhBlocoOuPalavraUnica
+     * OBJETIVO DE RECONSTRUCAO: Regra de Ouro da Formatacao:
+     * Quando fora do modo texto puro (em qualquer nivel de estilos: Basicos,
+     * Avancados ou Extendidos), caso o usuario clique sobre um bloco forense
+     * (CNPJ, CPF, CNJ, Data isolada, Data+Hora, Moeda, Telefone, etc.) ou sobre
+     * uma palavra unica isolada, a gravacao na area de transferencia DEVE ser
+     * estritamente somente texto puro (text/plain).
+     * Frases, paragrafos, tabelas e arrastos manuais cumprem o estilo ativo.
+     */
+    function verificarSeTextoEhBlocoOuPalavraUnica(textoAlvo) {
+        /* Passo 5.2.2: Higienizar entrada e verificar se e nula/vazia */
+        if (!textoAlvo || typeof textoAlvo !== 'string') return false;
+        const textoTrim = textoAlvo.trim();
+        if (!textoTrim) return false;
+
+        /* Passo 5.2.3: Regra 1 - Palavra unica isolada (sem nenhum espaco em branco ou quebra de linha) */
+        if (typeof EXPRESSOES_REGULARES !== 'undefined' && EXPRESSOES_REGULARES.CONTEM_ESPACO) {
+            if (!EXPRESSOES_REGULARES.CONTEM_ESPACO.test(textoTrim)) return true;
+        } else if (!/[\s\u00A0]/.test(textoTrim)) {
+            return true;
+        }
+
+        /* Passo 5.2.4: Regra 2 - Bloco forense do catalogo (Data+Hora, Moeda com extenso,
+         * Boletos espacados, Cardinal com extenso, Telefones, etc.) */
+        if (typeof CATALOGO_PADROES_JURIDICOS !== 'undefined' && Array.isArray(CATALOGO_PADROES_JURIDICOS)) {
+            for (let i = 0; i < CATALOGO_PADROES_JURIDICOS.length; i++) {
+                const entry = CATALOGO_PADROES_JURIDICOS[i];
+                if (!entry.regexes) continue;
+                for (let j = 0; j < entry.regexes.length; j++) {
+                    const rx = entry.regexes[j];
+                    const match = textoTrim.match(rx);
+                    if (match && match[0] === textoTrim) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        /* Passo 5.2.5: Regra 3 - Fallback de regexes de auditoria ou padroes de data/documento isolados */
+        if (typeof REGEX_AUDITORIA !== 'undefined') {
+            if (REGEX_AUDITORIA.DATA_NUMERICA_COM_HORARIO_AUDITORIA && REGEX_AUDITORIA.DATA_NUMERICA_COM_HORARIO_AUDITORIA.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.HORARIO_ISOLADO && REGEX_AUDITORIA.HORARIO_ISOLADO.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.DATA_EXTENSO_OU_ABREV && REGEX_AUDITORIA.DATA_EXTENSO_OU_ABREV.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.DATA_ISOLADA && REGEX_AUDITORIA.DATA_ISOLADA.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.CPF_ISOLADO && REGEX_AUDITORIA.CPF_ISOLADO.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.CNPJ_ISOLADO && REGEX_AUDITORIA.CNPJ_ISOLADO.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.CNJ_ISOLADO && REGEX_AUDITORIA.CNJ_ISOLADO.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.BENEFICIO_INSS_COM_ESPECIE && REGEX_AUDITORIA.BENEFICIO_INSS_COM_ESPECIE.test(textoTrim)) return true;
+            if (REGEX_AUDITORIA.BENEFICIO_INSS_ISOLADO && REGEX_AUDITORIA.BENEFICIO_INSS_ISOLADO.test(textoTrim)) return true;
+        }
+
+        /* Passo 5.2.6: Regra 4 - Sequencias de numeros espacados genericos (ex: boletos, senhas ou codigos com espacos) */
+        if (typeof EXPRESSOES_REGULARES !== 'undefined' && EXPRESSOES_REGULARES.MULTIPLOS_NUMEROS_ESPACADOS) {
+            const mEspacado = textoTrim.match(EXPRESSOES_REGULARES.MULTIPLOS_NUMEROS_ESPACADOS);
+            if (mEspacado && mEspacado[0] === textoTrim) return true;
+        }
+
+        return false;
+    }
+
+    /*
+     * FUNCAO: salvarClipboardInternoComBackup
+     * OBJETIVO DE RECONSTRUCAO: Ao gravar uma nova selecao no clipboard simulado interno do addon,
+     * preserva o valor anterior em window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ (usado em Ctrl + Botao do Meio)
+     * e atualiza window.__JUSGOV_ULTIMO_CLIPBOARD__ (usado no Botao do Meio simples), tudo protegido com try/catch
+     * e limite de seguranca contra overflow de dados.
+     */
+    function salvarClipboardInternoComBackup(novoPayload) {
+        try {
+            if (!novoPayload || typeof novoPayload !== 'object') return;
+            const LIMITE_BYTES_EMULACAO = 512 * 1024;
+            const txtSeguro = typeof novoPayload.texto === 'string'
+                ? (novoPayload.texto.length > LIMITE_BYTES_EMULACAO ? novoPayload.texto.slice(0, LIMITE_BYTES_EMULACAO) : novoPayload.texto)
+                : '';
+            const htmlSeguro = typeof novoPayload.html === 'string'
+                ? (novoPayload.html.length > LIMITE_BYTES_EMULACAO ? novoPayload.html.slice(0, LIMITE_BYTES_EMULACAO) : novoPayload.html)
+                : '';
+
+            const atual = window.__JUSGOV_ULTIMO_CLIPBOARD__;
+            if (atual && (atual.texto || atual.html) && (atual.texto !== txtSeguro || atual.html !== htmlSeguro)) {
+                window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = {
+                    texto: atual.texto || '',
+                    html: atual.html || '',
+                    formatado: Boolean(atual.formatado)
+                };
+            }
+
+            window.__JUSGOV_ULTIMO_CLIPBOARD__ = {
+                texto: txtSeguro,
+                html: htmlSeguro,
+                formatado: Boolean(novoPayload.formatado)
+            };
+            registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__, window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__);
+        } catch (_) { }
+    }
+
+    async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null) {
+        /* Passo 5.3: Gravacao com suporte a formatos basicos, avancados ou sem filtro (Blob text/html + ClipboardItem -> copy event -> writeText -> textarea)
+         * Paralelamente, DEPOIS de inserir a informacao no clipboard do sistema, salva-se tambem para emulacao interna com try/catch. */
+        if (!textoFinal || typeof textoFinal !== 'string') return false;
+
+        let deveManterFormatacao = Boolean(manterFormatacaoBasica && rangeDOMOpcional);
+        const nivelNorm = normalizarNivelFiltro(nivelFiltroFormatacao);
+        if (nivelNorm === 'texto_puro') {
+            deveManterFormatacao = false;
+        }
+        if (deveManterFormatacao && verificarSeTextoEhBlocoOuPalavraUnica(textoFinal)) {
+            /* Regra de Ouro: Bloco forense ou palavra unica e sempre somente texto puro */
+            deveManterFormatacao = false;
+        }
+
+        /* DIRETRIZ AUDITORIA AUTOMATIZADA: Durante a execucao da suite de testes de auditoria,
+         * preserva a integridade do clipboard real do usuario no Windows e previne violacoes de
+         * Permissions Policy do Chromium (crbug.com/414348233) decorrentes de disparos sinteticos sem ativacao. */
+        if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) {
+            salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false });
+            return true;
+        }
+
+        if (deveManterFormatacao) {
+            /* Passo 5.3.1: Aplicar o filtro correspondente ao nivel ativo na arquitetura progressiva */
+            const codigoHTML = aplicarFiltroHtmlPorNivel(rangeDOMOpcional, nivelNorm);
+
+            if (codigoHTML) {
+                const htmlParaClipboard = envolverHtmlComResetDeCursorParaWord(codigoHTML);
+                const textoPlanoMultilinha = extrairTextoPuroSanitizado(codigoHTML) || textoFinal;
+                try {
+                    const temFocoParaClip = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
+                    if (temFocoParaClip && typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
+                        const blobHtml = new Blob([htmlParaClipboard], { type: 'text/html' });
+                        const blobTexto = new Blob([textoPlanoMultilinha], { type: 'text/plain' });
+                        const dadosParaCopiar = new ClipboardItem({
+                            'text/html': blobHtml,
+                            'text/plain': blobTexto
+                        });
+                        await navigator.clipboard.write([dadosParaCopiar]);
+                        salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: codigoHTML, formatado: true });
+                        console.log('Texto formatado copiado! HTML:', codigoHTML);
+                        return true;
+                    }
+                } catch (err) {
+                    /* Restricao assincrona de I/O ou Permissions Policy no documento/iframe; prossegue para fallback */
+                }
+
+                try {
+                    let copiouViaEvento = false;
+                    const manipuladorCopy = (ev) => {
+                        if (ev && ev.clipboardData) {
+                            ev.clipboardData.setData('text/html', htmlParaClipboard);
+                            ev.clipboardData.setData('text/plain', textoPlanoMultilinha);
+                            ev.preventDefault();
+                            copiouViaEvento = true;
+                        }
+                    };
+                    document.addEventListener('copy', manipuladorCopy, { capture: true, once: true });
+                    const sucessoCopy = document.execCommand('copy');
+                    document.removeEventListener('copy', manipuladorCopy, { capture: true });
+                    if (sucessoCopy || copiouViaEvento) {
+                        salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: codigoHTML, formatado: true });
+                        return true;
+                    }
+                } catch (errCopy) {
+                    /* Fallback copy HTML protegido com try/catch */
+                }
+            }
+        }
+
+        let textoPuroFinal = '';
+        if (rangeDOMOpcional && nivelNorm === 'texto_puro') {
+            textoPuroFinal = extrairTextoPuroSanitizado(rangeDOMOpcional);
+        }
+        if (!textoPuroFinal) {
+            textoPuroFinal = (typeof textoFinal === 'string' && (textoFinal.indexOf('<') !== -1 || textoFinal.indexOf('\r') !== -1))
+                ? extrairTextoPuroSanitizado(textoFinal)
+                : aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(textoFinal));
+        }
+
+        let gravouSistema = false;
+        try {
+            const temFocoParaTexto = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
+            if (temFocoParaTexto && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(textoPuroFinal);
+                gravouSistema = true;
+            }
+        } catch (errTxt) {
+            /* Restricao de Permissions Policy ou foco de janela no iframe; fallback para textarea + execCommand */
+        }
+
+        if (!gravouSistema) {
+            try {
+                const areaTemp = document.createElement('textarea');
+                areaTemp.setAttribute('data-jusgov-ignore', 'true');
+                areaTemp.value = textoPuroFinal;
+                areaTemp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
+                document.body.appendChild(areaTemp);
+                areaTemp.select();
+                gravouSistema = Boolean(document.execCommand('copy'));
+                document.body.removeChild(areaTemp);
+            } catch (errArea) {
+                /* Fallback textarea protegido com try/catch */
+            }
+        }
+
+        /* Salva na memoria interna do addon para colagem simulada (botao do meio/direito) */
+        try {
+            salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false });
+        } catch (_) { }
+
+        /* Retorna true garantindo continuidade e fluidez visual ao usuario mesmo em documentos com Permissions Policy restritiva */
+        return true;
+    }
+
+    /*
+     * FUNCAO: registrarUltimaSelecao
+     * OBJETIVO DE RECONSTRUCAO: Persistir a "Ultima Selecao" (conteudo exato, TXT e/ou HTML, enviado por este
+     * addon a area de transferencia no momento da copia) e o item anterior para colagem simulada.
+     */
+    function registrarUltimaSelecao(novoItem, itemAnteriorOpcional) {
+        if (!novoItem || (!novoItem.texto && !novoItem.html)) return;
+        try {
+            const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
+            if (storageLocal) {
+                const payloadStorage = {
+                    ultimoClipboardInterno: {
+                        texto: novoItem.texto || '',
+                        html: novoItem.html || '',
+                        formatado: Boolean(novoItem.formatado),
+                        timestamp: Date.now()
+                    }
+                };
+                if (itemAnteriorOpcional && (itemAnteriorOpcional.texto || itemAnteriorOpcional.html)) {
+                    payloadStorage.ultimoClipboardAnteriorInterno = {
+                        texto: itemAnteriorOpcional.texto || '',
+                        html: itemAnteriorOpcional.html || '',
+                        formatado: Boolean(itemAnteriorOpcional.formatado),
+                        timestamp: Date.now()
+                    };
+                }
+                storageLocal.set(payloadStorage);
+            }
+        } catch (_) { }
+    }
+
+    /*
+     * FUNCAO: emularTeclasColar
+     * O PORQUE: Ao colar com o botao do meio um conteudo com estilos quando a opcao
+     * "Usar area de transferencia (clipboard) do sistema" estiver desativada (false),
+     * emula os eventos nativos de teclado (Ctrl+V) e ClipboardEvent('paste') para que o
+     * sistema/editor web receba e processe os dados formatados diretamente pelos seus proprios
+     * manipuladores de colagem nativos sem depender de permissao do clipboard do SO.
+     */
+    function emularTeclasColar(alvo, texto, html) {
+        try {
+            if (!alvo) return false;
+            if (typeof alvo.focus === 'function') {
+                try { alvo.focus(); } catch (_) { }
+            }
+
+            // 1. Despacha KeyDown de Ctrl+V
+            const evtDown = new KeyboardEvent('keydown', {
+                key: 'v',
+                code: 'KeyV',
+                keyCode: 86,
+                which: 86,
+                ctrlKey: true,
+                bubbles: true,
+                cancelable: true,
+                composed: true
+            });
+            alvo.dispatchEvent(evtDown);
+
+            // 2. Despacha ClipboardEvent('paste') com text/html e text/plain sintetico
+            let pasteTratadoPeloEditor = false;
+            const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable="true"]')) || document.designMode === 'on');
+            try {
+                if (typeof DataTransfer !== 'undefined') {
+                    const dt = new DataTransfer();
+                    if (html && ehEditorRico) dt.setData('text/html', html);
+                    dt.setData('text/plain', texto || '');
+                    const evtPaste = new ClipboardEvent('paste', {
+                        clipboardData: dt,
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true
+                    });
+                    pasteTratadoPeloEditor = !alvo.dispatchEvent(evtPaste);
+                }
+            } catch (_) { }
+
+            // 3. Se o editor nao tratou por conta propria, aciona execCommand de insercao
+            if (!pasteTratadoPeloEditor) {
+                let colouExec = false;
+                try {
+                    colouExec = document.execCommand('paste');
+                } catch (_) { }
+                if (!colouExec) {
+                    if (html && ehEditorRico) {
+                        try {
+                            colouExec = document.execCommand('insertHTML', false, html);
+                        } catch (_) { }
+                    }
+                    if (!colouExec) {
+                        const conteudoParaInserir = (ehEditorRico && html) ? html : (texto || '');
+                        inserirTextoEmElemento(alvo, conteudoParaInserir, Boolean(ehEditorRico && html));
+                    }
+                }
+            }
+
+            // 4. Despacha KeyUp de Ctrl+V
+            const evtUp = new KeyboardEvent('keyup', {
+                key: 'v',
+                code: 'KeyV',
+                keyCode: 86,
+                which: 86,
+                ctrlKey: true,
+                bubbles: true,
+                composed: true
+            });
+            alvo.dispatchEvent(evtUp);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /*
+     * FUNCAO: emularTeclasWinV
+     * O PORQUE: Quando a colagem Rollback (Ctrl + Botao do Meio) contem estilos (HTML/RTF),
+     * despacha para o sistema/aplicacao os eventos da combinacao de teclas "Win + V" (Meta + V)
+     * para ativar o historico avancado de area de transferencia da aplicacao / SO.
+     */
+    function emularTeclasWinV(alvo) {
+        try {
+            const el = alvo || (typeof document !== 'undefined' ? (document.activeElement || document.body) : null);
+            if (!el) return;
+            if (typeof el.focus === 'function') {
+                try { el.focus(); } catch (_) { }
+            }
+
+            // 1. Keydown tecla Windows (MetaLeft, key="Meta")
+            el.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Meta',
+                code: 'MetaLeft',
+                keyCode: 91,
+                which: 91,
+                metaKey: true,
+                bubbles: true,
+                cancelable: true,
+                composed: true
+            }));
+
+            // 2. Keydown tecla 'v' com metaKey (Win + V)
+            el.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'v',
+                code: 'KeyV',
+                keyCode: 86,
+                which: 86,
+                metaKey: true,
+                bubbles: true,
+                cancelable: true,
+                composed: true
+            }));
+
+            // 3. Keyup tecla 'v'
+            el.dispatchEvent(new KeyboardEvent('keyup', {
+                key: 'v',
+                code: 'KeyV',
+                keyCode: 86,
+                which: 86,
+                metaKey: true,
+                bubbles: true,
+                composed: true
+            }));
+
+            // 4. Keyup tecla Windows (MetaLeft)
+            el.dispatchEvent(new KeyboardEvent('keyup', {
+                key: 'Meta',
+                code: 'MetaLeft',
+                keyCode: 91,
+                which: 91,
+                metaKey: false,
+                bubbles: true,
+                composed: true
+            }));
+        } catch (_) { }
+    }
+
+    function converterHexParaRgbaFlash(hexBruto, alfa = 0.28) {
+        const hexLimpo = (typeof hexBruto === 'string' && /^#[0-9a-fA-F]{6}$/.test(hexBruto.trim()))
+            ? hexBruto.trim()
+            : '#0d9488';
+        const r = parseInt(hexLimpo.slice(1, 3), 16);
+        const g = parseInt(hexLimpo.slice(3, 5), 16);
+        const b = parseInt(hexLimpo.slice(5, 7), 16);
+        return {
+            hex: hexLimpo,
+            rgba: `rgba(${r}, ${g}, ${b}, ${alfa})`
+        };
+    }
+
+    function limparFlashBorderImediatamente() {
+        if (timerFlashBorder) {
+            clearTimeout(timerFlashBorder);
+            timerFlashBorder = null;
+        }
+        aguardandoDesselecaoFlash = false;
+        flashExclusivoSemSelecao = false;
+        try {
+            const containers = document.querySelectorAll('#jusgov-flash-contour-container, .jusgov-flash-box, [data-jusgov-flash="true"]');
+            for (let i = 0; i < containers.length; i++) {
+                const c = containers[i];
+                if (c && c.parentNode) {
+                    c.parentNode.removeChild(c);
+                }
+            }
+            if (typeof CSS !== 'undefined' && CSS.highlights) {
+                CSS.highlights.delete('jusgov-flash-copy');
+            }
+        } catch (_) { }
+
+        try {
+            if (window.top && window.top !== window && window.top.document) {
+                const topContainers = window.top.document.querySelectorAll('#jusgov-flash-contour-container, .jusgov-flash-box, [data-jusgov-flash="true"]');
+                for (let j = 0; j < topContainers.length; j++) {
+                    const tc = topContainers[j];
+                    if (tc && tc.parentNode) {
+                        tc.parentNode.removeChild(tc);
+                    }
+                }
+            }
+        } catch (_) { }
+    }
+
+    function limparAvisosAuditoriaEWikiImediatamente(preservarMiniTip = false) {
+        if (validador) {
+            if (typeof validador.ocultarTodosAvisosImediatamente === 'function') {
+                validador.ocultarTodosAvisosImediatamente(preservarMiniTip);
+            } else if (typeof validador.limparAlertaVisual === 'function') {
+                validador.limparAlertaVisual();
+            }
+        }
+    }
+
+    function agendarRetiradaFlashAposDesselecao(preservarMiniTip = false) {
+        /* Passo 5.4.0: Ao desselecionar (clicar fora / em area vazia ou pressionar Esc),
+         * retirar o contorno visual de Flash e todos os avisos de auditoria/Wiki imediatamente. */
+        if (aguardandoDesselecaoFlash || timerFlashBorder) {
+            limparFlashBorderImediatamente();
+        }
+        limparAvisosAuditoriaEWikiImediatamente(preservarMiniTip);
+    }
+
+    /*
+     * FUNCAO: calcularLinhasDoRange
+     * OBJETIVO: Obter somente os retangulos de TEXTO realmente selecionados (um por linha visual),
+     * eliminando os retangulos aninhados/sobrepostos dos elementos-pai que getClientRects() do Range
+     * devolve (causa do contorno duplicado/sobreposto). Fragmentos da mesma linha sao fundidos.
+     */
+    function calcularLinhasDoRange(rangeAlvo) {
+        const fragmentos = [];
+        const adicionar = (r) => {
+            if (r && r.width > 0.5 && r.height > 0.5) {
+                fragmentos.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+            }
+        };
+        try {
+            const raiz = rangeAlvo.commonAncestorContainer;
+            const nosTexto = [];
+            if (raiz && raiz.nodeType === 3) {
+                nosTexto.push(raiz);
+            } else if (raiz) {
+                const walker = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null);
+                let n;
+                while ((n = walker.nextNode())) {
+                    if (typeof rangeAlvo.intersectsNode === 'function' && !rangeAlvo.intersectsNode(n)) continue;
+                    nosTexto.push(n);
+                }
+            }
+            for (let i = 0; i < nosTexto.length; i++) {
+                const no = nosTexto[i];
+                const ini = (no === rangeAlvo.startContainer) ? rangeAlvo.startOffset : 0;
+                const fim = (no === rangeAlvo.endContainer) ? rangeAlvo.endOffset : no.length;
+                if (fim <= ini) continue;
+                if (!/\S/.test(no.data.substring(ini, fim))) continue;
+                const sub = document.createRange();
+                sub.setStart(no, ini);
+                sub.setEnd(no, fim);
+                const rs = sub.getClientRects();
+                for (let k = 0; k < rs.length; k++) adicionar(rs[k]);
+            }
+        } catch (_) { }
+
+        if (fragmentos.length === 0) {
+            /* Sem texto (ex.: imagem/elemento): usa o retangulo do proprio range */
+            try {
+                if (typeof rangeAlvo.getBoundingClientRect === 'function') adicionar(rangeAlvo.getBoundingClientRect());
+            } catch (_) { }
+        }
+        if (fragmentos.length === 0) return [];
+
+        /* Agrupa fragmentos por linha visual (centro vertical dentro de metade da altura) */
+        fragmentos.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        const linhas = [];
+        for (let i = 0; i < fragmentos.length; i++) {
+            const f = fragmentos[i];
+            const cy = (f.top + f.bottom) / 2;
+            let alvoLinha = null;
+            for (let j = linhas.length - 1; j >= 0 && j >= linhas.length - 4; j--) {
+                const l = linhas[j];
+                const h = Math.min(l.bottom - l.top, f.bottom - f.top);
+                if (cy >= l.top + (l.bottom - l.top) * 0.15 && cy <= l.bottom - (l.bottom - l.top) * 0.15 && Math.abs(((l.top + l.bottom) / 2) - cy) < h * 0.6) {
+                    alvoLinha = l;
+                    break;
+                }
+            }
+            if (alvoLinha) {
+                alvoLinha.frags.push(f);
+                alvoLinha.top = Math.min(alvoLinha.top, f.top);
+                alvoLinha.bottom = Math.max(alvoLinha.bottom, f.bottom);
+            } else {
+                linhas.push({ top: f.top, bottom: f.bottom, frags: [f] });
+            }
+        }
+
+        /* Em cada linha, funde fragmentos horizontalmente (lacunas de ate 12px = espacos entre palavras/tags) */
+        const segmentos = [];
+        for (let i = 0; i < linhas.length; i++) {
+            const l = linhas[i];
+            l.frags.sort((a, b) => a.left - b.left);
+            let atual = null;
+            for (let k = 0; k < l.frags.length; k++) {
+                const f = l.frags[k];
+                if (atual && (f.left - atual.right) <= 12) {
+                    atual.right = Math.max(atual.right, f.right);
+                } else {
+                    if (atual) segmentos.push(atual);
+                    atual = { left: f.left, right: f.right, top: l.top, bottom: l.bottom };
+                }
+            }
+            if (atual) segmentos.push(atual);
+        }
+        return segmentos;
+    }
+
+    /*
+     * FUNCAO: agruparLinhasEmBlocos
+     * OBJETIVO: Agrupar segmentos de linha verticalmente contiguos e com sobreposicao horizontal em um
+     * unico bloco, para desenhar UM contorno continuo (poligono) em vez de varias caixas empilhadas.
+     */
+    function agruparLinhasEmBlocos(segmentos) {
+        const ordenados = segmentos.slice().sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        const blocos = [];
+        for (let i = 0; i < ordenados.length; i++) {
+            const s = ordenados[i];
+            let destino = null;
+            for (let j = 0; j < blocos.length; j++) {
+                const ultima = blocos[j][blocos[j].length - 1];
+                const folga = Math.max(6, (s.bottom - s.top) * 0.6);
+                const contiguo = (s.top >= ultima.top) && ((s.top - ultima.bottom) <= folga);
+                const sobrepoe = (s.left < ultima.right) && (s.right > ultima.left);
+                if (contiguo && sobrepoe) { destino = blocos[j]; break; }
+            }
+            if (destino) destino.push(s); else blocos.push([s]);
+        }
+        return blocos;
+    }
+
+    function dispararFlashBorderVisual(rangeAlvo) {
+        /* Passo 5.4: Contorno visual temporario configuravel (0 a 5000ms, padrao 500ms e cor customizada)
+         * desenhado como contorno real (borda externa nitida com fundo 100% transparente), sem escurecer
+         * ou criar segunda selecao sobre o texto. Desaparece automaticamente apos o tempo estipulado.
+         * Um contorno por bloco de texto: sem caixas sobrepostas e, em varias linhas, um unico poligono. */
+        limparFlashBorderImediatamente();
+        const duracaoMs = tempoFlashBorderMs > 0 ? tempoFlashBorderMs : 0;
+        if (duracaoMs <= 0 || !rangeAlvo) return;
+        try {
+            const segmentos = calcularLinhasDoRange(rangeAlvo);
+            if (segmentos.length === 0) return;
+            const blocos = agruparLinhasEmBlocos(segmentos);
+
+            const idContainer = 'jusgov-flash-contour-container';
+            const existentes = document.querySelectorAll(`#${idContainer}`);
+            for (let e = 0; e < existentes.length; e++) {
+                if (existentes[e].parentNode) existentes[e].parentNode.removeChild(existentes[e]);
+            }
+
+            const container = document.createElement('div');
+            container.id = idContainer;
+            container.setAttribute('data-jusgov-ignore', 'true');
+            container.setAttribute('data-jusgov-flash', 'true');
+            container.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;pointer-events:none !important;z-index:2147483646;border:none;margin:0;padding:0;overflow:visible;';
+            (document.body || document.documentElement).appendChild(container);
+
+            const corBorda = (typeof corFlashBorder === 'string' && /^#[0-9a-fA-F]{6}$/.test(corFlashBorder.trim()))
+                ? corFlashBorder.trim().toLowerCase()
+                : '#0d9488';
+
+            for (let b = 0; b < blocos.length; b++) {
+                const linhas = blocos[b];
+                if (linhas.length === 1) {
+                    const r = linhas[0];
+                    const box = document.createElement('div');
+                    box.className = 'jusgov-flash-box';
+                    box.setAttribute('data-jusgov-ignore', 'true');
+                    box.style.cssText = [
+                        'position:fixed',
+                        `top:${Math.max(0, Math.round(r.top - 1))}px`,
+                        `left:${Math.max(0, Math.round(r.left - 2))}px`,
+                        `width:${Math.max(1, Math.round(r.right - r.left + 4))}px`,
+                        `height:${Math.max(1, Math.round(r.bottom - r.top + 2))}px`,
+                        `border:2px solid ${corBorda}`,
+                        'border-radius:3px',
+                        'background:transparent',
+                        'background-color:transparent',
+                        'pointer-events:none !important',
+                        'box-sizing:border-box',
+                        `box-shadow:0 0 0 1px rgba(255,255,255,0.45), 0 0 4px ${corBorda}`,
+                        'margin:0',
+                        'padding:0'
+                    ].join(';') + ';';
+                    container.appendChild(box);
+                    continue;
+                }
+
+                /* Varias linhas: normaliza as fronteiras verticais (sem frestas) e desenha um poligono unico */
+                const n = linhas.length;
+                const L = linhas.map(l => l.left - 2);
+                const R = linhas.map(l => l.right + 2);
+                const Y = [];
+                for (let i = 0; i < n - 1; i++) {
+                    Y.push((linhas[i].bottom + linhas[i + 1].top) / 2);
+                }
+                const topo = linhas[0].top - 1;
+                const base = linhas[n - 1].bottom + 1;
+                const pts = [[L[0], topo], [R[0], topo]];
+                for (let i = 0; i < n - 1; i++) {
+                    pts.push([R[i], Y[i]]);
+                    pts.push([R[i + 1], Y[i]]);
+                }
+                pts.push([R[n - 1], base]);
+                pts.push([L[n - 1], base]);
+                for (let i = n - 2; i >= 0; i--) {
+                    pts.push([L[i + 1], Y[i]]);
+                    pts.push([L[i], Y[i]]);
+                }
+                const d = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ') + ' Z';
+
+                const NS = 'http://www.w3.org/2000/svg';
+                const svg = document.createElementNS(NS, 'svg');
+                svg.setAttribute('class', 'jusgov-flash-box');
+                svg.setAttribute('data-jusgov-ignore', 'true');
+                svg.setAttribute('width', String(window.innerWidth || document.documentElement.clientWidth || 0));
+                svg.setAttribute('height', String(window.innerHeight || document.documentElement.clientHeight || 0));
+                svg.style.cssText = 'position:fixed;top:0;left:0;overflow:visible;pointer-events:none !important;background:transparent;margin:0;padding:0;';
+                const halo = document.createElementNS(NS, 'path');
+                halo.setAttribute('d', d);
+                halo.setAttribute('fill', 'none');
+                halo.setAttribute('stroke', 'rgba(255,255,255,0.45)');
+                halo.setAttribute('stroke-width', '4');
+                halo.setAttribute('stroke-linejoin', 'round');
+                const traco = document.createElementNS(NS, 'path');
+                traco.setAttribute('d', d);
+                traco.setAttribute('fill', 'none');
+                traco.setAttribute('stroke', corBorda);
+                traco.setAttribute('stroke-width', '2');
+                traco.setAttribute('stroke-linejoin', 'round');
+                svg.appendChild(halo);
+                svg.appendChild(traco);
+                container.appendChild(svg);
+            }
+
+            aguardandoDesselecaoFlash = true;
+            timestampCriacaoFlash = performance.now();
+
+            timerFlashBorder = setTimeout(() => {
+                limparFlashBorderImediatamente();
+            }, duracaoMs);
+        } catch (_) { }
+    }
+    function registrarEstatisticaOperacional(inconsistenciaDetectada = false) {
+        /* Passo 5.4.1: Incrementar contadores estatisticos de copias e alertas exclusivamente em storage.local (sem gravar na nuvem) */
+        try {
+            const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
+            if (storageLocal) {
+                storageLocal.get(['totalCopias', 'totalAlertas', 'dataInicioContadores'], (dados) => {
+                    if (chrome.runtime && chrome.runtime.lastError) return;
+                    const copiasBrutas = (dados && typeof dados.totalCopias === 'number') ? dados.totalCopias : 0;
+                    const alertasBrutos = (dados && typeof dados.totalAlertas === 'number') ? dados.totalAlertas : 0;
+                    const copiasAtuais = (Number.isSafeInteger(copiasBrutas) && copiasBrutas >= 0 && copiasBrutas < LIMITE_MAXIMO_CONTADOR_OPERACIONAL)
+                        ? copiasBrutas
+                        : 0;
+                    const alertasAtuais = (Number.isSafeInteger(alertasBrutos) && alertasBrutos >= 0 && alertasBrutos < LIMITE_MAXIMO_CONTADOR_OPERACIONAL)
+                        ? alertasBrutos
+                        : 0;
+                    const proxCopias = (copiasAtuais + 1 >= LIMITE_MAXIMO_CONTADOR_OPERACIONAL) ? 0 : (copiasAtuais + 1);
+                    const novoPayload = { totalCopias: proxCopias };
+                    if (inconsistenciaDetectada) {
+                        const proxAlertas = (alertasAtuais + 1 >= LIMITE_MAXIMO_CONTADOR_OPERACIONAL) ? 0 : (alertasAtuais + 1);
+                        novoPayload.totalAlertas = proxAlertas;
+                    } else if (alertasAtuais !== alertasBrutos) {
+                        novoPayload.totalAlertas = 0;
+                    }
+                    if (!dados || typeof dados.dataInicioContadores !== 'string' || !dados.dataInicioContadores) {
+                        const agora = new Date();
+                        const pad = (n) => String(n).padStart(2, '0');
+                        novoPayload.dataInicioContadores = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
+                    }
+                    storageLocal.set(novoPayload);
+                });
+            }
+        } catch (_) { }
+    }
+
+    /*
+     * FUNCAO: aplicarSelecaoDOM
+     * DIRETRIZ ROOT 6.16 (Modulo de Selecao Autonoma):
+     * Aplica o Range na Selection API do navegador, aciona o contorno visual rapido
+     * do Flash Verde temporizado (se ativo) e aplica a Regra de Retencao da Selecao do Sistema:
+     * - Se o elemento for de leitura/texto judicial ou documento PDF aberto no Chrome
+     *   (excluindo barras de ferramentas e controles do PDF): MANTEM a selecao ativa no sistema.
+     * - Se for elemento de interface grafica/controle/modal estrito: REMOVE imediatamente a selecao
+     *   do sistema (window.getSelection().removeAllRanges()) quando solicitado ou ao finalizar a acao.
+     */
+    function aplicarSelecaoDOM(rangeAlvo, opcoes = {}) {
+        if (!rangeAlvo) return { ok: false, manterSelecao: true };
+        const noContexto = opcoes.noContexto || rangeAlvo.commonAncestorContainer || null;
+        const eraArrasto = Boolean(opcoes.eraArrasto);
+        const manterSelecao = (opcoes.forcarDesselecao === true && modoRetirarSelecao !== 'nenhuma' && (modoRetirarSelecao !== 'total_exceto_arrasto' || !eraArrasto))
+            ? false
+            : ((opcoes.forcarManterSelecao === true && modoRetirarSelecao !== 'total' && (modoRetirarSelecao !== 'total_exceto_arrasto' || eraArrasto))
+                ? true
+                : deveManterSelecaoAtivaNoDom(noContexto, eraArrasto));
+
+        try {
+            const sel = window.getSelection();
+            if (sel && manterSelecao) {
+                const rangeJaAtivo = sel.rangeCount > 0 &&
+                    sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
+                    sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
+                    sel.getRangeAt(0).endContainer === rangeAlvo.endContainer &&
+                    sel.getRangeAt(0).endOffset === rangeAlvo.endOffset;
+                if (!rangeJaAtivo) {
+                    sel.removeAllRanges();
+                    sel.addRange(rangeAlvo);
+                }
+            } else if (sel && !manterSelecao && opcoes.aplicarNoDomAntesDeLimpar !== false) {
+                const rangeJaAtivo = sel.rangeCount > 0 &&
+                    sel.getRangeAt(0).startContainer === rangeAlvo.startContainer &&
+                    sel.getRangeAt(0).startOffset === rangeAlvo.startOffset &&
+                    sel.getRangeAt(0).endContainer === rangeAlvo.endContainer &&
+                    sel.getRangeAt(0).endOffset === rangeAlvo.endOffset;
+                if (!rangeJaAtivo) {
+                    sel.removeAllRanges();
+                    sel.addRange(rangeAlvo);
+                }
+            }
+        } catch (_) { }
+
+        if (opcoes.dispararFlash !== false) {
+            if (tempoFlashBorderMs > 0) {
+                if (!manterSelecao) {
+                    flashExclusivoSemSelecao = true;
+                }
+                dispararFlashBorderVisual(rangeAlvo);
+            } else {
+                limparFlashBorderImediatamente();
+            }
+        }
+
+        if (!manterSelecao && opcoes.limparImediatamente === true) {
+            try {
+                const selLimpar = window.getSelection();
+                if (selLimpar) selLimpar.removeAllRanges();
+                flashExclusivoSemSelecao = true;
+            } catch (_) { }
+        }
+
+        return { ok: true, manterSelecao, manterSelecaoNoDom: manterSelecao };
+    }
+
+    /*
+     * FUNCAO: executarCopiaDeSelecao
+     * DIRETRIZ ROOT 6.16 (Modulo de Copia Desacoplado e Reativo):
+     * Higieniza o texto do Range (ou texto sobrescrito), gerencia o Modo Acumulador ou copia simples,
+     * grava na Area de Transferencia (e no clipboard simulado interno com backup do anterior),
+     * registra a assinatura de deduplicacao e executa a validacao matematica nao-bloqueante.
+     */
+    async function executarCopiaDeSelecao(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesCopia = {}) {
+        if (!rangeAlvo && textoSobrescrito === null) return false;
+
+        let textoLimpo = '';
+        if (textoSobrescrito !== null) {
+            textoLimpo = higienizarTextoParaCopia(textoSobrescrito);
+            if (opcoesCopia && opcoesCopia.forcarUmaLinha) {
+                textoLimpo = textoLimpo.replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ').trim();
+            }
+        } else if (rangeAlvo) {
+            textoLimpo = extrairTextoPuroSanitizado(rangeAlvo);
+            if (!textoLimpo) {
+                textoLimpo = higienizarTextoParaCopia(rangeAlvo.toString());
+            }
+        }
+        if (!textoLimpo || textoLimpo.length === 0) return false;
+
+        if (modoAcumulador && acumulador) {
+            if (acumulador.obterQuantidade() === 0 && ultimoTextoSelecionadoLimpo && ultimoTextoSelecionadoLimpo !== textoLimpo) {
+                acumulador.absorverSelecaoPreviaSeVazio(ultimoTextoSelecionadoLimpo, ultimoRangeSelecionadoSimples);
+                ultimoTextoSelecionadoLimpo = '';
+                ultimoRangeSelecionadoSimples = null;
+            }
+
+            const ehModoBaralho = window.__JUSGOV_MODO_BARALHO__ === true;
+            const res = acumulador.adicionarItem(textoLimpo, rangeAlvo, ehModoBaralho);
+            if (res) {
+                await gravarNaAreaDeTransferencia(res.consolidado || '', null);
+                await cederControleAoCompositorBlink();
+                let alertaInvalido = false;
+                if (validador && rangeAlvo) {
+                    const check = validacaoMatematicaAtiva
+                        ? validador.auditarEAlerta(textoLimpo, rangeAlvo)
+                        : { valido: true, msg: '' };
+                    alertaInvalido = !check.valido;
+                    if (check.valido) {
+                        const numIntervalos = res.quantidade !== undefined ? res.quantidade : acumulador.obterQuantidade();
+                        const numPalavras = res.palavras !== undefined
+                            ? res.palavras
+                            : (res.consolidado ? res.consolidado.replace(EXPRESSOES_REGULARES.PONTO_VIRGULA_FINAL, '').split(EXPRESSOES_REGULARES.SEPARADOR_TOKENS_ACUMULADOR).filter(Boolean).length : 0);
+                        const numCaracteres = res.caracteres !== undefined
+                            ? res.caracteres
+                            : (res.consolidado ? res.consolidado.length : 0);
+                        validador.projetarAlertaVisual(
+                            rangeAlvo,
+                            `ACUMULADOR: ${numIntervalos} ${numIntervalos === 1 ? 'intervalo' : 'intervalos'} | ${numPalavras} ${numPalavras === 1 ? 'palavra' : 'palavras'} | ${numCaracteres} caracteres`,
+                            false
+                        );
+                    }
+                }
+                registrarEstatisticaOperacional(alertaInvalido);
+            }
+            return true;
+        }
+
+        if (acumulador) acumulador.limpar();
+        ultimoTextoSelecionadoLimpo = textoLimpo;
+        ultimoRangeSelecionadoSimples = (rangeAlvo && typeof rangeAlvo.cloneRange === 'function') ? rangeAlvo.cloneRange() : null;
+
+        const rangeParaGravacao = (opcoesCopia && opcoesCopia.forcarUmaLinha) ? null : rangeAlvo;
+        await gravarNaAreaDeTransferencia(textoLimpo, rangeParaGravacao);
+        try {
+            const selAssinatura = window.getSelection();
+            const ass = calcularAssinaturaSelecao(selAssinatura);
+            if (ass) {
+                ultimoRangeAssinaturaGlobal = ass;
+            } else if (rangeAlvo) {
+                ultimoRangeAssinaturaGlobal = `${rangeAlvo.startOffset}_${rangeAlvo.endOffset}_${textoLimpo}`;
+            }
+        } catch (_) { }
+
+        await cederControleAoCompositorBlink();
+        let alertaInvalido = false;
+        if (validador && validacaoMatematicaAtiva && rangeAlvo) {
+            const check = validador.auditarEAlerta(textoLimpo, rangeAlvo);
+            alertaInvalido = !check.valido;
+        }
+        registrarEstatisticaOperacional(alertaInvalido);
+        return true;
+    }
+
+    /*
+     * FUNCAO: aplicarSelecaoECopiar
+     * OBJETIVO DE RECONSTRUCAO: Orquestrar de forma desacoplada a selecao visual no DOM
+     * (aplicarSelecaoDOM) e a copia para a Area de Transferencia (executarCopiaDeSelecao),
+     * respeitando a retencao de selecao em areas de leitura/PDF e a desselecao imediata em UI.
+     */
+    async function aplicarSelecaoECopiar(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesSelecao = {}) {
+        /* Passo 5.5: Validar Range e orquestrar Selecao Autonoma + Copia Reativa */
+        if (!rangeAlvo) return false;
+
+        let textoPreview = '';
+        if (textoSobrescrito !== null) {
+            textoPreview = higienizarTextoParaCopia(textoSobrescrito);
+        } else {
+            textoPreview = extrairTextoPuroSanitizado(rangeAlvo) || higienizarTextoParaCopia(rangeAlvo.toString());
+        }
+        if (!textoPreview || textoPreview.length === 0) return false;
+
+        /* Protecao em Elementos de Interface do Browser sem Modificadores de Teclado */
+        const elAlvoVerif = rangeAlvo.commonAncestorContainer || null;
+        const temModificador = Boolean(opcoesSelecao && opcoesSelecao.temModificador);
+        if (!verificarProtecaoTamanhoMinimoInterface(textoPreview, elAlvoVerif, temModificador)) {
+            try {
+                const sel = window.getSelection();
+                if (sel) sel.removeAllRanges();
+            } catch (_) { }
+            return false;
+        }
+
+        if (timerDebounceSelecaoGlobal) {
+            clearTimeout(timerDebounceSelecaoGlobal);
+            timerDebounceSelecaoGlobal = null;
+        }
+
+        selecaoSendoAplicadaPeloAddon = true;
+        try {
+            const eraArrasto = Boolean(opcoesSelecao && opcoesSelecao.eraArrasto);
+            const elAlvo = rangeAlvo ? rangeAlvo.commonAncestorContainer : null;
+            let deveManter = true;
+            if (modoRetirarSelecao === 'nenhuma') {
+                deveManter = true;
+            } else if (modoRetirarSelecao === 'total') {
+                deveManter = false;
+            } else if (modoRetirarSelecao === 'total_exceto_arrasto') {
+                deveManter = (eraArrasto === true);
+            } else if (typeof opcoesSelecao.forcarManterSelecao === 'boolean') {
+                deveManter = opcoesSelecao.forcarManterSelecao;
+            } else if (typeof opcoesSelecao.forcarDesselecao === 'boolean') {
+                deveManter = !opcoesSelecao.forcarDesselecao;
+            } else {
+                deveManter = deveManterSelecaoAtivaNoDom(elAlvo, eraArrasto);
+            }
+
+            const infoSel = aplicarSelecaoDOM(rangeAlvo, {
+                ...opcoesSelecao,
+                forcarManterSelecao: deveManter,
+                forcarDesselecao: !deveManter,
+                dispararFlash: false,
+                limparImediatamente: false
+            });
+
+            const copiou = await executarCopiaDeSelecao(rangeAlvo, modoAcumulador, textoSobrescrito, {
+                forcarUmaLinha: Boolean(opcoesSelecao && opcoesSelecao.forcarUmaLinha)
+            });
+            if (!copiou) return false;
+
+            if (!modoAcumulador) {
+                if (tempoFlashBorderMs > 0) {
+                    if (!deveManter) {
+                        flashExclusivoSemSelecao = true;
+                    }
+                    dispararFlashBorderVisual(rangeAlvo);
+                } else {
+                    limparFlashBorderImediatamente();
+                }
+            }
+
+            // DIRETRIZ ROOT 6.22 e 6.27: Politica de Retencao / Remocao da Selecao do Sistema:
+            // "Esta funcao e pra funcionar 'apos soltar o mouse' e antes do flash sumir"
+            if (!deveManter) {
+                flashExclusivoSemSelecao = true;
+                setTimeout(() => {
+                    try {
+                        const sel = window.getSelection();
+                        if (sel) sel.removeAllRanges();
+                    } catch (_) { }
+                }, 20);
+            }
+
+            return true;
+        } catch (_) {
+            return false;
+        } finally {
+            setTimeout(() => {
+                selecaoSendoAplicadaPeloAddon = false;
+            }, 300);
+        }
+    }
+
+    /* ==========================================================================
+     * SECAO 6: PRE-SELECAO SEM COPIA EM EDITORES MULTILINHAS (CAMPOS DE SIMBOLOS)
+     * ========================================================================== */
+    /*
+     * FUNCAO: localizarCampoSimbolosSobCursor
+     * OBJETIVO DE RECONSTRUCAO: Identificar em textos editaveis multilinhas se o
+     * clique ocorreu sobre um marcador/placeholder delimitado por simbolos como:
+     * "##########", "$$$$$$$$", "@@@@", "#[digite o texto aqui]#", "##Funcionalidade##",
+     * "@@ Qualquer coisa aqui @@" ou "### Aqui qualquer coisa ##".
+     */
+    function localizarCampoSimbolosSobCursor(texto, idx) {
+        /* Passo 6.1: Testar padroes compostos de campos delimitados por simbolos (#, $, @, *, ~, _, =, %) */
+        if (!texto || idx < 0 || idx > texto.length) return null;
+
+        const rxFonte = EXPRESSOES_REGULARES.CAMPO_PLACEHOLDER_EDITAVEL || EXPRESSOES_REGULARES.CAMPO_MARCADOR_SIMBOLOS;
+        const regexCampo = new RegExp(rxFonte.source, 'gu');
+        let m;
+        while ((m = regexCampo.exec(texto)) !== null) {
+            const ini = m.index;
+            const fim = ini + m[0].length;
+            if (idx >= ini && idx <= fim) {
+                return { inicio: ini, fim };
+            }
+        }
+
+        /* Passo 6.2: Fallback para sequencia contigua de simbolos repetiveis ate a borda do espaco */
+        let pos = idx < texto.length ? idx : texto.length - 1;
+        if (pos >= 0 && !eSimboloRepetivel(texto[pos]) && pos > 0 && eSimboloRepetivel(texto[pos - 1])) {
+            pos--;
+        }
+        if (pos >= 0 && eSimboloRepetivel(texto[pos])) {
+            let ini = pos;
+            while (ini > 0 && !eEspacoBranco(texto[ini - 1]) && !eQuebraDeLinha(texto[ini - 1])) {
+                ini--;
+            }
+            let fim = pos + 1;
+            while (fim < texto.length && !eEspacoBranco(texto[fim]) && !eQuebraDeLinha(texto[fim])) {
+                fim++;
+            }
+            if (fim - ini >= 2) {
+                return { inicio: ini, fim };
+            }
+        }
+
+        return null;
+    }
+
+    /*
+     * FUNCAO: tratarCliqueEmEditorMultilinhaSemCopia
+     * OBJETIVO DE RECONSTRUCAO: Em editores de texto multilinhas (<textarea> ou
+     * contenteditable), selecionar APENAS marcadores de simbolos clicados, sem
+     * jamais executar "selecionar tudo" e sem jamais copiar nada para o clipboard.
+     */
+    function tratarCliqueEmEditorMultilinhaSemCopia(e) {
+        /* Passo 6.3: Verificar se a pre-selecao editavel esta ativa e se o alvo e <textarea> ou contenteditable */
+        const alvo = e.target;
+        if (!alvo) return false;
+
+        const ehTextarea = (alvo.tagName === 'TEXTAREA');
+        if (ehTextarea) {
+            if (!selecaoEditavelAtiva || (e && e.detail && e.detail > 1)) return false;
+            setTimeout(() => {
+                try {
+                    if (alvo.selectionStart !== alvo.selectionEnd) return;
+                    const idx = alvo.selectionStart;
+                    const valor = alvo.value || '';
+                    const spanSimbolo = localizarCampoSimbolosSobCursor(valor, idx);
+                    if (spanSimbolo) {
+                        alvo.setSelectionRange(spanSimbolo.inicio, spanSimbolo.fim);
+                    }
+                } catch (_) { }
+            }, 10);
+            return true;
+        }
+
+        /* Editores HTML Online (contenteditable / CKEditor / TinyMCE / ProseMirror / etc.) */
+        if (!placeholdersMinutasHtmlAtivo || modoPlaceholdersMinutasHtml === 'desabilitado') return false;
+
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        const detail = (e && typeof e.detail === 'number') ? e.detail : 1;
+        const ctrlPressionado = Boolean(e && (e.ctrlKey || e.metaKey));
+        const docAlvo = (alvo && alvo.ownerDocument) ? alvo.ownerDocument : document;
+        const winAlvo = (docAlvo && docAlvo.defaultView) ? docAlvo.defaultView : window;
+        setTimeout(() => {
+            try {
+                const selAtual = (winAlvo && typeof winAlvo.getSelection === 'function')
+                    ? winAlvo.getSelection()
+                    : window.getSelection();
+                if (selAtual && !selAtual.isCollapsed && selAtual.toString().trim().length > 0 && detail === 1) {
+                    return;
+                }
+                let ponto = null;
+                if (selAtual && selAtual.rangeCount > 0 && selAtual.isCollapsed) {
+                    const rNat = selAtual.getRangeAt(0);
+                    if (rNat && rNat.startContainer) {
+                        if (rNat.startContainer.nodeType === Node.TEXT_NODE) {
+                            ponto = { no: rNat.startContainer, offset: rNat.startOffset };
+                        } else if (rNat.startContainer.nodeType === Node.ELEMENT_NODE && rNat.startContainer.childNodes.length > 0) {
+                            const idxFilho = Math.min(rNat.startOffset, rNat.startContainer.childNodes.length - 1);
+                            const f = rNat.startContainer.childNodes[idxFilho];
+                            if (f && f.nodeType === Node.TEXT_NODE) {
+                                ponto = { no: f, offset: 0 };
+                            }
+                        }
+                    }
+                }
+                if (!ponto || !ponto.no) {
+                    ponto = obterPontoDoClique(clientX, clientY, docAlvo);
+                }
+                if (!ponto || !ponto.no) return;
+
+                const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                if (!mapa || !mapa.texto) return;
+
+                const { texto, idxCursor } = mapa;
+                let rangeParaSelecionar = null;
+
+                const ativarSelecaoAvancada = (modoPlaceholdersMinutasHtml === 'avancado') ||
+                    (modoPlaceholdersMinutasHtml === 'ctrl_avancado' && ctrlPressionado);
+
+                if (ativarSelecaoAvancada) {
+                    if (detail >= 3) {
+                        const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
+                        if (resTriplo) {
+                            rangeParaSelecionar = criarRangeDOMAPartirDeIndices(mapa, resTriplo.inicio, resTriplo.fim);
+                        }
+                        if (!rangeParaSelecionar) {
+                            const bloco = obterBlocoAncestralContextual(ponto.no);
+                            if (bloco && bloco !== docAlvo.body) {
+                                rangeParaSelecionar = docAlvo.createRange();
+                                rangeParaSelecionar.selectNodeContents(bloco);
+                            }
+                        }
+                    } else if (detail === 2) {
+                        const charNoCursor = texto[idxCursor] || '';
+                        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+                        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+                            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+                        const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
+                            eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
+
+                        let resIndices = null;
+                        if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
+                            resIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+                        }
+                        if (!resIndices) {
+                            resIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
+                        }
+                        if (!resIndices) {
+                            resIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+                        }
+                        if (!resIndices) {
+                            resIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+                        }
+                        if (!resIndices) {
+                            resIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+                        }
+                        if (!resIndices) {
+                            resIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+                        }
+                        if (resIndices) {
+                            rangeParaSelecionar = criarRangeDOMAPartirDeIndices(mapa, resIndices.inicio, resIndices.fim);
+                        }
+                    } else {
+                        /* detail === 1: Prioridade 1 no modo avancado: se clicou sobre um placeholder, seleciona-o diretamente */
+                        const spanSimbolo = localizarCampoSimbolosSobCursor(texto, idxCursor);
+                        if (spanSimbolo) {
+                            rangeParaSelecionar = criarRangeDOMAPartirDeIndices(mapa, spanSimbolo.inicio, spanSimbolo.fim);
+                        } else {
+                            const charNoCursor = texto[idxCursor] || '';
+                            const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+                            const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+                                (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+                            const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
+                                eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
+
+                            let resIndices = null;
+                            if (clicouEmDelimitadorOuAspas) {
+                                resIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+                            } else if (clicouEmEspaco) {
+                                resIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
+                                if (!resIndices) {
+                                    resIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+                                }
+                                if (!resIndices) {
+                                    resIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+                                }
+                                if (!resIndices) {
+                                    resIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+                                }
+                                if (!resIndices) {
+                                    resIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+                                }
+                                if (!resIndices) {
+                                    resIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+                                }
+                            } else {
+                                resIndices = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
+                                if (!resIndices) {
+                                    resIndices = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
+                                }
+                            }
+                            if (resIndices) {
+                                rangeParaSelecionar = criarRangeDOMAPartirDeIndices(mapa, resIndices.inicio, resIndices.fim);
+                            }
+                        }
+                    }
+                } else {
+                    /* modoPlaceholdersMinutasHtml === 'placeholders' */
+                    const spanSimbolo = localizarCampoSimbolosSobCursor(mapa.texto, mapa.idxCursor);
+                    if (spanSimbolo) {
+                        rangeParaSelecionar = criarRangeDOMAPartirDeIndices(mapa, spanSimbolo.inicio, spanSimbolo.fim);
+                    }
+                }
+
+                if (!rangeParaSelecionar) return;
+
+                const sel = (winAlvo && typeof winAlvo.getSelection === 'function')
+                    ? winAlvo.getSelection()
+                    : window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(rangeParaSelecionar);
+                }
+            } catch (_) { }
+        }, 15);
+        return true;
+    }
+
+    /* ==========================================================================
+     * SECAO 7: MOTORES DOS 6 ESTAGIOS DE EXPANSAO E CONTEXTO INCREMENTAL
+     * ========================================================================== */
+    function linhaEhTodaMaiuscula(strLinha) {
+        if (!strLinha) return false;
+        const limpa = strLinha.trim();
+        if (limpa.length < 2) return false;
+        const temLetra = EXPRESSOES_REGULARES.CHAR_LETRA_GERAL.test(limpa);
+        const temMinuscula = EXPRESSOES_REGULARES.CHAR_LETRA_MINUSCULA.test(limpa);
+        return temLetra && !temMinuscula;
+    }
+
+    function tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idx) {
+        /* Passo 7.0.1: Capturar sequencia contigua de 2+ palavras em LETRAS MAIUSCULAS
+         * (mesmo dentro de um paragrafo misto, ex: "REGULAR PROSSEGUIMENTO DO FEITO"
+         * ou "VARIAS PALAVRAS DO TEXTO EM LETRAS MAIUSCULAS"), ou bloco multilinhas em caixa alta. */
+        if (EXPRESSOES_REGULARES.SEQUENCIA_PALAVRAS_MAIUSCULAS) {
+            const regexSeqMaiusculas = new RegExp(EXPRESSOES_REGULARES.SEQUENCIA_PALAVRAS_MAIUSCULAS.source, 'gu');
+            let mSeq;
+            while ((mSeq = regexSeqMaiusculas.exec(texto)) !== null) {
+                const iniSeq = mSeq.index;
+                const fimSeq = iniSeq + mSeq[0].length;
+                if (idx >= (iniSeq - 1) && idx <= (fimSeq + 1)) {
+                    const trecho = mSeq[0].trim();
+                    const temPeloMenosDuasLetrasSeguidas = EXPRESSOES_REGULARES.CONTEM_DUAS_PALAVRAS_MAIUSCULAS
+                        ? EXPRESSOES_REGULARES.CONTEM_DUAS_PALAVRAS_MAIUSCULAS.test(trecho)
+                        : trecho.indexOf(' ') !== -1;
+                    if (temPeloMenosDuasLetrasSeguidas) {
+                        let iniLimpo = iniSeq;
+                        let fimLimpo = fimSeq;
+                        while (iniLimpo < fimLimpo && eEspacoBranco(texto[iniLimpo])) iniLimpo++;
+                        while (fimLimpo > iniLimpo && eEspacoBranco(texto[fimLimpo - 1])) fimLimpo--;
+                        if (fimLimpo > iniLimpo) {
+                            return { inicio: iniLimpo, fim: fimLimpo };
+                        }
+                    }
+                }
+            }
+        }
+
+        let iniLinha = idx;
+        while (iniLinha > 0 && !eQuebraDeLinha(texto[iniLinha - 1])) {
+            iniLinha--;
+        }
+        let fimLinha = idx;
+        while (fimLinha < texto.length && !eQuebraDeLinha(texto[fimLinha])) {
+            fimLinha++;
+        }
+
+        const linhaAtual = texto.substring(iniLinha, fimLinha);
+        if (!linhaEhTodaMaiuscula(linhaAtual)) {
+            return null;
+        }
+
+        let iniBloco = iniLinha;
+        while (iniBloco > 0 && eQuebraDeLinha(texto[iniBloco - 1])) {
+            let fimLinhaAnt = iniBloco - 1;
+            while (fimLinhaAnt > 0 && texto[fimLinhaAnt - 1] === '\r') fimLinhaAnt--;
+            let iniLinhaAnt = fimLinhaAnt;
+            while (iniLinhaAnt > 0 && !eQuebraDeLinha(texto[iniLinhaAnt - 1])) {
+                iniLinhaAnt--;
+            }
+            const linhaAnt = texto.substring(iniLinhaAnt, fimLinhaAnt);
+            if (linhaEhTodaMaiuscula(linhaAnt)) {
+                iniBloco = iniLinhaAnt;
+            } else {
+                break;
+            }
+        }
+
+        let fimBloco = fimLinha;
+        while (fimBloco < texto.length && eQuebraDeLinha(texto[fimBloco])) {
+            let iniLinhaProx = fimBloco + 1;
+            while (iniLinhaProx < texto.length && texto[iniLinhaProx] === '\n') iniLinhaProx++;
+            let fimLinhaProx = iniLinhaProx;
+            while (fimLinhaProx < texto.length && !eQuebraDeLinha(texto[fimLinhaProx])) {
+                fimLinhaProx++;
+            }
+            const linhaProx = texto.substring(iniLinhaProx, fimLinhaProx);
+            if (linhaEhTodaMaiuscula(linhaProx)) {
+                fimBloco = fimLinhaProx;
+            } else {
+                break;
+            }
+        }
+
+        while (iniBloco < fimBloco && eEspacoBranco(texto[iniBloco])) iniBloco++;
+        while (fimBloco > iniBloco && eEspacoBranco(texto[fimBloco - 1])) fimBloco--;
+
+        return (fimBloco > iniBloco) ? { inicio: iniBloco, fim: fimBloco } : null;
+    }
+
+    function tentarExpandirBlocoFormatadoDestaque(mapa, idx) {
+        /* Passo 7.0.2: Detectar conjunto contiguo de palavras destacadas por formatacao basica
+         * (negrito <b>/<strong>, italico <i>/<em>, sublinhado <u>/<ins>, marca-texto <mark>,
+         * tachado <s>/<del>, codigo <code>, citacao <cite>/<q> ou estilos CSS equivalentes,
+         * isolados ou combinados) para seleciona-lo por inteiro com 1 clique no espaco ou 2 cliques. */
+        if (!mapa || !Array.isArray(mapa.segmentos) || mapa.segmentos.length === 0) return null;
+
+        const idxGlobal = idx + mapa.deslocamentoJanela;
+        const blocoBase = mapa.bloco;
+        const TAGS_DESTAQUE = new Set([
+            'B', 'STRONG', 'I', 'EM', 'DFN', 'VAR', 'U', 'INS', 'MARK', 'S', 'STRIKE', 'DEL', 'SUP', 'SUB', 'CODE', 'KBD', 'SAMP', 'CITE', 'Q', 'ABBR'
+        ]);
+
+        let pesoBase = 400;
+        let italicoBase = false;
+        let sublinhadoBase = false;
+        let bgBase = '';
+        try {
+            if (blocoBase && blocoBase.nodeType === Node.ELEMENT_NODE) {
+                const stBase = window.getComputedStyle(blocoBase);
+                if (stBase) {
+                    pesoBase = parseInt(stBase.fontWeight, 10) || (stBase.fontWeight === 'bold' ? 700 : 400);
+                    italicoBase = stBase.fontStyle === 'italic' || stBase.fontStyle === 'oblique';
+                    const decBase = (stBase.textDecorationLine || stBase.textDecoration || '').toLowerCase();
+                    sublinhadoBase = decBase.indexOf('underline') !== -1 || decBase.indexOf('line-through') !== -1;
+                    bgBase = stBase.backgroundColor || '';
+                }
+            }
+        } catch (_) { }
+
+        const verificarDestaqueSegmento = (seg) => {
+            if (!seg || seg.ehBr || !seg.no) return { destacado: false, porTagInline: false };
+            let atual = seg.no.parentElement;
+            let porTagInline = false;
+
+            while (atual && atual !== blocoBase && atual !== document.body && atual !== document.documentElement) {
+                if (TAGS_DESTAQUE.has(atual.tagName)) {
+                    porTagInline = true;
+                    break;
+                }
+                atual = atual.parentElement;
+            }
+            if (porTagInline) {
+                return { destacado: true, porTagInline: true };
+            }
+
+            const elPai = seg.no.parentElement;
+            if (!elPai || elPai === blocoBase) return { destacado: false, porTagInline: false };
+            if (elPai.classList && elPai.classList.contains('sample-token')) {
+                return { destacado: false, porTagInline: false };
+            }
+
+            try {
+                const st = window.getComputedStyle(elPai);
+                if (st) {
+                    const peso = parseInt(st.fontWeight, 10) || (st.fontWeight === 'bold' || st.fontWeight === 'bolder' ? 700 : 400);
+                    const fam = (st.fontFamily || '').toLowerCase();
+                    const ehNegritoCss = (peso >= 600 && pesoBase < 600) || (fam.indexOf('bold') !== -1);
+                    const ehItalicoCss = ((st.fontStyle === 'italic' || st.fontStyle === 'oblique') && !italicoBase) || (fam.indexOf('italic') !== -1);
+                    const dec = (st.textDecorationLine || st.textDecoration || '').toLowerCase();
+                    const ehSublinhadoCss = (dec.indexOf('underline') !== -1 || dec.indexOf('line-through') !== -1) && !sublinhadoBase;
+                    const bg = st.backgroundColor || '';
+                    const ehMarcaTextoCss = Boolean(bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && bg !== bgBase);
+
+                    if (ehNegritoCss || ehItalicoCss || ehSublinhadoCss || ehMarcaTextoCss) {
+                        return { destacado: true, porTagInline: false };
+                    }
+                }
+            } catch (_) { }
+
+            return { destacado: false, porTagInline: false };
+        };
+
+        const segmentoEhApenasEspacoConector = (seg) => {
+            if (!seg) return false;
+            if (seg.ehBr) {
+                const comp = seg.comprimento || 0;
+                return comp === 1;
+            }
+            if (!seg.no) return false;
+            const v = seg.no.nodeValue || '';
+            return v.trim().length === 0;
+        };
+
+        let idxSegAlvo = -1;
+        for (let i = 0; i < mapa.segmentos.length; i++) {
+            const s = mapa.segmentos[i];
+            if (idxGlobal >= s.inicioGlobal && idxGlobal <= s.fimGlobal) {
+                idxSegAlvo = i;
+                const infoS = verificarDestaqueSegmento(s);
+                if (infoS.destacado) break;
+            }
+        }
+        if (idxSegAlvo === -1) return null;
+
+        let infoAlvo = verificarDestaqueSegmento(mapa.segmentos[idxSegAlvo]);
+        if (!infoAlvo.destacado && segmentoEhApenasEspacoConector(mapa.segmentos[idxSegAlvo])) {
+            const infoAnt = idxSegAlvo > 0 ? verificarDestaqueSegmento(mapa.segmentos[idxSegAlvo - 1]) : { destacado: false };
+            const infoProx = (idxSegAlvo + 1) < mapa.segmentos.length ? verificarDestaqueSegmento(mapa.segmentos[idxSegAlvo + 1]) : { destacado: false };
+            if (infoAnt.destacado && infoProx.destacado) {
+                infoAlvo = { destacado: true, porTagInline: infoAnt.porTagInline || infoProx.porTagInline };
+            } else if (infoAnt.destacado) {
+                idxSegAlvo = idxSegAlvo - 1;
+                infoAlvo = infoAnt;
+            } else if (infoProx.destacado) {
+                idxSegAlvo = idxSegAlvo + 1;
+                infoAlvo = infoProx;
+            }
+        }
+        if (!infoAlvo.destacado) return null;
+
+        let segIni = idxSegAlvo;
+        let usouTagInline = infoAlvo.porTagInline;
+        while (segIni > 0) {
+            const sAnt = mapa.segmentos[segIni - 1];
+            const infoAnt = verificarDestaqueSegmento(sAnt);
+            if (infoAnt.destacado) {
+                if (infoAnt.porTagInline) usouTagInline = true;
+                segIni--;
+            } else if (segmentoEhApenasEspacoConector(sAnt) && segIni >= 2) {
+                const infoAntesEspaco = verificarDestaqueSegmento(mapa.segmentos[segIni - 2]);
+                if (infoAntesEspaco.destacado) {
+                    if (infoAntesEspaco.porTagInline) usouTagInline = true;
+                    segIni -= 2;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let segFim = idxSegAlvo;
+        while ((segFim + 1) < mapa.segmentos.length) {
+            const sProx = mapa.segmentos[segFim + 1];
+            const infoProx = verificarDestaqueSegmento(sProx);
+            if (infoProx.destacado) {
+                if (infoProx.porTagInline) usouTagInline = true;
+                segFim++;
+            } else if (segmentoEhApenasEspacoConector(sProx) && (segFim + 2) < mapa.segmentos.length) {
+                const infoDepoisEspaco = verificarDestaqueSegmento(mapa.segmentos[segFim + 2]);
+                if (infoDepoisEspaco.destacado) {
+                    if (infoDepoisEspaco.porTagInline) usouTagInline = true;
+                    segFim += 2;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let iniLocal = Math.max(0, mapa.segmentos[segIni].inicioGlobal - mapa.deslocamentoJanela);
+        let fimLocal = Math.min(mapa.texto.length, mapa.segmentos[segFim].fimGlobal - mapa.deslocamentoJanela);
+
+        while (iniLocal < fimLocal && (eEspacoBranco(mapa.texto[iniLocal]) || eQuebraDeLinha(mapa.texto[iniLocal]))) {
+            iniLocal++;
+        }
+        while (fimLocal > iniLocal && (eEspacoBranco(mapa.texto[fimLocal - 1]) || eQuebraDeLinha(mapa.texto[fimLocal - 1]) || ePontuacaoFim(mapa.texto[fimLocal - 1]))) {
+            fimLocal--;
+        }
+
+        if (fimLocal <= iniLocal) return null;
+
+        const trechoDestacado = mapa.texto.substring(iniLocal, fimLocal).trim();
+        /* Se o destaque adveio de tag de formatacao inline explicita (<mark>, <b>, <i>, <u>, etc.) ou background
+         * visual diferenciado, seleciona o bloco formatado integral mesmo que possua apenas 1 termo ou palavra hifenizada.
+         * Para estilizacoes genericas de bloco ou herdadas, exige pelo menos 2 palavras com espaco interno. */
+        if (!usouTagInline && !/\S+\s+\S+/.test(trechoDestacado)) {
+            return null;
+        }
+
+        /* Se nao veio de tag de formatacao inline explicita (<b>, <i>, <u>, <mark>, etc.) e cobriu
+         * 100% do bloco sem que haja texto nao-destacado no paragrafo, evita falso positivo. */
+        if (!usouTagInline && iniLocal === 0 && fimLocal >= mapa.texto.trim().length) {
+            return null;
+        }
+
+        return { inicio: iniLocal, fim: fimLocal };
+    }
+
+    function delimitarParagrafoLocalizado(texto, idx) {
+        /* Passo 7.0.3: Resolver os limites exatos do paragrafo localizado em torno de idx,
+         * impedindo que o triplo clique (3 cliques) selecione paragrafos anteriores ou posteriores
+         * mesmo quando varios paragrafos coexistem num mesmo container (ex: PDF.js textLayer ou <div>). */
+        if (!texto || texto.length === 0) return null;
+
+        const quebraDeLinhaEhFronteiraDeParagrafo = (posQuebra) => {
+            if (posQuebra < 0 || posQuebra >= texto.length) return true;
+            if ((posQuebra + 1) < texto.length && eQuebraDeLinha(texto[posQuebra + 1])) return true;
+            if (posQuebra > 0 && eQuebraDeLinha(texto[posQuebra - 1])) return true;
+
+            const trechoApos = texto.substring(posQuebra + 1, Math.min(texto.length, posQuebra + 40));
+            if (EXPRESSOES_REGULARES.MARCADOR_NOVO_PARAGRAFO_LINHA &&
+                EXPRESSOES_REGULARES.MARCADOR_NOVO_PARAGRAFO_LINHA.test(trechoApos)) {
+                return true;
+            }
+
+            const trechoAntes = texto.substring(Math.max(0, posQuebra - 40), posQuebra);
+            if (EXPRESSOES_REGULARES.FIM_FRASE_PARAGRAFO &&
+                EXPRESSOES_REGULARES.FIM_FRASE_PARAGRAFO.test(trechoAntes)) {
+                if (!EXPRESSOES_REGULARES.ABREVIACAO_FINAL_LINHA ||
+                    !EXPRESSOES_REGULARES.ABREVIACAO_FINAL_LINHA.test(trechoAntes)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        let iniPar = 0;
+        for (let i = Math.min(idx, texto.length - 1); i > 0; i--) {
+            if (eQuebraDeLinha(texto[i - 1]) && quebraDeLinhaEhFronteiraDeParagrafo(i - 1)) {
+                iniPar = i;
+                break;
+            }
+        }
+
+        let fimPar = texto.length;
+        for (let i = Math.max(0, idx); i < texto.length; i++) {
+            if (eQuebraDeLinha(texto[i]) && quebraDeLinhaEhFronteiraDeParagrafo(i)) {
+                fimPar = i;
+                break;
+            }
+        }
+
+        /* Verificar tambem fronteiras inline entre paragrafos numerados na mesma linha (ex: "...infante; 3. Ordenar...") */
+        if (EXPRESSOES_REGULARES.FRONTEIRA_ENTRE_PARAGRAFOS_NUMERADOS) {
+            const fatia = texto.substring(iniPar, fimPar);
+            const idxRel = idx - iniPar;
+            const regexFronteira = new RegExp(EXPRESSOES_REGULARES.FRONTEIRA_ENTRE_PARAGRAFOS_NUMERADOS.source, 'gu');
+            let mFront;
+            let novoIniRel = 0;
+            let novoFimRel = fatia.length;
+
+            while ((mFront = regexFronteira.exec(fatia)) !== null) {
+                const posInicioProximoPar = mFront.index + mFront[0].length;
+                const posFimParAnterior = mFront.index + (mFront[1] ? mFront[1].length : 1);
+                if (posInicioProximoPar <= idxRel) {
+                    novoIniRel = posInicioProximoPar;
+                } else if (posFimParAnterior >= idxRel && posFimParAnterior < novoFimRel) {
+                    novoFimRel = posFimParAnterior;
+                    break;
+                }
+            }
+            iniPar += novoIniRel;
+            fimPar = (iniPar - novoIniRel) + novoFimRel;
+        }
+
+        while (iniPar < fimPar && (eEspacoBranco(texto[iniPar]) || eQuebraDeLinha(texto[iniPar]))) {
+            iniPar++;
+        }
+        while (fimPar > iniPar && (eEspacoBranco(texto[fimPar - 1]) || eQuebraDeLinha(texto[fimPar - 1]))) {
+            fimPar--;
+        }
+
+        return (fimPar > iniPar) ? { inicio: iniPar, fim: fimPar } : null;
+    }
+
+    function resolverSelecaoTriploClique(mapa, idx) {
+        /* Passo 7.0.4: Resolver 3 cliques (e.detail >= 3) com tendencia a MINORAR em blocos
+         * compostos (ex: "12.016/2009" -> "12.016" antes da barra ou "2009" apos a barra)
+         * e selecao estritamente localizada ao clicar 3 vezes no inicio de um paragrafo. */
+        if (!mapa || !mapa.texto) return null;
+        const { texto } = mapa;
+        let pos = Math.max(0, Math.min(idx, texto.length - 1));
+
+        /* 1. Minoracao de blocos compostos/pontuados (ex: "12.016/2009", "1.325.256.019-75", "10/01/2026") */
+        const unidade = expandirUnidadeAtomicaEstagio1(texto, pos);
+        if (unidade) {
+            const token = texto.substring(unidade.inicio, unidade.fim);
+            const ehSeparadorPrimario = (c) => (c === '/' || c === '-' || c === ':' || c === '@' || c === '_');
+            let temSeparadorPrimario = false;
+            for (let i = 0; i < token.length; i++) {
+                if (ehSeparadorPrimario(token[i])) {
+                    temSeparadorPrimario = true;
+                    break;
+                }
+            }
+
+            if (temSeparadorPrimario) {
+                let p = Math.max(unidade.inicio, Math.min(pos, unidade.fim - 1));
+                if (ehSeparadorPrimario(texto[p]) && p > unidade.inicio) {
+                    p--;
+                }
+                let subIni = p;
+                while (subIni > unidade.inicio && !ehSeparadorPrimario(texto[subIni - 1])) {
+                    subIni--;
+                }
+                let subFim = p + 1;
+                while (subFim < unidade.fim && !ehSeparadorPrimario(texto[subFim])) {
+                    subFim++;
+                }
+                if (subFim > subIni && (subIni > unidade.inicio || subFim < unidade.fim)) {
+                    return { inicio: subIni, fim: subFim };
+                }
+            } else if (token.indexOf('.') !== -1 && token.length > 2) {
+                let p = Math.max(unidade.inicio, Math.min(pos, unidade.fim - 1));
+                if (texto[p] === '.' && p > unidade.inicio) {
+                    p--;
+                }
+                let subIni = p;
+                while (subIni > unidade.inicio && texto[subIni - 1] !== '.') {
+                    subIni--;
+                }
+                let subFim = p + 1;
+                while (subFim < unidade.fim && texto[subFim] !== '.') {
+                    subFim++;
+                }
+                if (subFim > subIni && (subIni > unidade.inicio || subFim < unidade.fim)) {
+                    return { inicio: subIni, fim: subFim };
+                }
+            }
+        }
+
+        /* 2. Se os 3 cliques ocorreram no inicio do paragrafo (numerado ou nao, ex: "3. Ordenar..."),
+         * seleciona exclusivamente o paragrafo localizado em questao. */
+        const paragrafo = delimitarParagrafoLocalizado(texto, pos);
+        if (paragrafo) {
+            const fatiaParagrafo = texto.substring(paragrafo.inicio, paragrafo.fim);
+            let offsetFimZonaInicial = 0;
+            const regexPref = EXPRESSOES_REGULARES.PREFIXO_NUMERACAO_PARAGRAFO || EXPRESSOES_REGULARES.MARCADOR_NOVO_PARAGRAFO_LINHA;
+            if (regexPref) {
+                const mPref = fatiaParagrafo.match(regexPref);
+                if (mPref) {
+                    offsetFimZonaInicial = mPref[0].length;
+                }
+            }
+            while (offsetFimZonaInicial < fatiaParagrafo.length && eEspacoBranco(fatiaParagrafo[offsetFimZonaInicial])) {
+                offsetFimZonaInicial++;
+            }
+            while (offsetFimZonaInicial < fatiaParagrafo.length && eAlfanumericoUnicode(fatiaParagrafo[offsetFimZonaInicial])) {
+                offsetFimZonaInicial++;
+            }
+
+            if (pos <= (paragrafo.inicio + offsetFimZonaInicial + 1)) {
+                return paragrafo;
+            }
+        }
+
+        /* 3. No meio do paragrafo, tendencia a minorar (reduzindo da frase/expressao composta para a palavra/unidade) */
+        if (unidade) {
+            return unidade;
+        }
+        return paragrafo;
+    }
+
+    function tentarExpandirDelimitadoresSimetricos(texto, idx, incluirDelimitadoresExternos = false) {
+        /* Passo 7.1: Com 1 clique captura o miolo interno; com 2 cliques inclui os delimitadores.
+         * Se o cursor estiver diretamente sobre caractere alfanumerico (corpo de palavra),
+         * nao busca delimitadores adjacentes externos para nao invadir parenteses vizinhos. */
+        const charCursor = (idx >= 0 && idx < texto.length) ? texto[idx] : '';
+        const raioBusca = eAlfanumericoUnicode(charCursor) ? 0 : 1;
+        for (let delta = 0; delta <= raioBusca; delta++) {
+            const candidatos = delta === 0 ? [idx] : [idx - delta, idx + delta];
+            for (const pos of candidatos) {
+                if (pos < 0 || pos >= texto.length) continue;
+                const ch = texto[pos];
+
+                if (PARES_ABERTURA[ch]) {
+                    const charFechamento = PARES_ABERTURA[ch];
+                    let nivel = 1;
+                    for (let i = pos + 1; i < texto.length; i++) {
+                        if (texto[i] === ch) nivel++;
+                        else if (texto[i] === charFechamento) {
+                            nivel--;
+                            if (nivel === 0) {
+                                return incluirDelimitadoresExternos
+                                    ? { inicio: pos, fim: i + 1 }
+                                    : { inicio: pos + 1, fim: i };
+                            }
+                        }
+                    }
+                }
+
+                if (PARES_FECHAMENTO[ch]) {
+                    const charAbertura = PARES_FECHAMENTO[ch];
+                    let nivel = 1;
+                    for (let i = pos - 1; i >= 0; i--) {
+                        if (texto[i] === ch) nivel++;
+                        else if (texto[i] === charAbertura) {
+                            nivel--;
+                            if (nivel === 0) {
+                                return incluirDelimitadoresExternos
+                                    ? { inicio: i, fim: pos + 1 }
+                                    : { inicio: i + 1, fim: pos };
+                            }
+                        }
+                    }
+                }
+
+                if (eCaractereAspas(ch)) {
+                    const antesEhEspacoOuInicio = (pos === 0 || eEspacoBranco(texto[pos - 1]) || eDelimitadorPar(texto[pos - 1]));
+                    if (antesEhEspacoOuInicio) {
+                        for (let i = pos + 1; i < texto.length; i++) {
+                            if (eQuebraDeLinha(texto[i])) break;
+                            if (eCaractereAspas(texto[i])) {
+                                return incluirDelimitadoresExternos
+                                    ? { inicio: pos, fim: i + 1 }
+                                    : { inicio: pos + 1, fim: i };
+                            }
+                        }
+                    } else {
+                        for (let i = pos - 1; i >= 0; i--) {
+                            if (eQuebraDeLinha(texto[i])) break;
+                            if (eCaractereAspas(texto[i])) {
+                                return incluirDelimitadoresExternos
+                                    ? { inicio: i, fim: pos + 1 }
+                                    : { inicio: i + 1, fim: pos };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let posAbre = -1;
+        let charAbre = '';
+        const pilhaDireita = [];
+
+        for (let i = idx - 1; i >= 0; i--) {
+            const c = texto[i];
+            if (eQuebraDeLinha(c)) break;
+            if (PARES_FECHAMENTO[c]) {
+                pilhaDireita.push(PARES_FECHAMENTO[c]);
+            } else if (PARES_ABERTURA[c]) {
+                if (pilhaDireita.length > 0 && pilhaDireita[pilhaDireita.length - 1] === c) {
+                    pilhaDireita.pop();
+                } else {
+                    posAbre = i;
+                    charAbre = c;
+                    break;
+                }
+            }
+        }
+
+        if (posAbre !== -1 && charAbre) {
+            const charFecha = PARES_ABERTURA[charAbre];
+            let nivel = 1;
+            for (let i = posAbre + 1; i < texto.length; i++) {
+                if (eQuebraDeLinha(texto[i])) break;
+                if (texto[i] === charAbre) nivel++;
+                else if (texto[i] === charFecha) {
+                    nivel--;
+                    if (nivel === 0 && i >= idx) {
+                        return incluirDelimitadoresExternos
+                            ? { inicio: posAbre, fim: i + 1 }
+                            : { inicio: posAbre + 1, fim: i };
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function extrairPalavraSobCursor(texto, idx) {
+        if (idx < 0 || idx >= texto.length) return '';
+        let pos = idx;
+        if (!eAlfanumericoUnicode(texto[pos]) && pos > 0 && eAlfanumericoUnicode(texto[pos - 1])) {
+            pos--;
+        }
+        if (!eAlfanumericoUnicode(texto[pos])) return '';
+
+        let ini = pos;
+        while (ini > 0 && (eAlfanumericoUnicode(texto[ini - 1]) || texto[ini - 1] === '\u00BA' || texto[ini - 1] === '\u00B0')) {
+            ini--;
+        }
+        let fim = pos + 1;
+        while (fim < texto.length && (eAlfanumericoUnicode(texto[fim]) || texto[fim] === '\u00BA' || texto[fim] === '\u00AA' || texto[fim] === '\u00B0')) {
+            fim++;
+        }
+        return texto.substring(ini, fim);
+    }
+
+    function tentarExpandirPadraoComposto(texto, idx, forcarCompostos = false, ehDuploClique = false) {
+        /* Passo 7.2: Identificar entidades juridicas (CPF, CNPJ, CNJ, Datas, Moedas, Leis, Coordenadas GPS) */
+        const palavraSobCursor = extrairPalavraSobCursor(texto, idx);
+        const clicouEmRotuloInicial = palavraSobCursor.length > 0 &&
+            EXPRESSOES_REGULARES.PALAVRA_ROTULO_INICIAL.test(palavraSobCursor);
+        const clicouEmConectorIntervalo = palavraSobCursor.length > 0 &&
+            EXPRESSOES_REGULARES.PALAVRA_CONECTORA_INTERVALO.test(palavraSobCursor);
+
+        const finalizarMatchSemTransbordo = (iniBruto, fimBruto, nomeGrupo, supShift) => {
+            let ini = iniBruto;
+            let fim = fimBruto;
+            while (ini < fim && (eEspacoBranco(texto[ini]) || eQuebraDeLinha(texto[ini]))) {
+                ini++;
+            }
+            while (fim > ini && (eEspacoBranco(texto[fim - 1]) || eQuebraDeLinha(texto[fim - 1]))) {
+                fim--;
+            }
+            if (nomeGrupo === 'LEGISLACAO_JURISPRUDENCIA_E_ATOS' || nomeGrupo === 'INTERVALOS_E_REFERENCIAS_ID_FOLHAS') {
+                const trechoAtual = texto.substring(ini, fim);
+                const mSufixoSolto = trechoAtual.match(/(?:[\s,;:\-]+(?:e|ou|c\/c|cumulado\s+com|combinado\s+com|de|do|da|dos|das|no|na|nos|nas|ao|aos|a|o|as|os|em|por|para|com))+$/iu);
+                if (mSufixoSolto && mSufixoSolto[0].length < trechoAtual.length) {
+                    fim -= mSufixoSolto[0].length;
+                }
+                while (fim > ini && (eEspacoBranco(texto[fim - 1]) || eQuebraDeLinha(texto[fim - 1]) || texto[fim - 1] === ',' || texto[fim - 1] === ';' || texto[fim - 1] === ':')) {
+                    fim--;
+                }
+            }
+            if (ini >= fim || idx < ini || idx > fim) return null;
+            return { inicio: ini, fim, grupo: nomeGrupo, suportaFiltroShift: supShift };
+        };
+
+        for (let g = 0; g < CATALOGO_PADROES_JURIDICOS.length; g++) {
+            const grupo = CATALOGO_PADROES_JURIDICOS[g];
+            const suportaShift = Boolean(grupo.suportaFiltroShiftDigitos);
+
+            if (grupo.exigeEspacoOuDuploClique && !forcarCompostos && !clicouEmRotuloInicial && !clicouEmConectorIntervalo) {
+                continue;
+            }
+
+            for (let r = 0; r < grupo.regexes.length; r++) {
+                const padraoOriginal = grupo.regexes[r];
+                const regex = new RegExp(padraoOriginal.source, padraoOriginal.flags);
+                let match;
+
+                while ((match = regex.exec(texto)) !== null) {
+                    const textoMatch = match[0];
+                    const inicioMatch = match.index;
+                    const fimMatch = inicioMatch + textoMatch.length;
+
+                    if (idx < inicioMatch || idx > fimMatch) continue;
+                    const idxRelativo = idx - inicioMatch;
+
+                    if (grupo.grupo === 'FINANCEIRO_E_DECIMAIS' && !textoMatch.endsWith('%')) {
+                        const idxAbrePar = textoMatch.indexOf('(');
+
+                        if (idxAbrePar !== -1) {
+                            if (idxRelativo > idxAbrePar) {
+                                continue;
+                            }
+
+                            const textoAntesPar = textoMatch.substring(0, idxAbrePar).trimEnd();
+                            const compValor = textoAntesPar.length;
+
+                            if (ehDuploClique || (idxRelativo >= compValor && idxRelativo <= idxAbrePar)) {
+                                const resFin = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                if (resFin) return resFin;
+                                continue;
+                            }
+
+                            const matchPrefixoRS = textoAntesPar.match(EXPRESSOES_REGULARES.PREFIXO_MOEDA_RS);
+                            if (matchPrefixoRS) {
+                                const compPrefixoRS = matchPrefixoRS[0].length;
+                                if (idxRelativo < compPrefixoRS) {
+                                    const resFin = finalizarMatchSemTransbordo(inicioMatch, inicioMatch + compValor, grupo.grupo, suportaShift);
+                                    if (resFin) return resFin;
+                                    continue;
+                                }
+                                const resFin = finalizarMatchSemTransbordo(inicioMatch + compPrefixoRS, inicioMatch + compValor, grupo.grupo, suportaShift);
+                                if (resFin) return resFin;
+                                continue;
+                            }
+                            const resFin = finalizarMatchSemTransbordo(inicioMatch, inicioMatch + compValor, grupo.grupo, suportaShift);
+                            if (resFin) return resFin;
+                            continue;
+                        } else {
+                            const matchPrefixoRS = textoMatch.match(EXPRESSOES_REGULARES.PREFIXO_MOEDA_RS);
+                            if (matchPrefixoRS) {
+                                const compPrefixoRS = matchPrefixoRS[0].length;
+                                if (ehDuploClique || forcarCompostos || idxRelativo < compPrefixoRS) {
+                                    const resFin = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                    if (resFin) return resFin;
+                                    continue;
+                                }
+                                const resFin = finalizarMatchSemTransbordo(inicioMatch + compPrefixoRS, fimMatch, grupo.grupo, suportaShift);
+                                if (resFin) return resFin;
+                                continue;
+                            }
+                            const resFin = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                            if (resFin) return resFin;
+                            continue;
+                        }
+                    }
+
+                    if (grupo.grupo === 'INTERVALOS_E_REFERENCIAS_ID_FOLHAS') {
+                        const idxAbrePar = textoMatch.indexOf('(');
+                        if (idxAbrePar !== -1 && EXPRESSOES_REGULARES.INICIO_DIGITO.test(textoMatch)) {
+                            /* Protecao de precedencia monetaria: se o numero com extenso entre parenteses
+                             * for precedido por "R$", ignora este match parcial para que o grupo
+                             * FINANCEIRO_E_DECIMAIS capture "R$ 65,00 (sessenta e cinco reais)" por inteiro. */
+                            const trechoAnterior = texto.substring(Math.max(0, inicioMatch - 6), inicioMatch);
+                            if (EXPRESSOES_REGULARES.SUFIXO_MOEDA_RS_ANTERIOR && EXPRESSOES_REGULARES.SUFIXO_MOEDA_RS_ANTERIOR.test(trechoAnterior)) {
+                                continue;
+                            }
+                            if (idxRelativo > idxAbrePar) {
+                                continue;
+                            }
+                            const textoAntesPar = textoMatch.substring(0, idxAbrePar).trimEnd();
+                            const compNum = textoAntesPar.length;
+                            if (ehDuploClique || (idxRelativo >= compNum && idxRelativo <= idxAbrePar)) {
+                                const resInt = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                if (resInt) return resInt;
+                                continue;
+                            }
+                            const resInt = finalizarMatchSemTransbordo(inicioMatch, inicioMatch + compNum, grupo.grupo, suportaShift);
+                            if (resInt) return resInt;
+                            continue;
+                        }
+                    }
+
+                    if (grupo.grupo === 'DOCUMENTOS_PESSOAIS_FISCAIS_E_CIDADAO') {
+                        /* Passo 7.2.3: Beneficio INSS com Especie (ex: "31/6506589241" ou "31/650.658.924-1")
+                         * - 1 clique em "31" ou na barra "/": seleciona TUDO ("31/6506589241");
+                         * - 1 clique em "6506589241": seleciona SOMENTE o numero do beneficio;
+                         * - 2 cliques ou selecao composta: seleciona TUDO. */
+                        const matchInssComEspecie = textoMatch.match(/^(\d{2})\/(\d{10}|\d{1,3}\.\d{3}\.\d{3}-\d)$/);
+                        if (matchInssComEspecie) {
+                            const idxBarra = textoMatch.indexOf('/');
+                            if (ehDuploClique || forcarCompostos) {
+                                const resInss = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                if (resInss) return resInss;
+                                continue;
+                            }
+                            if (idxRelativo <= idxBarra) {
+                                const resInss = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                if (resInss) return resInss;
+                                continue;
+                            }
+                            if (idxRelativo > idxBarra) {
+                                const resInss = finalizarMatchSemTransbordo(inicioMatch + idxBarra + 1, fimMatch, grupo.grupo, suportaShift);
+                                if (resInss) return resInss;
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (!forcarCompostos && !ehDuploClique && grupo.grupo === 'DATA_COM_HORARIO_CONTIGUO') {
+                        /* Passo 7.2.4: Em datas numericas seguidas de horario (ex: "23/10/2026 10:14:18", "28/10/2026 - 06:28:50"):
+                         * - 1 clique sobre a data numerica: seleciona apenas a data isolada;
+                         * - 1 clique sobre o horario: seleciona apenas o horario isolado;
+                         * - 1 clique sobre o separador ("-", espacos intermediarios ou conector) OU 2 cliques (ou Espaco=2 Cliques):
+                         *   seleciona Data + Horario inteiros!
+                         * Ja datas abreviadas ("17 ago. 2026"), por extenso ("29 de fevereiro de 2025") e competencias
+                         * Mes/Ano ("out. 26") sao sempre selecionadas inteiras imediatamente no 1o clique. */
+                        if (EXPRESSOES_REGULARES.DATA_NUMERICA_COM_HORARIO &&
+                            EXPRESSOES_REGULARES.DATA_NUMERICA_COM_HORARIO.test(textoMatch) &&
+                            EXPRESSOES_REGULARES.SUFIXO_HORARIO_EM_DATA) {
+                            const matchHorario = textoMatch.match(EXPRESSOES_REGULARES.SUFIXO_HORARIO_EM_DATA);
+                            if (matchHorario) {
+                                const compDataSemHorario = matchHorario.index !== undefined ? matchHorario.index : (textoMatch.length - matchHorario[0].length);
+                                const matchRelHora = matchHorario[0].search(/\d{1,2}:\d{2}/);
+                                const idxInicioHora = compDataSemHorario + (matchRelHora >= 0 ? matchRelHora : matchHorario[0].length);
+
+                                if (idxRelativo < compDataSemHorario) {
+                                    /* Clique estritamente sobre a data numerica */
+                                    const resDt = finalizarMatchSemTransbordo(inicioMatch, inicioMatch + compDataSemHorario, grupo.grupo, suportaShift);
+                                    if (resDt) return resDt;
+                                    continue;
+                                }
+                                if (idxRelativo >= idxInicioHora) {
+                                    /* Clique estritamente sobre o horario */
+                                    const resTm = finalizarMatchSemTransbordo(inicioMatch + idxInicioHora, fimMatch, grupo.grupo, suportaShift);
+                                    if (resTm) return resTm;
+                                    continue;
+                                }
+                                /* Clique sobre o conector intermediario (hifen "-", traco, ou espacos em branco):
+                                 * Seleciona a expressao composta inteira (Data + Horario)! */
+                                const resComp = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                                if (resComp) return resComp;
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (!forcarCompostos && grupo.grupo === 'NUMERACOES_ID_E_PUBLICAS') {
+                        const matchAtoBarra = textoMatch.match(EXPRESSOES_REGULARES.PROTOCOLO_BARRA_ANO);
+                        if (matchAtoBarra) {
+                            const idxBarra = textoMatch.indexOf('/');
+                            if (idxRelativo < idxBarra) {
+                                const resAt = finalizarMatchSemTransbordo(inicioMatch, inicioMatch + idxBarra, grupo.grupo, suportaShift);
+                                if (resAt) return resAt;
+                                continue;
+                            }
+                            if (idxRelativo > idxBarra) {
+                                const resAt = finalizarMatchSemTransbordo(inicioMatch + idxBarra + 1, fimMatch, grupo.grupo, suportaShift);
+                                if (resAt) return resAt;
+                                continue;
+                            }
+                        }
+                    }
+
+                    const resFinal = finalizarMatchSemTransbordo(inicioMatch, fimMatch, grupo.grupo, suportaShift);
+                    if (resFinal) return resFinal;
+                }
+            }
+        }
+
+        /* Passo 7.2.9: Fallback de Multiplos Numeros Espacados (ex: "215 7014 6992 8831")
+         * Avaliado somente apos o catalogo forense para nao canibalizar entidades especificas como Datas com Horario. */
+        if (forcarCompostos) {
+            const regexMultiNum = new RegExp(EXPRESSOES_REGULARES.MULTIPLOS_NUMEROS_ESPACADOS.source, 'gu');
+            let mNum;
+            while ((mNum = regexMultiNum.exec(texto)) !== null) {
+                const iniM = mNum.index;
+                const fimM = iniM + mNum[0].length;
+                if (idx >= iniM && idx <= fimM) {
+                    const resMulti = finalizarMatchSemTransbordo(iniM, fimM, 'MULTIPLOS_NUMEROS_ESPACADOS', true);
+                    if (resMulti) return resMulti;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function expandirUnidadeAtomicaEstagio1(texto, idx) {
+        /* Passo 7.3: Expansao atomica (inclui pontuacoes internas de CNPJ/CPF/CNJ como '.', '/', '-', virgula decimal e sinais unarios +/-) */
+        let pos = idx;
+        if (pos >= texto.length) pos = texto.length - 1;
+        if (pos < 0) return null;
+
+        if (!eAlfanumericoUnicode(texto[pos]) && !eSimboloRepetivel(texto[pos])) {
+            if (pos > 0 && (eAlfanumericoUnicode(texto[pos - 1]) || eSimboloRepetivel(texto[pos - 1]))) {
+                pos--;
+            } else if ((texto[pos] === '+' || texto[pos] === '-' || texto[pos] === '\u2212' || texto[pos] === '\u2013') &&
+                (pos + 1) < texto.length && eAlfanumericoUnicode(texto[pos + 1])) {
+                pos++;
+            }
+        }
+
+        if (eSimboloRepetivel(texto[pos])) {
+            let ini = pos;
+            while (ini > 0 && eSimboloRepetivel(texto[ini - 1])) ini--;
+            let fim = pos + 1;
+            while (fim < texto.length && eSimboloRepetivel(texto[fim])) fim++;
+            return { inicio: ini, fim };
+        }
+
+        if (!eAlfanumericoUnicode(texto[pos])) return null;
+
+        let ini = pos;
+        while (ini > 0) {
+            const chAnt = texto[ini - 1];
+            if (eAlfanumericoUnicode(chAnt)) {
+                ini--;
+            } else if ((chAnt === '-' || chAnt === '_' || chAnt === '.' || chAnt === '/') && ini >= 2 && eAlfanumericoUnicode(texto[ini - 2])) {
+                ini--;
+            } else if (chAnt === ',' && ini >= 2 && texto[ini - 2] >= '0' && texto[ini - 2] <= '9' && ini < texto.length && texto[ini] >= '0' && texto[ini] <= '9') {
+                /* Virgula decimal entre digitos (ex: "0,25") */
+                ini--;
+            } else if ((chAnt === '+' || chAnt === '-' || chAnt === '\u2212' || chAnt === '\u2013') && (ini === 1 || !eAlfanumericoUnicode(texto[ini - 2]))) {
+                /* Sinal unario inicial (+ ou -) em numeros (ex: "+0,25", "-0,45", "+1", "-1.233,00") */
+                ini--;
+                break;
+            } else {
+                break;
+            }
+        }
+
+        let fim = pos + 1;
+        while (fim < texto.length) {
+            const chProx = texto[fim];
+            if (eAlfanumericoUnicode(chProx) || chProx === '\u00BA' || chProx === '\u00AA' || chProx === '\u00B0' || chProx === '%') {
+                fim++;
+            } else if ((chProx === '-' || chProx === '_' || chProx === '.' || chProx === '/') && (fim + 1) < texto.length && eAlfanumericoUnicode(texto[fim + 1])) {
+                fim++;
+            } else if (chProx === ',' && (fim + 1) < texto.length && texto[fim - 1] >= '0' && texto[fim - 1] <= '9' && texto[fim + 1] >= '0' && texto[fim + 1] <= '9') {
+                /* Virgula decimal entre digitos */
+                fim++;
+            } else {
+                break;
+            }
+        }
+
+        return { inicio: ini, fim };
+    }
+
+    /*
+     * FUNCAO: tentarExpandirSentencaPorDoisPontos
+     * OBJETIVO: Regra de bloco. Em "Atencao: confira o processo antes de prosseguir.", clicar no espaco
+     * entre ":" e "confira" seleciona a sentenca inteira, pois o ":" e um conectivo do que vem antes com o
+     * que vem depois. A sentenca vai do inicio da linha/frase ate o fim da frase (".", "!", "?" seguido de
+     * espaco/fim, ou quebra de linha), sem incluir a pontuacao final (igual ao Estagio 3).
+     * Retorna null se o clique nao foi no espaco imediatamente apos ":".
+     */
+    function tentarExpandirSentencaPorDoisPontos(texto, idx) {
+        if (!texto || typeof idx !== 'number' || idx < 0 || idx > texto.length) return null;
+        const ehEspacoSimples = (c) => Boolean(c) && eEspacoBranco(c) && !eQuebraDeLinha(c);
+
+        let i;
+        if (idx < texto.length && ehEspacoSimples(texto[idx])) {
+            i = idx;
+        } else if (idx > 0 && ehEspacoSimples(texto[idx - 1]) && !eAlfanumericoUnicode(texto[idx] || '')) {
+            i = idx - 1;
+        } else {
+            return null;
+        }
+
+        let j = i;
+        while (j >= 0 && ehEspacoSimples(texto[j])) j--;
+        if (j < 0 || texto[j] !== ':') return null;
+
+        let k = i;
+        while (k < texto.length && ehEspacoSimples(texto[k])) k++;
+        if (k >= texto.length || eQuebraDeLinha(texto[k])) return null;
+
+        const ehFimDeSentenca = (p) => {
+            const c = texto[p];
+            return (c === '.' || c === '!' || c === '?') && (p + 1 >= texto.length || eEspacoBranco(texto[p + 1]));
+        };
+
+        let ini = j;
+        while (ini > 0 && !eQuebraDeLinha(texto[ini - 1]) && !ehFimDeSentenca(ini - 1)) ini--;
+        let fim = k;
+        while (fim < texto.length && !eQuebraDeLinha(texto[fim]) && !ehFimDeSentenca(fim)) fim++;
+
+        while (ini < fim && eEspacoBranco(texto[ini])) ini++;
+        while (fim > ini && eEspacoBranco(texto[fim - 1])) fim--;
+        return (fim > ini) ? { inicio: ini, fim } : null;
+    }
+
+    function expandirFraseAtePontuacaoEstagio3(texto, idx) {
+        let ini = idx;
+        while (ini > 0) {
+            const c = texto[ini - 1];
+            if (eQuebraDeLinha(c) || ePontuacaoFim(c) || c === ':' || eDelimitadorPar(c) || eCaractereAspas(c)) {
+                break;
+            }
+            ini--;
+        }
+
+        let fim = idx;
+        while (fim < texto.length) {
+            const c = texto[fim];
+            if (eQuebraDeLinha(c) || ePontuacaoFim(c) || c === ':' || eDelimitadorPar(c) || eCaractereAspas(c)) {
+                break;
+            }
+            fim++;
+        }
+
+        while (ini < fim && eEspacoBranco(texto[ini])) ini++;
+        while (fim > ini && eEspacoBranco(texto[fim - 1])) fim--;
+
+        return (fim > ini) ? { inicio: ini, fim } : null;
+    }
+
+    /* ==========================================================================
+     * SECAO 8: SELECAO EM TABELAS E ORQUESTRADOR ELASTICO (CTRL OU ALT: CLIQUE E ARRASTO)
+     * ========================================================================== */
+    function obterRangePalavraOuBlocoNoPonto(clientX, clientY) {
+        const ponto = obterPontoDoClique(clientX, clientY);
+        if (!ponto) return null;
+
+        const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+        if (!mapa) return null;
+
+        let resultadoIndices = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
+        if (!resultadoIndices) {
+            resultadoIndices = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
+        }
+        if (!resultadoIndices) return null;
+
+        const range = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
+        if (!range) return null;
+
+        return {
+            range,
+            mapa,
+            inicio: resultadoIndices.inicio,
+            fim: resultadoIndices.fim
+        };
+    }
+
+    async function executarMotorElastico(e) {
+        /* Passo 8.1: Executar expansao/retracao elastica de palavras/blocos exclusivamente com Ctrl isolado */
+        const ehModoElastico = Boolean(e.ctrlKey && !e.altKey && !e.shiftKey);
+        if (!e || e.button !== 0 || !ehModoElastico) return false;
+
+        const selection = window.getSelection();
+        if (!selection) return false;
+
+        if (e.detail >= 2 && e.target && typeof e.target.closest === 'function') {
+            const linhaTr = e.target.closest('tr');
+            if (linhaTr) {
+                e.preventDefault();
+                e.stopPropagation();
+                const celulasVisiveis = Array.from(linhaTr.querySelectorAll('th, td'))
+                    .map(td => (td.innerText || td.textContent || '').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim())
+                    .filter(Boolean);
+                if (celulasVisiveis.length > 0) {
+                    const textoLinha = celulasVisiveis.join(' | ');
+                    const rangeLinha = document.createRange();
+                    rangeLinha.selectNodeContents(linhaTr);
+                    rangeAncoraArrastoElastico = rangeLinha.cloneRange();
+                    await aplicarSelecaoECopiar(rangeLinha, false, textoLinha);
+                    return true;
+                }
+            }
+        }
+
+        const infoAlvo = obterRangePalavraOuBlocoNoPonto(e.clientX, e.clientY);
+        if (!infoAlvo) return false;
+
+        const { range: clickedRange, mapa } = infoAlvo;
+        const resultadoIndices = { inicio: infoAlvo.inicio, fim: infoAlvo.fim };
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (selection.rangeCount === 0 || selection.isCollapsed || selection.toString().trim() === '') {
+            rangeAncoraArrastoElastico = clickedRange.cloneRange();
+            await aplicarSelecaoECopiar(clickedRange, false);
+            return true;
+        }
+
+        const currentRange = selection.getRangeAt(0).cloneRange();
+        const isBefore = currentRange.compareBoundaryPoints(Range.START_TO_START, clickedRange) > 0;
+        const isAfter = currentRange.compareBoundaryPoints(Range.END_TO_END, clickedRange) < 0;
+        const isInside = !isBefore && !isAfter;
+
+        const newRange = document.createRange();
+
+        try {
+            if (isAfter) {
+                newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                newRange.setEnd(clickedRange.endContainer, clickedRange.endOffset);
+                const ancoraIni = document.createRange();
+                ancoraIni.setStart(currentRange.startContainer, currentRange.startOffset);
+                ancoraIni.setEnd(currentRange.startContainer, currentRange.startOffset);
+                rangeAncoraArrastoElastico = ancoraIni;
+            } else if (isBefore) {
+                newRange.setStart(clickedRange.startContainer, clickedRange.startOffset);
+                newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                const ancoraFim = document.createRange();
+                ancoraFim.setStart(currentRange.endContainer, currentRange.endOffset);
+                ancoraFim.setEnd(currentRange.endContainer, currentRange.endOffset);
+                rangeAncoraArrastoElastico = ancoraFim;
+            } else if (isInside) {
+                const leftSide = document.createRange();
+                leftSide.setStart(currentRange.startContainer, currentRange.startOffset);
+                leftSide.setEnd(clickedRange.startContainer, clickedRange.startOffset);
+
+                const rightSide = document.createRange();
+                rightSide.setStart(clickedRange.endContainer, clickedRange.endOffset);
+                rightSide.setEnd(currentRange.endContainer, currentRange.endOffset);
+
+                const leftTextLivre = leftSide.toString().replace(EXPRESSOES_REGULARES.SEPARADOR_PONTUACAO_LIVRE, '');
+                const rightTextLivre = rightSide.toString().replace(EXPRESSOES_REGULARES.SEPARADOR_PONTUACAO_LIVRE, '');
+
+                if (leftTextLivre === '' && rightTextLivre === '') {
+                    selection.removeAllRanges();
+                    ultimoTextoSelecionadoLimpo = '';
+                    rangeAncoraArrastoElastico = clickedRange.cloneRange();
+                    return true;
+                } else if (leftTextLivre === '') {
+                    let newStart = resultadoIndices.fim;
+                    while (newStart < mapa.texto.length && EXPRESSOES_REGULARES.SEPARADOR_BORDA_RECUO.test(mapa.texto[newStart])) newStart++;
+                    const ptIni = obterPontoDOMNoMapa(mapa, newStart);
+                    if (ptIni) {
+                        newRange.setStart(ptIni.no, ptIni.offset);
+                        newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                    } else {
+                        newRange.setStart(clickedRange.endContainer, clickedRange.endOffset);
+                        newRange.setEnd(clickedRange.endContainer, clickedRange.endOffset);
+                    }
+                    const ancoraFim = document.createRange();
+                    ancoraFim.setStart(currentRange.endContainer, currentRange.endOffset);
+                    ancoraFim.setEnd(currentRange.endContainer, currentRange.endOffset);
+                    rangeAncoraArrastoElastico = ancoraFim;
+                } else if (rightTextLivre === '') {
+                    let newEnd = resultadoIndices.inicio;
+                    while (newEnd > 0 && EXPRESSOES_REGULARES.SEPARADOR_BORDA_RECUO.test(mapa.texto[newEnd - 1])) newEnd--;
+                    const ptFim = obterPontoDOMNoMapa(mapa, newEnd);
+                    if (ptFim) {
+                        newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                        newRange.setEnd(ptFim.no, ptFim.offset);
+                    } else {
+                        newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                        newRange.setEnd(clickedRange.startContainer, clickedRange.startOffset);
+                    }
+                    const ancoraIni = document.createRange();
+                    ancoraIni.setStart(currentRange.startContainer, currentRange.startOffset);
+                    ancoraIni.setEnd(currentRange.startContainer, currentRange.startOffset);
+                    rangeAncoraArrastoElastico = ancoraIni;
+                } else {
+                    if (leftSide.toString().length <= rightSide.toString().length) {
+                        newRange.setStart(clickedRange.startContainer, clickedRange.startOffset);
+                        newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+                        const ancoraFim = document.createRange();
+                        ancoraFim.setStart(currentRange.endContainer, currentRange.endOffset);
+                        ancoraFim.setEnd(currentRange.endContainer, currentRange.endOffset);
+                        rangeAncoraArrastoElastico = ancoraFim;
+                    } else {
+                        newRange.setStart(currentRange.startContainer, currentRange.startOffset);
+                        newRange.setEnd(clickedRange.endContainer, clickedRange.endOffset);
+                        const ancoraIni = document.createRange();
+                        ancoraIni.setStart(currentRange.startContainer, currentRange.startOffset);
+                        ancoraIni.setEnd(currentRange.startContainer, currentRange.startOffset);
+                        rangeAncoraArrastoElastico = ancoraIni;
+                    }
+                }
+            }
+
+            await aplicarSelecaoECopiar(newRange, false);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function atualizarArrastoElasticoNoMovimento(e) {
+        if (!rangeAncoraArrastoElastico) return;
+
+        const infoHover = obterRangePalavraOuBlocoNoPonto(e.clientX, e.clientY);
+        if (!infoHover || !infoHover.range) return;
+
+        const hoverRange = infoHover.range;
+        const selection = window.getSelection();
+        if (!selection) return;
+
+        try {
+            const novoRange = document.createRange();
+            const compInicio = rangeAncoraArrastoElastico.compareBoundaryPoints(Range.START_TO_START, hoverRange);
+            const compFim = rangeAncoraArrastoElastico.compareBoundaryPoints(Range.END_TO_END, hoverRange);
+
+            if (compInicio <= 0 && compFim <= 0) {
+                novoRange.setStart(rangeAncoraArrastoElastico.startContainer, rangeAncoraArrastoElastico.startOffset);
+                novoRange.setEnd(hoverRange.endContainer, hoverRange.endOffset);
+            } else if (compInicio >= 0 && compFim >= 0) {
+                novoRange.setStart(hoverRange.startContainer, hoverRange.startOffset);
+                novoRange.setEnd(rangeAncoraArrastoElastico.endContainer, rangeAncoraArrastoElastico.endOffset);
+            } else {
+                novoRange.setStart(hoverRange.startContainer, hoverRange.startOffset);
+                novoRange.setEnd(hoverRange.endContainer, hoverRange.endOffset);
+            }
+
+            selection.removeAllRanges();
+            selection.addRange(novoRange);
+        } catch (_) { }
+    }
+
+    async function tentarSelecionarTabelaLinhaOuColuna(e) {
+        const alvo = e.target;
+        if (!alvo || typeof alvo.closest !== 'function') return false;
+
+        const celula = alvo.closest('td, th');
+        if (!celula) return false;
+        const tabela = celula.closest('table');
+        if (!tabela) return false;
+        const linhaTr = celula.closest('tr');
+
+        const modoAcumulador = (e.ctrlKey && e.altKey);
+        const rectLinha = linhaTr ? linhaTr.getBoundingClientRect() : null;
+        const clicouNaBordaEsquerdaDaLinha = rectLinha && (e.clientX - rectLinha.left) <= 14;
+        const ehCabecalhoTh = celula.tagName.toUpperCase() === 'TH';
+
+        if (modoAcumulador && acumulador && typeof acumulador.acumularSelecaoTabelaPorColunasOuLinhas === 'function' &&
+            (ehCabecalhoTh || clicouNaBordaEsquerdaDaLinha || e.shiftKey)) {
+            const modoTab = clicouNaBordaEsquerdaDaLinha ? 'LINHA' : 'COLUNA';
+            const alvoTab = clicouNaBordaEsquerdaDaLinha ? linhaTr : celula;
+            const resTab = acumulador.acumularSelecaoTabelaPorColunasOuLinhas(alvoTab, modoTab, e.shiftKey);
+            if (resTab) {
+                await gravarNaAreaDeTransferencia(resTab.consolidado || '', null);
+                if (resTab.consolidado) {
+                    registrarEstatisticaOperacional(false);
+                }
+                if (validador) {
+                    const rangeRef = document.createRange();
+                    rangeRef.selectNodeContents(alvoTab);
+                    const numIntervalos = resTab.quantidade !== undefined ? resTab.quantidade : 0;
+                    const numColunas = resTab.colunas !== undefined ? resTab.colunas : numIntervalos;
+                    const numLinhas = resTab.linhas !== undefined ? resTab.linhas : numIntervalos;
+                    const numCelulas = resTab.celulas !== undefined ? resTab.celulas : (numColunas * numLinhas);
+                    const numCaracteres = resTab.caracteres !== undefined ? resTab.caracteres : (resTab.consolidado ? resTab.consolidado.length : 0);
+                    const estatisticaTabela = modoTab === 'COLUNA'
+                        ? `TABELA: ${numIntervalos} ${numIntervalos === 1 ? 'intervalo' : 'intervalos'} | ${numColunas} ${numColunas === 1 ? 'coluna' : 'colunas'} (${numCelulas} celulas) | ${numCaracteres} caracteres`
+                        : `TABELA: ${numIntervalos} ${numIntervalos === 1 ? 'intervalo' : 'intervalos'} | ${numLinhas} ${numLinhas === 1 ? 'linha' : 'linhas'} (${numCelulas} celulas) | ${numCaracteres} caracteres`;
+                    validador.projetarAlertaVisual(rangeRef, estatisticaTabela, false);
+                }
+                return true;
+            }
+        }
+
+        if (!modoAcumulador && clicouNaBordaEsquerdaDaLinha && linhaTr) {
+            const celulasVisiveis = Array.from(linhaTr.querySelectorAll('th, td'))
+                .map(td => (td.innerText || td.textContent || '').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim())
+                .filter(Boolean);
+            if (celulasVisiveis.length > 0) {
+                const sepLinha = separadorTabelas === '\t' ? '\t' : (separadorTabelas === ';' ? '; ' : ' | ');
+                const textoLinha = celulasVisiveis.join(sepLinha);
+                const rangeLinha = document.createRange();
+                rangeLinha.selectNodeContents(linhaTr);
+                await aplicarSelecaoECopiar(rangeLinha, false, textoLinha);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /* ==========================================================================
+     * SECAO 9: HANDLERS DE EVENTOS DE MOUSE E TECLADO (CICLO DE VIDA)
+     * ========================================================================== */
+
+    /*
+     * FUNCAO: tratarNavegacaoAbasPorBotoesMouse
+     * OBJETIVO DE RECONSTRUCAO: Interceptar com confianca absoluta os botoes 4 e 5 do mouse:
+     * - Botao 4 (Back / Voltar / XBUTTON1): atua como Control+Shift+Tab (retorna a aba anterior a esquerda)
+     * - Botao 5 (Forward / Avancar / XBUTTON2): atua como Control+Tab (avanca para a proxima aba a direita)
+     * Reconhece todas as variacoes de emissao do Chrome/OS:
+     * e.button (3=voltar, 4=avancar), e.which (4=voltar, 5=avancar), bitmask buttons (8=voltar, 16=avancar)
+     * e eventos de teclado disparados por drivers de mouse (BrowserBack / BrowserForward).
+     * Neutraliza categoricamente o comportamento nativo de historico (Back/Forward) em todos os eventos
+     * (pointerdown, mousedown, pointerup, mouseup, auxclick, keydown, keyup) e dispara a navegacao de abas
+     * exatamente uma vez por clique fisico, mesmo em abas recem-abertas.
+     */
+    function tratarNavegacaoAbasPorBotoesMouse(e) {
+        if (!capturaBotoesMouse4e5Ativa) return;
+
+        let ehBotao4 = false;
+        let ehBotao5 = false;
+
+        if (e.type === 'keydown' || e.type === 'keyup') {
+            if (e.key === 'BrowserBack' || e.keyCode === 166) {
+                ehBotao4 = true;
+            } else if (e.key === 'BrowserForward' || e.keyCode === 167) {
+                ehBotao5 = true;
+            }
+        } else {
+            const btn = e.button;
+            const bts = typeof e.buttons === 'number' ? e.buttons : 0;
+            const which = e.which;
+
+            // Botao 4 (Voltar / Control+Shift+Tab): no DOM padrao e.button === 3, ou which === 4, ou bitmask buttons & 8
+            if (btn === 3 || which === 4 || ((bts & 8) !== 0 && (btn === 3 || btn === -1 || btn === undefined))) {
+                ehBotao4 = true;
+            }
+            // Botao 5 (Avancar / Control+Tab): no DOM padrao e.button === 4, ou which === 5, ou bitmask buttons & 16
+            else if (btn === 4 || which === 5 || ((bts & 16) !== 0 && (btn === 4 || btn === -1 || btn === undefined))) {
+                ehBotao5 = true;
+            }
+        }
+
+        if (!ehBotao4 && !ehBotao5) return;
+
+        // Neutralizacao categorica e imediata do comportamento de historico nativo do navegador
+        try {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+        } catch (_) { }
+
+        // Em eventos de soltura (up) ou auxclick, resetamos o estado do botao para o proximo clique
+        if (e.type === 'mouseup' || e.type === 'pointerup' || e.type === 'keyup' || e.type === 'auxclick') {
+            botaoLateralEmProcessamento = 0;
+            return;
+        }
+
+        // Em eventos de pressao (down), dispara a navegacao de abas com protecao contra eventos em cascata
+        const agora = Date.now();
+        const numBotao = ehBotao4 ? 4 : 5;
+
+        // Evita duplicacao de disparo entre pointerdown e mousedown do mesmo clique fisico
+        if (botaoLateralEmProcessamento === numBotao && (agora - ultimoTimestampNavegacaoAbas < DEBOUNCE_NAVEGACAO_ABAS_MS)) {
+            return;
+        }
+
+        botaoLateralEmProcessamento = numBotao;
+        ultimoTimestampNavegacaoAbas = agora;
+
+        const direcao = ehBotao4 ? 'anterior' : 'proxima';
+        try {
+            if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) return;
+            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                chrome.runtime.sendMessage({ acao: 'navegarAba', direcao });
+            }
+        } catch (_) { }
+    }
+
+    /**
+     * Modulo TECLADO/MOUSE: Navegacao entre campos de entrada simples via setas (ArrowDown / ArrowUp).
+     * Permite avancar (seta para baixo) ou retroceder (seta para cima) continuamente entre inputs,
+     * mesmo estando alinhados horizontalmente na mesma linha.
+     * Preserva as regras de alternancia e pre-selecao inicial de campo.
+     */
+    function navegarEntreCamposEntrada(inputAtual, direcao) {
+        if (!inputAtual) return false;
+        let raiz = inputAtual.form;
+        if (!raiz) {
+            raiz = inputAtual.closest('#containerLinhasEntradaDemo, form, .cartao, body') || document;
+        }
+        const seletores = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([disabled]):not([readonly])';
+        const todos = Array.from(raiz.querySelectorAll(seletores));
+        const visiveis = todos.filter(inp => {
+            try {
+                return inp.offsetParent !== null || inp.getClientRects().length > 0;
+            } catch (_) {
+                return true;
+            }
+        });
+        if (visiveis.length <= 1) return false;
+        const indiceAtual = visiveis.indexOf(inputAtual);
+        if (indiceAtual === -1) return false;
+        const proximoIndice = direcao > 0
+            ? (indiceAtual + 1) % visiveis.length
+            : (indiceAtual - 1 + visiveis.length) % visiveis.length;
+        const proximoInput = visiveis[proximoIndice];
+        if (!proximoInput) return false;
+
+        try {
+            proximoInput.focus();
+            const jaSelecionouAntes = inputsJaSelecionadosInicialmente.has(proximoInput) || proximoInput.__jusgovSelecionadoInicial === true;
+            if (!jaSelecionouAntes) {
+                inputsJaSelecionadosInicialmente.add(proximoInput);
+                proximoInput.__jusgovSelecionadoInicial = true;
+                if (typeof proximoInput.select === 'function') {
+                    proximoInput.select();
+                }
+            } else {
+                const tam = (proximoInput.value && typeof proximoInput.value.length === 'number') ? proximoInput.value.length : 0;
+                if (typeof proximoInput.setSelectionRange === 'function') {
+                    proximoInput.setSelectionRange(tam, tam);
+                }
+            }
+        } catch (_) { }
+        return true;
+    }
+
+    /*
+     * FUNCAO: lidarFocoInteligente (Autofill & Datepicker Helper)
+     * O PORQUE: Intercepta o evento 'focusin' disparado quando o usuario navega via Tab,
+     * clica ou quando scripts do JSF/Angular focam campos de data e texto.
+     * Seleciona imediatamente todo o conteudo (50ms) se o campo for novo ou se contiver
+     * apenas mascara (ex: ___/___/_____ no PJe/PREVJUD), permitindo colagem direta.
+     * Ao sair (blur), remove a trava para que o proximo acesso volte a selecionar tudo.
+     */
+    let ultimoTempoSelecaoInteligente = 0;
+    function lidarFocoInteligente(event) {
+        if (!selecaoEditavelAtiva) return;
+        const target = event.target;
+        if (!target) return;
+
+        if (isCampoDeTextoValido(target)) {
+            if (target.tagName === 'TEXTAREA') return;
+            const valLen = (target.value || '').length;
+            const sizeAttr = parseInt(target.getAttribute('size') || '0', 10);
+            if (valLen > 25 || sizeAttr > 25) return;
+            const agora = Date.now();
+            if (agora - ultimoTempoSelecaoInteligente < 150) return;
+
+            const temAlfanumerico = /[\p{L}\p{N}]/u.test(target.value || '');
+            if (target.dataset.autoselected && temAlfanumerico) return;
+
+            target.dataset.autoselected = 'true';
+            target.addEventListener('blur', () => {
+                delete target.dataset.autoselected;
+            }, { once: true });
+
+            setTimeout(() => {
+                try {
+                    if (typeof target.select === 'function') {
+                        target.select();
+                        ultimoTempoSelecaoInteligente = Date.now();
+                    }
+                } catch (_) { }
+            }, 50);
+        }
+    }
+
+    function aoPressionarBotaoMouse(e) {
+        if (!cssBlindado || !document.getElementById('pje-turbo-lock')) {
+            blindarCSS();
+        }
+
+        const elAlvoEfetivo = obterElementoAlvoEfetivo(e);
+        if (validador && typeof validador.registrarPontoInteracaoMouse === 'function') {
+            validador.registrarPontoInteracaoMouse(e.clientX, e.clientY);
+        }
+
+        /* BUG-02 e Seção 6.30: Destruicao imediata do contorno Flash e dos popups de checagem/auditoria
+         * (calculo Mod falhou, CPF/CNPJ/CNJ/NB/Data invalido) e mensagens de instrucao Wiki Forense
+         * (tipo de aposentadoria/beneficio, regiao do CPF, Matriz/Filial CNPJ, justica CNJ, dia da semana)
+         * ao clicar com o mouse ou clicar sobre qualquer modal/dialogo critico */
+        const temAvisoAtivoNoValidador = Boolean(
+            validador && (
+                (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
+                validador.avisoVisivel ||
+                validador.temporizadorAlerta
+            )
+        );
+        if (aguardandoDesselecaoFlash || timerFlashBorder || temAvisoAtivoNoValidador) {
+            const clicouEmModalCritico = Boolean(
+                elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function' &&
+                elAlvoEfetivo.closest('[role="dialog"], [role="alertdialog"], .modal, .rich-modalpanel, .swal2-container, .ui-dialog, .p-dialog, mat-dialog-container')
+            );
+            if (clicouEmModalCritico || !e || typeof e.button !== 'number' || e.button === 0 || e.button === 1 || e.button === 2) {
+                limparFlashBorderImediatamente();
+                limparAvisosAuditoriaEWikiImediatamente();
+            }
+        }
+
+        if (!verificarUrlPermitida()) return;
+
+        /* Padrao nativo do navegador para Links (Ctrl + Clique em <a href>):
+         * Permite que o navegador abra o link em nova aba sem interceptacao */
+        const elLinkAlvoMouseUp = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+            ? elAlvoEfetivo.closest('a[href]')
+            : null;
+        if (elLinkAlvoMouseUp && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+            ignorarProximoClick = false;
+            houveArrastoMouse = false;
+            return;
+        }
+
+        /* Passo 9.1: Desfazer ultimo item do Acumulador por Clique com Botao Direito com Ctrl+Alt */
+        if (e.button === 2 && e.ctrlKey && e.altKey && acumulador && acumulador.obterQuantidade() > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            const res = acumulador.desfazerUltimoItem();
+            if (res) {
+                gravarNaAreaDeTransferencia(res.consolidado || '', null);
+                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                    const numIntervalos = res.quantidade !== undefined ? res.quantidade : acumulador.obterQuantidade();
+                    const numPalavras = res.palavras !== undefined
+                        ? res.palavras
+                        : (res.consolidado ? res.consolidado.replace(EXPRESSOES_REGULARES.PONTO_VIRGULA_FINAL, '').split(EXPRESSOES_REGULARES.SEPARADOR_TOKENS_ACUMULADOR).filter(Boolean).length : 0);
+                    const numCaracteres = res.caracteres !== undefined
+                        ? res.caracteres
+                        : (res.consolidado ? res.consolidado.length : 0);
+                    validador.projetarMiniTipGlobal(
+                        `Acumulador (Desfeito): ${numIntervalos} ${numIntervalos === 1 ? 'intervalo' : 'intervalos'} | ${numPalavras} ${numPalavras === 1 ? 'palavra' : 'palavras'} | ${numCaracteres} caracteres`,
+                        '#f59e0b'
+                    );
+                }
+            }
+            return;
+        }
+
+        /* Modulo MOUSE: Captura dos Botoes 4 e 5 para navegacao circular entre abas */
+        if (capturaBotoesMouse4e5Ativa && (e.button === 3 || e.button === 4 || e.which === 4 || e.which === 5)) {
+            tratarNavegacaoAbasPorBotoesMouse(e);
+            return;
+        }
+
+        /* Modulo MOUSE: Tratamento do Botao do Meio (scroll click, button === 1) */
+        if (e.button === 1) {
+            /* Regra fundamental: Preservar navegacao nativa do navegador (abrir link em nova aba).
+             * Nunca chamar preventDefault() no clique com botao do meio sobre <a href>. */
+            const elLinkMeio = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+                ? elAlvoEfetivo.closest('a[href]')
+                : null;
+            if (elLinkMeio) {
+                return;
+            }
+
+            /* Regra fundamental: Se "Colar com o botão do Meio" estiver desabilitado,
+             * não intercepta nem bloqueia o clique do meio, preservando integralmente
+             * a rolagem automática nativa (cursor de bússola/roda) do navegador. */
+            if (!colarBotaoMeioAtivo) {
+                return;
+            }
+
+            /* Ctrl + Botao do Meio (Win+V): apenas anula autoscroll e prepara foco */
+            if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+                e.preventDefault();
+                try { elAlvoEfetivo.focus(); } catch (_) { }
+                return;
+            }
+
+            /* Colar com o Botao do Meio ativo:
+             * Anula a rolagem automatica nativa (autoscroll) do Chromium que altera o cursor para icone de bussola,
+             * mesmo se houver erro ou alvo nao editavel, realizando foco preparatorio caso seja campo editavel. */
+            e.preventDefault();
+            const ctxMeio = classificarContextoElementoAlvo(elAlvoEfetivo);
+            if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
+                try { elAlvoEfetivo.focus(); } catch (_) { }
+            }
+            return;
+        }
+
+        /* Foco preparatorio no clique com botao direito em campo editavel */
+        if (e.button === 2) {
+            const ctxDireito = classificarContextoElementoAlvo(elAlvoEfetivo);
+            if (colarBotaoMeioAtivo && colagemBotaoDireitoAtiva && (ctxDireito === 'CAMPO_SIMPLES_EDITAVEL' || ctxDireito === 'EDITOR_MULTILINHA_EDITAVEL')) {
+                try { elAlvoEfetivo.focus(); } catch (_) { }
+            }
+            return;
+        }
+
+        if (e.button !== 0) return;
+
+        isMousePressionado = true;
+        coordsMouseDown.x = e.clientX;
+        coordsMouseDown.y = e.clientY;
+        if (validador && typeof validador.registrarPontoInteracaoMouse === 'function') {
+            validador.registrarPontoInteracaoMouse(e.clientX, e.clientY);
+        }
+        houveArrastoMouse = false;
+        selecaoElasticaAtivaNoClique = false;
+        rangeAncoraArrastoElastico = null;
+        pontoAncoraArrastoAlt = null;
+
+        const tipoContexto = classificarContextoElementoAlvo(elAlvoEfetivo);
+        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL') {
+            inputAlvoMouseDown = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+                ? (elAlvoEfetivo.closest('input') || elAlvoEfetivo)
+                : elAlvoEfetivo;
+            if (inputAlvoMouseDown) {
+                const eraAtivo = (document.activeElement === inputAlvoMouseDown);
+                let tinhaSelecao = false;
+                try {
+                    tinhaSelecao = (typeof inputAlvoMouseDown.selectionStart === 'number' &&
+                        typeof inputAlvoMouseDown.selectionEnd === 'number' &&
+                        inputAlvoMouseDown.selectionStart !== inputAlvoMouseDown.selectionEnd);
+                } catch (_) { }
+                inputJaEstavaSelecionadoNoMouseDown = Boolean(eraAtivo && tinhaSelecao);
+            } else {
+                inputJaEstavaSelecionadoNoMouseDown = false;
+            }
+            return;
+        }
+        if (tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL') {
+            const ehTextarea = Boolean(elAlvoEfetivo && elAlvoEfetivo.tagName === 'TEXTAREA');
+            const ehEditorHtmlAtivo = !ehTextarea && isElementoOuAncestralContentEditable(elAlvoEfetivo);
+            if (ehTextarea || ehEditorHtmlAtivo) {
+                return;
+            }
+            /* Se nao for textarea nem editor HTML ativo, prossegue normalmente como texto comum */
+        }
+        if (tipoContexto === 'IGNORAR') {
+            return;
+        }
+        if (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function' && elAlvoEfetivo.closest('[data-jusgov-ignore]')) {
+            return;
+        }
+
+        const temModificadorTeclado = temModificadorTecladoAtivo(e);
+        if (temModificadorTeclado) {
+            garantirSelecaoForcadaEmElemento(elAlvoEfetivo);
+        }
+
+        /* Passo 9.1.5: Padrao nativo do navegador para Links (Ctrl + Clique em <a href>):
+         * Quando o usuario clica com a tecla Ctrl sobre um link hipertexto (<a href>),
+         * NAO intercepta nem bloqueia o evento, permitindo que o navegador execute
+         * sua acao nativa universal de abrir o link em nova aba em segundo plano. */
+        const elLinkAlvo = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+            ? elAlvoEfetivo.closest('a[href]')
+            : null;
+        if (elLinkAlvo && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+            ignorarProximoClick = false;
+            return;
+        }
+
+        const ehModoElastico = Boolean(e.ctrlKey && !e.altKey && !e.shiftKey);
+        if (ehModoElastico) {
+            /* Quando o usuario pressiona Ctrl isolado, aciona o Motor Elastico para continuar,
+             * expandir ou retrair a selecao existente por palavras/blocos. */
+            selecaoElasticaAtivaNoClique = true;
+            ignorarProximoClick = true;
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            executarMotorElastico(e);
+            return;
+        }
+
+        const ehModoAltIsolado = Boolean(e.altKey && !e.ctrlKey && !e.shiftKey);
+        if (ehModoAltIsolado) {
+            /* Alt + Clique inicia SEMPRE uma nova selecao (nao continua a selecao anterior como Ctrl).
+             * Registra tambem o ponto inicial para permitir "Alt + Arrastar" sobre parte de links ou botoes. */
+            const selAlt = window.getSelection();
+            if (selAlt) {
+                selAlt.removeAllRanges();
+            }
+            ultimoTextoSelecionadoLimpo = '';
+            ultimoRangeSelecionadoSimples = null;
+            pontoAncoraArrastoAlt = obterPontoDoClique(e.clientX, e.clientY);
+            ignorarProximoClick = true;
+            e.stopPropagation();
+        }
+
+        /* DIRETRIZ ROOT 2.17: Modo Acumulador (Ctrl+Alt) e estritamente desabilitado em qualquer controle, interface ou formulario */
+        if (e.ctrlKey && e.altKey) {
+            if (isContextoDeSistemaOuUi(elAlvoEfetivo) || tipoContexto !== 'LEITURA_COMUM') {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
+
+        /* Em links, botoes e elementos de interface interativa (LINK_CLICAVEL ou Contexto de Sistema):
+         * - DIRETRIZ ROOT IMUTAVEL: Se for clique sem tecla modificadora (Alt, Ctrl, Shift),
+         *   retorna imediatamente para permitir que a navegacao e interacao nativa da pagina
+         *   e do navegador funcione sem nenhuma interferencia ou delay (coordsMouseDown continua ativo para checar arrasto).
+         * - Se houver Alt mantido: cancela o evento padrao (preventDefault) para evitar cliques ou acoes indesejadas,
+         *   mas NUNCA forca selecao visual antecipada, permitindo que arrasto parcial ou clique unico copie limpo em mouseup! */
+        const ehSistemaOuUiMousedown = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(elAlvoEfetivo);
+        if (ehSistemaOuUiMousedown) {
+            if (!temModificadorTeclado) {
+                ignorarProximoClick = false;
+                return;
+            }
+            ignorarProximoClick = true;
+            if (e.ctrlKey || e.altKey) {
+                e.preventDefault();
+            }
+        }
+
+        /* Passo 9.2: Tecla Shift mantida: NUNCA desseleciona a selecao existente,
+         * preservando a ancora ativa para permitir continuar ou estender a selecao atual */
+        if (e.shiftKey && !e.ctrlKey && !e.altKey && !ancoraCursorShift) {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                const r = sel.getRangeAt(0);
+                ancoraCursorShift = {
+                    no: sel.anchorNode || r.startContainer,
+                    offset: typeof sel.anchorOffset === 'number' ? sel.anchorOffset : r.startOffset
+                };
+            }
+        }
+
+        if (!e.ctrlKey && !e.shiftKey && e.detail >= 2) {
+            e.preventDefault();
+        }
+    }
+
+    function atualizarArrastoCaracteresAltNoMovimento(e) {
+        /* Passo 9.2.1: Permitir arrastar com Alt pressionado sobre o texto de links, botoes ou menus
+         * para selecionar apenas uma parte especifica do seu texto (mesmo quando preventDefault bloqueou a acao do link/botao). */
+        if (!pontoAncoraArrastoAlt || !pontoAncoraArrastoAlt.no) return;
+        const pontoAtual = obterPontoDoClique(e.clientX, e.clientY);
+        if (!pontoAtual || !pontoAtual.no) return;
+
+        const selection = window.getSelection();
+        if (!selection) return;
+
+        try {
+            const rAncora = document.createRange();
+            rAncora.setStart(pontoAncoraArrastoAlt.no, pontoAncoraArrastoAlt.offset);
+            rAncora.setEnd(pontoAncoraArrastoAlt.no, pontoAncoraArrastoAlt.offset);
+
+            const rAtual = document.createRange();
+            rAtual.setStart(pontoAtual.no, pontoAtual.offset);
+            rAtual.setEnd(pontoAtual.no, pontoAtual.offset);
+
+            const novoRange = document.createRange();
+            if (rAncora.compareBoundaryPoints(Range.START_TO_START, rAtual) <= 0) {
+                novoRange.setStart(pontoAncoraArrastoAlt.no, pontoAncoraArrastoAlt.offset);
+                novoRange.setEnd(pontoAtual.no, pontoAtual.offset);
+            } else {
+                novoRange.setStart(pontoAtual.no, pontoAtual.offset);
+                novoRange.setEnd(pontoAncoraArrastoAlt.no, pontoAncoraArrastoAlt.offset);
+            }
+
+            selection.removeAllRanges();
+            selection.addRange(novoRange);
+        } catch (_) { }
+    }
+
+    function aoMoverMouse(e) {
+        if ((e.buttons & 1) !== 1) return;
+
+        const dx = Math.abs(e.clientX - coordsMouseDown.x);
+        const dy = Math.abs(e.clientY - coordsMouseDown.y);
+        if (dx > CONFIGURACAO_MOTOR.DISTANCIA_MINIMA_ARRASTO_PX ||
+            dy > CONFIGURACAO_MOTOR.DISTANCIA_MINIMA_ARRASTO_PX) {
+            houveArrastoMouse = true;
+        }
+
+        if (selecaoElasticaAtivaNoClique && houveArrastoMouse) {
+            if (e.target) garantirSelecaoForcadaEmElemento(e.target);
+            atualizarArrastoElasticoNoMovimento(e);
+            return;
+        }
+
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && houveArrastoMouse && pontoAncoraArrastoAlt) {
+            if (e.target) garantirSelecaoForcadaEmElemento(e.target);
+            atualizarArrastoCaracteresAltNoMovimento(e);
+        }
+    }
+
+    async function aoSoltarBotaoMouse(e) {
+        if (capturaBotoesMouse4e5Ativa && (e.button === 3 || e.button === 4 || e.which === 4 || e.which === 5)) {
+            tratarNavegacaoAbasPorBotoesMouse(e);
+            return;
+        }
+        if (e.button !== 0) return;
+
+        const elAlvoEfetivo = obterElementoAlvoEfetivo(e);
+        if (validador && typeof validador.registrarPontoInteracaoMouse === 'function') {
+            validador.registrarPontoInteracaoMouse(e.clientX, e.clientY);
+        }
+
+        if (selecaoElasticaAtivaNoClique) {
+            const arrastouElastico = houveArrastoMouse;
+            selecaoElasticaAtivaNoClique = false;
+            houveArrastoMouse = false;
+            rangeAncoraArrastoElastico = null;
+            ignorarProximoClick = true;
+
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+
+            if (arrastouElastico) {
+                const selElastica = window.getSelection();
+                if (selElastica && !selElastica.isCollapsed && selElastica.rangeCount > 0) {
+                    const rngFinalElastico = selElastica.getRangeAt(0).cloneRange();
+                    await aplicarSelecaoECopiar(rngFinalElastico, false);
+                }
+            }
+            return;
+        }
+
+        if (!verificarUrlPermitida()) return;
+
+        /* Padrao nativo do navegador para Links (Ctrl + Clique em <a href>):
+         * Permite que o navegador abra o link em nova aba sem interceptacao */
+        const elLinkAlvoMouseUp = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+            ? elAlvoEfetivo.closest('a[href]')
+            : null;
+        if (elLinkAlvoMouseUp && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+            ignorarProximoClick = false;
+            houveArrastoMouse = false;
+            return;
+        }
+
+        const tipoContexto = classificarContextoElementoAlvo(elAlvoEfetivo);
+        if (tipoContexto === 'IGNORAR') return;
+
+        /* Passo 9.3: Regra de Ouro dos Campos Editaveis (ZERO copia automatica em qualquer campo editavel) */
+        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL') {
+            const inputAlvo = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+                ? (elAlvoEfetivo.closest('input') || elAlvoEfetivo)
+                : elAlvoEfetivo;
+
+            if (selecaoEditavelAtiva && !houveArrastoMouse && !e.shiftKey && !e.ctrlKey && !e.altKey && inputAlvo && typeof inputAlvo.select === 'function') {
+                if (e.detail === 2) {
+                    /* Regra 3: Se der dois cliques ele seleciona tudo novamente */
+                    setTimeout(() => {
+                        try { inputAlvo.select(); } catch (_) { }
+                    }, 10);
+                } else if (e.detail === 1) {
+                    const valLen = (inputAlvo.value || '').length;
+                    const sizeAttr = parseInt(inputAlvo.getAttribute('size') || '0', 10);
+                    const ehCampoCurto = valLen <= 25 && sizeAttr <= 25;
+                    const temAlfanumerico = /[\p{L}\p{N}]/u.test(inputAlvo.value || '');
+                    if (ehCampoCurto && (!inputAlvo.dataset.autoselected || !temAlfanumerico)) {
+                        /* 1a vez ou campo sem caracteres alfanumericos (ex: mascara de data ___/___/_____): seleciona tudo */
+                        inputAlvo.dataset.autoselected = 'true';
+                        inputAlvo.addEventListener('blur', () => {
+                            delete inputAlvo.dataset.autoselected;
+                        }, { once: true });
+                        setTimeout(() => {
+                            try { inputAlvo.select(); } catch (_) { }
+                        }, 50);
+                    } else if (inputJaEstavaSelecionadoNoMouseDown) {
+                        /* 2º clique consecutivo em campo ja focado com texto: permite posicionar o cursor pontualmente */
+                        setTimeout(() => {
+                            try {
+                                if (inputAlvo.selectionStart !== inputAlvo.selectionEnd) {
+                                    inputAlvo.setSelectionRange(inputAlvo.selectionStart, inputAlvo.selectionStart);
+                                }
+                            } catch (_) { }
+                        }, 10);
+                    }
+                }
+            }
+            inputJaEstavaSelecionadoNoMouseDown = false;
+            inputAlvoMouseDown = null;
+            houveArrastoMouse = false;
+            return;
+        }
+
+        if (tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL') {
+            const ehTextarea = Boolean(elAlvoEfetivo && elAlvoEfetivo.tagName === 'TEXTAREA');
+            if (ehTextarea) {
+                if (selecaoEditavelAtiva && !houveArrastoMouse && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    tratarCliqueEmEditorMultilinhaSemCopia(e);
+                }
+                houveArrastoMouse = false;
+                return;
+            }
+
+            /* Editores HTML Online estritos (contenteditable no elemento, pai, avo ou body / CKEditor ativo, excluindo interface cke_*) */
+            const ehEditorHtmlAtivo = isElementoOuAncestralContentEditable(elAlvoEfetivo);
+
+            if (ehEditorHtmlAtivo) {
+                const permiteCliqueCtrl = (modoPlaceholdersMinutasHtml === 'ctrl_avancado' || modoPlaceholdersMinutasHtml === 'avancado') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+                const permiteCliqueNormal = !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+                if (placeholdersMinutasHtmlAtivo && modoPlaceholdersMinutasHtml !== 'desabilitado' && !houveArrastoMouse && (permiteCliqueNormal || permiteCliqueCtrl)) {
+                    tratarCliqueEmEditorMultilinhaSemCopia(e);
+                }
+                houveArrastoMouse = false;
+                return;
+            }
+            /* Se NAO for de fato um editor HTML ativo, prossegue imediatamente para a selecao de texto comum abaixo! */
+        }
+
+        const modoAcumulador = Boolean(e.ctrlKey && e.altKey);
+
+        /* DIRETRIZ ROOT 2.17: Modo Acumulador (Ctrl+Alt) e estritamente desabilitado em qualquer controle, interface ou formulario */
+        if (modoAcumulador) {
+            if (isContextoDeSistemaOuUi(elAlvoEfetivo) || tipoContexto !== 'LEITURA_COMUM') {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
+
+        /* Passo 9.4: Shift + Arrasto linear (inicio do arrasto ate final do arrasto) */
+        if (e.shiftKey && !modoAcumulador && houveArrastoMouse) {
+            houveArrastoMouse = false;
+            setTimeout(async () => {
+                const selShift = window.getSelection();
+                if (selShift && !selShift.isCollapsed && selShift.rangeCount > 0) {
+                    const rngShift = selShift.getRangeAt(0).cloneRange();
+                    await aplicarSelecaoECopiar(rngShift, false);
+                }
+            }, 15);
+            return;
+        }
+
+        /* Passo 9.5: Arrasto de mouse comum, com Alt (selecao parcial em link/botao/texto) ou com Acumulador (Ctrl+Alt)
+         * Preservacao integral da selecao por arrasto em texto comum e visualizadores de PDF.
+         * Em telas de sistema/interface: copia e remove a selecao visual da tela (removeAllRanges) imediatamente! */
+        isMousePressionado = false;
+        coordsMouseDown = { x: 0, y: 0 };
+
+        if (houveArrastoMouse) {
+            houveArrastoMouse = false;
+            pontoAncoraArrastoAlt = null;
+            const selAtualNoMouseUp = window.getSelection();
+            const textoArrastadoBruto = selAtualNoMouseUp ? selAtualNoMouseUp.toString().trim() : '';
+            const temTextoSelecionadoEfetivo = Boolean(selAtualNoMouseUp && !selAtualNoMouseUp.isCollapsed && selAtualNoMouseUp.rangeCount > 0 && textoArrastadoBruto.length > 0);
+            if (temTextoSelecionadoEfetivo) {
+                const rangeArrastado = selAtualNoMouseUp.getRangeAt(0).cloneRange();
+                const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(elAlvoEfetivo) || (rangeArrastado && isTelaSistemaEstritaParaDesselecao(rangeArrastado.commonAncestorContainer)) || isContextoDeSistemaOuUi(elAlvoEfetivo);
+                const temModificadorArrasto = Boolean(e.altKey || e.ctrlKey || e.shiftKey || e.metaKey);
+
+                /* DIRETRIZ ROOT: Em textos da pagina ou elementos de interface, caso nao seja um campo estruturado,
+                 * evita a perda acidental do conteudo da Area de Transferencia quando inexistem teclas modificadoras.
+                 * Se o arrasto for menor que o minimo exigido sem modificadores (Ctrl ou Alt), cancela a copia e a selecao. */
+                if (!temModificadorArrasto) {
+                    if (!verificarProtecaoTamanhoMinimoInterface(textoArrastadoBruto, elAlvoEfetivo, false)) {
+                        selAtualNoMouseUp.removeAllRanges();
+                        ignorarProximoClick = true;
+                        return;
+                    }
+                }
+
+                // Blindagem anti-loop de selecao manual
+                if (textoArrastadoBruto === ultimaSelecaoManualTexto && (Date.now() - ultimoTimestampSelecaoManual) < 1500) {
+                    ignorarProximoClick = true;
+                    return;
+                }
+                ultimaSelecaoManualTexto = textoArrastadoBruto;
+                ultimoTimestampSelecaoManual = Date.now();
+
+                const deveDesselecionarArrasto = (modoRetirarSelecao === 'total') ||
+                    (modoRetirarSelecao === 'interface' && ehSistemaEstrito);
+
+                ignorarProximoClick = true;
+                await aplicarSelecaoECopiar(rangeArrastado, modoAcumulador, null, {
+                    forcarDesselecao: deveDesselecionarArrasto,
+                    forcarManterSelecao: !deveDesselecionarArrasto,
+                    temModificador: temModificadorArrasto,
+                    eraArrasto: true
+                });
+                if (deveDesselecionarArrasto) {
+                    /* Em tela de sistema/interface (ou modo total): remove a selecao visual residual apos soltar o mouse e antes do flash sumir */
+                    flashExclusivoSemSelecao = true;
+                    setTimeout(() => {
+                        try {
+                            const selAtual = window.getSelection();
+                            if (selAtual) selAtual.removeAllRanges();
+                        } catch (_) { }
+                    }, 20);
+                }
+                return;
+            }
+        }
+
+        pontoAncoraArrastoAlt = null;
+
+        const temModificadorTeclado = temModificadorTecladoAtivo(e);
+
+        /* Passo 9.6: Regra da Maozinha (cursor: pointer), Help (cursor: help), Links, Controles e Eventos (onclick, onmouse*):
+         * Cliques sem teclas modificadoras sobre links, botoes, controles, elementos com cursor "maozinha"/"help"
+         * ou eventos associados JAMAIS devem selecionar ou copiar palavras comuns — preservam 100% a acao nativa!
+         * Excecao Regra Semiflexivel (Diretriz Root 6.20): Se NAO for um botao ou controle de formulario estrito
+         * (isComponenteBotaoOuFormularioEstrito === false), permite prosseguir para o Passo 9.7.1b a fim de
+         * verificar se o clique incidiu sobre uma mascara/bloco forense (datas, horas, combinacoes data+hora,
+         * CPF, CNPJ, processos CNJ, IDs), copiando-o com Flash Verde rapido e sem manter selecao do sistema. */
+        if (!temModificadorTeclado && isElementoInterativoClicavelDireto(elAlvoEfetivo) && isComponenteBotaoOuFormularioEstrito(elAlvoEfetivo)) {
+            ignorarProximoClick = false;
+            return;
+        }
+
+        /* Passo 9.7: Shift + Clique e Solta (Filtro de Digitos/Alfanumericos Corridos c/ Zero-Pad CNJ OU Cursor Inicial -> Final) */
+        if (e.shiftKey && !modoAcumulador) {
+            const pontoClique = obterPontoDoClique(e.clientX, e.clientY);
+            if (!pontoClique) return;
+
+            const mapaCtx = construirMapaTextoBlocoComJanela(pontoClique.no, pontoClique.offset);
+            if (!mapaCtx) return;
+
+            const selAtual = window.getSelection();
+            const temSelecaoAtiva = Boolean(selAtual && !selAtual.isCollapsed && selAtual.rangeCount > 0);
+
+            /* Se ha selecao ativa e ainda nao ha ancora de Shift, adota o ponto de ancora da selecao para permitir estender */
+            if (temSelecaoAtiva && !ancoraCursorShift) {
+                const rAtual = selAtual.getRangeAt(0);
+                ancoraCursorShift = {
+                    no: selAtual.anchorNode || rAtual.startContainer,
+                    offset: typeof selAtual.anchorOffset === 'number' ? selAtual.anchorOffset : rAtual.startOffset
+                };
+            }
+
+            /* Se ainda nao ha ancora de Shift (e nao havia selecao ativa previa), verifica se clicou em entidade contigua (CPF, CNPJ, CNJ, Data, Tel) */
+            if (!ancoraCursorShift) {
+                const infoEntidade = tentarExpandirPadraoComposto(mapaCtx.texto, mapaCtx.idxCursor, false, false);
+                if (infoEntidade && (infoEntidade.suportaFiltroShift || EXPRESSOES_REGULARES.ENTIDADE_FILTRO_SHIFT.test(infoEntidade.grupo || ''))) {
+                    const rangeEnt = criarRangeDOMAPartirDeIndices(mapaCtx, infoEntidade.inicio, infoEntidade.fim);
+                    if (rangeEnt) {
+                        const textoEnt = rangeEnt.toString().trim();
+                        const ehCnpjAlfanumerico = REGEX_AUDITORIA.CNPJ_ISOLADO && REGEX_AUDITORIA.CNPJ_ISOLADO.test(textoEnt);
+                        let digitosPuros = ehCnpjAlfanumerico
+                            ? textoEnt.toUpperCase().replace(EXPRESSOES_REGULARES.NAO_ALFANUMERICO_UPPER, '')
+                            : textoEnt.replace(EXPRESSOES_REGULARES.NAO_DIGITOS, '');
+                        const matchCnj = textoEnt.match(EXPRESSOES_REGULARES.ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL);
+                        if (matchCnj && modoShiftCnj !== 'semZeros') {
+                            const seqPreenchida = matchCnj[1].padStart(7, '0');
+                            digitosPuros = seqPreenchida + digitosPuros.substring(matchCnj[1].length);
+                        }
+                        if (digitosPuros.length > 0) {
+                            await aplicarSelecaoECopiar(rangeEnt, false, digitosPuros);
+                            return;
+                        }
+                    }
+                }
+
+                /* Caso nao seja entidade numerica, inicia o cursor no ponto clicado sem marcar nada */
+                ancoraCursorShift = { no: pontoClique.no, offset: pontoClique.offset };
+                const sel = window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    try {
+                        const rColapsado = document.createRange();
+                        rColapsado.setStart(pontoClique.no, pontoClique.offset);
+                        rColapsado.setEnd(pontoClique.no, pontoClique.offset);
+                        sel.addRange(rColapsado);
+                    } catch (_) { }
+                }
+                return;
+            } else {
+                /* Segundo clique com Shift mantido: expande da ancoraCursorShift ate a palavra/ponto clicado */
+                const infoFim = obterRangePalavraOuBlocoNoPonto(e.clientX, e.clientY);
+                try {
+                    const rangeExpandido = document.createRange();
+                    const rangeAncora = document.createRange();
+                    rangeAncora.setStart(ancoraCursorShift.no, ancoraCursorShift.offset);
+                    rangeAncora.setEnd(ancoraCursorShift.no, ancoraCursorShift.offset);
+
+                    const rangeDestino = infoFim ? infoFim.range : (() => {
+                        const r = document.createRange();
+                        r.setStart(pontoClique.no, pontoClique.offset);
+                        r.setEnd(pontoClique.no, pontoClique.offset);
+                        return r;
+                    })();
+
+                    if (rangeAncora.compareBoundaryPoints(Range.START_TO_START, rangeDestino) <= 0) {
+                        rangeExpandido.setStart(ancoraCursorShift.no, ancoraCursorShift.offset);
+                        rangeExpandido.setEnd(rangeDestino.endContainer, rangeDestino.endOffset);
+                    } else {
+                        rangeExpandido.setStart(rangeDestino.startContainer, rangeDestino.startOffset);
+                        rangeExpandido.setEnd(ancoraCursorShift.no, ancoraCursorShift.offset);
+                    }
+                    await aplicarSelecaoECopiar(rangeExpandido, false);
+                } catch (_) { }
+                return;
+            }
+        }
+
+        if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+            return;
+        }
+
+        if (modoAcumulador && await tentarSelecionarTabelaLinhaOuColuna(e)) {
+            ignorarProximoClick = true;
+            return;
+        }
+
+        /* Passo 9.7.1: Alt + Clique sobre links, botoes, menus, abas, etiquetas ou controles de interface:
+         * DIRETRIZ ROOT 6.28: Ordem de prioridade estrita:
+         * 1) TRES CLIQUES COM ALT EM LINK (e.detail >= 3):
+         *    Seleciona OBRIGATORIAMENTE TODO O TEXTO DO LINK (mesmo que tenha duas ou mais linhas, <br>,
+         *    multiplos spans/divs ou > 120 caracteres), fazendo com que o texto copiado fique TUDO EM UMA
+         *    LINHA SO, devidamente separado por espacos simples!
+         * 2) DOIS CLIQUES COM ALT (e.detail >= 2):
+         *    Seleciona "TODO" OBRIGATORIAMENTE, nao apenas o bloco interno (ex.: todo o texto do link,
+         *    todo o botao, toda a etiqueta/span), ignorando blocos pontuais ou mascaras parciais!
+         * 3) CLIQUE UNICO COM ALT (e.detail === 1):
+         *    a) Primeiro: "o campo" ou registro estruturado sob o cursor (CPF, CNPJ, Data, Hora, NB, CNJ, Moeda, etc.)
+         *    b) Segundo: se nao for campo, seleciona o texto completo do objeto da interface (botao, etiqueta, link)
+         *    c) Terceiro: se nao for interface nem campo, seleciona a unidade "palavra" (minimo possivel). */
+        if (e.altKey && !e.ctrlKey && !e.shiftKey) {
+            let textoParaCopiar = '';
+            let rangeParaFlash = null;
+            let forcarUmaLinhaAltLink = false;
+            const ehTresCliquesAlt = (e.detail >= 3);
+            const ehDoisCliquesAlt = (e.detail >= 2);
+            const elLinkDireto = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+                ? elAlvoEfetivo.closest('a[href], a, [role="link"]')
+                : null;
+            let elInterativo = obterObjetoInterativoParaSelecaoCompleta(elAlvoEfetivo);
+            if (!elInterativo && elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function') {
+                const candidato = elAlvoEfetivo.closest('a[href], a, button, [role="button"], [class*="label"], [class*="badge"], [class*="chip"]');
+                if (candidato && !isContainerComposto(candidato)) {
+                    elInterativo = candidato;
+                }
+            }
+
+            /* REGRA DOS TRES CLIQUES COM ALT EM LINK (Diretriz 6.28):
+             * Ao dar 3 cliques com Alt sobre um link, seleciona TODO O TEXTO DO LINK
+             * (independentemente de ter multiplas linhas ou tamanho), unificando tudo em uma linha so! */
+            if (ehTresCliquesAlt && elLinkDireto) {
+                textoParaCopiar = extrairTextoLinkUmaLinha(elLinkDireto);
+                if (textoParaCopiar && textoParaCopiar.length > 0) {
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNodeContents(elLinkDireto);
+                    forcarUmaLinhaAltLink = true;
+                }
+            }
+
+            /* REGRA DOS DOIS CLIQUES COM ALT:
+             * Ao dar 2 cliques com Alt no objeto de interface, seleciona OBRIGATORIAMENTE o texto TODO do objeto
+             * (ex.: todo o link, todo o botao, toda a etiqueta), descartando restricoes de bloco ou campos internos! */
+            if (!textoParaCopiar && ehDoisCliquesAlt && elInterativo) {
+                if (elInterativo.tagName === 'INPUT') {
+                    textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
+                } else if (elInterativo.tagName === 'OPTION') {
+                    textoParaCopiar = (elInterativo.text || elInterativo.innerText || elInterativo.textContent || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
+                } else {
+                    textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNodeContents(elInterativo);
+                }
+            }
+
+            /* DIRETRIZ ROOT UNIVERSAL 6.37: REGRA DE ALT + CLIQUE EM ESPACO EM BRANCO
+             * 1 clique sobre espaco em branco faz exatamente o que 2 cliques fazem na palavra:
+             * expande para o bloco completo / expressao conectada pelo espaco (em link, botao ou texto). */
+            if (!textoParaCopiar && !ehTresCliquesAlt && !ehDoisCliquesAlt) {
+                const pontoAltEspaco = obterPontoDoClique(e.clientX, e.clientY);
+                if (pontoAltEspaco) {
+                    const mapaAltEspaco = construirMapaTextoBlocoComJanela(pontoAltEspaco.no, pontoAltEspaco.offset);
+                    if (mapaAltEspaco && mapaAltEspaco.texto) {
+                        const { texto: txtEspaco, idxCursor: idxEspaco } = mapaAltEspaco;
+                        const chNoCursor = txtEspaco[idxEspaco] || '';
+                        const chAnterior = idxEspaco > 0 ? txtEspaco[idxEspaco - 1] : '';
+                        const clicouEmEspacoAlt = eEspacoBranco(chNoCursor) ||
+                            (eEspacoBranco(chAnterior) && !eAlfanumericoUnicode(chNoCursor));
+                        const clicouEmDelimAlt = eDelimitadorPar(chNoCursor) || eDelimitadorPar(chAnterior) ||
+                            eCaractereAspas(chNoCursor) || eCaractereAspas(chAnterior);
+
+                        if (clicouEmEspacoAlt || clicouEmDelimAlt) {
+                            let resExpAlt = null;
+                            if (clicouEmDelimAlt || clicouEmEspacoAlt) {
+                                resExpAlt = tentarExpandirDelimitadoresSimetricos(txtEspaco, idxEspaco, true);
+                            }
+                            if (!resExpAlt) {
+                                resExpAlt = tentarExpandirPadraoComposto(txtEspaco, idxEspaco, true, true);
+                            }
+                            if (!resExpAlt) {
+                                resExpAlt = tentarExpandirBlocoMaiusculasComQuebraSuave(txtEspaco, idxEspaco);
+                            }
+                            if (!resExpAlt) {
+                                resExpAlt = tentarExpandirBlocoFormatadoDestaque(mapaAltEspaco, idxEspaco);
+                            }
+                            if (!resExpAlt) {
+                                resExpAlt = tentarExpandirDelimitadoresSimetricos(txtEspaco, idxEspaco, true);
+                            }
+                            if (!resExpAlt) {
+                                resExpAlt = expandirFraseAtePontuacaoEstagio3(txtEspaco, idxEspaco);
+                            }
+
+                            if (resExpAlt) {
+                                const rExpAlt = criarRangeDOMAPartirDeIndices(mapaAltEspaco, resExpAlt.inicio, resExpAlt.fim);
+                                if (rExpAlt) {
+                                    const tExpAlt = extrairTextoPuroSanitizado(rExpAlt) || rExpAlt.toString().trim();
+                                    if (tExpAlt && tExpAlt.length > 0) {
+                                        rangeParaFlash = rExpAlt;
+                                        textoParaCopiar = tExpAlt;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* Caso NAO seja 2/3 cliques em interface (ex.: clique unico com Alt):
+             * 1. Prioridade 1: Verifica se o clique com Alt incidiu diretamente sobre mascara/campo estruturado forense */
+            if (!textoParaCopiar) {
+                const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
+                if (pontoAlt) {
+                    const mapaAlt = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
+                    if (mapaAlt) {
+                        const resBlocoAlt = tentarExpandirPadraoComposto(mapaAlt.texto, mapaAlt.idxCursor, false, false);
+                        if (resBlocoAlt) {
+                            const rBlocoAlt = criarRangeDOMAPartirDeIndices(mapaAlt, resBlocoAlt.inicio, resBlocoAlt.fim);
+                            if (rBlocoAlt) {
+                                const txtBlocoAlt = extrairTextoPuroSanitizado(rBlocoAlt) || rBlocoAlt.toString().trim();
+                                if (txtBlocoAlt && txtBlocoAlt.length > 0) {
+                                    rangeParaFlash = rBlocoAlt;
+                                    textoParaCopiar = txtBlocoAlt;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* 2. Prioridade 2 (Clique Unico): Se nao for campo estruturado e for objeto de interface: */
+            if (!textoParaCopiar && elInterativo) {
+                if (elInterativo.tagName === 'INPUT') {
+                    textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
+                } else if (elInterativo.tagName === 'OPTION') {
+                    textoParaCopiar = (elInterativo.text || elInterativo.innerText || elInterativo.textContent || '').trim();
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNode(elInterativo);
+                } else {
+                    textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
+                    rangeParaFlash = document.createRange();
+                    rangeParaFlash.selectNodeContents(elInterativo);
+                }
+            }
+
+            /* 3. Prioridade 3: Se nao for campo nem interface:
+             * Se for 2 cliques com Alt: seleciona todo o elemento de texto ancestral ou sentenca!
+             * Se for 1 clique com Alt: seleciona a unidade "palavra" pontual sob o cursor (minimo possivel) */
+            if (!textoParaCopiar) {
+                const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
+                if (pontoAlt) {
+                    const mapa = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
+                    if (mapa) {
+                        if (ehDoisCliquesAlt) {
+                            const elTextoPai = (pontoAlt.no && pontoAlt.no.parentElement) ? pontoAlt.no.parentElement : null;
+                            if (elTextoPai && elTextoPai !== document.body && (elTextoPai.innerText || elTextoPai.textContent || '').trim().length <= 150) {
+                                textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elTextoPai);
+                                rangeParaFlash = document.createRange();
+                                rangeParaFlash.selectNodeContents(elTextoPai);
+                            } else {
+                                const resSentenca = expandirFraseAtePontuacaoEstagio3(mapa.texto, mapa.idxCursor);
+                                if (resSentenca) {
+                                    rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resSentenca.inicio, resSentenca.fim);
+                                    if (rangeParaFlash) {
+                                        textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
+                                    }
+                                }
+                            }
+                        } else {
+                            const resAtomica = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
+                            if (resAtomica) {
+                                rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resAtomica.inicio, resAtomica.fim);
+                                if (rangeParaFlash) {
+                                    textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (textoParaCopiar && textoParaCopiar.length > 0 && rangeParaFlash) {
+                ignorarProximoClick = true;
+                e.preventDefault();
+                e.stopPropagation();
+
+                await aplicarSelecaoECopiar(rangeParaFlash, false, textoParaCopiar, {
+                    forcarUmaLinha: forcarUmaLinhaAltLink,
+                    temModificador: true,
+                    eraArrasto: false
+                });
+                return;
+            }
+        }
+
+        /* Passo 9.7.1b: Clique Simples sem Modificadores em Tela de Sistema / Interface (modais, caixas de dialogo):
+         * DIRETRIZ ROOT 2.17 e 6.20 (Regra Semiflexivel em Interfaces):
+         * - Se for botao ou controle de formulario estrito (isComponenteBotaoOuFormularioEstrito):
+         *   ja retornou no Passo 9.6 sem fazer nada.
+         * - Se for texto dentro de tela de sistema ou container de interface (ex: corpo de modal, cabecalho PJe,
+         *   arvore de timeline, <div>, <span>, <small>, <td>, <h3>, <a>) e o ponto clicado contiver mascara util /
+         *   bloco estruturado (datas em qualquer formato, horas, combinacoes de data+hora, processo CNJ, CPF, CNPJ,
+         *   IDs numericos, moedas): COPIA para a Area de Transferencia e exibe Flash Verde temporizado,
+         *   SEM manter selecao na tela.
+         * - Se for palavra avulsa ou rotulo comum de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
+        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(elAlvoEfetivo) || isElementoInterativoClicavelDireto(elAlvoEfetivo);
+        if (ehSistemaOuUi && !temModificadorTeclado) {
+            if ((e.detail === 1 || e.detail === 2) && !isComponenteBotaoOuFormularioEstrito(elAlvoEfetivo)) {
+                const ponto = obterPontoDoClique(e.clientX, e.clientY);
+                if (ponto) {
+                    const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+                    if (mapa) {
+                        const resComposto = localizarBlocoForenseAutoSelecionavelEmInterface(
+                            mapa.texto,
+                            mapa.idxCursor,
+                            e.detail,
+                            false
+                        );
+                        if (resComposto) {
+                            const rangeComposto = criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim);
+                            if (rangeComposto) {
+                                const textoLimpo = extrairTextoPuroSanitizado(rangeComposto) || rangeComposto.toString().trim();
+                                if (textoLimpo && textoLimpo.length > 0) {
+                                    await aplicarSelecaoECopiar(rangeComposto, false, textoLimpo, {
+                                        forcarDesselecao: true
+                                    });
+                                    const sel = window.getSelection();
+                                    if (sel) sel.removeAllRanges();
+                                    ignorarProximoClick = false;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            ignorarProximoClick = false;
+            return;
+        }
+
+        const ponto = obterPontoDoClique(e.clientX, e.clientY);
+        if (!ponto) return;
+
+        const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
+        if (!mapa) {
+            if (e.detail >= 3) {
+                const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
+                if (bloco && bloco !== document.body) {
+                    const rangeBloco = document.createRange();
+                    rangeBloco.selectNodeContents(bloco);
+                    await aplicarSelecaoECopiar(rangeBloco, modoAcumulador);
+                }
+            }
+            return;
+        }
+
+        const { texto, idxCursor } = mapa;
+
+        /* Passo 9.7.2: 3 Cliques (e.detail >= 3): tendencia a minorar em blocos compostos ("12.016/2009" -> "12.016" ou "2009")
+         * e selecao estritamente localizada ao clicar 3 vezes no inicio de um paragrafo (sem invadir paragrafos vizinhos). */
+        if (e.detail >= 3) {
+            const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
+            if (resTriplo) {
+                const rangeTriplo = criarRangeDOMAPartirDeIndices(mapa, resTriplo.inicio, resTriplo.fim);
+                if (rangeTriplo) {
+                    await aplicarSelecaoECopiar(rangeTriplo, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                    return;
+                }
+            }
+            const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
+            if (bloco && bloco !== document.body) {
+                const rangeBloco = document.createRange();
+                rangeBloco.selectNodeContents(bloco);
+                await aplicarSelecaoECopiar(rangeBloco, modoAcumulador, null, { temModificador: temModificadorTeclado });
+            }
+            return;
+        }
+
+        const ehDuploClique = (e.detail === 2);
+        const charNoCursor = texto[idxCursor] || '';
+        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+        const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
+            eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
+
+        let resultadoIndices = null;
+
+        if (ehDuploClique) {
+            if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+            }
+        } else if (clicouEmDelimitadorOuAspas) {
+            resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+        } else if (clicouEmEspaco) {
+            /* Regra de bloco: espaco logo apos ":" liga o rotulo ao que vem depois -> sentenca inteira */
+            resultadoIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+            }
+        } else {
+            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
+            if (!resultadoIndices) {
+                resultadoIndices = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
+            }
+        }
+
+        if (!resultadoIndices) return;
+
+        const textoCandidato = (mapa && typeof mapa.texto === 'string')
+            ? mapa.texto.slice(resultadoIndices.inicio, resultadoIndices.fim)
+            : '';
+        if (!temModificadorTeclado && !verificarProtecaoTamanhoMinimoInterface(textoCandidato, elAlvoEfetivo, false)) {
+            return;
+        }
+
+        const rangeFinal = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
+        if (rangeFinal) {
+            if (modoAcumulador || e.altKey) {
+                ignorarProximoClick = true;
+            }
+            await aplicarSelecaoECopiar(rangeFinal, modoAcumulador, null, { temModificador: temModificadorTeclado });
+        }
+    }
+
+    function aoClicar(e) {
+        /* DIRETRIZ ROOT IMUTAVEL: Preservacao Absoluta da Navegacao e Interacao Nativa Web.
+         * Cliques com botao do meio (button === 1) ou outros botoes nao primarios NUNCA devem
+         * ser interceptados no evento click, garantindo abertura nativa de links em novas abas. */
+        if (e && e.button !== undefined && e.button !== 0) {
+            return;
+        }
+
+        /* Cliques comuns sem teclas modificadoras ativas (Alt, Ctrl, Shift, Meta) JAMAIS devem
+         * ser interceptados, bloqueados ou suprimidos pelo addon em nenhum site ou aplicacao web. */
+        const temModificador = Boolean(e && (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey));
+        if (!temModificador) {
+            ignorarProximoClick = false;
+            return;
+        }
+
+        /* Passo 9.8.1: Padrao nativo do navegador para Links (Ctrl + Clique em <a href>):
+         * Permite que o navegador abra o link em nova aba sem cancelamento do clique */
+        const elLinkAlvoClick = (e.target && typeof e.target.closest === 'function')
+            ? e.target.closest('a[href]')
+            : null;
+        if (elLinkAlvoClick && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+            ignorarProximoClick = false;
+            return;
+        }
+
+        if (ignorarProximoClick || (e.ctrlKey && e.altKey) || (e.altKey && !e.ctrlKey && !e.shiftKey) || (e.ctrlKey && !e.altKey && !e.shiftKey)) {
+            ignorarProximoClick = false;
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+        }
+    }
+
+    /*
+     * FUNCAO: ehDominioPjeOuJusGov
+     * OBJETIVO DE RECONSTRUCAO: Verificar se a URL atual pertence a zona judicial
+     * brasileira (*.jus.br, *.gov.br, *.mp.br, *.def.br ou subdominios pje/eproc/projudi).
+     */
+    function ehDominioPjeOuJusGov(urlStr) {
+        try {
+            const u = new URL(urlStr || location.href);
+            const host = u.hostname.toLowerCase();
+            if (host.endsWith('.jus.br') || host.endsWith('.gov.br') || host.endsWith('.mp.br') || host.endsWith('.def.br')) return true;
+            if (host.includes('pje') || host.includes('eproc') || host.includes('projudi')) return true;
+            return false;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /*
+     * FUNCAO: inserirTextoEmElemento
+     * OBJETIVO DE RECONSTRUCAO: Inserir texto ou fragmento HTML de forma segura e universal
+     * em <input>, <textarea> ou conteudos com contenteditable / editores online.
+     */
+    function inserirTextoEmElemento(alvo, texto, ehHtmlFormatado) {
+        try {
+            if (!alvo) return;
+            alvo.focus();
+
+            if (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA') {
+                const tipoInput = (alvo.getAttribute('type') || alvo.type || 'text').toLowerCase();
+                const ehTipoTemporal = ['date', 'datetime-local', 'month', 'week', 'time'].includes(tipoInput);
+
+                if (ehTipoTemporal) {
+                    let valorData = (texto || '').trim();
+                    if (tipoInput === 'date') {
+                        // Converte DD/MM/AAAA ou DD-MM-AAAA ou DD.MM.AAAA para AAAA-MM-DD aceito pelo padrao HTML5
+                        const mDataBr = valorData.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+                        if (mDataBr) {
+                            const dia = mDataBr[1].padStart(2, '0');
+                            const mes = mDataBr[2].padStart(2, '0');
+                            const ano = mDataBr[3];
+                            valorData = `${ano}-${mes}-${dia}`;
+                        }
+                    }
+                    try {
+                        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                        if (descriptor && descriptor.set) {
+                            descriptor.set.call(alvo, valorData);
+                        } else {
+                            alvo.value = valorData;
+                        }
+                    } catch (_) {
+                        alvo.value = valorData;
+                    }
+                    try {
+                        alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                        alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                    } catch (_) { }
+                    return;
+                }
+
+                let start = null;
+                let end = null;
+                try {
+                    start = (typeof alvo.selectionStart === 'number') ? alvo.selectionStart : null;
+                    end = (typeof alvo.selectionEnd === 'number') ? alvo.selectionEnd : null;
+                } catch (_) {
+                    start = null;
+                    end = null;
+                }
+
+                let inseriuComRange = false;
+                if (start !== null && end !== null && typeof alvo.setRangeText === 'function') {
+                    try {
+                        alvo.setRangeText(texto, start, end, 'end');
+                        inseriuComRange = true;
+                    } catch (_) {
+                        inseriuComRange = false;
+                    }
+                }
+
+                if (!inseriuComRange) {
+                    if (start !== null && end !== null) {
+                        alvo.value = (alvo.value || '').substring(0, start) + texto + (alvo.value || '').substring(end);
+                        try {
+                            alvo.selectionStart = alvo.selectionEnd = start + texto.length;
+                        } catch (_) { }
+                    } else {
+                        // Fallback seguro para inputs que rejeitam selectionStart (ex: type="number", "email", etc.)
+                        try {
+                            const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                            if (descriptor && descriptor.set) {
+                                descriptor.set.call(alvo, texto);
+                            } else {
+                                alvo.value = texto;
+                            }
+                        } catch (_) {
+                            alvo.value = texto;
+                        }
+                    }
+                }
+
+                try {
+                    alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                    alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                } catch (_) { }
+                return;
+            }
+
+            let executou = false;
+            try {
+                if (ehHtmlFormatado) {
+                    executou = document.execCommand('insertHTML', false, texto);
+                } else {
+                    executou = document.execCommand('insertText', false, texto);
+                }
+            } catch (_) { }
+
+            if (!executou) {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    range.deleteContents();
+                    const node = document.createTextNode(texto);
+                    range.insertNode(node);
+                    range.setStartAfter(node);
+                    range.setEndAfter(node);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
+            try {
+                alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+            } catch (_) { }
+        } catch (_) { }
+    }
+
+    /*
+     * FUNCAO: executarColagemBotaoDireito
+     * OBJETIVO DE RECONSTRUCAO: Executar colagem (botao do meio / botao direito) usando a simulacao
+     * interna de clipboard do addon ("Ultima Selecao" em window.__JUSGOV_ULTIMO_CLIPBOARD__ ou a selecao
+     * anterior em window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ quando acionado via Ctrl + Botao do Meio).
+     * Tudo protegido com try/catch.
+     */
+    async function executarColagemBotaoDireito(alvo, modo, usarAnterior = false) {
+        try {
+            if (!alvo) return;
+
+            /* Regra: 1 clique com botao direito utiliza formato estilo padrao/avancado;
+             * 2 cliques rapidos forcam obrigatoriamente colar SOMENTE TEXTO puro do clipboard. */
+            const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
+
+            const ehEditorRico = Boolean(alvo.isContentEditable ||
+                (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
+                (alvo.closest && alvo.closest('[contenteditable="true"]')) ||
+                document.designMode === 'on');
+            const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
+
+            const itemInterno = usarAnterior
+                ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
+                : window.__JUSGOV_ULTIMO_CLIPBOARD__;
+            const textoEmulado = (itemInterno && itemInterno.texto) || (!usarAnterior ? ultimoTextoSelecionadoLimpo : '') || '';
+            const htmlEmulado = (itemInterno && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
+
+            if (textoEmulado && textoEmulado.trim().length > 0) {
+                if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
+                    /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
+                    inserirTextoEmElemento(alvo, textoEmulado, false);
+                } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
+                    /* Editor Web / HTML / RTF / contenteditable: cola com formatacao */
+                    inserirTextoEmElemento(alvo, htmlEmulado, true);
+                } else {
+                    inserirTextoEmElemento(alvo, textoEmulado, false);
+                }
+            }
+        } catch (_) { }
+    }
+
+    /*
+     * FUNCAO: aoClicarAuxiliarMouse
+     * OBJETIVO DE RECONSTRUCAO: Neutralizar o comportamento de navegacao de historico
+     * nativo nos botoes 4 e 5 (botoes laterais do mouse) em auxclick e despachar navegacao de abas.
+     */
+    function aoClicarAuxiliarMouse(e) {
+        if (capturaBotoesMouse4e5Ativa) {
+            tratarNavegacaoAbasPorBotoesMouse(e);
+        }
+        /* Modulo MOUSE: Botao do meio (scroll click) */
+        if (e.button === 1) {
+            /* Regra fundamental: Preservar navegacao nativa do navegador (abrir link em nova aba).
+             * Nunca interceptar o evento auxclick sobre <a href>. */
+            const elLinkMeio = (e.target && typeof e.target.closest === 'function')
+                ? e.target.closest('a[href]')
+                : null;
+            if (elLinkMeio) {
+                return;
+            }
+
+            /* Se colarBotaoMeioAtivo estiver desabilitado, não intercepta o evento auxclick */
+            if (!colarBotaoMeioAtivo) {
+                return;
+            }
+
+            const ctxMeio = classificarContextoElementoAlvo(e.target);
+            const alvo = (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL')
+                ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
+                : e.target;
+
+            /* Ctrl + Botao do Meio: envia as teclas Win+V ao sistema operacional
+             * (sem colar diretamente nem alterar o campo interno, permitindo selecao no historico nativo do SO). */
+            if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    if (typeof emularTeclasWinV === 'function') {
+                        emularTeclasWinV(alvo);
+                    }
+                } catch (_) { }
+                return;
+            }
+
+            /* Colagem normal com o botao do meio */
+            if (colarBotaoMeioAtivo) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
+                    try {
+                        executarColagemBotaoDireito(alvo, 'normal', false);
+                    } catch (_) { }
+                }
+                /* Se der qualquer erro ou elemento nao for editavel: 'fazer nada' silenciosamente */
+                return;
+            }
+        }
+    }
+
+    function aoAbrirMenuContexto(e) {
+        if (e.ctrlKey && e.altKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+
+        /* Garantia absoluta de correcao de textos e menus nativos do navegador:
+         * 1) Na pagina de opcoes da extensao, liberar apenas dentro dos campos de teste editaveis.
+         * 2) Se colagemBotaoDireitoAtiva estiver desativado (padrao), nunca interceptar.
+         * 3) Se a tecla Shift estiver pressionada ao clicar com botao direito, nunca interceptar. */
+        const ehAmbienteOpcoes = (typeof location !== 'undefined' && (location.protocol === 'chrome-extension:' || (location.pathname && location.pathname.includes('options.html'))));
+        if (ehAmbienteOpcoes && !e.target.closest('.editable-demo, #textareaMinutasDemo, #editorHtmlOnlineDemo, #demoInputAlternancia, .linha-campos-entrada, input, textarea, [contenteditable]')) {
+            return;
+        }
+
+        if (!colarBotaoMeioAtivo || !colagemBotaoDireitoAtiva) return;
+
+        if (e.shiftKey) {
+            return;
+        }
+
+        const tipoContexto = classificarContextoElementoAlvo(e.target);
+        if (tipoContexto !== 'CAMPO_SIMPLES_EDITAVEL' && tipoContexto !== 'EDITOR_MULTILINHA_EDITAVEL') {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const alvo = (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL')
+            ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
+            : e.target;
+
+        const agora = Date.now();
+        const diff = agora - ultimoCliqueDireitoTimestamp;
+        ultimoCliqueDireitoTimestamp = agora;
+
+        if (diff < 350 && timerCliqueDireitoColagem) {
+            clearTimeout(timerCliqueDireitoColagem);
+            timerCliqueDireitoColagem = null;
+            executarColagemBotaoDireito(alvo, 'texto_puro');
+        } else {
+            if (timerCliqueDireitoColagem) {
+                clearTimeout(timerCliqueDireitoColagem);
+            }
+            timerCliqueDireitoColagem = setTimeout(() => {
+                timerCliqueDireitoColagem = null;
+                executarColagemBotaoDireito(alvo, 'normal');
+            }, 300);
+        }
+    }
+
+    /* Passo 9.9.5: Desselecao Universal Profunda e Multi-Frame
+     * O porque: Em paginas juridicas com multiplos iframes (PJe, eproc, visualizadores de PDF),
+     * containers de rolagem independentes, divs contenteditable e inputs/textareas, window.getSelection()
+     * comum alcanca apenas a janela local. Esta rotina executa todas as funcoes nativas de desselecao
+     * (empty, removeAllRanges, execCommand('unselect'), collapseToStart e setSelectionRange(0, 0)),
+     * varre recursivamente toda a arvore de quadros (frames/iframes/shadowRoots) e transmite broadcast
+     * entre frames isolados via Service Worker. */
+    function deselecionarTudoEmContexto(win, doc) {
+        if (!win || !doc) return;
+        try {
+            /* 1. Selection API Nativa do Window */
+            const s = (typeof win.getSelection === 'function') ? win.getSelection() : null;
+            if (s) {
+                if (typeof s.empty === 'function') {
+                    try { s.empty(); } catch (_) { }
+                }
+                if (typeof s.removeAllRanges === 'function') {
+                    try { s.removeAllRanges(); } catch (_) { }
+                }
+                if (s.rangeCount > 0 && typeof s.collapseToStart === 'function') {
+                    try { s.collapseToStart(); } catch (_) { }
+                }
+            }
+        } catch (_) { }
+
+        try {
+            /* 2. Funcao Nativa do Documento execCommand('unselect') */
+            if (typeof doc.execCommand === 'function') {
+                try { doc.execCommand('unselect'); } catch (_) { }
+            }
+        } catch (_) { }
+
+        try {
+            /* 3. Limpeza de Elemento Ativo e Desselecao de Inputs/Textareas */
+            const elemAtivo = doc.activeElement;
+            if (elemAtivo) {
+                if (typeof elemAtivo.setSelectionRange === 'function') {
+                    try { elemAtivo.setSelectionRange(0, 0); } catch (_) { }
+                }
+                if (elemAtivo.blur && (elemAtivo.tagName === 'INPUT' || elemAtivo.tagName === 'TEXTAREA' || elemAtivo.isContentEditable)) {
+                    try { elemAtivo.blur(); } catch (_) { }
+                }
+            }
+            if (doc.querySelectorAll) {
+                const campos = doc.querySelectorAll('input, textarea');
+                for (let i = 0; i < campos.length; i++) {
+                    const c = campos[i];
+                    if (c && typeof c.selectionStart === 'number' && c.selectionStart !== c.selectionEnd) {
+                        try { c.setSelectionRange(0, 0); } catch (_) { }
+                    }
+                }
+            }
+        } catch (_) { }
+
+        try {
+            /* 4. Shadow Roots Acessiveis no Documento (somente elementos customizados com hifen para evitar varredura O(N) de todo o DOM) */
+            if (doc.activeElement && doc.activeElement.shadowRoot && typeof doc.activeElement.shadowRoot.getSelection === 'function') {
+                const sShAtivo = doc.activeElement.shadowRoot.getSelection();
+                if (sShAtivo) {
+                    if (typeof sShAtivo.empty === 'function') sShAtivo.empty();
+                    if (typeof sShAtivo.removeAllRanges === 'function') sShAtivo.removeAllRanges();
+                }
+            }
+        } catch (_) { }
+    }
+
+    function executarDeselecaoUniversal(origemRemota = false, preservarMiniTip = false) {
+        /* Passo 9.9.6: Executa desselecao no contexto local */
+        deselecionarTudoEmContexto(window, document);
+
+        /* Passo 9.9.7: Varre toda a arvore local de iframes e frames */
+        try {
+            if (document.querySelectorAll) {
+                const quadros = document.querySelectorAll('iframe, frame');
+                for (let i = 0; i < quadros.length; i++) {
+                    try {
+                        const q = quadros[i];
+                        const docQ = q.contentDocument || (q.contentWindow && q.contentWindow.document);
+                        const winQ = q.contentWindow;
+                        if (winQ && docQ) {
+                            deselecionarTudoEmContexto(winQ, docQ);
+                            if (docQ.querySelectorAll) {
+                                const subQuadros = docQ.querySelectorAll('iframe, frame');
+                                for (let j = 0; j < subQuadros.length; j++) {
+                                    try {
+                                        const sq = subQuadros[j];
+                                        const subDoc = sq.contentDocument || (sq.contentWindow && sq.contentWindow.document);
+                                        const subWin = sq.contentWindow;
+                                        if (subWin && subDoc) {
+                                            deselecionarTudoEmContexto(subWin, subDoc);
+                                        }
+                                    } catch (_) { }
+                                }
+                            }
+                        }
+                    } catch (_) { }
+                }
+            }
+        } catch (_) { }
+
+        /* Passo 9.9.8: Se executado dentro de iframe, desseleciona parent e top */
+        try {
+            if (window.parent && window.parent !== window) {
+                deselecionarTudoEmContexto(window.parent, window.parent.document);
+            }
+        } catch (_) { }
+        try {
+            if (window.top && window.top !== window && window.top !== window.parent) {
+                deselecionarTudoEmContexto(window.top, window.top.document);
+            }
+        } catch (_) { }
+
+        /* Passo 9.9.9: Limpeza de estados internos, acumulador, alertas e contornos flash */
+        ancoraCursorShift = null;
+        ultimoTextoSelecionadoLimpo = '';
+        ultimoRangeSelecionadoSimples = null;
+        teclasPressionadasAtivas.clear();
+        limparFlashBorderImediatamente();
+        if (acumulador && acumulador.obterQuantidade() > 0) {
+            acumulador.limpar();
+        }
+        /* Preserva minitip de alternancia Esc+Esc quando originado por broadcast remoto ou solicitado explicitamente */
+        limparAvisosAuditoriaEWikiImediatamente(Boolean(origemRemota || preservarMiniTip));
+
+        /* Passo 9.9.10: Transmissao broadcast entre todos os frames da aba via Service Worker */
+        if (!origemRemota) {
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ acao: 'broadcastDeselecionarGeral' }, () => {
+                        if (chrome.runtime && chrome.runtime.lastError) { }
+                    });
+                }
+            } catch (_) { }
+        }
+    }
+
+    function aoPressionarTecla(e) {
+        if (e && e.key && e.key !== 'Escape') {
+            teclasPressionadasAtivas.add(String(e.key).toLowerCase());
+        }
+
+        /* BUG-02 e Seção 6.30: Destruicao imediata e atomica do contorno Flash e dos avisos de auditoria/Wiki
+         * ao pressionar Enter ou Escape (fechamento/confirmacao de modais criticos ou desselecao) */
+        if (e && (e.key === 'Enter' || e.key === 'Escape')) {
+            if (aguardandoDesselecaoFlash || timerFlashBorder) {
+                limparFlashBorderImediatamente();
+            }
+            limparAvisosAuditoriaEWikiImediatamente();
+        }
+
+        /* Passo 9.8: Tecla Shift exclusiva: NUNCA desseleciona a selecao existente,
+         * permitindo continuar ou estender a selecao ativa (Shift + Setas ou Shift + Clique) */
+        if (e.key === 'Shift' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.repeat) {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                const r = sel.getRangeAt(0);
+                ancoraCursorShift = {
+                    no: sel.anchorNode || r.startContainer,
+                    offset: typeof sel.anchorOffset === 'number' ? sel.anchorOffset : r.startOffset
+                };
+            }
+            return;
+        }
+
+        /* Passo 9.9: Atalho Inteligente F1 -> Localizar no Google Gemini com ou sem selecao */
+        if (e.key === 'F1' || e.code === 'F1') {
+            if (!atalhoF1GeminiAtivo) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            let textoSelecionadoF1 = '';
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+                textoSelecionadoF1 = higienizarTextoParaCopia(sel.toString());
+            } else if (ultimoTextoSelecionadoLimpo && ultimoTextoSelecionadoLimpo.trim().length > 0) {
+                textoSelecionadoF1 = ultimoTextoSelecionadoLimpo.trim();
+            } else {
+                const elemAtivo = document.activeElement;
+                if (elemAtivo && (elemAtivo.tagName === 'INPUT' || elemAtivo.tagName === 'TEXTAREA')) {
+                    try {
+                        if (typeof elemAtivo.selectionStart === 'number') {
+                            const txtInput = elemAtivo.value.substring(elemAtivo.selectionStart, elemAtivo.selectionEnd);
+                            if (txtInput && txtInput.trim().length > 0) {
+                                textoSelecionadoF1 = higienizarTextoParaCopia(txtInput);
+                            }
+                        }
+                    } catch (_) { }
+                }
+            }
+
+            const templatePrompt = (typeof promptF1Gemini === 'string' && promptF1Gemini.trim().length > 0)
+                ? promptF1Gemini.trim()
+                : PROMPT_F1_GEMINI_PADRAO;
+
+            if (textoSelecionadoF1.length > 0) {
+                const promptF1 = templatePrompt.includes('{{TEXTO}}')
+                    ? templatePrompt.replace(/\{\{TEXTO\}\}/g, textoSelecionadoF1)
+                    : `'${textoSelecionadoF1}' :  ${templatePrompt}`;
+
+                /* O prompt e inserido diretamente na caixa do Gemini via background script (preencherPromptGemini),
+                 * preservando intacto o conteudo da area de transferencia do usuario. */
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                        chrome.runtime.sendMessage({ acao: 'abrirGeminiLateral', modo: 'flash', prompt: promptF1 }, () => {
+                            if (chrome.runtime && chrome.runtime.lastError) {
+                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) { }
+                            }
+                        });
+                    } else {
+                        window.open('https://gemini.google.com/app', '_blank');
+                    }
+                } catch (_) {
+                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) { }
+                }
+
+                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                    validador.projetarMiniTipGlobal('Abrindo assistente de IA Gemini...', '#2563eb');
+                }
+            } else {
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                        chrome.runtime.sendMessage({ acao: 'abrirGeminiLateral', modo: 'flash', prompt: '' }, () => {
+                            if (chrome.runtime && chrome.runtime.lastError) {
+                                try { window.open('https://gemini.google.com/app', '_blank'); } catch (_) { }
+                            }
+                        });
+                    } else {
+                        window.open('https://gemini.google.com/app', '_blank');
+                    }
+                } catch (_) {
+                    try { window.open('https://gemini.google.com/app', '_blank'); } catch (__) { }
+                }
+
+                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                    validador.projetarMiniTipGlobal('Abrindo assistente de IA...', '#3b82f6');
+                }
+            }
+            return;
+        }
+
+        /* Modulo TECLADO/MOUSE: Navegacao entre campos de entrada usando setas do teclado (Seta Baixo / Seta Cima) */
+        if (navegacaoTecladoCamposAtiva && !e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Down' || e.key === 'Up')) {
+            const elAtivo = (document.activeElement && document.activeElement.tagName === 'INPUT')
+                ? document.activeElement
+                : ((e.target && e.target.tagName === 'INPUT') ? e.target : null);
+            if (elAtivo) {
+                const tipoEl = classificarContextoElementoAlvo(elAtivo);
+                if (tipoEl === 'CAMPO_SIMPLES_EDITAVEL') {
+                    const direcao = (e.key === 'ArrowDown' || e.key === 'Down') ? 1 : -1;
+                    if (navegarEntreCamposEntrada(elAtivo, direcao)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                }
+            }
+        }
+
+        /* Passo 9.10: Tecla Escape (limpa selecao universalmente, acumulador e alertas na tela, sem zerar clipboard) */
+        if (e.key === 'Escape') {
+            /* Ignora repeticao automatica de tecla mantida pressionada */
+            if (e.repeat) return;
+
+            /* Regra 4: Esc ao editar campo simples sai do foco e fica como se nunca tivesse sido selecionado */
+            const elAtivo = (document.activeElement && document.activeElement.tagName === 'INPUT')
+                ? document.activeElement
+                : ((e.target && e.target.tagName === 'INPUT') ? e.target : null);
+            if (elAtivo) {
+                const tipoEl = classificarContextoElementoAlvo(elAtivo);
+                if (tipoEl === 'CAMPO_SIMPLES_EDITAVEL') {
+                    inputsJaSelecionadosInicialmente.delete(elAtivo);
+                    elAtivo.__jusgovSelecionadoInicial = false;
+                    try { elAtivo.blur(); } catch (_) { }
+                }
+            }
+
+            executarDeselecaoUniversal(false);
+
+            const agora = performance.now();
+            const intervaloMs = agora - ultimoTimestampEsc;
+
+            /* Valida estritamente 2 Escs sequenciais rapidos: intervalo entre 60ms e JANELA_DUPLO_ESC_MS (420ms) */
+            if (ultimoTimestampEsc > 0 && intervaloMs >= 60 && intervaloMs <= CONFIGURACAO_MOTOR.JANELA_DUPLO_ESC_MS) {
+                ultimoTimestampEsc = 0;
+                manterFormatacaoBasica = !manterFormatacaoBasica;
+
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                        chrome.storage.sync.set({ manterFormatacaoBasica }).catch(() => { });
+                    }
+                } catch (_) { }
+
+                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                    const norm = normalizarNivelFiltro(nivelFiltroFormatacao);
+                    let rotuloNivel = 'Estilos Basicos (Inline)';
+                    if (norm === 'intermediario') rotuloNivel = 'Estilos Intermediarios (Paragrafo)';
+                    else if (norm === 'avancado') rotuloNivel = 'Estilos Avancados (Documental)';
+                    else if (norm === 'estendido') rotuloNivel = 'Estilos Extendidos (Office)';
+
+                    const msgModo = manterFormatacaoBasica
+                        ? `Remover Formatacoes: DESATIVADO (${rotuloNivel})`
+                        : 'Remover Formatacoes: ATIVADO (Somente Texto)';
+                    const corBorda = manterFormatacaoBasica ? '#10b981' : '#3b82f6';
+                    validador.projetarMiniTipGlobal(msgModo, corBorda);
+                    try {
+                        if (window.top && window.top !== window && window.top.__JUSGOV_MOTOR_SELECAO_API__) {
+                            const apiTop = window.top.__JUSGOV_MOTOR_SELECAO_API__;
+                            if (typeof apiTop.projetarMiniTipGlobalNoTop === 'function') {
+                                apiTop.projetarMiniTipGlobalNoTop(msgModo, corBorda);
+                            }
+                        }
+                    } catch (_) { }
+                }
+            } else {
+                ultimoTimestampEsc = agora;
+            }
+            return;
+        }
+    }
+
+    function aoSoltarTecla(e) {
+        if (e && e.key) {
+            teclasPressionadasAtivas.delete(String(e.key).toLowerCase());
+        }
+        if (e && !e.ctrlKey) teclasPressionadasAtivas.delete('control');
+        if (e && !e.altKey) teclasPressionadasAtivas.delete('alt');
+        if (e && !e.shiftKey) teclasPressionadasAtivas.delete('shift');
+        if (e && !e.metaKey) teclasPressionadasAtivas.delete('meta');
+        if (e.key === 'Shift') {
+            ancoraCursorShift = null;
+        }
+        window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
+    }
+
+    /*
+     * FUNCAO: calcularAssinaturaSelecao
+     * OBJETIVO: Gerar uma assinatura unica (offsets + texto) da selecao atual, usada para saber se
+     * aquela selecao exata ja foi copiada (por qualquer caminho: clique, arraste, teclado ou sistema).
+     */
+    function calcularAssinaturaSelecao(sel) {
+        try {
+            if (!sel || sel.isCollapsed || sel.rangeCount === 0) return '';
+            const r = sel.getRangeAt(0);
+            const txt = (sel.toString() || '').trim();
+            if (!txt) return '';
+            return `${r.startOffset}_${r.endOffset}_${txt}`;
+        } catch (_) {
+            return '';
+        }
+    }
+
+    /*
+     * FUNCAO: tratarMudancaSelecaoGlobal
+     * DIRETRIZ ROOT: Identifica globalmente selecoes de texto ativas na pagina ou em
+     * visualizadores de PDF (criadas por teclado Shift+Setas, selecoes nativas, mouseup)
+     * e garante a aplicacao imediata da formatacao, copia para a Area de Transferencia
+     * e contorno visual, sem quebrar o fluxo do usuario.
+     * Regra: toda selecao (do sistema ou feita pelo addon) que ainda nao foi copiada e copiada agora.
+     */
+    function tratarMudancaSelecaoGlobal(winAlvo) {
+        const win = winAlvo || window;
+        if (!win || typeof win.getSelection !== 'function') return;
+
+        // Se o foco atual esta em um IFRAME ou EMBED nao-PDF, a selecao e de responsabilidade exclusiva do subframe.
+        // Se for um visualizador de PDF embutido (ex.: embed#plugin type="application/x-google-chrome-pdf"),
+        // a mudanca de selecao deve ser processada normalmente para permitir copia com flash no PDF.
+        if (document.activeElement) {
+            const tagAtiva = document.activeElement.tagName;
+            if (tagAtiva === 'IFRAME') {
+                return;
+            }
+            if (tagAtiva === 'EMBED' && !isAreaLeituraOuPdfConteudo(document.activeElement)) {
+                return;
+            }
+        }
+
+        // Se for um subframe que ja possui seu proprio motor de selecao ativo, o frame pai nunca intercepta
+        if (winAlvo && winAlvo !== window && winAlvo.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+            return;
+        }
+
+        /* Selecao desfeita: libera a assinatura imediatamente (mesmo com o mouse pressionado), para que
+         * selecionar novamente o MESMO texto (ex.: duplo clique na mesma palavra) volte a ser copiado. */
+        try {
+            const selReset = win.getSelection();
+            if (!selReset || selReset.rangeCount === 0 || selReset.isCollapsed) {
+                ultimoRangeAssinaturaGlobal = '';
+            }
+        } catch (_) { }
+
+        if (selecaoSendoAplicadaPeloAddon) return;
+
+        // Guarda de reentrancia no topo da hierarquia de janelas
+        let topWin = window;
+        try { if (window.top && window.top.document) topWin = window.top; } catch (_) { }
+        if (topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__) return;
+
+        if (timerDebounceSelecaoGlobal) {
+            clearTimeout(timerDebounceSelecaoGlobal);
+        }
+        timerDebounceSelecaoGlobal = setTimeout(async () => {
+            timerDebounceSelecaoGlobal = null;
+            if (selecaoSendoAplicadaPeloAddon) return;
+            if (topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__) return;
+            if (isMousePressionado) return; // Se mouse ainda esta sendo arrastado, aguarda mouseup
+            if (!verificarUrlPermitida()) return;
+
+            const sel = (win && typeof win.getSelection === 'function') ? win.getSelection() : window.getSelection();
+            if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+                ultimoRangeAssinaturaGlobal = '';
+                return;
+            }
+            const textoSel = (sel.toString() || '').trim();
+            if (textoSel.length === 0) return;
+
+            const range = sel.getRangeAt(0);
+            if (!range) return;
+
+            // Nao intercepta campos de entrada simples ou editores para respeitar a Regra de Ouro
+            const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
+            if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
+
+            // Em botoes ou controles de formulario estritos, nunca seleciona nem copia via selectionchange sem teclas modificadoras
+            if (isComponenteBotaoOuFormularioEstrito(range.commonAncestorContainer)) {
+                return;
+            }
+            if (isElementoInterativoClicavelDireto(range.commonAncestorContainer)) {
+                const resBlocoSel = localizarBlocoForenseAutoSelecionavelEmInterface(textoSel, 0, 1, true);
+                if (!resBlocoSel || resBlocoSel.inicio !== 0 || resBlocoSel.fim < textoSel.length) {
+                    return;
+                }
+            }
+
+            // Assinatura única para evitar re-execução em loop da mesma seleção exata
+            const assinatura = `${range.startOffset}_${range.endOffset}_${textoSel}`;
+            if (assinatura === ultimoRangeAssinaturaGlobal) return;
+            ultimoRangeAssinaturaGlobal = assinatura;
+
+            // Blindagem anti-loop de selecao manual (Diretriz 6.39)
+            if (textoSel === ultimaSelecaoManualTexto && (Date.now() - ultimoTimestampSelecaoManual) < 1500) {
+                return;
+            }
+            ultimaSelecaoManualTexto = textoSel;
+            ultimoTimestampSelecaoManual = Date.now();
+
+            const rangeClone = range.cloneRange();
+            const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(range.commonAncestorContainer);
+            if (!teclasPressionadasAtivas.has('alt') && !teclasPressionadasAtivas.has('control')) {
+                if (!verificarProtecaoTamanhoMinimoInterface(textoSel, range.commonAncestorContainer, false)) {
+                    return;
+                }
+            }
+
+            topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__ = true;
+            selecaoSendoAplicadaPeloAddon = true;
+            try {
+                await aplicarSelecaoECopiar(rangeClone, false, null, {
+                    eraArrasto: false
+                });
+            } finally {
+                setTimeout(() => {
+                    selecaoSendoAplicadaPeloAddon = false;
+                    topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__ = false;
+                }, 300);
+            }
+        }, 120);
+    }
+
+    /*
+     * FUNCAO: observarFramesDinamicos
+     * DIRETRIZ ROOT: Observa a adicao e navegacao dinamica de iframes, embeds ou objects
+     * de visualizadores de PDF (comuns em sistemas judiciais como PJe e eproc), notifica o
+     * Service Worker para garantir a injecao imediata da suite em subframes e anexa
+     * diretamente ouvintes de seguranca em iframes same-origin.
+     */
+    function observarFramesDinamicos() {
+        if (observerFrames) {
+            try { observerFrames.disconnect(); } catch (_) { }
+            observerFrames = null;
+        }
+        try {
+            const notificarInjecao = () => {
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => { });
+                    }
+                } catch (_) { }
+            };
+
+            const inspecionarIframeLocal = (el) => {
+                if (!el || el.tagName !== 'IFRAME') return;
+                try {
+                    if (el.contentDocument && el.contentWindow) {
+                        const subDoc = el.contentDocument;
+                        const subWin = el.contentWindow;
+                        // Com allFrames: true, o Service Worker ja injeta o content script em cada subframe.
+                        // Se o subframe ja possui motor ativo, o frame pai nao anexa ouvintes redundantes.
+                        if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__ || subWin.__JUSGOV_OUVINTE_LOCAL__) {
+                            return;
+                        }
+                        subWin.__JUSGOV_OUVINTE_LOCAL__ = true;
+                        subDoc.addEventListener('selectionchange', () => {
+                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
+                            tratarMudancaSelecaoGlobal(subWin);
+                        }, { passive: true });
+                        subWin.addEventListener('mousedown', (e) => {
+                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
+                            aoPressionarBotaoMouse(e);
+                        }, { capture: true });
+                        subWin.addEventListener('mousemove', (e) => {
+                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
+                            aoMoverMouse(e);
+                        }, { capture: true, passive: true });
+                        subWin.addEventListener('mouseup', (e) => {
+                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
+                            aoSoltarBotaoMouse(e);
+                        }, { capture: true });
+                    }
+                } catch (_) { }
+            };
+
+            // Inspecionar iframes ja existentes no DOM no momento da carga
+            if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+                const iframesIniciais = document.querySelectorAll('iframe');
+                for (let i = 0; i < iframesIniciais.length; i++) {
+                    inspecionarIframeLocal(iframesIniciais[i]);
+                }
+            }
+
+            observerFrames = new MutationObserver((mutations) => {
+                let temFrame = false;
+                let surgiuModalCritico = false;
+                for (let i = 0; i < mutations.length; i++) {
+                    const m = mutations[i];
+                    if (m.type === 'attributes') {
+                        const t = m.target;
+                        if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
+                            temFrame = true;
+                            inspecionarIframeLocal(t);
+                            break;
+                        }
+                    }
+                    const nodes = m.addedNodes;
+                    if (!nodes || nodes.length === 0) continue;
+                    for (let j = 0; j < nodes.length; j++) {
+                        const n = nodes[j];
+                        if (n && n.nodeType === Node.ELEMENT_NODE) {
+                            const tag = n.tagName;
+                            /* BUG-02 e Seção 6.30: Destruicao imediata do contorno Flash e avisos de auditoria/Wiki se surgir dialogo/modal critico */
+                            const temAvisoModal = Boolean(
+                                validador && (
+                                    (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
+                                    validador.avisoVisivel ||
+                                    validador.temporizadorAlerta
+                                )
+                            );
+                            if (aguardandoDesselecaoFlash || timerFlashBorder || temAvisoModal) {
+                                const roleAttr = (n.getAttribute && n.getAttribute('role')) || '';
+                                const clsAttr = (typeof n.className === 'string') ? n.className : '';
+                                if (roleAttr === 'dialog' || roleAttr === 'alertdialog' ||
+                                    tag === 'MAT-DIALOG-CONTAINER' || tag === 'P-DIALOG' ||
+                                    /\b(modal|rich-modalpanel|swal2-container|ui-dialog|p-dialog)\b/i.test(clsAttr) ||
+                                    (typeof n.querySelector === 'function' && n.querySelector('[role="dialog"], [role="alertdialog"], .modal, .rich-modalpanel, .swal2-container, .ui-dialog, .p-dialog, mat-dialog-container'))) {
+                                    surgiuModalCritico = true;
+                                }
+                            }
+                            if (tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT') {
+                                temFrame = true;
+                                inspecionarIframeLocal(n);
+                                break;
+                            } else if (typeof n.getElementsByTagName === 'function') {
+                                const subIframes = n.getElementsByTagName('iframe');
+                                if (subIframes && subIframes.length > 0) {
+                                    temFrame = true;
+                                    inspecionarIframeLocal(subIframes[0]);
+                                    break;
+                                }
+                                const subEmbeds = n.getElementsByTagName('embed');
+                                if (subEmbeds && subEmbeds.length > 0) {
+                                    temFrame = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (temFrame) break;
+                }
+                if (surgiuModalCritico) {
+                    limparFlashBorderImediatamente();
+                    limparAvisosAuditoriaEWikiImediatamente();
+                }
+                if (temFrame) {
+                    notificarInjecao();
+                }
+            });
+
+            const alvoObservacao = document.documentElement || document.body;
+            if (alvoObservacao) {
+                observerFrames.observe(alvoObservacao, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['src', 'data']
+                });
+            }
+        } catch (_) { }
+    }
+
+    /* ==========================================================================
+     * SECAO 9.9: MONITORAMENTO INTELIGENTE DE MODIFICACOES DE PAGINA (SPA & DIRTY)
+     * ==========================================================================
+     * Rastreia transicoes de rota em Single Page Applications (Navigation API,
+     * History pushState/replaceState, hashchange) e preenchimento de formularios/
+     * minutas judiciais (dirty state em inputs e contenteditables) sem causar
+     * Layout Thrashing, notificando o Service Worker de forma assincrona e debounced.
+     */
+    let timerNotificacaoModificacao = null;
+    let paginaModificadaDetectada = false;
+
+    function notificarModificacaoPagina(motivo, urlReferencia) {
+        paginaModificadaDetectada = true;
+        if (timerNotificacaoModificacao) return;
+        timerNotificacaoModificacao = setTimeout(() => {
+            timerNotificacaoModificacao = null;
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({
+                        acao: 'registrarPaginaModificada',
+                        motivo: motivo || 'DIRTY',
+                        urlAtual: urlReferencia || (typeof window !== 'undefined' ? window.location.href : '')
+                    }).catch(() => { });
+                }
+            } catch (_) { }
+        }, 300);
+    }
+
+    function iniciarMonitoramentoModificacoesPagina(signal) {
+        try {
+            if (typeof window === 'undefined') return;
+
+            /* 1. Vetor de Roteamento SPA: Navigation API nativa */
+            if (window.navigation && typeof window.navigation.addEventListener === 'function') {
+                window.navigation.addEventListener('navigate', (e) => {
+                    const destUrl = (e && e.destination && e.destination.url) ? e.destination.url : window.location.href;
+                    notificarModificacaoPagina('SPA_NAVIGATE', destUrl);
+                }, { signal });
+            }
+
+            /* 2. Vetor de Roteamento SPA: Monkey-patching seguro de History API e Hashchange */
+            try {
+                if (window.history && typeof window.history.pushState === 'function' && !window.__JUSGOV_HISTORY_HOOKED__) {
+                    window.__JUSGOV_HISTORY_HOOKED__ = true;
+                    const origPushState = window.history.pushState;
+                    window.history.pushState = function (...args) {
+                        const ret = origPushState.apply(this, args);
+                        notificarModificacaoPagina('SPA_PUSH_STATE', window.location.href);
+                        return ret;
+                    };
+                    const origReplaceState = window.history.replaceState;
+                    window.history.replaceState = function (...args) {
+                        const ret = origReplaceState.apply(this, args);
+                        notificarModificacaoPagina('SPA_REPLACE_STATE', window.location.href);
+                        return ret;
+                    };
+                }
+            } catch (_) { }
+
+            window.addEventListener('hashchange', () => {
+                notificarModificacaoPagina('SPA_HASHCHANGE', window.location.href);
+            }, { passive: true, signal });
+
+            window.addEventListener('popstate', () => {
+                notificarModificacaoPagina('SPA_POPSTATE', window.location.href);
+            }, { passive: true, signal });
+
+            /* 3. Vetor de Conteudo: Edicao de Formularios e Minutas (Dirty State) */
+            const tratarInputModificacao = (e) => {
+                const el = e.target;
+                if (!el) return;
+                if (el.closest && el.closest('[data-jusgov-ignore="true"]')) return;
+                const tag = (el.tagName || '').toUpperCase();
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) {
+                    notificarModificacaoPagina('FORM_DIRTY', window.location.href);
+                }
+            };
+            document.addEventListener('input', tratarInputModificacao, { capture: true, passive: true, signal });
+            document.addEventListener('change', tratarInputModificacao, { capture: true, passive: true, signal });
+
+            /* 4. Vetor de Titulo de Documento (O(1), sem subtree no body) */
+            const elTitle = document.querySelector('title');
+            if (elTitle && typeof MutationObserver !== 'undefined') {
+                const obsTitle = new MutationObserver(() => {
+                    notificarModificacaoPagina('TITULO_MODIFICADO', window.location.href);
+                });
+                obsTitle.observe(elTitle, { childList: true, characterData: true, subtree: true });
+                if (signal) {
+                    signal.addEventListener('abort', () => obsTitle.disconnect());
+                }
+            }
+        } catch (_) { }
+    }
+
+    /* ==========================================================================
+     * SECAO 10: INICIALIZACAO, ABORTCONTROLLER E SINCRONIZACAO COM SERVICE WORKER
+     * ========================================================================== */
+    function registrarListenersDOM() {
+        if (controladorCicloVida) {
+            try { controladorCicloVida.abort(); } catch (_) { }
+        }
+        if (window.__JUSGOV_ABORT_CONTROLLER__) {
+            try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) { }
+        }
+        controladorCicloVida = new AbortController();
+        window.__JUSGOV_ABORT_CONTROLLER__ = controladorCicloVida;
+        const signal = controladorCicloVida.signal;
+
+        signal.addEventListener('abort', () => {
+            if (observerFrames) {
+                try { observerFrames.disconnect(); } catch (_) { }
+                observerFrames = null;
+            }
+            if (timerDebounceSelecaoGlobal) {
+                clearTimeout(timerDebounceSelecaoGlobal);
+                timerDebounceSelecaoGlobal = null;
+            }
+        });
+
+        blindarCSS();
+        observarFramesDinamicos();
+        iniciarMonitoramentoModificacoesPagina(signal);
+
+        window.addEventListener('pointerdown', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('mousedown', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('pointerup', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('mouseup', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('auxclick', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('keydown', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        window.addEventListener('keyup', tratarNavegacaoAbasPorBotoesMouse, { capture: true, signal });
+        document.addEventListener('mousedown', aoPressionarBotaoMouse, { capture: true, signal });
+        document.addEventListener('mousemove', aoMoverMouse, { capture: true, passive: true, signal });
+        document.addEventListener('mouseup', aoSoltarBotaoMouse, { capture: true, signal });
+        document.addEventListener('focusin', lidarFocoInteligente, { capture: true, signal });
+        document.addEventListener('auxclick', aoClicarAuxiliarMouse, { capture: true, signal });
+        document.addEventListener('click', aoClicar, { capture: true, signal });
+        document.addEventListener('dblclick', (e) => {
+            if (!selecaoEditavelAtiva) return;
+            const tipo = classificarContextoElementoAlvo(e.target);
+            if (tipo === 'CAMPO_SIMPLES_EDITAVEL') {
+                const inp = (e.target && typeof e.target.closest === 'function')
+                    ? (e.target.closest('input') || e.target)
+                    : e.target;
+                if (inp && typeof inp.select === 'function') {
+                    try { inp.select(); } catch (_) { }
+                }
+            }
+        }, { capture: true, signal });
+        document.addEventListener('contextmenu', aoAbrirMenuContexto, { capture: true, signal });
+        window.addEventListener('keydown', aoPressionarTecla, { capture: true, signal });
+        window.addEventListener('help', (e) => {
+            if (atalhoF1GeminiAtivo) {
+                e.preventDefault();
+            }
+        }, { capture: true, signal });
+        window.addEventListener('keyup', aoSoltarTecla, { capture: true, passive: true, signal });
+        document.addEventListener('selectionchange', () => {
+            tratarMudancaSelecaoGlobal();
+            if (selecaoSendoAplicadaPeloAddon) return;
+            if (flashExclusivoSemSelecao) return;
+            const temAvisoAtivo = Boolean(
+                validador && (
+                    (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
+                    validador.avisoVisivel ||
+                    validador.temporizadorAlerta
+                )
+            );
+            if (!aguardandoDesselecaoFlash && !temAvisoAtivo) return;
+            const agoraPerf = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+                ? performance.now()
+                : Date.now();
+            const tsRef = Math.max(
+                timestampCriacaoFlash || 0,
+                (validador && validador.timestampCriacaoAviso) ? validador.timestampCriacaoAviso : 0
+            );
+            if ((agoraPerf - tsRef) < 40) return;
+            const selAtual = window.getSelection();
+            if (!selAtual || selAtual.rangeCount === 0 || selAtual.isCollapsed || selAtual.toString().trim().length === 0) {
+                agendarRetiradaFlashAposDesselecao(true);
+            }
+        }, { passive: true, signal });
+        window.addEventListener('load', (e) => {
+            const t = e.target;
+            if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                        chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => { });
+                    }
+                } catch (_) { }
+            }
+        }, { capture: true, passive: true, signal });
+        document.addEventListener('mouseup', () => {
+            isMousePressionado = false;
+            /* Rede de seguranca: a selecao feita com o mouse (ex.: duplo clique) que ainda nao foi copiada
+             * por outro caminho e copiada agora. A assinatura evita copiar duas vezes a mesma selecao. */
+            setTimeout(() => {
+                try { tratarMudancaSelecaoGlobal(); } catch (_) { }
+            }, 200);
+        }, { capture: true, passive: true, signal });
+        window.addEventListener('blur', () => {
+            isMousePressionado = false;
+            coordsMouseDown = { x: 0, y: 0 };
+            houveArrastoMouse = false;
+            botaoLateralEmProcessamento = 0;
+            teclasPressionadasAtivas.clear();
+            agendarRetiradaFlashAposDesselecao();
+        }, { passive: true, signal });
+        window.addEventListener('scroll', () => {
+            const temAvisoScroll = Boolean(
+                validador && (
+                    (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
+                    validador.avisoVisivel ||
+                    validador.temporizadorAlerta
+                )
+            );
+            if (aguardandoDesselecaoFlash || timerFlashBorder) {
+                limparFlashBorderImediatamente();
+            }
+            if (temAvisoScroll) {
+                limparAvisosAuditoriaEWikiImediatamente();
+            }
+        }, { passive: true, signal });
+        window.addEventListener('keydown', (e) => {
+            window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
+        }, { capture: true, passive: true, signal });
+    }
+
+    function inicializarModulo() {
+        registrarListenersDOM();
+
+        try {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                chrome.storage.sync.get([
+                    'modoTurbo',
+                    'urlsTurbo',
+                    'manterFormatacaoBasica',
+                    'nivelFiltroFormatacao',
+                    'selecaoEditavelAtiva',
+                    'modoPlaceholdersMinutasHtml',
+                    'placeholdersMinutasHtmlAtivo',
+                    'colagemBotaoDireitoAtiva',
+                    'capturaBotoesMouse4e5Ativa',
+                    'colarBotaoMeioAtivo',
+                    'navegacaoTecladoCamposAtiva',
+                    'validacaoMatematicaAtiva',
+                    'tempoFlashBorderMs',
+                    'corFlashBorder',
+                    'modoRetirarSelecao',
+                    'minimoCaracteresInterface',
+                    'separadorAcumulador',
+                    'incluirSeparadorFinalAcumulador',
+                    'separadorTabelas',
+                    'modoShiftCnj',
+                    'promptF1Gemini',
+                    'converterCabecalhoPjeAtivo',
+                    'atalhoF1GeminiAtivo',
+                    'ativoAmpuletas',
+                    'tempoExibicaoAlertaMs'
+                ], (cfg) => {
+                    if (chrome.runtime && chrome.runtime.lastError) return;
+                    if (cfg) {
+                        if (cfg.modoTurbo) modoExecucao = cfg.modoTurbo;
+                        if (Array.isArray(cfg.urlsTurbo)) listaUrlsPermitidas = cfg.urlsTurbo;
+                        if (typeof cfg.manterFormatacaoBasica === 'boolean') {
+                            manterFormatacaoBasica = cfg.manterFormatacaoBasica;
+                        }
+                        if (typeof cfg.nivelFiltroFormatacao === 'string' && ['basico', 'avancado', 'sem_filtro'].includes(cfg.nivelFiltroFormatacao)) {
+                            nivelFiltroFormatacao = cfg.nivelFiltroFormatacao;
+                        }
+                        if (typeof cfg.modoPlaceholdersMinutasHtml === 'string' && ['desabilitado', 'placeholders', 'ctrl_avancado', 'avancado'].includes(cfg.modoPlaceholdersMinutasHtml)) {
+                            modoPlaceholdersMinutasHtml = cfg.modoPlaceholdersMinutasHtml;
+                            placeholdersMinutasHtmlAtivo = (cfg.modoPlaceholdersMinutasHtml !== 'desabilitado');
+                            selecaoEditavelAtiva = (cfg.modoPlaceholdersMinutasHtml !== 'desabilitado');
+                        } else if (typeof cfg.placeholdersMinutasHtmlAtivo === 'boolean') {
+                            placeholdersMinutasHtmlAtivo = cfg.placeholdersMinutasHtmlAtivo;
+                            modoPlaceholdersMinutasHtml = cfg.placeholdersMinutasHtmlAtivo ? 'placeholders' : 'desabilitado';
+                            selecaoEditavelAtiva = cfg.placeholdersMinutasHtmlAtivo;
+                        } else if (typeof cfg.selecaoEditavelAtiva === 'boolean') {
+                            selecaoEditavelAtiva = cfg.selecaoEditavelAtiva;
+                            placeholdersMinutasHtmlAtivo = cfg.selecaoEditavelAtiva;
+                            modoPlaceholdersMinutasHtml = cfg.selecaoEditavelAtiva ? 'placeholders' : 'desabilitado';
+                        }
+                        if (typeof cfg.colagemBotaoDireitoAtiva === 'boolean') {
+                            colagemBotaoDireitoAtiva = cfg.colagemBotaoDireitoAtiva;
+                        }
+                        if (typeof cfg.capturaBotoesMouse4e5Ativa === 'boolean') {
+                            capturaBotoesMouse4e5Ativa = cfg.capturaBotoesMouse4e5Ativa;
+                        }
+                        if (typeof cfg.colarBotaoMeioAtivo === 'boolean') {
+                            colarBotaoMeioAtivo = cfg.colarBotaoMeioAtivo;
+                        } else if (cfg.colarBotaoMeioAtivo === undefined) {
+                            colarBotaoMeioAtivo = true;
+                        }
+                        if (typeof cfg.navegacaoTecladoCamposAtiva === 'boolean') {
+                            navegacaoTecladoCamposAtiva = cfg.navegacaoTecladoCamposAtiva;
+                        }
+                        if (typeof cfg.validacaoMatematicaAtiva === 'boolean') {
+                            validacaoMatematicaAtiva = cfg.validacaoMatematicaAtiva;
+                        }
+                        if (cfg.tempoFlashBorderMs !== undefined) {
+                            const tFlash = Number(cfg.tempoFlashBorderMs);
+                            tempoFlashBorderMs = (Number.isFinite(tFlash) && tFlash >= 0 && tFlash <= 5000) ? tFlash : 500;
+                        } else if (typeof cfg.flashBorderAtivo === 'boolean') {
+                            tempoFlashBorderMs = cfg.flashBorderAtivo ? 500 : 0;
+                        }
+                        if (typeof cfg.corFlashBorder === 'string' && /^#[0-9a-fA-F]{6}$/.test(cfg.corFlashBorder.trim())) {
+                            corFlashBorder = cfg.corFlashBorder.trim().toLowerCase();
+                        }
+                        if (cfg.modoRetirarSelecao !== undefined) {
+                            modoRetirarSelecao = normalizarModoRetirarSelecao(cfg.modoRetirarSelecao);
+                        }
+                        if (cfg.minimoCaracteresInterface !== undefined) {
+                            const minCar = parseInt(cfg.minimoCaracteresInterface, 10);
+                            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(minCar) ? minCar : 5;
+                        }
+                        if (typeof cfg.converterCabecalhoPjeAtivo === 'boolean') {
+                            converterCabecalhoPjeAtivo = cfg.converterCabecalhoPjeAtivo;
+                        }
+                        if (typeof cfg.atalhoF1GeminiAtivo === 'boolean') {
+                            atalhoF1GeminiAtivo = cfg.atalhoF1GeminiAtivo;
+                        }
+                        if (typeof cfg.modoShiftCnj === 'string') {
+                            modoShiftCnj = cfg.modoShiftCnj;
+                        }
+                        if (typeof cfg.promptF1Gemini === 'string' && cfg.promptF1Gemini.trim().length > 0) {
+                            promptF1Gemini = cfg.promptF1Gemini.trim();
+                        }
+                        if (typeof cfg.ativoAmpuletas === 'boolean') {
+                            ativoAmpuletas = cfg.ativoAmpuletas;
+                        }
+                        blindarCSS();
+                        if (cfg.tempoExibicaoAlertaMs !== undefined && validador && typeof validador.definirTempoExibicao === 'function') {
+                            validador.definirTempoExibicao(cfg.tempoExibicaoAlertaMs);
+                        }
+                        if (typeof cfg.separadorAcumulador === 'string' && acumulador && typeof acumulador.definirSeparador === 'function') {
+                            acumulador.definirSeparador(cfg.separadorAcumulador);
+                        }
+                        if (typeof cfg.incluirSeparadorFinalAcumulador === 'boolean') {
+                            incluirSeparadorFinalAcumulador = cfg.incluirSeparadorFinalAcumulador;
+                            if (acumulador && typeof acumulador.definirSeparadorFinal === 'function') {
+                                acumulador.definirSeparadorFinal(incluirSeparadorFinalAcumulador);
+                            }
+                        }
+                        if (typeof cfg.separadorTabelas === 'string') {
+                            separadorTabelas = cfg.separadorTabelas;
+                            if (acumulador && typeof acumulador.definirSeparadorTabela === 'function') {
+                                acumulador.definirSeparadorTabela(separadorTabelas);
+                            }
+                        }
+                    }
+                });
+
+                chrome.storage.onChanged.addListener((changes, area) => {
+                    if (area === 'sync') {
+                        if (changes.modoTurbo) modoExecucao = changes.modoTurbo.newValue;
+                        if (changes.urlsTurbo) listaUrlsPermitidas = changes.urlsTurbo.newValue || [];
+                        if (changes.manterFormatacaoBasica !== undefined) {
+                            manterFormatacaoBasica = Boolean(changes.manterFormatacaoBasica.newValue);
+                        }
+                        if (changes.nivelFiltroFormatacao !== undefined && typeof changes.nivelFiltroFormatacao.newValue === 'string') {
+                            nivelFiltroFormatacao = changes.nivelFiltroFormatacao.newValue;
+                        }
+                        if (changes.modoPlaceholdersMinutasHtml !== undefined && typeof changes.modoPlaceholdersMinutasHtml.newValue === 'string') {
+                            modoPlaceholdersMinutasHtml = changes.modoPlaceholdersMinutasHtml.newValue;
+                            placeholdersMinutasHtmlAtivo = (modoPlaceholdersMinutasHtml !== 'desabilitado');
+                            selecaoEditavelAtiva = (modoPlaceholdersMinutasHtml !== 'desabilitado');
+                        } else if (changes.placeholdersMinutasHtmlAtivo !== undefined) {
+                            placeholdersMinutasHtmlAtivo = (changes.placeholdersMinutasHtmlAtivo.newValue !== false);
+                            selecaoEditavelAtiva = placeholdersMinutasHtmlAtivo;
+                            if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
+                                modoPlaceholdersMinutasHtml = placeholdersMinutasHtmlAtivo ? 'placeholders' : 'desabilitado';
+                            }
+                        } else if (changes.selecaoEditavelAtiva !== undefined) {
+                            selecaoEditavelAtiva = (changes.selecaoEditavelAtiva.newValue !== false);
+                            placeholdersMinutasHtmlAtivo = selecaoEditavelAtiva;
+                            if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
+                                modoPlaceholdersMinutasHtml = selecaoEditavelAtiva ? 'placeholders' : 'desabilitado';
+                            }
+                        }
+                        if (changes.colagemBotaoDireitoAtiva !== undefined) {
+                            colagemBotaoDireitoAtiva = (changes.colagemBotaoDireitoAtiva.newValue !== false);
+                        }
+                        if (changes.capturaBotoesMouse4e5Ativa !== undefined) {
+                            capturaBotoesMouse4e5Ativa = (changes.capturaBotoesMouse4e5Ativa.newValue !== false);
+                        }
+                        if (changes.colarBotaoMeioAtivo !== undefined) {
+                            colarBotaoMeioAtivo = (changes.colarBotaoMeioAtivo.newValue !== false);
+                        }
+                        if (changes.navegacaoTecladoCamposAtiva !== undefined) {
+                            navegacaoTecladoCamposAtiva = (changes.navegacaoTecladoCamposAtiva.newValue !== false);
+                        }
+                        if (changes.validacaoMatematicaAtiva !== undefined) {
+                            validacaoMatematicaAtiva = (changes.validacaoMatematicaAtiva.newValue !== false);
+                        }
+                        if (changes.tempoFlashBorderMs !== undefined) {
+                            const tFlashNovo = Number(changes.tempoFlashBorderMs.newValue);
+                            tempoFlashBorderMs = (Number.isFinite(tFlashNovo) && tFlashNovo >= 0 && tFlashNovo <= 5000) ? tFlashNovo : 500;
+                        } else if (changes.flashBorderAtivo !== undefined) {
+                            tempoFlashBorderMs = changes.flashBorderAtivo.newValue ? 500 : 0;
+                        }
+                        if (changes.corFlashBorder !== undefined && typeof changes.corFlashBorder.newValue === 'string' && /^#[0-9a-fA-F]{6}$/.test(changes.corFlashBorder.newValue.trim())) {
+                            corFlashBorder = changes.corFlashBorder.newValue.trim().toLowerCase();
+                        }
+                        if (changes.modoRetirarSelecao !== undefined) {
+                            modoRetirarSelecao = normalizarModoRetirarSelecao(changes.modoRetirarSelecao.newValue);
+                        }
+                        if (changes.minimoCaracteresInterface !== undefined) {
+                            const minCarNovo = parseInt(changes.minimoCaracteresInterface.newValue, 10);
+                            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(minCarNovo) ? minCarNovo : 5;
+                        }
+                        if (changes.converterCabecalhoPjeAtivo !== undefined) {
+                            converterCabecalhoPjeAtivo = (changes.converterCabecalhoPjeAtivo.newValue !== false);
+                        }
+                        if (changes.atalhoF1GeminiAtivo !== undefined) {
+                            atalhoF1GeminiAtivo = (changes.atalhoF1GeminiAtivo.newValue !== false);
+                        }
+                        if (changes.modoShiftCnj !== undefined && typeof changes.modoShiftCnj.newValue === 'string') {
+                            modoShiftCnj = changes.modoShiftCnj.newValue;
+                        }
+                        if (changes.promptF1Gemini !== undefined && typeof changes.promptF1Gemini.newValue === 'string') {
+                            promptF1Gemini = changes.promptF1Gemini.newValue.trim() || PROMPT_F1_GEMINI_PADRAO;
+                        }
+                        if (changes.tempoExibicaoAlertaMs !== undefined && validador && typeof validador.definirTempoExibicao === 'function') {
+                            validador.definirTempoExibicao(changes.tempoExibicaoAlertaMs.newValue);
+                        }
+                        if (changes.separadorAcumulador !== undefined && acumulador && typeof acumulador.definirSeparador === 'function') {
+                            acumulador.definirSeparador(changes.separadorAcumulador.newValue);
+                        }
+                        if (changes.incluirSeparadorFinalAcumulador !== undefined) {
+                            incluirSeparadorFinalAcumulador = (changes.incluirSeparadorFinalAcumulador.newValue !== false);
+                            if (acumulador && typeof acumulador.definirSeparadorFinal === 'function') {
+                                acumulador.definirSeparadorFinal(incluirSeparadorFinalAcumulador);
+                            }
+                        }
+                        if (changes.separadorTabelas !== undefined && typeof changes.separadorTabelas.newValue === 'string') {
+                            separadorTabelas = changes.separadorTabelas.newValue;
+                            if (acumulador && typeof acumulador.definirSeparadorTabela === 'function') {
+                                acumulador.definirSeparadorTabela(separadorTabelas);
+                            }
+                        }
+                        if (changes.ativoAmpuletas !== undefined) {
+                            ativoAmpuletas = (changes.ativoAmpuletas.newValue !== false);
+                            blindarCSS();
+                        }
+                    }
+                });
+            }
+
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+                chrome.runtime.onMessage.addListener((msg) => {
+                    if (msg && msg.acao === 'executarDeselecaoGeral') {
+                        executarDeselecaoUniversal(true);
+                        return;
+                    }
+                    if (msg && msg.acao === 'atualizarEstadoModulo') {
+                        if (msg.modoTurbo) modoExecucao = msg.modoTurbo;
+                        if (Array.isArray(msg.urlsTurbo)) listaUrlsPermitidas = msg.urlsTurbo;
+                        if (typeof msg.manterFormatacaoBasica === 'boolean') {
+                            manterFormatacaoBasica = msg.manterFormatacaoBasica;
+                        }
+                        if (typeof msg.nivelFiltroFormatacao === 'string') {
+                            nivelFiltroFormatacao = msg.nivelFiltroFormatacao;
+                        }
+                        if (typeof msg.modoPlaceholdersMinutasHtml === 'string') {
+                            modoPlaceholdersMinutasHtml = msg.modoPlaceholdersMinutasHtml;
+                            placeholdersMinutasHtmlAtivo = (modoPlaceholdersMinutasHtml !== 'desabilitado');
+                            selecaoEditavelAtiva = (modoPlaceholdersMinutasHtml !== 'desabilitado');
+                        } else if (typeof msg.placeholdersMinutasHtmlAtivo === 'boolean') {
+                            placeholdersMinutasHtmlAtivo = msg.placeholdersMinutasHtmlAtivo;
+                            selecaoEditavelAtiva = msg.placeholdersMinutasHtmlAtivo;
+                            if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
+                                modoPlaceholdersMinutasHtml = placeholdersMinutasHtmlAtivo ? 'placeholders' : 'desabilitado';
+                            }
+                        } else if (typeof msg.selecaoEditavelAtiva === 'boolean') {
+                            selecaoEditavelAtiva = msg.selecaoEditavelAtiva;
+                            placeholdersMinutasHtmlAtivo = msg.selecaoEditavelAtiva;
+                            if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
+                                modoPlaceholdersMinutasHtml = selecaoEditavelAtiva ? 'placeholders' : 'desabilitado';
+                            }
+                        }
+                        if (typeof msg.colagemBotaoDireitoAtiva === 'boolean') {
+                            colagemBotaoDireitoAtiva = msg.colagemBotaoDireitoAtiva;
+                        }
+                        if (typeof msg.capturaBotoesMouse4e5Ativa === 'boolean') {
+                            capturaBotoesMouse4e5Ativa = msg.capturaBotoesMouse4e5Ativa;
+                        }
+                        if (typeof msg.colarBotaoMeioAtivo === 'boolean') {
+                            colarBotaoMeioAtivo = msg.colarBotaoMeioAtivo;
+                        }
+                        if (typeof msg.navegacaoTecladoCamposAtiva === 'boolean') {
+                            navegacaoTecladoCamposAtiva = msg.navegacaoTecladoCamposAtiva;
+                        }
+                        if (typeof msg.validacaoMatematicaAtiva === 'boolean') {
+                            validacaoMatematicaAtiva = msg.validacaoMatematicaAtiva;
+                        }
+                        if (msg.tempoFlashBorderMs !== undefined) {
+                            const tFlashMsg = Number(msg.tempoFlashBorderMs);
+                            tempoFlashBorderMs = (Number.isFinite(tFlashMsg) && tFlashMsg >= 0 && tFlashMsg <= 5000) ? tFlashMsg : 500;
+                        } else if (typeof msg.flashBorderAtivo === 'boolean') {
+                            tempoFlashBorderMs = msg.flashBorderAtivo ? 500 : 0;
+                        }
+                        if (typeof msg.corFlashBorder === 'string' && /^#[0-9a-fA-F]{6}$/.test(msg.corFlashBorder.trim())) {
+                            corFlashBorder = msg.corFlashBorder.trim().toLowerCase();
+                        }
+                        if (msg.modoRetirarSelecao !== undefined) {
+                            modoRetirarSelecao = normalizarModoRetirarSelecao(msg.modoRetirarSelecao);
+                        }
+                        if (msg.minimoCaracteresInterface !== undefined) {
+                            const minCarMsg = parseInt(msg.minimoCaracteresInterface, 10);
+                            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(minCarMsg) ? minCarMsg : 5;
+                        }
+                        if (typeof msg.converterCabecalhoPjeAtivo === 'boolean') {
+                            converterCabecalhoPjeAtivo = msg.converterCabecalhoPjeAtivo;
+                        }
+                        if (typeof msg.atalhoF1GeminiAtivo === 'boolean') {
+                            atalhoF1GeminiAtivo = msg.atalhoF1GeminiAtivo;
+                        }
+                        if (typeof msg.modoShiftCnj === 'string') {
+                            modoShiftCnj = msg.modoShiftCnj;
+                        }
+                        if (typeof msg.promptF1Gemini === 'string') {
+                            promptF1Gemini = msg.promptF1Gemini.trim() || PROMPT_F1_GEMINI_PADRAO;
+                        }
+                        if (msg.tempoExibicaoAlertaMs !== undefined && validador && typeof validador.definirTempoExibicao === 'function') {
+                            validador.definirTempoExibicao(msg.tempoExibicaoAlertaMs);
+                        }
+                        if (typeof msg.separadorAcumulador === 'string' && acumulador && typeof acumulador.definirSeparador === 'function') {
+                            acumulador.definirSeparador(msg.separadorAcumulador);
+                        }
+                        if (typeof msg.incluirSeparadorFinalAcumulador === 'boolean') {
+                            incluirSeparadorFinalAcumulador = msg.incluirSeparadorFinalAcumulador;
+                            if (acumulador && typeof acumulador.definirSeparadorFinal === 'function') {
+                                acumulador.definirSeparadorFinal(incluirSeparadorFinalAcumulador);
+                            }
+                        }
+                        if (typeof msg.separadorTabelas === 'string') {
+                            separadorTabelas = msg.separadorTabelas;
+                            if (acumulador && typeof acumulador.definirSeparadorTabela === 'function') {
+                                acumulador.definirSeparadorTabela(separadorTabelas);
+                            }
+                        }
+                        if (typeof msg.ativoAmpuletas === 'boolean') {
+                            ativoAmpuletas = msg.ativoAmpuletas;
+                            blindarCSS();
+                        }
+                    }
+                });
+            }
+        } catch (_) { }
+    }
+
+    /* Passo 10.2: Expor interface de homologacao para a bateria automatizada (debug.js) */
+    window.JusGovMotorSelecaoTeste = Object.freeze({
+        aplicarFiltro1DadosLixo,
+        aplicarFiltro3InformacoesELinhas,
+        extrairTextoPuroSanitizado,
+        construirHtmlNivel1Basico,
+        construirHtmlNivel2Intermediario,
+        construirHtmlNivel3Avancado,
+        construirHtmlNivel4Estendido,
+        aplicarFiltroHtmlPorNivel,
+        normalizarNivelFiltro,
+        converterNivelFiltroParaIndice,
+        converterIndiceParaNivelFiltro,
+        construirHtmlFormatacaoBasica,
+        construirHtmlFormatacaoAvancada,
+        construirHtmlSemFiltroWord,
+        definirNivelFiltroFormatacao(nivel) {
+            const norm = normalizarNivelFiltro(nivel);
+            nivelFiltroFormatacao = (norm === 'texto_puro') ? 'basico' : norm;
+        },
+        definirManterFormatacaoBasica(valor) {
+            manterFormatacaoBasica = Boolean(valor);
+        },
+        definirPlaceholdersMinutasHtmlAtivo(valor) {
+            placeholdersMinutasHtmlAtivo = Boolean(valor);
+            selecaoEditavelAtiva = Boolean(valor);
+            modoPlaceholdersMinutasHtml = valor ? 'placeholders' : 'desabilitado';
+        },
+        definirModoPlaceholdersMinutasHtml(valor) {
+            if (valor === 'desabilitado' || valor === 'placeholders' || valor === 'ctrl_avancado' || valor === 'avancado') {
+                modoPlaceholdersMinutasHtml = valor;
+                placeholdersMinutasHtmlAtivo = (valor !== 'desabilitado');
+                selecaoEditavelAtiva = (valor !== 'desabilitado');
+            } else {
+                placeholdersMinutasHtmlAtivo = Boolean(valor);
+                selecaoEditavelAtiva = Boolean(valor);
+                modoPlaceholdersMinutasHtml = valor ? 'placeholders' : 'desabilitado';
+            }
+        },
+        definirColagemBotaoDireitoAtiva(valor) {
+            colagemBotaoDireitoAtiva = Boolean(valor);
+        },
+        definirCapturaBotoesMouse4e5Ativa(valor) {
+            capturaBotoesMouse4e5Ativa = Boolean(valor);
+        },
+        definirColarBotaoMeioAtivo(valor) {
+            colarBotaoMeioAtivo = Boolean(valor);
+        },
+        obterColarBotaoMeioAtivo() {
+            return colarBotaoMeioAtivo;
+        },
+        aoPressionarBotaoMouse,
+        aoSoltarBotaoMouse,
+        aoClicarAuxiliarMouse,
+        aoAbrirMenuContexto,
+        aoClicar,
+        tratarNavegacaoAbasPorBotoesMouse,
+        emularTeclasColar,
+        emularTeclasWinV,
+        definirNavegacaoTecladoCamposAtiva(valor) {
+            navegacaoTecladoCamposAtiva = Boolean(valor);
+        },
+        simularNavegacaoTecladoCampos(inputAtual, direcao) {
+            return navegarEntreCamposEntrada(inputAtual, direcao);
+        },
+        simularColagemBotaoDireito(alvo, modo, textoSimulado) {
+            if (!alvo) return false;
+            const ehHtml = (modo === 'normal' && Boolean(alvo.isContentEditable || (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true')));
+            inserirTextoEmElemento(alvo, textoSimulado || '', ehHtml);
+            return true;
+        },
+        simularNavegacaoBotoesMouse(botao, totalAbas, idxAtual) {
+            if (typeof totalAbas !== 'number' || totalAbas <= 1) return idxAtual;
+            if (botao === 3) {
+                return (idxAtual - 1 + totalAbas) % totalAbas;
+            } else if (botao === 4) {
+                return (idxAtual + 1) % totalAbas;
+            }
+            return idxAtual;
+        },
+        definirSelecaoEditavelAtiva(valor) {
+            selecaoEditavelAtiva = Boolean(valor);
+        },
+        higienizarTextoParaCopia,
+        tentarExpandirPadraoComposto,
+        expandirUnidadeAtomicaEstagio1,
+        expandirFraseAtePontuacaoEstagio3,
+        tentarExpandirDelimitadoresSimetricos,
+        tentarExpandirBlocoMaiusculasComQuebraSuave,
+        tentarExpandirBlocoFormatadoDestaque,
+        delimitarParagrafoLocalizado,
+        resolverSelecaoTriploClique,
+        construirMapaTextoBlocoComJanela,
+        simularCliqueEmTexto(texto, idxZeroBased, numCliques = 1, ehAlt = false) {
+            if (typeof texto !== 'string' || texto.length === 0) return '';
+            if (idxZeroBased < 0 || idxZeroBased >= texto.length) return '';
+
+            const mapaSimulado = {
+                bloco: null,
+                texto,
+                idxCursor: idxZeroBased,
+                deslocamentoJanela: 0,
+                segmentos: [],
+                tamanhoTotalBloco: texto.length
+            };
+
+            if (numCliques >= 3) {
+                const res3 = resolverSelecaoTriploClique(mapaSimulado, idxZeroBased);
+                return res3 ? higienizarTextoParaCopia(texto.substring(res3.inicio, res3.fim)) : '';
+            }
+
+            const charNoCursor = texto[idxZeroBased] || '';
+            const charAnterior = idxZeroBased > 0 ? texto[idxZeroBased - 1] : '';
+            const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+                (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+            const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
+                eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
+
+            let res = null;
+            if (numCliques === 2 || (ehAlt && numCliques === 1 && (clicouEmEspaco || clicouEmDelimitadorOuAspas))) {
+                if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
+                    res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
+                }
+                if (!res) res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, true);
+                if (!res) res = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
+                if (!res) res = tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
+                if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
+                if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
+            } else if (clicouEmDelimitadorOuAspas) {
+                res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
+            } else if (clicouEmEspaco) {
+                res = tentarExpandirSentencaPorDoisPontos(texto, idxZeroBased);
+                if (!res) res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, false);
+                if (!res) res = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
+                if (!res) res = tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
+                if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
+                if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
+                if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
+            } else {
+                res = tentarExpandirPadraoComposto(texto, idxZeroBased, false, false);
+                if (!res) res = expandirUnidadeAtomicaEstagio1(texto, idxZeroBased);
+            }
+
+            return res ? higienizarTextoParaCopia(texto.substring(res.inicio, res.fim)) : '';
+        },
+        simularAlternanciaCliqueInput(inputElem, posCliqueDesejada = null, numCliques = 1) {
+            if (!inputElem || typeof inputElem.select !== 'function') return '';
+            if (numCliques === 2) {
+                inputElem.select();
+                return 'SELECIONADO';
+            }
+            const temAlfanumerico = /[\p{L}\p{N}]/u.test(inputElem.value || '');
+            if (!inputElem.dataset.autoselected || !temAlfanumerico) {
+                inputElem.dataset.autoselected = 'true';
+                if (!inputElem.__jusgovBlurLigado) {
+                    inputElem.__jusgovBlurLigado = true;
+                    inputElem.addEventListener('blur', () => {
+                        delete inputElem.dataset.autoselected;
+                        inputElem.__jusgovBlurLigado = false;
+                    }, { once: true });
+                }
+                if (typeof inputElem.focus === 'function') inputElem.focus();
+                inputElem.select();
+                return 'SELECIONADO';
+            } else {
+                const pos = (typeof posCliqueDesejada === 'number' && posCliqueDesejada >= 0)
+                    ? posCliqueDesejada
+                    : (typeof inputElem.selectionStart === 'number' ? inputElem.selectionStart : 0);
+                inputElem.setSelectionRange(pos, pos);
+                return 'DESSELECIONADO';
+            }
+        },
+        simularEscInput(inputElem) {
+            if (!inputElem) return;
+            delete inputElem.dataset.autoselected;
+            if (typeof inputElem.blur === 'function') {
+                inputElem.blur();
+            }
+        },
+        deselecionarTudo() {
+            executarDeselecaoUniversal(false);
+        },
+        verificarSeTextoEhBlocoOuPalavraUnica(texto) {
+            return verificarSeTextoEhBlocoOuPalavraUnica(texto);
+        },
+        classificarContextoElementoAlvo,
+        isCampoDeTextoValido,
+        isEditorMultilinhaValido,
+        isElementoOuAncestralContentEditable,
+        isElementoInterfaceDeEditorRico,
+        isElementoInterativoOuUi,
+        isElementoInterativoClicavelDireto,
+        isComponenteBotaoOuFormularioEstrito,
+        localizarBlocoForenseAutoSelecionavelEmInterface,
+        isContextoDeSistemaOuUi,
+        isElementoControlePdf,
+        isAreaLeituraOuPdfConteudo,
+        isCelulaTabelaDadosLeitura,
+        isTelaSistemaEstritaParaDesselecao,
+        deveManterSelecaoAtivaNoDom,
+        aplicarSelecaoDOM,
+        executarCopiaDeSelecao,
+        aplicarSelecaoECopiar,
+        salvarClipboardInternoComBackup,
+        executarColagemBotaoDireito,
+        extrairTextoVisivelLimpoDeElemento,
+        extrairTextoLinkUmaLinha,
+        obterObjetoInterativoParaSelecaoCompleta,
+        dispararFlashBorderVisual,
+        limparFlashBorderImediatamente,
+        limparAvisosAuditoriaEWikiImediatamente,
+        obterValidador() {
+            return validador;
+        },
+        projetarMiniTipGlobalNoTop(mensagem, corBorda) {
+            if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                validador.projetarMiniTipGlobal(mensagem, corBorda);
+            }
+        },
+        localizarCampoSimbolosSobCursor,
+        definirMinimoCaracteresInterface(valor) {
+            const v = Number(valor);
+            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(v) ? v : 5;
+        },
+        obterMinimoCaracteresInterface() {
+            return minimoCaracteresInterface;
+        },
+        obterModoRetirarSelecao() {
+            return modoRetirarSelecao;
+        },
+        definirModoRetirarSelecao(valor) {
+            modoRetirarSelecao = normalizarModoRetirarSelecao(valor);
+        },
+        isTextoCampoEstruturadoForense,
+        verificarProtecaoTamanhoMinimoInterface,
+        obterEstadoAtual() {
+            return {
+                modoExecucao,
+                manterFormatacaoBasica,
+                nivelFiltroFormatacao,
+                selecaoEditavelAtiva,
+                placeholdersMinutasHtmlAtivo,
+                modoPlaceholdersMinutasHtml,
+                colagemBotaoDireitoAtiva,
+                capturaBotoesMouse4e5Ativa,
+                colarBotaoMeioAtivo,
+                navegacaoTecladoCamposAtiva,
+                validacaoMatematicaAtiva,
+                flashBorderAtivo: tempoFlashBorderMs > 0,
+                tempoFlashBorderMs,
+                corFlashBorder,
+                modoRetirarSelecao,
+                minimoCaracteresInterface,
+                converterCabecalhoPjeAtivo,
+                atalhoF1GeminiAtivo,
+                ativoAmpuletas
+            };
+        },
+        blindarCSS,
+        definirAtivoAmpuletas(valor) {
+            ativoAmpuletas = Boolean(valor);
+            blindarCSS();
+        },
+        isPaginaModificada() {
+            return paginaModificadaDetectada;
+        },
+        notificarModificacaoPagina(motivo, urlRef) {
+            notificarModificacaoPagina(motivo, urlRef);
+        }
+    });
+
+    inicializarModulo();
+})();

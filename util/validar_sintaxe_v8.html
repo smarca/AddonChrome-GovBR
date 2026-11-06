@@ -1,0 +1,93 @@
+<!--
+ ==============================================================================
+ ARQUIVO: util/validar_sintaxe_v8.html
+ PROJETO: JusGovBR — Seleção & Cópia Inteligente + PJe Turbo
+ AUTOR/CONTATO: smarca@gmail.com
+ 
+ ESPECIFICAÇÃO DE ENGENHARIA E DIRETRIZES DE USO (BLUEPRINT):
+ 1) FINALIDADE PRIMÁRIA:
+    Runner de compilação e validação estrita de sintaxe JavaScript no motor V8 nativo
+    do Google Chrome em modo Headless ('util/executar_auditoria.ps1' - Etapa 1).
+ 2) ESCOPO OPERACIONAL:
+    Audita dinamicamente todos os 32 arquivos JavaScript do projeto, validando sua
+    compilação sintática em tempo real. Se qualquer arquivo contiver erro de parsing,
+    gera diagnóstico imediato no elemento #resultado e aborta o pipeline de auditoria.
+ ==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Validador Universal Sincrono de Sintaxe V8</title>
+</head>
+<body>
+    <pre id="resultado">Carregando...</pre>
+    <script>
+        const arquivos = [
+            '../src/cfg/background.js',
+            '../src/cfg/debug.js',
+            '../src/cfg/editor_demo.js',
+            '../src/cfg/exemplos.js',
+            '../src/cfg/options.js',
+            '../src/cfg/popup.js',
+            '../src/mod-copia/AcumuladorCopia.js',
+            '../src/mod-copia/AvisoFlutuante.js',
+            '../src/mod-copia/ConstantesPadroes.js',
+            '../src/mod-copia/copia-geometria.js',
+            '../src/mod-copia/copia-filtros.js',
+            '../src/mod-copia/copia-validadores.js',
+            '../src/mod-copia/copia-minutas.js',
+            '../src/mod-copia/copia-visual.js',
+            '../src/mod-copia/copia-estagio1.js',
+            '../src/mod-copia/copia-estagio2.js',
+            '../src/mod-copia/copia-estagio3.js',
+            '../src/mod-copia/copia-estagio4.js',
+            '../src/mod-copia/copia-estagio5.js',
+            '../src/mod-copia/copia-estagio6.js',
+            '../src/mod-copia/mod-copia.js',
+            '../src/mod-copia/SelecionarCopiar.js',
+            '../src/mod-input/input-botoes-laterais.js',
+            '../src/mod-input/input-botao-meio.js',
+            '../src/mod-input/input-teclado-campos.js',
+            '../src/mod-input/input-atalho-f1.js',
+            '../src/mod-input/mod-input.js',
+            '../src/mod-navegador/navegador-janela-unica.js',
+            '../src/mod-navegador/navegador-anti-duplicacao.js',
+            '../src/mod-navegador/navegador-ordenacao.js',
+            '../src/mod-navegador/navegador-descarte.js',
+            '../src/mod-navegador/mod-navegador.js'
+        ];
+
+        const relatorio = [];
+        let erros = 0;
+
+        for (const arq of arquivos) {
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', arq, false); // Sincrono
+                xhr.send();
+                if (xhr.status !== 200 && xhr.status !== 0) {
+                    relatorio.push(`[ERRO_LEITURA] ${arq}: Status HTTP ${xhr.status}`);
+                    erros++;
+                    continue;
+                }
+                const codigo = xhr.responseText;
+                // new Function analisa a sintaxe completa pelo V8 sem executar o corpo
+                new Function(codigo);
+                relatorio.push(`[OK_SINTAXE] ${arq}`);
+            } catch (e) {
+                relatorio.push(`[FALHA_SINTAXE] ${arq}: ${e.name} - ${e.message}`);
+                erros++;
+            }
+        }
+
+        if (erros === 0) {
+            relatorio.push(`\nRESULTADO_FINAL: SUCESSO_TOTAL_TODOS_${arquivos.length}_ARQUIVOS_JS_SINTAXE_VALIDA`);
+        } else {
+            relatorio.push(`\nRESULTADO_FINAL: FALHA_${erros}_ARQUIVOS_COM_ERRO_DE_SINTAXE`);
+        }
+
+        document.getElementById('resultado').innerText = relatorio.join('\n');
+    </script>
+</body>
+</html>

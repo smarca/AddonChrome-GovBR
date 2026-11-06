@@ -1,0 +1,155 @@
+/* ==========================================================================
+ * Nome do arquivo: input-botoes-laterais.js
+ * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+ * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Botões Laterais
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * ESPECIFICAÇÃO DE ENGENHARIA E DIRETRIZES DE MANUTENÇÃO (BLUEPRINT):
+ * 1) FINALIDADE:
+ *    Captura e tratamento exclusivo dos botões físicos laterais do mouse (Botão 4: Voltar;
+ *    Botão 5: Avançar) para permitir a alternância e navegação circular contínua entre as
+ *    guias abertas na janela ativa do navegador, simulando os atalhos Ctrl+Shift+Tab e Ctrl+Tab.
+ * 2) CONTRATO POO E ENCAPSULAMENTO:
+ *    Instancia a classe BotoesLateraisMouse com campos privados (#) e método público
+ *    processarEventoMouse(evento). Blindagem contra exceções de DOM e desacoplamento via IPC.
+ * 3) PASSOS DE RECONSTRUÇÃO DO ZERO (PSEUDOCÓDIGO INTERCALADO):
+ *    Passo 1.1: Identificação rápida do botão através de event.button (3 para botão 4; 4 para botão 5)
+ *               e máscara de bits event.buttons (8 para botão 4; 16 para botão 5).
+ *    Passo 1.2: Neutralização imediata da propagação (stopPropagation e stopImmediatePropagation)
+ *               para impedir que o navegador execute a ação nativa de histórico voltar/avançar página.
+ *    Passo 1.3: Envio de mensagem assíncrona ao Service Worker (background.js) com as ações
+ *               'TROCAR_GUIA_ANTERIOR' ou 'TROCAR_GUIA_PROXIMA'.
+ *    Passo 1.4: Tratamento de tolerância a falhas caso o runtime do Chrome esteja indisponível.
+ *
+ * DOCUMENTAÇÃO COMPLEMENTAR:
+ * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Diretrizes 11, 14 e 16)
+ * - docs/02_ARQUITETURA_E_AS_BUILT.md (Módulo mod-input)
+ * - docs/03_BACKLOG_TAREFAS_E_FEATURES.md (Seção 6.46 e 6.53)
+ * ========================================================================== */
+
+(function (raiz, fabrica) {
+    if (typeof define === 'function' && define.amd) {
+        define([], fabrica);
+    } else if (typeof module === 'object' && module.exports) {
+        module.exports = fabrica();
+    } else {
+        raiz.JusGovBotoesLateraisMouse = fabrica();
+    }
+}(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
+
+    class BotoesLateraisMouse {
+        #ativo = true;
+        #ultimoDisparoTimestamp = 0;
+        #intervaloMinimoDisparoMs = 80;
+
+        /**
+         * @param {Object} [opcoes={}]
+         * @param {boolean} [opcoes.ativo=true] - Estado inicial de ativação do recurso
+         * @param {number} [opcoes.intervaloMinimoDisparoMs=80] - Debounce mínimo entre cliques rápidos
+         */
+        constructor(opcoes = {}) {
+            /* Passo 1.1: Inicialização defensiva de parâmetros */
+            if (typeof opcoes.ativo === 'boolean') {
+                this.#ativo = opcoes.ativo;
+            }
+            if (typeof opcoes.intervaloMinimoDisparoMs === 'number' && opcoes.intervaloMinimoDisparoMs >= 0) {
+                this.#intervaloMinimoDisparoMs = opcoes.intervaloMinimoDisparoMs;
+            }
+        }
+
+        /**
+         * @returns {boolean} Se o monitoramento está ativado
+         */
+        get ativo() {
+            return this.#ativo;
+        }
+
+        /**
+         * @param {boolean} valor
+         */
+        set ativo(valor) {
+            this.#ativo = Boolean(valor);
+        }
+
+        /**
+         * Determina se o evento do mouse corresponde ao Botão Lateral 4 (Voltar / Aba Anterior)
+         * @param {MouseEvent} e
+         * @returns {boolean}
+         */
+        #ehBotao4Voltar(e) {
+            /* Passo 1.2: Checagem por button padronizado (3), which (4) ou bitmask (8) */
+            if (!e) return false;
+            return e.button === 3 || e.which === 4 || (typeof e.buttons === 'number' && (e.buttons & 8) === 8);
+        }
+
+        /**
+         * Determina se o evento do mouse corresponde ao Botão Lateral 5 (Avançar / Próxima Aba)
+         * @param {MouseEvent} e
+         * @returns {boolean}
+         */
+        #ehBotao5Avancar(e) {
+            /* Passo 1.3: Checagem por button padronizado (4), which (5) ou bitmask (16) */
+            if (!e) return false;
+            return e.button === 4 || e.which === 5 || (typeof e.buttons === 'number' && (e.buttons & 16) === 16);
+        }
+
+        /**
+         * Processa o evento de mouse e despacha a troca de guias caso corresponda aos botões laterais
+         * @param {MouseEvent} e
+         * @returns {boolean} True se o evento foi interceptado e tratado; False caso contrário
+         */
+        processarEventoMouse(e) {
+            /* Passo 2.1: Guarda de ativação e integridade do evento */
+            if (!this.#ativo || !e || typeof e.button !== 'number') {
+                return false;
+            }
+
+            const ehVoltar = this.#ehBotao4Voltar(e);
+            const ehAvancar = this.#ehBotao5Avancar(e);
+
+            if (!ehVoltar && !ehAvancar) {
+                return false;
+            }
+
+            /* Passo 2.2: Cancelamento de propagação imediata e ação nativa do navegador */
+            try {
+                if (typeof e.preventDefault === 'function') e.preventDefault();
+                if (typeof e.stopPropagation === 'function') e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+            } catch (_) { }
+
+            /* Passo 2.3: Debounce de proteção contra múltiplos disparos mecânicos de hardware */
+            const agora = Date.now();
+            if (agora - this.#ultimoDisparoTimestamp < this.#intervaloMinimoDisparoMs) {
+                return true;
+            }
+            this.#ultimoDisparoTimestamp = agora;
+
+            /* Passo 2.4: Despacho de mensagem segura para o Service Worker do Chrome */
+            const acaoAlvo = ehVoltar ? 'TROCAR_GUIA_ANTERIOR' : 'TROCAR_GUIA_PROXIMA';
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({ acao: acaoAlvo }).catch(() => { });
+                }
+            } catch (_) { }
+
+            return true;
+        }
+
+        /**
+         * Executa o teste de diagnóstico simulando os botões laterais
+         * @param {number} numeroBotao - 4 para voltar, 5 para avançar
+         * @returns {{ ok: boolean, acao: string }}
+         */
+        simularDisparo(numeroBotao) {
+            if (!this.#ativo) {
+                return { ok: false, acao: 'INATIVO' };
+            }
+            const acao = numeroBotao === 4 ? 'TROCAR_GUIA_ANTERIOR' : 'TROCAR_GUIA_PROXIMA';
+            return { ok: true, acao };
+        }
+    }
+
+    return Object.freeze(BotoesLateraisMouse);
+}));

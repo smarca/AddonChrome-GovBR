@@ -1,0 +1,76 @@
+<!--
+ ==============================================================================
+ ARQUIVO: util/executar_testes.html
+ PROJETO: JusGovBR — Seleção & Cópia Inteligente + PJe Turbo
+ AUTOR/CONTATO: smarca@gmail.com
+ 
+ ESPECIFICAÇÃO DE ENGENHARIA E DIRETRIZES DE USO (BLUEPRINT):
+ 1) FINALIDADE PRIMÁRIA:
+    Runner de execução da suíte de 300 testes determinísticos e regras de negócio forenses
+    no Chromium Headless ('util/executar_auditoria.ps1' - Etapa 2).
+ 2) ESCOPO OPERACIONAL:
+    Carrega em ordem estrita de dependências os scripts dos 4 módulos de produção,
+    dispara 'JusGovExecutarAuditoria()' em 'src/cfg/debug.js' e renderiza o relatório
+    completo no elemento #resultado para extração via '--dump-dom'.
+ ==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Runner Headless de Testes - JusGovBR</title>
+</head>
+<body>
+    <pre id="resultado">Carregando...</pre>
+    <script>
+        window.__TESTE_HEADLESS__ = true;
+        window.__ERRO_GLOBAL__ = '';
+        window.addEventListener('error', (e) => {
+            window.__ERRO_GLOBAL__ += '\n[GLOBAL_ERROR] ' + (e.message || e.error);
+        });
+    </script>
+    <script src="../src/mod-copia/ConstantesPadroes.js"></script>
+    <script src="../src/mod-copia/AvisoFlutuante.js"></script>
+    <script src="../src/mod-copia/AcumuladorCopia.js"></script>
+    <script src="../src/mod-copia/copia-geometria.js"></script>
+    <script src="../src/mod-copia/copia-filtros.js"></script>
+    <script src="../src/mod-copia/copia-validadores.js"></script>
+    <script src="../src/mod-copia/copia-minutas.js"></script>
+    <script src="../src/mod-copia/copia-visual.js"></script>
+    <script src="../src/mod-copia/copia-estagio1.js"></script>
+    <script src="../src/mod-copia/copia-estagio2.js"></script>
+    <script src="../src/mod-copia/copia-estagio3.js"></script>
+    <script src="../src/mod-copia/copia-estagio4.js"></script>
+    <script src="../src/mod-copia/copia-estagio5.js"></script>
+    <script src="../src/mod-copia/copia-estagio6.js"></script>
+    <script src="../src/mod-copia/mod-copia.js"></script>
+    <script src="../src/mod-input/input-botoes-laterais.js"></script>
+    <script src="../src/mod-input/input-botao-meio.js"></script>
+    <script src="../src/mod-input/input-teclado-campos.js"></script>
+    <script src="../src/mod-input/input-atalho-f1.js"></script>
+    <script src="../src/mod-input/mod-input.js"></script>
+    <script src="../src/mod-navegador/navegador-janela-unica.js"></script>
+    <script src="../src/mod-navegador/navegador-anti-duplicacao.js"></script>
+    <script src="../src/mod-navegador/navegador-ordenacao.js"></script>
+    <script src="../src/mod-navegador/navegador-descarte.js"></script>
+    <script src="../src/mod-navegador/mod-navegador.js"></script>
+    <script src="../src/mod-copia/SelecionarCopiar.js"></script>
+    <script src="../src/cfg/exemplos.js"></script>
+    <script src="../src/cfg/debug.js"></script>
+    <script src="../src/cfg/editor_demo.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                if (typeof window.JusGovExecutarAuditoria === 'function') {
+                    const res = window.JusGovExecutarAuditoria();
+                    document.getElementById('resultado').innerText = res.logTexto;
+                } else {
+                    document.getElementById('resultado').innerText = '[ERRO] JusGovExecutarAuditoria nao encontrado.' + window.__ERRO_GLOBAL__;
+                }
+            } catch (err) {
+                document.getElementById('resultado').innerText = '[ERRO] ' + err.stack + window.__ERRO_GLOBAL__;
+            }
+        });
+    </script>
+</body>
+</html>
