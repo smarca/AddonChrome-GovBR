@@ -47,7 +47,8 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
   * Permitir que um clique simples (1 clique) sobre esses blocos de metadados/dados estruturados na interface consiga isolar e selecionar o dado/máscara útil correspondente (`30/10/2026`, `30/10/2026 00:35:21`, etc.) de forma inteligente e pontual.
   * Diferenciar claramente esses contêineres estáticos de texto/metadados da interface (mesmo que tenham classes de sistema ou filhos decorativos) de botões de ação e links clicáveis de navegação direta, garantindo que o 1 clique nesses dados copie/selecione a informação sem interferir nos controles interativos reais.
 
-### 6.2 Auto Seleção Inteligente de Texto em Visualizadores de Documentos PDF Nativos / Incorporados (Ex.: PJe download.seam)
+### 6.2 Auto Seleção Inteligente de Texto em Visualizadores de Documentos PDF Nativos / Incorporados (Ex.: PJe download.seam) [DESCARTADO PELO USUÁRIO]
+- **Status:** **DESCARTADO** (Descartado por decisão expressa do usuário em 06/11/2026).
 - **Contexto Operacional:** Em visualizadores de documentos PDF abertos diretamente pelo navegador ou incorporados no tribunal (ex.: `pje1g.trf1.jus.br/pje/download.seam?cid=...` exibindo certidões de juntada com `"O documento a seguir foi juntado aos autos do processo de nmero 1015306-38.2026.4.01.4002 em 19/10/2026 11:13:55..."` ou petições iniciais), os textos residem no visualizador interno de PDF do Chromium / PDF.js.
 - **Comportamento Previsto para Futura Implementação:**
   * **Habilitar Seleção Completa de Textos em PDF:** Permitir a seleção e cópia de qualquer texto em documentos PDF (seja com 1 clique para palavras/números de processo/datas ou arrasto manual contínuo), garantindo que a suíte capture os eventos dentro do visualizador (`embed`, `object`, `#viewer`, `.textLayer` ou documento PDF direto).
@@ -437,7 +438,8 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
      * Dentro do `#document` do embed há `<div id="sizer">` e outro `<embed type="application/x-google-chrome-pdf">`.
      * **Comportamento exigido no PDF:** Sendo um documento de leitura estritamente não editável, o clique simples sobre qualquer dado ou palavra deve executar o fluxo completo de cópia com sinalização do Flash Verde e retirada da seleção visual do sistema conforme a opção selecionada (`interface` ou `total`).
 
-### 6.36 Migração de `exemplos.txt` para `exemplos.json` Integrado a `ConstantesPadroes.js` e `debug.js` [ANOTADO — PENDENTE DE IMPLEMENTAÇÃO]
+### 6.36 Migração de `exemplos.txt` para `exemplos.json` Integrado a `ConstantesPadroes.js` e `debug.js` [IMPLEMENTADO]
+- **Status:** **IMPLEMENTADO** (Migração concluída com sucesso: `exemplos.json` integrado em tempo de execução via fetch em `debug.js` e espelhado síncrono em `exemplos.js` sob a política Append-Only, com 450/450 testes aprovados).
 - **Objetivo da Migração:**
   * Transformar o catálogo de exemplos atualmente em formato texto (`src/cfg/exemplos.txt`) em um arquivo JSON estruturado, tipado e hierárquico (`src/cfg/exemplos.json`).
   * Em vez de utilizar identificadores e códigos artificiais de máscara (como `01.05_BENEFICIO_PREVIDENCIARIO_INSS_NB`), correlacionar diretamente as chaves, nomes e regex com as constantes já definidas em `ConstantesPadroes.js` e com as opções de `options.html`.
@@ -460,7 +462,8 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
      * Esta regra possui caráter **root e universal**, aplicando-se a links, botões, etiquetas de interface e parágrafos de texto comum.
      * Preservação da lógica contínua de expansão sem quebras artificiais de contexto.
 
-### 6.38 Proteção de Tamanho Mínimo em Texto de Leitura e Unificação de Desinências Isoladas entre Parênteses `(A)` [ANOTADO — PENDENTE DE IMPLEMENTAÇÃO]
+### 6.38 Proteção de Tamanho Mínimo em Texto de Leitura e Unificação de Desinências Isoladas entre Parênteses `(A)` [DESCARTADO PELO USUÁRIO]
+- **Status:** **DESCARTADO** (Descartado por decisão expressa do usuário em 06/11/2026).
 - **Problema Relatado com Evidência Visual (`media_1793860297200_8eaaa2bb.png`):**
   * Na imagem anexada de cabeçalho de petição judicial (`"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) FEDERAL..."`), ao clicar na desinência `(A)` de `"SENHOR(A)"`, o sistema selecionou e copiou exclusivamente a letra `"A"`.
   * **Inconformidades diagnosticadas:**
@@ -831,8 +834,9 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 
 ---
 
-### 6.63 Controle Interno do Histórico de Clipboard (Penúltimo Buffer via Ctrl + Clique e Substituição do Win+V) [PENDENTE]
+### 6.63 Controle Interno do Histórico de Clipboard (Penúltimo Buffer via Ctrl + Clique e Substituição do Win+V) [PENDENTE — MARCADO PARA IMPLEMENTAR ASSIM QUE POSSÍVEL (!)]
 - **Origem da Demanda:** Usuário em 06/11/2026: *"anotar: 'Com Ctrl + botão do meio, envia ao sistema as teclas Win+V para abrir o histórico da área de transferência do Windows (se habilitado no sistema).' não está funcinando, então preciso que controle 'por dentro' o clipboard. Assim como botão direito cola o clipboard interno, control+botão direito colaria o penultimo clipboard interno (mantendo o ultimo caso fosse clicado com o botão do meio novamente)."*
+- **Priorização de Execução:** Marcado pelo usuário com o modificador de urgência `!` ("Marcar para implementar assim que possível, nesta ordem: Seção 6.63").
 - **Diagnóstico Técnico:**
   1. *Limitação do Sandbox do Navegador:* As extensões Chrome/Chromium não possuem permissão de hardware/SO para sintetizar atalhos de teclado globais de sistema operacional (como a tecla `Windows` / `Meta` combinada com `V`). A tentativa legada de envio de mensagem de background para disparar `Win+V` é ineficaz na sandbox.
   2. *Texto de Ajuda / UI Obsoleto:* Em `src/cfg/options.html`, a descrição do botão do meio ainda promete a abertura do histórico nativo `Win+V`, o que gera expectativa inverídica de comportamento do SO.
@@ -848,7 +852,7 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
      * *Regra de Preservação Imutável:* Ao colar o penúltimo conteúdo com `Ctrl + Clique`, o buffer do último conteúdo **NÃO** deve ser alterado nem rotacionado. Se o usuário clicar em seguida apenas com o botão simples (meio ou direito), o último conteúdo continua intacto e pronto para colagem sucessiva.
   3. *Atualização de UI e Textos:*
      * Atualizar a descrição em `src/cfg/options.html` (e tooltips associadas), substituindo a promessa de envio de `Win+V` pela explicação fidedigna: *"Clique do meio cola a última seleção copiada; Ctrl + clique do meio cola a penúltima seleção copiada, mantendo a última preservada na memória."*
-- **Status:** **PENDENTE (Salvo silenciosamente na fila de pendências)**.
+- **Status:** **PENDENTE — MARCADO PARA IMPLEMENTAR ASSIM QUE POSSÍVEL (!)** (Posicionado no topo da fila prioritária).
 
 ---
 

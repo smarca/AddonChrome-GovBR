@@ -23,18 +23,20 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 > Quando o usuário solicitar um levantamento de pendências de mudanças, correções/bugs ou previsibilidade de novas funcionalidades, esta seção somada à Seção 6 fornecerá a resposta estruturada completa e exaustiva.
 
 ### 7.1 Bugs e Falhas Potenciais Identificados pela Análise de Engenharia
-- **BUG-01: Vazamento de Handlers Globais em Subframes Descarregados [PENDENTE]:**
+- **BUG-01: Vazamento de Handlers Globais em Subframes Descarregados [MARCADO PARA REVISÃO (?)]:**
+  * *Status:* Marcado com modificador `?` para reavaliar e reverificar a necessidade técnica de implementação.
   * *Descrição:* Ao navegar ou substituir dinamicamente páginas em iframes sem reload completo da janela-mãe, listeners atachados diretamente em `window` ou `document` do subframe podem permanecer referenciados em memória antes do garbage collector atuar.
   * *Ação Preventiva:* Adicionar rotina de teardown explícito em `beforeunload` ou via `AbortController` com `signal` compartilhado por ciclo de vida do frame.
 - **BUG-02: Sobrescrita de `z-index` de Overlays do PJe e PDPJ [IMPLEMENTADO]:**
   * *Descrição:* O contorno do Flash Verde possui `z-index: 2147483647`. Caso surja um diálogo nativo de confirmação ou modal crítico do tribunal que necessite de foco modal estrito, o contorno poderia sobrepor botões desse modal antes de seu timeout expirar.
   * *Solução Implementada:* Garantido `pointer-events: none !important;` e destruição atômica imediata ao detectar `keydown` (`Escape`/`Enter`), clique em modal ou surgimento de modal crítico no DOM.
-- **BUG-03: Sincronização Duplicada de `turboCSS` vs `PJE-anti_ampuletas.css` [IDENTIFICADO NA ANÁLISE DE CÓDIGO]:**
+- **BUG-03: Sincronização Duplicada de `turboCSS` vs `PJE-anti_ampuletas.css` [DESCARTADO PELO USUÁRIO]:**
+  * *Status:* Descartado da fila de implementação por decisão do usuário em 06/11/2026.
   * *Descrição:* As regras CSS de desbloqueio do PJe existem tanto em `src/mod-pje/PJE-anti_ampuletas.css` quanto na string `turboCSS` em `src/mod-copia/SelecionarCopiar.js`.
-  * *Ação Futura:* Unificar sob o módulo `mod-pje` durante o Desacoplamento Físico em Módulos (Seção 6.13).
-- **BUG-04: Concentração Monolítica em `SelecionarCopiar.js` (~7.900 linhas) [IDENTIFICADO NA ANÁLISE DE CÓDIGO]:**
-  * *Descrição:* `SelecionarCopiar.js` concentra atualmente motor geométrico de seleção, filtros HTML em 5 níveis, conversão de cabeçalhos PJe, gestos de mouse (botões 4/5 e botão do meio), navegação por teclado entre campos e injeção de CSS.
-  * *Ação Futura:* Fatiar em submódulos independentes (`FiltroFormatacaoHtml.js`, `InteracaoMouseTecladoUI.js`, `MotorGeometriaFlash.js`) na refatoração de Desacoplamento Físico e POO Blindada.
+  * *Ação Futura:* Dispensada pelo usuário.
+- **BUG-04: Concentração Monolítica em `SelecionarCopiar.js` [IMPLEMENTADO EM 6.49]:**
+  * *Status:* Resolvido pela arquitetura especializada em classes POO em diretório plano único (`src/mod-copia/`) implementada na Seção 6.49.
+  * *Descrição:* `SelecionarCopiar.js` concentra atualmente motor geométrico de seleção, filtros HTML em 5 níveis, conversão de cabeçalhos PJe, gestos de mouse (botões 4/5 e botão do meio), navegação por teclado entre campos e injeção de CSS. Fatiamento em submódulos concluído na Seção 6.49.
 - **BUG-05: Falso Positivo em `validarNumeroGenericoFallback` Disparando Mod10 em Textos Alfanuméricos e Sequências Numéricas Curtas [CORRIGIDO]:**
   * *Descrição:* O método `validarNumeroGenericoFallback` extraía apenas dígitos (`replace(/\D/g, '')`) e avaliava o algoritmo de Luhn (Mod10) em qualquer sequência com `n >= 4`. Isso causava disparos indevidos de `[Mod10]: <texto> ✓` em palavras alfanuméricas comuns (como modelos de hardware `RTL2832U`, `GTX1080`) e em números curtos casuais (anos, ramais, portas), onde 10% dos números de 4 dígitos satisfazem aleatoriamente a congruência de Luhn (`soma % 10 === 0`).
   * *Solução Implementada:*
