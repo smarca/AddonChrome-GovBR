@@ -87,7 +87,12 @@
 // =====================================================================
 /* Passo 1.1: Congelar listas padrao de Match Patterns e a cadeia de arquivos JS
  * para permitir otimizacao de constantes no compilador JIT TurboFan do V8. */
-/* Passo 0.1: Importacao segura dos submódulos do Grupo 4 (NAVEGADOR: Gerenciamento de Guias e Janelas) */
+/* Passo 0.1: Importacao segura dos submódulos do Grupo 4 (NAVEGADOR: Gerenciamento de Guias e Janelas)
+ * e instanciação da Fachada POO (ModuloNavegador) com tolerância total a falhas (Null Object Pattern).
+ * O porquê (Seção 6.47): Estabelece separação física e lógica estrita entre o domínio de orquestração
+ * privilegiada do navegador (abas, janelas, anti-duplicação, Tab Groups e Tab Discarding no Service Worker)
+ * e os domínios de Content Script (Grupo 2: Cópia Inteligente e Grupo 3: Periféricos Mouse/Teclado),
+ * comunicando-se exclusivamente por barramento IPC assíncrono (chrome.runtime.onMessage / tabs.sendMessage). */
 try {
     if (typeof importScripts === 'function') {
         importScripts(
@@ -99,6 +104,17 @@ try {
         );
     }
 } catch (_) { }
+
+const instanciaModuloNavegador = (() => {
+    try {
+        if (typeof self !== 'undefined' && typeof self.JusGovModuloNavegador === 'function') {
+            const inst = new self.JusGovModuloNavegador();
+            self.JusGovInstanciaNavegador = inst;
+            return inst;
+        }
+    } catch (_) { }
+    return null;
+})();
 
 const PADROES_DEFAULT_TURBO = Object.freeze([
     '*://*.jus.br/*',
@@ -117,7 +133,8 @@ const PADROES_DEFAULT_AMPULETAS = Object.freeze([
     '*://*pje*.*.jus.br/*'
 ]);
 
-const ARQUIVOS_MODULO_COPIA = Object.freeze([
+/* Grupo 2: CÓPIA INTELIGENTE — Núcleo desacoplado de constantes, auditoria, acumulador e estágios POO */
+const ARQUIVOS_NUCLEO_MODULO_COPIA = Object.freeze([
     'src/mod-copia/ConstantesPadroes.js',
     'src/mod-copia/AvisoFlutuante.js',
     'src/mod-copia/AcumuladorCopia.js',
@@ -132,11 +149,10 @@ const ARQUIVOS_MODULO_COPIA = Object.freeze([
     'src/mod-copia/copia-estagio4.js',
     'src/mod-copia/copia-estagio5.js',
     'src/mod-copia/copia-estagio6.js',
-    'src/mod-copia/mod-copia.js',
-    'src/mod-copia/SelecionarCopiar.js'
+    'src/mod-copia/mod-copia.js'
 ]);
 
-/* Grupo 3: TECLADO/MOUSE: Navegação por Teclado e Botões Laterais */
+/* Grupo 3: TECLADO/MOUSE — Submódulos POO de navegação por teclado, botões laterais 4/5, botão do meio e F1 */
 const ARQUIVOS_MODULO_INPUT = Object.freeze([
     'src/mod-input/input-botoes-laterais.js',
     'src/mod-input/input-botao-meio.js',
@@ -144,6 +160,15 @@ const ARQUIVOS_MODULO_INPUT = Object.freeze([
     'src/mod-input/input-atalho-f1.js',
     'src/mod-input/mod-input.js'
 ]);
+
+/* Cadeia determinística unificada do Content Script (espelhando 1:1 a ordem de options.html e executar_testes.html):
+ * 1º Núcleo Grupo 2 (Cópia POO) -> 2º Núcleo Grupo 3 (Input POO) -> 3º Orquestrador DOM SelecionarCopiar.js */
+const ARQUIVOS_CONTEUDO_INTEGRADO = Object.freeze([
+    ...ARQUIVOS_NUCLEO_MODULO_COPIA,
+    ...ARQUIVOS_MODULO_INPUT,
+    'src/mod-copia/SelecionarCopiar.js'
+]);
+const ARQUIVOS_MODULO_COPIA = ARQUIVOS_CONTEUDO_INTEGRADO;
 
 const ARQUIVOS_MODULO_CSS_PJE = Object.freeze([
     'src/mod-pje/PJE-anti_ampuletas.css'
@@ -284,10 +309,11 @@ function enfileirarRegistro(urlsTurbo, urlsAmpuletas, modoTurbo, estadoAmpuletas
                 }
             }
 
-            /* Passo 3.4: Os modulos JS do Motor de Selecao, Copia e Navegacao ja sao declarados
-             * estaticamente no manifest.json para <all_urls> (all_frames: true, document_start).
-             * Nao registrar dinamicamente um segundo Content Script identico para evitar dupla
-             * injecao e sobrecarga de CPU a cada navegacao ou criacao de iframe. */
+            /* Passo 3.4 (Seção 6.47): Os módulos JS de Cópia Inteligente (Grupo 2) e Periféricos
+             * Mouse/Teclado (Grupo 3) operam por injeção dinâmica orientada a eventos (executeScript
+             * idempotente O(1) via tabs.onUpdated, webNavigation.onCommitted/onDOMContentLoaded e
+             * mensagem assíncrona garantirInjecaoSubframes), evitando declarações estáticas duplicadas
+             * em content_scripts no manifest.json e sobrecarga redundante de CPU em subframes. */
         } catch (err) {
             console.warn('[JusGovBR] Aviso ao atualizar registro de scripts:', err);
         }
@@ -638,9 +664,14 @@ async function sincronizarEstado() {
         chrome.storage.sync.remove(['totalCopias', 'totalAlertas', 'flashBorderAtivo']).catch(() => { });
     }
 
-    /* Passo 4.3: Espelhar configuracao no chrome.storage.session (RAM rapida) */
+    /* Passo 4.3: Espelhar configuracao no chrome.storage.session (RAM rapida) e sincronizar Fachada POO do Navegador */
     if (chrome.storage.session) {
         chrome.storage.session.set({ cacheConfigJusGov: config }).catch(() => { });
+    }
+    if (instanciaModuloNavegador && typeof instanciaModuloNavegador.atualizarConfiguracoes === 'function') {
+        try {
+            instanciaModuloNavegador.atualizarConfiguracoes(config);
+        } catch (_) { }
     }
 
     /* Passo 4.4: Enfileirar atualizacao dos Content Scripts e notificar/injetar nas abas */
@@ -1896,11 +1927,13 @@ if (chrome.windows && chrome.windows.onCreated) {
                         });
                     }
                 } else {
-                    /* URL pendente de resolucao: tenta mover a aba ou aguarda o primeiro evento de URL */
+                    /* URL pendente de resolucao: tenta mover a aba ou aguarda o primeiro evento de URL.
+                     * Correcao deterministica (Seção 6.47): utiliza estritamente a flag resolvida 'emPrimeiroPlano'
+                     * (eliminando ReferenceError silencioso da variavel inexistente '!emSegundoPlano'). */
                     let moveu = false;
                     try {
                         await chrome.tabs.move(t.id, { windowId: janelaPrincipal.id, index: -1 });
-                        if (!emSegundoPlano) {
+                        if (emPrimeiroPlano) {
                             await chrome.tabs.update(t.id, { active: true });
                         }
                         moveu = true;
@@ -1917,14 +1950,14 @@ if (chrome.windows && chrome.windows.onCreated) {
                                 if (uNova && uNova !== 'about:blank' && !uNova.startsWith('chrome://')) {
                                     try {
                                         await chrome.tabs.move(t.id, { windowId: janelaPrincipal.id, index: -1 });
-                                        if (!emSegundoPlano) {
+                                        if (emPrimeiroPlano) {
                                             await chrome.tabs.update(t.id, { active: true });
                                         }
                                     } catch (_) {
                                         await chrome.tabs.create({
                                             windowId: janelaPrincipal.id,
                                             url: uNova,
-                                            active: !emSegundoPlano
+                                            active: emPrimeiroPlano
                                         });
                                     }
                                 }

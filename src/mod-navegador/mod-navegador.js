@@ -19,7 +19,9 @@
  * 3) PASSOS DE RECONSTRUÇÃO DO ZERO (PSEUDOCÓDIGO INTERCALADO):
  *    Passo 1.1: Declaração dos Null Objects imutáveis para os 4 serviços do navegador.
  *    Passo 1.2: Injeção de dependências no construtor com fallback gracioso.
- *    Passo 1.3: Exposição de métodos públicos de orquestração delegados.
+ *    Passo 1.3: Exposição de métodos públicos de orquestração delegados e sincronização
+ *               bidirecional com as chaves persistidas em chrome.storage.sync (Seção 6.47),
+ *               preservando isolamento total em relação ao DOM dos Content Scripts (Grupos 2 e 3).
  *
  * DOCUMENTAÇÃO COMPLEMENTAR:
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Diretrizes 1, 9, 11, 14 e 16)
@@ -116,6 +118,7 @@
 
         /**
          * Sincroniza todas as preferências dos 4 serviços do navegador
+         * (suportando tanto as chaves de formulário opt* quanto as chaves canônicas do chrome.storage.sync).
          * @param {Object} cfg
          */
         atualizarConfiguracoes(cfg = {}) {
@@ -124,26 +127,40 @@
             /* Janela Única */
             if (typeof cfg.optBloquearNovasJanelas === 'boolean') {
                 this.#janelaUnica.bloquearNovasJanelas = cfg.optBloquearNovasJanelas;
+            } else if (typeof cfg.bloquearNovasJanelas === 'boolean') {
+                this.#janelaUnica.bloquearNovasJanelas = cfg.bloquearNovasJanelas;
             }
             if (typeof cfg.optPreservarJanelasAutenticacao === 'boolean') {
                 this.#janelaUnica.preservarJanelasAutenticacao = cfg.optPreservarJanelasAutenticacao;
+            } else if (typeof cfg.preservarJanelasAutenticacao === 'boolean') {
+                this.#janelaUnica.preservarJanelasAutenticacao = cfg.preservarJanelasAutenticacao;
             }
 
             /* Anti-Duplicação */
             if (typeof cfg.optReutilizarAbasAbertas === 'boolean') {
                 this.#antiDuplicacao.reutilizarAbasAbertas = cfg.optReutilizarAbasAbertas;
+            } else if (typeof cfg.reutilizarAbasAbertas === 'boolean') {
+                this.#antiDuplicacao.reutilizarAbasAbertas = cfg.reutilizarAbasAbertas;
             }
             if (typeof cfg.optReutilizarFocoPrimeiroPlano === 'boolean') {
                 this.#antiDuplicacao.focoPrimeiroPlano = cfg.optReutilizarFocoPrimeiroPlano;
+            } else if (typeof cfg.reutilizarAbasFocoPrimeiroPlano === 'boolean') {
+                this.#antiDuplicacao.focoPrimeiroPlano = cfg.reutilizarAbasFocoPrimeiroPlano;
             }
             if (typeof cfg.optMonitorarUrlOriginal === 'boolean') {
                 this.#antiDuplicacao.monitorarUrlOriginal = cfg.optMonitorarUrlOriginal;
+            } else if (typeof cfg.monitorarUrlOriginalAbertura === 'boolean') {
+                this.#antiDuplicacao.monitorarUrlOriginal = cfg.monitorarUrlOriginalAbertura;
             }
             if (typeof cfg.optMonitorarUrlAtual === 'boolean') {
                 this.#antiDuplicacao.monitorarUrlAtual = cfg.optMonitorarUrlAtual;
+            } else if (typeof cfg.monitorarUrlAtualPagina === 'boolean') {
+                this.#antiDuplicacao.monitorarUrlAtual = cfg.monitorarUrlAtualPagina;
             }
             if (typeof cfg.optProtegerGuiasModificadas === 'boolean') {
                 this.#antiDuplicacao.protegerGuiasModificadas = cfg.optProtegerGuiasModificadas;
+            } else if (typeof cfg.protegerGuiasModificadas === 'boolean') {
+                this.#antiDuplicacao.protegerGuiasModificadas = cfg.protegerGuiasModificadas;
             }
             if (typeof cfg.reutilizarAbasAcaoConteudo === 'string') {
                 this.#antiDuplicacao.acaoConteudo = cfg.reutilizarAbasAcaoConteudo;
@@ -152,20 +169,30 @@
             /* Ordenação e Agrupamento */
             if (typeof cfg.optCriterioOrdenacaoGuias === 'string') {
                 this.#ordenacao.criterio = cfg.optCriterioOrdenacaoGuias;
+            } else if (typeof cfg.criterioOrdenacaoGuias === 'string') {
+                this.#ordenacao.criterio = cfg.criterioOrdenacaoGuias;
             }
             if (typeof cfg.optSentidoOrdenacaoGuias === 'string') {
                 this.#ordenacao.sentido = cfg.optSentidoOrdenacaoGuias;
+            } else if (typeof cfg.sentidoOrdenacaoGuias === 'string') {
+                this.#ordenacao.sentido = cfg.sentidoOrdenacaoGuias;
             }
             if (typeof cfg.optOrdenarGuiasFixadas === 'boolean') {
                 this.#ordenacao.ordenarGuiasFixadas = cfg.optOrdenarGuiasFixadas;
+            } else if (typeof cfg.ordenarGuiasFixadas === 'boolean') {
+                this.#ordenacao.ordenarGuiasFixadas = cfg.ordenarGuiasFixadas;
             }
 
             /* Descarte / Economizador de RAM */
             if (typeof cfg.optDescarteGuiasInativas === 'boolean') {
                 this.#descarte.ativo = cfg.optDescarteGuiasInativas;
+            } else if (typeof cfg.descarteGuiasInativasAtivo === 'boolean') {
+                this.#descarte.ativo = cfg.descarteGuiasInativasAtivo;
             }
             if (cfg.optTempoInatividadeDescarteMinutos !== undefined) {
                 this.#descarte.tempoInatividadeMinutos = cfg.optTempoInatividadeDescarteMinutos;
+            } else if (cfg.tempoInatividadeDescarteMinutos !== undefined) {
+                this.#descarte.tempoInatividadeMinutos = cfg.tempoInatividadeDescarteMinutos;
             }
         }
     }

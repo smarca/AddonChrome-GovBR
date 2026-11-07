@@ -582,11 +582,23 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
      * `mod-navegador.js` (`class ModuloNavegador`): Fachada orquestradora selada com `Object.freeze` e grafo com Null Objects imutáveis para Service Worker.
 - **Auditoria e Validação:** 10 testes unitários determinísticos injetados na Bateria 11 de `src/cfg/debug.js` (300/300 testes aprovados, 100% verde).
 
-### 6.47 Varredura Completa do Código, Revisão Profunda de Comentários e Separação de Módulos [ANOTADO — PENDÊNCIA]
+### 6.47 Varredura Completa do Código, Revisão Profunda de Comentários e Separação de Módulos [IMPLEMENTADO E COBERTO POR TESTES]
 - **Escopo da Varredura e Documentação:**
-  * Realizar varredura sistemática linha a linha no código-fonte de todos os módulos (`src/cfg/`, `src/mod-copia/`, `src/mod-pje/`), mapeando todos os pontos de acoplamento entre as rotinas de Cópia Inteligente, Navegação Web/Abas e Teclado/Mouse.
+  * Realizar varredura sistemática linha a linha no código-fonte de todos os módulos (`src/cfg/`, `src/mod-copia/`, `src/mod-input/`, `src/mod-navegador/` e `src/mod-pje/`), mapeando todos os pontos de acoplamento entre as rotinas de Cópia Inteligente, Navegação Web/Abas e Teclado/Mouse.
   * Revisar, expandir e enriquecer todos os comentários internos com detalhes exatos de funcionamento operacional, lógica de fronteiras, estruturas de dados manipuladas e regras de negócio.
   * Auditar continuamente o alinhamento com a Central de Ajuda (`options.html`), catálogo centralizado de regras (`exemplos.json`) e suíte de testes determinísticos de debug (`debug.js`).
+- **Entregas e Correções Realizadas na Varredura:**
+  1. **Unificação da Cadeia de Injeção e Desacoplamento Inter-Módulos (`src/cfg/background.js`, `src/mod-copia/SelecionarCopiar.js`, `src/mod-copia/mod-copia.js`, `src/mod-input/mod-input.js`, `src/mod-navegador/mod-navegador.js`):**
+     * Eliminado o array morto `ARQUIVOS_MODULO_INPUT` em `background.js`, unificando `ARQUIVOS_CONTEUDO_INTEGRADO` (`ARQUIVOS_NUCLEO_MODULO_COPIA` + `ARQUIVOS_MODULO_INPUT` + `SelecionarCopiar.js`) em paridade 1:1 com `options.html` e `executar_testes.html`.
+     * Instanciadas e sincronizadas em tempo real as 3 fachadas POO seladas com `Object.freeze` (`ModuloCopia`, `ModuloInput` e `ModuloNavegador` no Service Worker), garantindo paridade bidirecional tanto com chaves de formulário (`opt*`) quanto com chaves canônicas persistidas em `chrome.storage.sync`.
+  2. **Correção de Bugs Ocultos Detectados na Inspeção Estática:**
+     * `src/cfg/background.js`: Corrigido `ReferenceError` silencioso (`!emSegundoPlano` -> `emPrimeiroPlano`) na migração de abas com URL pendente (`about:blank`) do gerenciador de Janela Única (`windows.onCreated`).
+     * `src/mod-input/input-atalho-f1.js`: Corrigido `AtalhoF1Gemini.prototype.obterPromptFormatado` para substituir tanto o marcador padrão `'{{TEXTO}}'` quanto o marcador legado `'{SELECAO}'`.
+     * `src/mod-copia/SelecionarCopiar.js`: Removida chamada redundante duplicada de `expandirFraseAtePontuacaoEstagio3` em `simularCliqueEmTexto`.
+  3. **Revisão e Enriquecimento de Comentários Blueprint:**
+     * Atualizado o Blueprint de cabeçalho em `SelecionarCopiar.js` (Seção 3 — preservação de seleção ao pressionar `Shift` conforme Seção 6.62 / BUG-07, e Seção 7 — Mapa de Fronteiras Arquiteturais entre Grupos 1, 2, 3 e 4 + Ciclo de Vida `BUG-01`) e corrigida a documentação do Passo 3.4 em `background.js` sobre a injeção dinâmica orientada a eventos no Manifest V3.
+  4. **Homologação Automatizada (`src/cfg/debug.js`):**
+     * Adicionada bateria de homologação `SECAO_6_47_SEPARACAO_MODULOS_E_FACHADAS_INTEGRADAS`, aprovando 455/455 testes no Chromium Headless.
 
 ### 6.48 Correção do Duplo Clique em Elementos Formatados Inline / Marca-Texto (`<mark>`) [RESOLVIDO E COBERTO POR TESTES]
 - **Descrição do Bug:**
@@ -886,10 +898,7 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
     * Com Flash desativado (`tempoFlashBorderMs = 0`), preserva a seleção normal nativa do sistema.
 * **Pendente (Salvo na fila para implementação futura):**
   * **Seleção de Texto de Leitura em PDF Embedded e Exceção da Interface do PDF (`viewer-toolbar` / `#toolbar` / `input#pageSelector`) (Seção 6.32):** Permitir seleção/cópia do texto de leitura em PDFs embarcados (`<pdf-viewer>`, `<embed type="application/x-google-chrome-pdf">`, `#content`/`#scroller`, `.textLayer`), mantendo toda a barra de ferramentas do PDF (`viewer-toolbar`, `div#toolbar`, `cr-icon-button`, `viewer-page-selector`, `input#pageSelector`, `#sidenav-container`) sob as regras estritas de interface/campo editável.
-  * **Desacoplamento Físico em Módulos e POO Blindada (Seção 6.13 / Diretriz Root 11 / BP-01):** Isolar fisicamente em arquivos separados o Módulo de Seleção/Cópia Inteligente e o Módulo de Mudança de Interface/UI (Mouse 4/5, Scroll Click, Teclado, Auto-seleção de Inputs), aplicando encapsulamento POO com API pública congelada (`Object.freeze`).
-  * **Barramento de Eventos Desacoplado (BP-02):** Comunicação intermodular via `CustomEvent` (`jusgovbr:*`) sem dependência direta entre arquivos.
   * **Identificação Única de Componentes (`Ctrl + Alt + Shift + Clique`) e Mapeamento Manual Avançado XPath/CSS (Seção 6.20):** Grupo recolhido em Configurações Avançadas para cadastrar regras locais (Textual, Interface ou Semiflexível) com exportação/importação JSON.
-  * **Higienização de Handlers Globais em Subframes via `AbortController` (BUG-01):** Teardown determinístico no descarregamento de iframes dinâmicos.
 * **Implementado no Ciclo Atual (243/243 testes aprovados):**
   * **Detecção Hierárquica de Editores (`pai`/`avô`/`ancestral` `contenteditable="true"`) e Exceção de Interface CKEditor (`cke_*` / `cke_*editor`) (Seção 6.31) [IMPLEMENTADO]:** Verificação do elemento clicado, pai, avô e cadeia ancestral até `ownerDocument.body` para `contenteditable="true"` / `.cke_editable`, auto-seleção de placeholders longos/complexos (`@@@@INSTITUTO...; @@@` e `#####`) e exclusão estrita da interface CKEditor (`cke_*`, `cke_*editor`).
   * **Fechamento Imediato de Popups de Auditoria e Mensagens Wiki Forense (Seção 6.30) [IMPLEMENTADO]:** Popups de checagem/auditoria (cálculo Mod 11/97 falhou, CPF/CNPJ/CNJ/NB/Data inválido e máscara amarela) e mensagens de instrução Wiki Forense (tipo de aposentadoria/benefício INSS, região fiscal do CPF, Matriz/Filial CNPJ, ramo CNJ, dia da semana) fecham imediatamente ao clicar com o mouse (`mousedown`), desselecionar o texto, pressionar `Escape`/`Enter`, rolar a página ou perder foco, acompanhando o comportamento do Flash Temporizado.

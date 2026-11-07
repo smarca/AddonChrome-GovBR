@@ -22,10 +22,16 @@
  *   que caso qualquer arquivo/módulo seja excluído fisicamente ou desabilitado, o JavaScript
  *   não trave com "Cannot read properties of undefined" e execute com degradação graciosa.
  * 
+ * - Isolamento de Fronteiras entre Módulos (Seção 6.47):
+ *   Encapsula exclusivamente a inteligência léxica, geométrica, documental e visual de
+ *   Seleção e Cópia (Grupo 2), sem acoplar ouvintes de periféricos de navegação (delegados
+ *   ao Grupo 3 `mod-input`) nem APIs privilegiadas de abas/janelas (isoladas no Grupo 4
+ *   `mod-navegador` / `background.js`).
+ * 
  * DOCUMENTAÇÃO RELACIONADA:
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Diretrizes 11, 13, 14, 15 e 16)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 2: Arquitetura Global e Seção 3: 6 Estágios)
- * - docs/03_BACKLOG_TAREFAS_E_FEATURES.md (Seção 6.49: Arquitetura POO em Diretório Plano)
+ * - docs/03_BACKLOG_TAREFAS_E_FEATURES.md (Seções 6.47 e 6.49: Separação de Módulos e POO)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004 e ADR-006: Null Object Pattern)
  */
 
@@ -279,5 +285,5 @@
         }
     }
 
-    window.JusGovModuloCopia = ModuloCopia;
+    window.JusGovModuloCopia = Object.freeze(ModuloCopia);
 })();

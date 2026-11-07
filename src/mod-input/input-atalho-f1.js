@@ -85,14 +85,21 @@
         }
 
         /**
-         * Retorna o prompt formatado substituindo o marcador {SELECAO}
+         * Retorna o prompt formatado substituindo os marcadores {{TEXTO}} ou {SELECAO}
+         * de forma determinística e sem acoplamento ao DOM externo.
+         * O porquê (Seção 6.47): O contrato padrão do storage e da Central de Opções utiliza
+         * o marcador '{{TEXTO}}', enquanto suítes de homologação legadas também empregam
+         * '{SELECAO}'. Suportar ambos preserva retrocompatibilidade total em 100% dos fluxos.
          * @param {string} [texto=""]
          * @returns {string}
          */
         obterPromptFormatado(texto = '') {
             const limpo = String(texto || '').trim();
+            if (this.#promptPadrao.includes('{{TEXTO}}')) {
+                return this.#promptPadrao.replace(/\{\{TEXTO\}\}/g, limpo);
+            }
             if (this.#promptPadrao.includes('{SELECAO}')) {
-                return this.#promptPadrao.replace('{SELECAO}', limpo);
+                return this.#promptPadrao.replace(/\{SELECAO\}/g, limpo);
             }
             return (this.#promptPadrao + ' ' + limpo).trim();
         }

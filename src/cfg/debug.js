@@ -6227,6 +6227,251 @@
             'Fachadas orquestradoras ModuloInput e ModuloNavegador seladas com Object.freeze contra mutações em tempo de execução'
         );
 
+        /* 11) BUG-01: Ciclo de vida determinístico de subframes (<iframe>) com AbortController e segurança BFCache */
+        let bug01SubframeOk = false;
+        let iframeBug01 = null;
+        try {
+            if (motorTeste && typeof motorTeste.inspecionarSubframeTeste === 'function' && typeof motorTeste.obterEstadoCicloVida === 'function') {
+                const contagemInicial = motorTeste.obterEstadoCicloVida().subframesMonitoradosCount;
+                iframeBug01 = document.createElement('iframe');
+                iframeBug01.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;border:0;';
+                iframeBug01.setAttribute('data-jusgov-ignore', 'true');
+                document.body.appendChild(iframeBug01);
+
+                /* Garante estado limpo sem motor próprio no iframe sintético */
+                iframeBug01.contentWindow.__JUSGOV_MOTOR_SELECAO_ATIVO__ = false;
+                iframeBug01.contentWindow.__JUSGOV_OUVINTE_LOCAL__ = false;
+                motorTeste.limparSubframeTeste(iframeBug01);
+
+                const baseAposLimpeza = motorTeste.obterEstadoCicloVida().subframesMonitoradosCount;
+                const anexou = motorTeste.inspecionarSubframeTeste(iframeBug01);
+                const aposInspecao = motorTeste.obterEstadoCicloVida().subframesMonitoradosCount;
+                const flagAtiva = (iframeBug01.contentWindow.__JUSGOV_OUVINTE_LOCAL__ === true);
+
+                /* Simula navegação BFCache (persisted: true) -> NÃO deve abortar ouvintes */
+                const evBfCache = new PageTransitionEvent('pagehide', { persisted: true });
+                iframeBug01.contentWindow.dispatchEvent(evBfCache);
+                const preservouBfCache = (
+                    iframeBug01.contentWindow.__JUSGOV_OUVINTE_LOCAL__ === true &&
+                    motorTeste.obterEstadoCicloVida().subframesMonitoradosCount === (baseAposLimpeza + 1)
+                );
+
+                /* Simula descarregamento definitivo (persisted: false) -> DEVE abortar imediatamente */
+                const evUnload = new PageTransitionEvent('pagehide', { persisted: false });
+                iframeBug01.contentWindow.dispatchEvent(evUnload);
+                const desmontouNoPagehide = (
+                    iframeBug01.contentWindow.__JUSGOV_OUVINTE_LOCAL__ === false &&
+                    motorTeste.obterEstadoCicloVida().subframesMonitoradosCount === baseAposLimpeza
+                );
+
+                bug01SubframeOk = Boolean(
+                    contagemInicial >= 0 &&
+                    anexou === true &&
+                    aposInspecao === (baseAposLimpeza + 1) &&
+                    flagAtiva &&
+                    preservouBfCache &&
+                    desmontouNoPagehide
+                );
+            }
+        } catch (_) {
+            bug01SubframeOk = false;
+        } finally {
+            if (iframeBug01) {
+                try { motorTeste.limparSubframeTeste(iframeBug01); } catch (_) { }
+                try { iframeBug01.remove(); } catch (_) { }
+            }
+        }
+        registrar(
+            bug01SubframeOk,
+            'BUG01_SUBFRAME_ABORTCONTROLLER_LIFECYCLE',
+            'Subframes <iframe> gerenciam AbortController próprio: preservam BFCache (persisted=true) e abortam closures em pagehide definitivo (persisted=false)'
+        );
+
+        /* 12) BUG-01: Auto-desmontagem imediata quando subframe ativa seu próprio motor nativo */
+        let bug01AutoAbortNativoOk = false;
+        let iframeBug01Nativo = null;
+        try {
+            if (motorTeste && typeof motorTeste.inspecionarSubframeTeste === 'function') {
+                iframeBug01Nativo = document.createElement('iframe');
+                iframeBug01Nativo.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;border:0;';
+                iframeBug01Nativo.setAttribute('data-jusgov-ignore', 'true');
+                document.body.appendChild(iframeBug01Nativo);
+
+                iframeBug01Nativo.contentWindow.__JUSGOV_MOTOR_SELECAO_ATIVO__ = false;
+                iframeBug01Nativo.contentWindow.__JUSGOV_OUVINTE_LOCAL__ = false;
+                motorTeste.limparSubframeTeste(iframeBug01Nativo);
+
+                const baseCount = motorTeste.obterEstadoCicloVida().subframesMonitoradosCount;
+                motorTeste.inspecionarSubframeTeste(iframeBug01Nativo);
+
+                /* Simula ativação tardia do Content Script próprio dentro do iframe */
+                iframeBug01Nativo.contentWindow.__JUSGOV_MOTOR_SELECAO_ATIVO__ = true;
+                iframeBug01Nativo.contentWindow.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+
+                bug01AutoAbortNativoOk = (
+                    iframeBug01Nativo.contentWindow.__JUSGOV_OUVINTE_LOCAL__ === false &&
+                    motorTeste.obterEstadoCicloVida().subframesMonitoradosCount === baseCount
+                );
+            }
+        } catch (_) {
+            bug01AutoAbortNativoOk = false;
+        } finally {
+            if (iframeBug01Nativo) {
+                try { motorTeste.limparSubframeTeste(iframeBug01Nativo); } catch (_) { }
+                try { iframeBug01Nativo.remove(); } catch (_) { }
+            }
+        }
+        registrar(
+            bug01AutoAbortNativoOk,
+            'BUG01_SUBFRAME_AUTO_ABORT_MOTOR_NATIVO',
+            'Fallback de subframe auto-aborta instantaneamente suas 4 closures ao detectar ativação do motor nativo no iframe'
+        );
+
+        /* 13) BUG-01: Desmontagem completa e reconstrução idempotente do motor principal */
+        let bug01MotorTeardownOk = false;
+        try {
+            if (motorTeste && typeof motorTeste.destruirCicloVida === 'function' && typeof motorTeste.reconstruirCicloVida === 'function') {
+                try {
+                    motorTeste.destruirCicloVida();
+                    const estDestruido = motorTeste.obterEstadoCicloVida();
+                    const desmontouTudo = (
+                        estDestruido.motorAtivo === false &&
+                        estDestruido.controladorAtivo === false &&
+                        estDestruido.sinalAbortado === true &&
+                        estDestruido.observerFramesAtivo === false &&
+                        estDestruido.subframesMonitoradosCount === 0
+                    );
+
+                    motorTeste.reconstruirCicloVida();
+                    const estReconstruido = motorTeste.obterEstadoCicloVida();
+                    const reconstruiuTudo = (
+                        estReconstruido.motorAtivo === true &&
+                        estReconstruido.controladorAtivo === true &&
+                        estReconstruido.sinalAbortado === false &&
+                        estReconstruido.observerFramesAtivo === true
+                    );
+
+                    bug01MotorTeardownOk = Boolean(desmontouTudo && reconstruiuTudo);
+                } finally {
+                    /* Garante que o motor principal da página permaneça 100% operacional */
+                    if (!motorTeste.obterEstadoCicloVida().motorAtivo) {
+                        motorTeste.reconstruirCicloVida();
+                    }
+                }
+            }
+        } catch (_) {
+            bug01MotorTeardownOk = false;
+        }
+        registrar(
+            bug01MotorTeardownOk,
+            'BUG01_MOTOR_PRINCIPAL_TEARDOWN_E_RECONSTRUCAO',
+            'Motor principal encerra AbortController, MutationObservers e timers em destruirCicloVida() e restaura estado íntegro em reconstruirCicloVida()'
+        );
+
+        /* 14) BUG-01: ModuloInput com AbortController privado, pagehide (!persisted) e método destruir() */
+        let bug01ModInputTeardownOk = false;
+        let iframeModInput = null;
+        try {
+            iframeModInput = document.createElement('iframe');
+            iframeModInput.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;border:0;';
+            iframeModInput.setAttribute('data-jusgov-ignore', 'true');
+            document.body.appendChild(iframeModInput);
+
+            const modSub = new window.JusGovModuloInput();
+            const init1 = modSub.inicializar(iframeModInput.contentDocument);
+            const initDuplo = modSub.inicializar(iframeModInput.contentDocument);
+            const sinal1 = modSub.sinalCicloVida;
+
+            /* BFCache (persisted: true) preserva listener */
+            iframeModInput.contentWindow.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+            const vivoAposBfCache = (modSub.inicializado === true && sinal1 && sinal1.aborted === false);
+
+            /* Unload real (persisted: false) destrói automaticamente */
+            iframeModInput.contentWindow.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+            const destruidoAposPagehide = (modSub.inicializado === false && sinal1 && sinal1.aborted === true);
+
+            /* Permite reinicializar de forma limpa e destruir manualmente */
+            const init2 = modSub.inicializar(iframeModInput.contentDocument);
+            const sinal2 = modSub.sinalCicloVida;
+            const destruiuManual = modSub.destruir();
+
+            bug01ModInputTeardownOk = Boolean(
+                init1 === true &&
+                initDuplo === false &&
+                vivoAposBfCache &&
+                destruidoAposPagehide &&
+                init2 === true &&
+                destruiuManual === true &&
+                modSub.inicializado === false &&
+                sinal2 &&
+                sinal2.aborted === true
+            );
+        } catch (_) {
+            bug01ModInputTeardownOk = false;
+        } finally {
+            if (iframeModInput) {
+                try { iframeModInput.remove(); } catch (_) { }
+            }
+        }
+        registrar(
+            bug01ModInputTeardownOk,
+            'BUG01_MOD_INPUT_ABORTCONTROLLER_DESTRUIR',
+            'ModuloInput gerencia #abortController privado com idempotência, preservação de BFCache e desmontagem determinística em pagehide/destruir()'
+        );
+
+        /* 15) Seção 6.47: Separação inter-módulos, imutabilidade das 3 fachadas POO e paridade de chaves de storage */
+        let secao647IntegracaoOk = false;
+        try {
+            const fachadaCopia = motorTeste && typeof motorTeste.obterFachadaCopia === 'function' ? motorTeste.obterFachadaCopia() : null;
+            const fachadaInput = motorTeste && typeof motorTeste.obterFachadaInput === 'function' ? motorTeste.obterFachadaInput() : null;
+            const modCopiaSelado = Object.isFrozen(window.JusGovModuloCopia);
+
+            const f1Teste = new window.JusGovAtalhoF1Gemini({ promptPadrao: 'Analisar trecho: "{{TEXTO}}"' });
+            const promptDuplaChave = f1Teste.obterPromptFormatado('Art. 5º CF');
+
+            const navTeste = new window.JusGovModuloNavegador();
+            navTeste.atualizarConfiguracoes({
+                bloquearNovasJanelas: false,
+                preservarJanelasAutenticacao: true,
+                reutilizarAbasAbertas: false,
+                monitorarUrlOriginalAbertura: true,
+                criterioOrdenacaoGuias: 'dominio',
+                sentidoOrdenacaoGuias: 'dir_esq',
+                ordenarGuiasFixadas: true,
+                descarteGuiasInativasAtivo: true,
+                tempoInatividadeDescarteMinutos: 45
+            });
+
+            secao647IntegracaoOk = Boolean(
+                modCopiaSelado &&
+                fachadaCopia &&
+                fachadaCopia.estagio1 &&
+                fachadaCopia.filtros &&
+                fachadaCopia.validadores &&
+                fachadaInput &&
+                fachadaInput.botoesLaterais &&
+                fachadaInput.botaoMeio &&
+                fachadaInput.tecladoCampos &&
+                fachadaInput.atalhoF1 &&
+                promptDuplaChave === 'Analisar trecho: "Art. 5º CF"' &&
+                navTeste.janelaUnica.bloquearNovasJanelas === false &&
+                navTeste.antiDuplicacao.reutilizarAbasAbertas === false &&
+                navTeste.antiDuplicacao.monitorarUrlOriginal === true &&
+                navTeste.ordenacao.criterio === 'dominio' &&
+                navTeste.ordenacao.sentido === 'dir_esq' &&
+                navTeste.ordenacao.ordenarGuiasFixadas === true &&
+                navTeste.descarte.ativo === true &&
+                navTeste.descarte.tempoInatividadeMinutos === 45
+            );
+        } catch (_) {
+            secao647IntegracaoOk = false;
+        }
+        registrar(
+            secao647IntegracaoOk,
+            'SECAO_6_47_SEPARACAO_MODULOS_E_FACHADAS_INTEGRADAS',
+            'Separação de domínios (Cópia, Input e Navegador), selamento Object.freeze das 3 fachadas e paridade bidirecional com chaves do storage'
+        );
+
         /* ==================================================================
          * BATERIA 13: FUZZING MUTACIONAL E RESISTÊNCIA A MUTANTES DE DV (MUTATION TESTING +1/-1)
          * Diretriz de Verificação Dupla (Paridade Correto -> Mutado):

@@ -120,8 +120,9 @@
  *     copia apenas a parte arrastada do texto.
  *
  * 3. ESTILO SHIFT DE SELECAO E FILTRO DE DIGITOS COM ZERO-PADDING CNJ:
- * - Pressionar "Shift" exclusivamente quando ja houver selecao limpa tudo na tela
- *   para iniciar nova marcacao de cursor inicial e final.
+ * - Preservacao Estrita da Selecao Ativa (BUG-07 / Secao 6.62): Pressionar ou soltar
+ *   a tecla "Shift" isoladamente NUNCA limpa nem recolhe uma selecao ativa na tela,
+ *   garantindo compatibilidade total com ajustes finos nativos via "Shift + Setas".
  * - Sem selecao previa, "Shift + Clique" em texto comum posiciona o cursor inicial
  *   (sem marcar nada); o segundo "Shift + Clique" expande ate a palavra final.
  * - "Shift + Clique e Solta" sobre entidade contigua numerica/alfanumerica (CPF,
@@ -155,6 +156,20 @@
  *   arraste o mouse ou mantenha qualquer tecla do teclado pressionada (Ctrl, Alt,
  *   Shift, Ctrl+Alt ou qualquer outra tecla), a maozinha e ignorada e a selecao/copia
  *   (incluindo copia de coluna inteira no alto da tabela) ocorre normalmente!
+ *
+ * 7. FRONTEIRAS ARQUITETURAIS E CICLO DE VIDA DETERMINISTICO (SECAO 6.47 & BUG-01):
+ * - Separacao de Dominios:
+ *   * Grupo 1 (src/mod-pje/): Neutralizacao CSS Anti-Ampulhetas (PJE-anti_ampuletas.css + fallback #pje-turbo-lock).
+ *   * Grupo 2 (src/mod-copia/): Motor Lexico/Geometrico em 6 Estagios, Filtros HTML (5 niveis),
+ *     Acumulador e Auditoria Forense orquestrados via fachada POO (ModuloCopia).
+ *   * Grupo 3 (src/mod-input/): Contratos POO de perifericos (ModuloInput: Botoes 4/5, Botao do Meio,
+ *     Setas em Inputs e F1 Gemini), mantidos sincronizados em tempo real sem duplicar listeners DOM.
+ *   * Grupo 4 (src/mod-navegador/ e src/cfg/background.js): Operacoes privilegiadas de abas/janelas
+ *     isoladas no Service Worker e acionadas estritamente por barramento IPC (chrome.runtime.sendMessage).
+ * - Ciclo de Vida Deterministico em Subframes (BUG-01): Todos os ouvintes globais, MutationObservers,
+ *   timers, listeners IPC e ouvintes locais de <iframe> de mesma origem sao governados por
+ *   AbortController individualizado, com auto-desmontagem imediata em pagehide (!event.persisted),
+ *   remocao fisica de nos <iframe> ou ativacao do motor nativo no subframe, preservando BFCache.
  * ========================================================================== */
 
 (function () {
@@ -224,6 +239,37 @@
 
     const validador = window.JusGovAvisoFlutuante ? new window.JusGovAvisoFlutuante() : null;
     const acumulador = window.JusGovAcumulador ? new window.JusGovAcumulador() : null;
+
+    /* Passo 1.1.2 (Secao 6.47): Instanciacao desacoplada das Fachadas POO dos Grupos 2 (Copia)
+     * e 3 (Perifericos de Input) com injecao de dependencias (DIP) e tolerancia Null Object.
+     * Nota critica: A fachadaModuloInput nao executa inicializar(document) duplicado aqui para
+     * respeitar o pipeline unificado de precedencia DOM (selecao editavel, editores ricos e escopo
+     * verificarSeSiteAtivo), mantendo seu estado reativo 100% sincronizado com o storage. */
+    const fachadaModuloCopia = (() => {
+        try {
+            if (typeof window.JusGovModuloCopia === 'function') {
+                const inst = new window.JusGovModuloCopia({
+                    constantes: C_EXT,
+                    avisoFlutuante: validador,
+                    acumulador
+                });
+                window.JusGovInstanciaCopia = inst;
+                return inst;
+            }
+        } catch (_) { }
+        return null;
+    })();
+
+    const fachadaModuloInput = (() => {
+        try {
+            if (typeof window.JusGovModuloInput === 'function') {
+                const inst = new window.JusGovModuloInput();
+                window.JusGovInstanciaInput = inst;
+                return inst;
+            }
+        } catch (_) { }
+        return null;
+    })();
 
     /* Passo 1.2: Variaveis de controle de estado monomorficas em tempo real */
     let modoExecucao = 'global';
@@ -532,18 +578,18 @@
     /* Gatilho 1: Injeção imediata na carga do script (document_start) */
     blindarCSS();
 
-    /* Gatilho 2: Injeção na conclusão do parsing da árvore DOM */
+    /* Gatilho 2: Injeção na conclusão do parsing da árvore DOM (once: true evita retenção de listener após disparo — BUG-01) */
     if (typeof document !== 'undefined') {
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', blindarCSS);
+            document.addEventListener('DOMContentLoaded', blindarCSS, { once: true });
         } else {
             blindarCSS();
         }
     }
 
-    /* Gatilho 3: Injeção após carga completa de sub-recursos e iframes */
+    /* Gatilho 3: Injeção após carga completa de sub-recursos e iframes (once: true libera listener na heap V8 — BUG-01) */
     if (typeof window !== 'undefined') {
-        window.addEventListener('load', blindarCSS);
+        window.addEventListener('load', blindarCSS, { once: true });
     }
     let ultimoTimestampEsc = 0;
     let ultimoTextoSelecionadoLimpo = '';
@@ -7731,12 +7777,135 @@
         }, 120);
     }
 
+    /* ==========================================================================
+     * REGISTRO DETERMINISTICO DE CICLO DE VIDA DE SUBFRAMES (BUG-01 / SECAO 6.47)
+     * O porque: Iframes dinamicos de visualizacao de autos/PDFs no PJe, eproc e SAJ
+     * sao criados, recarregados (troca de atributo 'src') e removidos continuamente
+     * sem recarregar a aba pai. Governar cada subframe same-origin com seu proprio
+     * AbortController garante remocao deterministica O(1) das closures de eventos
+     * em 4 gatilhos: (a) ativacao do motor nativo no proprio subframe, (b) evento
+     * pagehide definitivo (!persisted), (c) remocao fisica do <iframe> no DOM via
+     * MutationObserver (removedNodes) ou troca de 'src', e (d) abort do frame pai.
+     * ========================================================================== */
+    const conjuntoControladoresSubframes = new Set();
+    const mapaSubframePorElemento = new WeakMap();
+
+    function limparOuvintesIframeLocal(el) {
+        if (!el) return false;
+        const reg = mapaSubframePorElemento.get(el);
+        if (!reg) return false;
+        mapaSubframePorElemento.delete(el);
+        if (reg.controller) {
+            conjuntoControladoresSubframes.delete(reg.controller);
+            try { reg.controller.abort(); } catch (_) { }
+        }
+        if (reg.subWin) {
+            try { reg.subWin.__JUSGOV_OUVINTE_LOCAL__ = false; } catch (_) { }
+        }
+        return true;
+    }
+
+    function limparTodosSubframesLocais() {
+        if (conjuntoControladoresSubframes.size === 0) return 0;
+        const lista = Array.from(conjuntoControladoresSubframes);
+        conjuntoControladoresSubframes.clear();
+        for (let i = 0; i < lista.length; i++) {
+            try { lista[i].abort(); } catch (_) { }
+        }
+        return lista.length;
+    }
+
+    function inspecionarIframeLocal(el) {
+        if (!el || el.tagName !== 'IFRAME') return false;
+        try {
+            if (!el.contentDocument || !el.contentWindow) {
+                limparOuvintesIframeLocal(el);
+                return false;
+            }
+            const subDoc = el.contentDocument;
+            const subWin = el.contentWindow;
+
+            /* Com allFrames: true, o Service Worker injeta o content script em cada subframe.
+             * Se o subframe ja possui motor proprio ativo, remove eventual fallback anterior e aborta. */
+            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+                limparOuvintesIframeLocal(el);
+                return false;
+            }
+
+            const regExistente = mapaSubframePorElemento.get(el);
+            if (regExistente) {
+                if (regExistente.subWin === subWin && regExistente.controller && !regExistente.controller.signal.aborted) {
+                    return false;
+                }
+                limparOuvintesIframeLocal(el);
+            }
+
+            if (subWin.__JUSGOV_OUVINTE_LOCAL__) {
+                return false;
+            }
+
+            const subCtrl = new AbortController();
+            const subSignal = subCtrl.signal;
+            conjuntoControladoresSubframes.add(subCtrl);
+            mapaSubframePorElemento.set(el, { controller: subCtrl, subWin });
+            subWin.__JUSGOV_OUVINTE_LOCAL__ = true;
+
+            subSignal.addEventListener('abort', () => {
+                conjuntoControladoresSubframes.delete(subCtrl);
+                try { subWin.__JUSGOV_OUVINTE_LOCAL__ = false; } catch (_) { }
+            }, { once: true });
+
+            subDoc.addEventListener('selectionchange', () => {
+                if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+                    limparOuvintesIframeLocal(el);
+                    return;
+                }
+                tratarMudancaSelecaoGlobal(subWin);
+            }, { passive: true, signal: subSignal });
+
+            subWin.addEventListener('mousedown', (e) => {
+                if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+                    limparOuvintesIframeLocal(el);
+                    return;
+                }
+                aoPressionarBotaoMouse(e);
+            }, { capture: true, signal: subSignal });
+
+            subWin.addEventListener('mousemove', (e) => {
+                if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+                    limparOuvintesIframeLocal(el);
+                    return;
+                }
+                aoMoverMouse(e);
+            }, { capture: true, passive: true, signal: subSignal });
+
+            subWin.addEventListener('mouseup', (e) => {
+                if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
+                    limparOuvintesIframeLocal(el);
+                    return;
+                }
+                aoSoltarBotaoMouse(e);
+            }, { capture: true, signal: subSignal });
+
+            /* Auto-desmontagem deterministica quando o subdocumento for descarregado sem BFCache */
+            subWin.addEventListener('pagehide', (ev) => {
+                if (!ev || !ev.persisted) {
+                    limparOuvintesIframeLocal(el);
+                }
+            }, { capture: true, signal: subSignal });
+
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
     /*
      * FUNCAO: observarFramesDinamicos
-     * DIRETRIZ ROOT: Observa a adicao e navegacao dinamica de iframes, embeds ou objects
+     * DIRETRIZ ROOT: Observa a adicao, navegacao e remocao dinamica de iframes, embeds ou objects
      * de visualizadores de PDF (comuns em sistemas judiciais como PJe e eproc), notifica o
-     * Service Worker para garantir a injecao imediata da suite em subframes e anexa
-     * diretamente ouvintes de seguranca em iframes same-origin.
+     * Service Worker para garantir a injecao imediata da suite em subframes e gerencia
+     * ouvintes same-origin sem vazamento de closures (BUG-01).
      */
     function observarFramesDinamicos() {
         if (observerFrames) {
@@ -7748,38 +7917,6 @@
                 try {
                     if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                         chrome.runtime.sendMessage({ acao: 'garantirInjecaoSubframes' }).catch(() => { });
-                    }
-                } catch (_) { }
-            };
-
-            const inspecionarIframeLocal = (el) => {
-                if (!el || el.tagName !== 'IFRAME') return;
-                try {
-                    if (el.contentDocument && el.contentWindow) {
-                        const subDoc = el.contentDocument;
-                        const subWin = el.contentWindow;
-                        // Com allFrames: true, o Service Worker ja injeta o content script em cada subframe.
-                        // Se o subframe ja possui motor ativo, o frame pai nao anexa ouvintes redundantes.
-                        if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__ || subWin.__JUSGOV_OUVINTE_LOCAL__) {
-                            return;
-                        }
-                        subWin.__JUSGOV_OUVINTE_LOCAL__ = true;
-                        subDoc.addEventListener('selectionchange', () => {
-                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
-                            tratarMudancaSelecaoGlobal(subWin);
-                        }, { passive: true });
-                        subWin.addEventListener('mousedown', (e) => {
-                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
-                            aoPressionarBotaoMouse(e);
-                        }, { capture: true });
-                        subWin.addEventListener('mousemove', (e) => {
-                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
-                            aoMoverMouse(e);
-                        }, { capture: true, passive: true });
-                        subWin.addEventListener('mouseup', (e) => {
-                            if (subWin.__JUSGOV_MOTOR_SELECAO_ATIVO__) return;
-                            aoSoltarBotaoMouse(e);
-                        }, { capture: true });
                     }
                 } catch (_) { }
             };
@@ -7797,11 +7934,33 @@
                 let surgiuModalCritico = false;
                 for (let i = 0; i < mutations.length; i++) {
                     const m = mutations[i];
+
+                    /* Passo BUG-01.1: Desmontar ouvintes de iframes removidos fisicamente da arvore DOM */
+                    const removidos = m.removedNodes;
+                    if (removidos && removidos.length > 0) {
+                        for (let r = 0; r < removidos.length; r++) {
+                            const noRem = removidos[r];
+                            if (noRem && noRem.nodeType === Node.ELEMENT_NODE) {
+                                if (noRem.tagName === 'IFRAME') {
+                                    limparOuvintesIframeLocal(noRem);
+                                } else if (typeof noRem.getElementsByTagName === 'function') {
+                                    const iframesRem = noRem.getElementsByTagName('iframe');
+                                    for (let ir = 0; ir < iframesRem.length; ir++) {
+                                        limparOuvintesIframeLocal(iframesRem[ir]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (m.type === 'attributes') {
                         const t = m.target;
                         if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
                             temFrame = true;
-                            inspecionarIframeLocal(t);
+                            if (t.tagName === 'IFRAME') {
+                                limparOuvintesIframeLocal(t);
+                                inspecionarIframeLocal(t);
+                            }
                             break;
                         }
                     }
@@ -7832,23 +7991,21 @@
                             if (tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT') {
                                 temFrame = true;
                                 inspecionarIframeLocal(n);
-                                break;
                             } else if (typeof n.getElementsByTagName === 'function') {
                                 const subIframes = n.getElementsByTagName('iframe');
                                 if (subIframes && subIframes.length > 0) {
                                     temFrame = true;
-                                    inspecionarIframeLocal(subIframes[0]);
-                                    break;
+                                    for (let k = 0; k < subIframes.length; k++) {
+                                        inspecionarIframeLocal(subIframes[k]);
+                                    }
                                 }
                                 const subEmbeds = n.getElementsByTagName('embed');
                                 if (subEmbeds && subEmbeds.length > 0) {
                                     temFrame = true;
-                                    break;
                                 }
                             }
                         }
                     }
-                    if (temFrame) break;
                 }
                 if (surgiuModalCritico) {
                     limparFlashBorderImediatamente();
@@ -7968,6 +8125,90 @@
     /* ==========================================================================
      * SECAO 10: INICIALIZACAO, ABORTCONTROLLER E SINCRONIZACAO COM SERVICE WORKER
      * ========================================================================== */
+    let ouvinteStorageSync = null;
+    let ouvinteMensagemRuntime = null;
+    let ouvintesIpcRegistrados = false;
+
+    function sincronizarFachadasModulares() {
+        if (fachadaModuloInput && typeof fachadaModuloInput.atualizarConfiguracoes === 'function') {
+            try {
+                fachadaModuloInput.atualizarConfiguracoes({
+                    capturaBotoesMouse4e5Ativa,
+                    colarBotaoMeioAtivo,
+                    navegacaoTecladoCamposAtiva,
+                    atalhoF1GeminiAtivo,
+                    promptF1Gemini
+                });
+            } catch (_) { }
+        }
+    }
+
+    function removerOuvintesIpcExtensao() {
+        if (!ouvintesIpcRegistrados) return;
+        ouvintesIpcRegistrados = false;
+        try {
+            if (ouvinteStorageSync && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.removeListener === 'function') {
+                chrome.storage.onChanged.removeListener(ouvinteStorageSync);
+            }
+        } catch (_) { }
+        try {
+            if (ouvinteMensagemRuntime && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage && typeof chrome.runtime.onMessage.removeListener === 'function') {
+                chrome.runtime.onMessage.removeListener(ouvinteMensagemRuntime);
+            }
+        } catch (_) { }
+    }
+
+    /*
+     * FUNCAO: destruirCicloVidaFrame (BUG-01)
+     * OBJETIVO DE RECONSTRUCAO: Encerrar deterministicamente 100% dos listeners globais,
+     * controladores de subframes (iframes same-origin), MutationObservers, timers pendentes
+     * e canais IPC quando um frame/subframe for descarregado definitivamente (pagehide com
+     * persisted === false) ou durante testes de homologacao, evitando retencao de closures V8.
+     */
+    function destruirCicloVidaFrame() {
+        limparTodosSubframesLocais();
+        if (controladorCicloVida) {
+            try { controladorCicloVida.abort(); } catch (_) { }
+            controladorCicloVida = null;
+        }
+        if (window.__JUSGOV_ABORT_CONTROLLER__) {
+            try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) { }
+            window.__JUSGOV_ABORT_CONTROLLER__ = null;
+        }
+        if (observerFrames) {
+            try { observerFrames.disconnect(); } catch (_) { }
+            observerFrames = null;
+        }
+        if (observadorBlindagem) {
+            try { observadorBlindagem.disconnect(); } catch (_) { }
+            observadorBlindagem = null;
+        }
+        if (timerDebounceSelecaoGlobal) {
+            clearTimeout(timerDebounceSelecaoGlobal);
+            timerDebounceSelecaoGlobal = null;
+        }
+        if (timerFlashBorder) {
+            clearTimeout(timerFlashBorder);
+            timerFlashBorder = null;
+        }
+        if (timerCliqueDireitoColagem) {
+            clearTimeout(timerCliqueDireitoColagem);
+            timerCliqueDireitoColagem = null;
+        }
+        if (timerNotificacaoModificacao) {
+            clearTimeout(timerNotificacaoModificacao);
+            timerNotificacaoModificacao = null;
+        }
+        try { limparFlashBorderImediatamente(); } catch (_) { }
+        try { limparAvisosAuditoriaEWikiImediatamente(); } catch (_) { }
+        removerOuvintesIpcExtensao();
+        isMousePressionado = false;
+        botaoLateralEmProcessamento = 0;
+        teclasPressionadasAtivas.clear();
+        window.__JUSGOV_MOTOR_SELECAO_ATIVO__ = false;
+        return true;
+    }
+
     function registrarListenersDOM() {
         if (controladorCicloVida) {
             try { controladorCicloVida.abort(); } catch (_) { }
@@ -7975,20 +8216,47 @@
         if (window.__JUSGOV_ABORT_CONTROLLER__) {
             try { window.__JUSGOV_ABORT_CONTROLLER__.abort(); } catch (_) { }
         }
+        window.__JUSGOV_MOTOR_SELECAO_ATIVO__ = true;
         controladorCicloVida = new AbortController();
         window.__JUSGOV_ABORT_CONTROLLER__ = controladorCicloVida;
         const signal = controladorCicloVida.signal;
 
         signal.addEventListener('abort', () => {
+            limparTodosSubframesLocais();
             if (observerFrames) {
                 try { observerFrames.disconnect(); } catch (_) { }
                 observerFrames = null;
+            }
+            if (observadorBlindagem) {
+                try { observadorBlindagem.disconnect(); } catch (_) { }
+                observadorBlindagem = null;
             }
             if (timerDebounceSelecaoGlobal) {
                 clearTimeout(timerDebounceSelecaoGlobal);
                 timerDebounceSelecaoGlobal = null;
             }
-        });
+            if (timerFlashBorder) {
+                clearTimeout(timerFlashBorder);
+                timerFlashBorder = null;
+            }
+            if (timerCliqueDireitoColagem) {
+                clearTimeout(timerCliqueDireitoColagem);
+                timerCliqueDireitoColagem = null;
+            }
+            if (timerNotificacaoModificacao) {
+                clearTimeout(timerNotificacaoModificacao);
+                timerNotificacaoModificacao = null;
+            }
+        }, { once: true });
+
+        /* Passo BUG-01.2: Desmontagem deterministica no descarregamento definitivo do frame/subframe.
+         * Quando event.persisted === true (navegacao elegivel ao Back-Forward Cache / BFCache),
+         * mantem os ouvintes intactos para restauracao instantanea ao voltar na aba. */
+        window.addEventListener('pagehide', (e) => {
+            if (!e || !e.persisted) {
+                destruirCicloVidaFrame();
+            }
+        }, { capture: true, signal });
 
         blindarCSS();
         observarFramesDinamicos();
@@ -8220,10 +8488,11 @@
                                 acumulador.definirSeparadorTabela(separadorTabelas);
                             }
                         }
+                        sincronizarFachadasModulares();
                     }
                 });
 
-                chrome.storage.onChanged.addListener((changes, area) => {
+                ouvinteStorageSync = (changes, area) => {
                     if (area === 'sync') {
                         if (changes.modoTurbo) modoExecucao = changes.modoTurbo.newValue;
                         if (changes.urlsTurbo) listaUrlsPermitidas = changes.urlsTurbo.newValue || [];
@@ -8315,12 +8584,15 @@
                             ativoAmpuletas = (changes.ativoAmpuletas.newValue !== false);
                             blindarCSS();
                         }
+                        sincronizarFachadasModulares();
                     }
-                });
+                };
+                chrome.storage.onChanged.addListener(ouvinteStorageSync);
+                ouvintesIpcRegistrados = true;
             }
 
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-                chrome.runtime.onMessage.addListener((msg) => {
+                ouvinteMensagemRuntime = (msg) => {
                     if (msg && msg.acao === 'executarDeselecaoGeral') {
                         executarDeselecaoUniversal(true);
                         return;
@@ -8416,9 +8688,13 @@
                             ativoAmpuletas = msg.ativoAmpuletas;
                             blindarCSS();
                         }
+                        sincronizarFachadasModulares();
                     }
-                });
+                };
+                chrome.runtime.onMessage.addListener(ouvinteMensagemRuntime);
+                ouvintesIpcRegistrados = true;
             }
+            sincronizarFachadasModulares();
         } catch (_) { }
     }
 
@@ -8559,7 +8835,6 @@
                 if (!res) res = tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
                 if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
                 if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
-                if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
             } else {
                 res = tentarExpandirPadraoComposto(texto, idxZeroBased, false, false);
                 if (!res) res = expandirUnidadeAtomicaEstagio1(texto, idxZeroBased);
@@ -8690,6 +8965,50 @@
         },
         notificarModificacaoPagina(motivo, urlRef) {
             notificarModificacaoPagina(motivo, urlRef);
+        },
+        /* Hooks deterministicos de homologacao de ciclo de vida (BUG-01) e fachadas POO (Secao 6.47) */
+        destruirCicloVida() {
+            return destruirCicloVidaFrame();
+        },
+        reconstruirCicloVida() {
+            registrarListenersDOM();
+            if (!ouvintesIpcRegistrados) {
+                try {
+                    if (ouvinteStorageSync && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+                        chrome.storage.onChanged.addListener(ouvinteStorageSync);
+                        ouvintesIpcRegistrados = true;
+                    }
+                    if (ouvinteMensagemRuntime && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+                        chrome.runtime.onMessage.addListener(ouvinteMensagemRuntime);
+                        ouvintesIpcRegistrados = true;
+                    }
+                } catch (_) { }
+            }
+            sincronizarFachadasModulares();
+            return true;
+        },
+        inspecionarSubframeTeste(iframeEl) {
+            return inspecionarIframeLocal(iframeEl);
+        },
+        limparSubframeTeste(iframeEl) {
+            return limparOuvintesIframeLocal(iframeEl);
+        },
+        obterEstadoCicloVida() {
+            return {
+                motorAtivo: Boolean(window.__JUSGOV_MOTOR_SELECAO_ATIVO__),
+                controladorAtivo: Boolean(controladorCicloVida && !controladorCicloVida.signal.aborted),
+                sinalAbortado: controladorCicloVida ? Boolean(controladorCicloVida.signal.aborted) : true,
+                observerFramesAtivo: Boolean(observerFrames),
+                observadorBlindagemAtivo: Boolean(observadorBlindagem),
+                subframesMonitoradosCount: conjuntoControladoresSubframes.size,
+                ouvintesIpcRegistrados: Boolean(ouvintesIpcRegistrados)
+            };
+        },
+        obterFachadaCopia() {
+            return fachadaModuloCopia;
+        },
+        obterFachadaInput() {
+            return fachadaModuloInput;
         }
     });
 

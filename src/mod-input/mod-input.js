@@ -17,12 +17,18 @@
  * 3) PASSOS DE RECONSTRUÇÃO DO ZERO (PSEUDOCÓDIGO INTERCALADO):
  *    Passo 1.1: Definição dos Null Objects para as 4 dependências funcionais.
  *    Passo 1.2: Injeção de dependências no construtor da classe ModuloInput.
- *    Passo 1.3: Registro idempotente de listeners globais de mouse e teclado no document/window.
- *    Passo 1.4: Sincronização reativa de configurações via chrome.storage ou mensagens.
+ *    Passo 1.3: Registro idempotente de listeners globais de mouse e teclado no document/window
+ *               governado por AbortController privado (#abortController) e auto-desmontagem
+ *               determinística em pagehide (!event.persisted) para prevenção de vazamento de
+ *               closures em subframes/iframes dinâmicos (BUG-01).
+ *    Passo 1.4: Sincronização reativa de configurações via chrome.storage ou mensagens,
+ *               mantendo desacoplamento estrito entre Grupo 3 (Input), Grupo 2 (Cópia)
+ *               e Grupo 4 (Navegador via IPC assíncrono) conforme Seção 6.47.
  *
  * DOCUMENTAÇÃO COMPLEMENTAR:
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Diretrizes 1, 9, 11, 14 e 16)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Módulo mod-input)
+ * - docs/04_RADAR_BUGS_E_QUALIDADE.md (BUG-01: Ciclo de vida determinístico em subframes)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004 e ADR-006)
  * ========================================================================== */
 
@@ -69,6 +75,8 @@
         #tecladoCampos;
         #atalhoF1;
         #inicializado = false;
+        #abortController = null;
+        #documentoAssociado = null;
 
         /**
          * @param {Object} [opcoes={}]
@@ -104,16 +112,45 @@
         get tecladoCampos() { return this.#tecladoCampos; }
         get atalhoF1() { return this.#atalhoF1; }
         get inicializado() { return this.#inicializado; }
+        get sinalCicloVida() { return this.#abortController ? this.#abortController.signal : null; }
 
         /**
-         * Inicializa os listeners globais de eventos no document e window de forma idempotente
+         * Desmonta deterministicamente todos os ouvintes DOM anexados por esta fachada (BUG-01),
+         * liberando closures de eventos em documentos e subframes descarregados sem aguardar GC.
+         * @returns {boolean} True se havia um ciclo ativo que foi encerrado
+         */
+        destruir() {
+            const estavaAtivo = Boolean(this.#inicializado || this.#abortController);
+            if (this.#abortController) {
+                try {
+                    this.#abortController.abort();
+                } catch (_) { }
+                this.#abortController = null;
+            }
+            this.#documentoAssociado = null;
+            this.#inicializado = false;
+            return estavaAtivo;
+        }
+
+        /**
+         * Inicializa os listeners globais de eventos no document e window de forma idempotente,
+         * atrelados a um AbortController dedicado com limpeza automática em pagehide (!persisted).
          * @param {Document} [doc=document]
          * @returns {boolean} True se inicializado com sucesso
          */
         inicializar(doc = (typeof document !== 'undefined' ? document : null)) {
-            if (!doc || this.#inicializado) {
+            if (!doc || typeof doc.addEventListener !== 'function') {
                 return false;
             }
+            if (this.#inicializado && this.#documentoAssociado === doc && this.#abortController && !this.#abortController.signal.aborted) {
+                return false;
+            }
+            if (this.#abortController) {
+                this.destruir();
+            }
+
+            const ctrl = new AbortController();
+            const signal = ctrl.signal;
 
             /* Passo 1.3: Registro de manipuladores de eventos de mouse */
             const tratarMouse = (e) => {
@@ -138,18 +175,34 @@
             };
 
             try {
-                doc.addEventListener('mouseup', tratarMouse, true);
-                doc.addEventListener('auxclick', tratarMouse, true);
-                doc.addEventListener('keydown', tratarTeclado, true);
+                doc.addEventListener('mouseup', tratarMouse, { capture: true, signal });
+                doc.addEventListener('auxclick', tratarMouse, { capture: true, signal });
+                doc.addEventListener('keydown', tratarTeclado, { capture: true, signal });
+
+                /* Passo 1.5 (BUG-01): Auto-teardown determinístico caso o documento/subframe seja
+                 * definitivamente descarregado (pagehide sem BFCache), preservando BFCache quando persisted=true. */
+                const winAssociada = doc.defaultView;
+                if (winAssociada && typeof winAssociada.addEventListener === 'function') {
+                    winAssociada.addEventListener('pagehide', (ev) => {
+                        if (!ev || !ev.persisted) {
+                            this.destruir();
+                        }
+                    }, { capture: true, signal });
+                }
+
+                this.#abortController = ctrl;
+                this.#documentoAssociado = doc;
                 this.#inicializado = true;
                 return true;
             } catch (_) {
+                try { ctrl.abort(); } catch (__) { }
                 return false;
             }
         }
 
         /**
          * Atualiza os estados de ativação com base nas configurações da extensão
+         * (aceitando tanto as chaves de UI opt* quanto as chaves persistidas no chrome.storage.sync).
          * @param {Object} cfg
          */
         atualizarConfiguracoes(cfg = {}) {
@@ -173,8 +226,16 @@
                 this.#tecladoCampos.ativo = cfg.navegacaoTecladoCamposAtiva;
             }
 
-            if (typeof cfg.optPromptF1Gemini === 'string') {
+            if (typeof cfg.optAtalhoF1Gemini === 'boolean') {
+                this.#atalhoF1.ativo = cfg.optAtalhoF1Gemini;
+            } else if (typeof cfg.atalhoF1GeminiAtivo === 'boolean') {
+                this.#atalhoF1.ativo = cfg.atalhoF1GeminiAtivo;
+            }
+
+            if (typeof cfg.optPromptF1Gemini === 'string' && cfg.optPromptF1Gemini.trim().length > 0) {
                 this.#atalhoF1.promptPadrao = cfg.optPromptF1Gemini;
+            } else if (typeof cfg.promptF1Gemini === 'string' && cfg.promptF1Gemini.trim().length > 0) {
+                this.#atalhoF1.promptPadrao = cfg.promptF1Gemini;
             }
         }
     }
