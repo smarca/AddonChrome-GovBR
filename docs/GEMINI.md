@@ -17,16 +17,16 @@ Finalidade: Regras de automação, conduta e carregamento de contexto para o age
   [`00_INDICE_GERAL.md`](00_INDICE_GERAL.md)
 - Este índice é o **roteador semântico** do projeto. Ele indica o arquivo exato para cada objetivo, economizando tokens e evitando a leitura desnecessária de múltiplos arquivos.
 
-## 2. Padrão Visual Obrigatório de Resposta (Diretriz Root 13)
+## 2. Padrão Visual Obrigatório de Resposta e Sugestões Proativas (Diretrizes Root 1 e 13)
 - Todas as respostas com planos, relatórios parciais ou conclusões devem utilizar o formato estruturado em tabelas Markdown:
-  - Tabela `📋 Próximas ações pendentes` (com colunas `# | ID / Seção | Tipo | Descrição da Pendência | Próximo Passo`);
-  - Tabela `✅ Ações implementadas` (com colunas `Item / Arquivo | Tipo de Ação | Detalhamento da Solução`);
+  - Tabela `📋 Quadro de Pendências Priorizadas` (5 colunas: `# | ID / Seção | Tipo | P | Descrição da Pendência`), exibindo 10 casos com `!` (urgente), `?` (revisar), `+` (sugestão automatizada da IA) e `#2`/`#1` (itens mais antigos nos dois slots finais);
+  - Tabela `✅ Ações Implementadas (v<versao>)` (com colunas `Item / Arquivo | Tipo de Ação | Detalhamento da Solução`), sem hashes Git nem instruções de recarga;
   - Seguidas de tópicos objetivos e hierárquicos com links clicáveis para os arquivos.
 
 ## 3. Reúso Estrito dos Utilitários em `util/` (Economia Máxima de Tokens)
 - Sempre utilize os scripts prontos de terminal em `util/` em vez de reescrever lógica no chat ou inventar comandos alternativos:
   - `powershell -ExecutionPolicy Bypass -File util/verificar_codificacao.ps1` (Valida UTF-8, entidades e links MD);
-  - `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` (Executa os 290 testes headless V8);
+  - `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` (Executa os 460 testes headless V8);
   - `powershell -ExecutionPolicy Bypass -File util/fazer_backup.ps1` (Gera backup versionado e sincroniza o README.md);
   - `powershell -ExecutionPolicy Bypass -File util/gerar_exemplos_js.ps1` (Compila `exemplos.json` para `exemplos.js`).
 

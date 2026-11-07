@@ -62,7 +62,7 @@ Sempre que um documento ou data é selecionado, o aplicativo audita sua validade
   * **`1x Esc`:** Limpa qualquer seleção ativa na página (inclusive dentro de quadros/iframes), esvazia o acumulador e fecha alertas visuais.
   * **`2x Esc` (Rápido):** Alterna instantaneamente entre o modo **Somente Texto Puro** e o modo **Manter Formatação Básica/Rica**.
 * **`F1` (Envio Rápido para Assistente de IA):** Ao selecionar um trecho do processo e pressionar `F1`, o texto é inserido no seu modelo personalizado de prompt jurídico, copiado para a área de transferência e enviado para análise em assistente de Inteligência Artificial (Painel Lateral ou aba dedicada).
-* **Colagem Rápida via Botão Direito e Navegação no Mouse:** Suporte opcional para colar textos com o botão direito do mouse em editores e alternar rapidamente entre abas abertas usando os **Botões Laterais 4 e 5 do mouse**.
+* **Colagem Rápida (2 Níveis Internos) e Navegação no Mouse:** Suporte opcional para colar a **Última Seleção** com o Botão do Meio (Scroll Click) ou Botão Direito, colar a **Penúltima Seleção** com `Ctrl + Botão do Meio` (memória interna de 2 slots sem leitura do clipboard do sistema) e alternar rapidamente entre abas abertas usando os **Botões Laterais 4 e 5 do mouse**.
 
 ---
 

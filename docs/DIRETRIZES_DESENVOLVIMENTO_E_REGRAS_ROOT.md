@@ -84,11 +84,12 @@ Documento Complementar: [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQU
       - Tabela `📋 Quadro de Pendências Priorizadas` (com 5 colunas canônicas ultra-otimizadas: `# | ID / Seção | Tipo | P | Descrição da Pendência`):
         * **Quantidade Estrita de Linhas e Ordenação Topológica:** Exibir sempre **10 casos** (se existirem no backlog/radar), organizados rigorosamente pela seguinte ordem estrutural:
           1. **Início da Lista (Topo Prioritário):** Itens marcados com o modificador de urgência `!` ("Assim que possível", "Urgente", "Pra agora");
-          2. **Corpo Intermediário:** Itens normais numerados sequencialmente (`1`, `2`, `3`...), ordenados pela taxonomia de prioridade (`↑`, `↗`, `→`, `↘`, `↓`), incluindo itens marcados com o modificador de revisão `?` ("Revisar / Reavaliar e reverificar a necessidade");
+          2. **Corpo Intermediário:** Itens normais numerados sequencialmente (`1`, `2`, `3`...), ordenados pela taxonomia de prioridade (`↑`, `↗`, `→`, `↘`, `↓`), incluindo itens marcados com `?` ("Revisar / Reavaliar e reverificar a necessidade") e sugestões automatizadas da IA marcadas com `+`;
           3. **Final da Lista (Últimos Slots):** Os itens mais antigos do histórico do projeto ocupam compulsoriamente as últimas posições, identificados com os símbolos `#2` e `#1`, sendo `#1` o mais antigo absoluto do histórico e `#2` o segundo mais antigo (caso já não estejam exibidos nas posições anteriores);
-        * **Coluna `#` e Tooltips para IDs Não-Padrão e Modificadores:** Numeração sequencial alinhada ao centro. Quando o identificador for não padrão (`#1`, `#2` para itens mais antigos, `!` para urgentes ou `?` para revisão), é obrigatório incluir tooltip descritivo nativo via `<span title="...">`:
+        * **Coluna `#` e Tooltips para IDs Não-Padrão e Modificadores:** Numeração sequencial alinhada ao centro. Quando o identificador for não padrão (`#1`, `#2`, `!`, `?` ou `+`), é obrigatório incluir tooltip descritivo nativo via `<span title="...">`:
           - `!` = `<span title="Urgente / Assim que possível">!</span>` (topo prioritário);
           - `?` = `<span title="Revisar: Reavaliar e reverificar a necessidade">?</span>` (marcado para reavaliação técnica);
+          - `+` = `<span title="Sugestão automatizada da IA (Bug provável / Nova feature)">+</span>` (sugestão proativa contínua da IA);
           - `#` = `<span title="ID não padrão: Tarefa antiga residual do histórico">#1</span>` (final da lista);
         * **Coluna `ID / Seção`:** Texto puro sem link de arquivo (para evitar quebra ou ícones M+ poluindo a visão), formatado com `<nobr>` / `white-space:nowrap` para caber estritamente em uma única linha e ajustar sua largura automaticamente;
         * **Coluna `Tipo`:** Dividido em duas linhas via `<br>` sem barra `/` (ex: `Correção<br>Expansão`, `Feature<br>Máscaras`), ajustando sua largura de forma estreita e compacta;
@@ -589,7 +590,7 @@ Consultar [BLUEPRINT_ARQUITETURA_E_RECONSTRUCAO.md](BLUEPRINT_ARQUITETURA_E_RECO
        - **Módulo de Mudança de Interface (UI / Interação):** Responsável isoladamente pelas rotinas de mouse (botões laterais 4 e 5, gestos), teclado (atalhos de sistema), tratamento de foco, clique em controles e auto-seleção específica em campos de formulários (`<input>`, `<textarea>`, editores e forms).
      * O código de intervenção em formulários e interface não deve poluir a lógica de parsing e seleção de texto corrido.
   2. **Preservação Unificada das Telas de Opções e Ajuda:**
-     * As páginas centrais de configuração ([options.html](../src/cfg/options.html)) e a Central de Ajuda ([ajuda.html](../src/cfg/ajuda.html)) devem **continuar centralizadas em arquivos únicos**, contendo todos os módulos integrados.
+     * As páginas centrais de configuração e a Central de Ajuda integrada ([options.html](../src/cfg/options.html)) devem **continuar centralizadas em arquivo único**, contendo todos os módulos integrados.
      * Manter a excelente organização já consolidada, onde as preferências e documentações são agrupadas de forma clara e intuitiva em seções/abas temáticas por módulo.
   3. **Aderência Obrigatória aos Princípios de Engenharia (Item 11 das Diretrizes Root):**
      * Estruturação de cada arquivo `.js` por Orientação a Objetos com encapsulamento de estado interno e guardas defensivas (`typeof ... === 'function'`) antes de qualquer chamada intermodular, garantindo que o desligamento de qualquer módulo de UI ou cópia jamais aborte ou quebre os demais módulos em execução.

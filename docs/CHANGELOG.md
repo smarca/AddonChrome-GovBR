@@ -16,6 +16,19 @@ O formato baseia-se no padrão [*Keep a Changelog*](https://keepachangelog.com/p
 
 ---
 
+## [v6.18] (261106.6.18) - 2026-11-06
+
+### Adicionado
+- **Seção 6.63 — Histórico Interno de Clipboard em 2 Slots (`Botão do Meio` e `Ctrl + Botão do Meio`):** Substituição da síntese de `Win+V` por memória interna persistente de 2 níveis (`ultimoClipboardInterno` e `ultimoClipboardAnteriorInterno`), colando o penúltimo item com `Ctrl + Clique` sem alterar o último slot.
+- **Seção 6.60 — Máscaras e Validação Algorítmica de Tributos Governamentais (DARF, GRU, IPTU):** Suporte completo a linhas digitáveis FEBRABAN de arrecadação (48 dígitos, Mod 10/11) e GRU Cobrança BB (`0019...`) na Wiki Forense e auditoria âmbar.
+- **Seções 6.3, 6.6 e 6.7 — Anti-Truncamento e Precedência `Alt + Clique`:** Espaçamento obrigatório anti-truncamento em cards multilinhas do PJe (`6.3`), captura exclusiva do rótulo em etiquetas/chips ignorando o ícone irmão de exclusão (`6.6`) e precedência estrita `bloco forense -> linha clicada -> texto integral` em links (`6.7`).
+
+### Corrigido
+- **BUG-01 & Seção 6.47 — Ciclo de Vida de Subframes e Unificação de Fachadas POO:** `AbortController` determinístico em subframes same-origin, método `destruir()` em `ModuloInput`, unificação de `ARQUIVOS_CONTEUDO_INTEGRADO` em `background.js` e correção de `emPrimeiroPlano` / marcadores F1.
+- **BUG-06 (Seção 6.59) & BUG-07 (Seção 6.62):** Expansão de sequências numéricas espaçadas genéricas (`215 7014 6992 8831`) com duplo clique ou clique no espaço e preservação integral da seleção ativa ao pressionar `Shift` (elevando a suíte para **460/460 testes aprovados** nos 32 arquivos JS).
+
+---
+
 ## [v4.14] (261106.4.14) - 2026-11-06
 
 ### Adicionado

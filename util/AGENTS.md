@@ -16,16 +16,17 @@
 
 ## 🛠️ CATÁLOGO EXECUTIVO DE FERRAMENTAS (`util/`)
 
-A tabela abaixo relaciona os **17 scripts mantidos**, seus comandos de invocação em linha única, tempo médio de resposta e gatilhos de uso:
+A tabela abaixo relaciona os **18 scripts mantidos**, seus comandos de invocação em linha única, tempo médio de resposta e gatilhos de uso:
 
 | Script / Arquivo | Comando em 1 Linha | Tempo Médio | Finalidade Operacional e Gatilhos de Uso |
 | :--- | :--- | :---: | :--- |
-| [`executar_auditoria.ps1`](file:///z:/AddonChrome-GovBR/util/executar_auditoria.ps1) | `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` | ~4s | **Auditoria Headless V8:** Valida a sintaxe estrita dos 32 arquivos JS e executa os 300 testes funcionais. Rodar antes de commits, backups e deploys. |
+| [`executar_auditoria.ps1`](file:///z:/AddonChrome-GovBR/util/executar_auditoria.ps1) | `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` | ~4s | **Auditoria Headless V8:** Valida a sintaxe estrita dos 32 arquivos JS e executa os 460 testes funcionais. Rodar antes de commits, backups e deploys. |
 | [`verificar_codificacao.ps1`](file:///z:/AddonChrome-GovBR/util/verificar_codificacao.ps1) | `powershell -ExecutionPolicy Bypass -File util/verificar_codificacao.ps1 [-Arquivos "path"]` | ~0.1s a ~1.5s | **Auditor de Codificação:** Garante UTF-8 sem BOM, sem Mojibake, sem entidades HTML e sem links MD quebrados. Suporta parâmetro `-Arquivos` para validar apenas arquivos modificados pontualmente. |
 | [`fazer_backup.ps1`](file:///z:/AddonChrome-GovBR/util/fazer_backup.ps1) | `powershell -ExecutionPolicy Bypass -File util/fazer_backup.ps1` | ~3s | **Backup com Rotação GFS:** Incrementa versão no `manifest.json`, limpa `tmp/`, sincroniza `settings.json` e compacta o repositório em `bkp/`. |
 | [`backup.bat`](file:///z:/AddonChrome-GovBR/util/backup.bat) | `util\backup.bat` | ~3s | **Atalho Rápido CLI:** Invoca `fazer_backup.ps1` diretamente no terminal CMD com repasse de parâmetros opcionais (`/Fix`, `/Patch`, etc.). |
 | [`fazer_backup.bat`](file:///z:/AddonChrome-GovBR/util/fazer_backup.bat) | `util\fazer_backup.bat` | ~3s | **Atalho Interativo:** Executa o backup com comando `pause` ao final para visualização no Windows Explorer. |
 | [`postar_chrome.ps1`](file:///z:/AddonChrome-GovBR/util/postar_chrome.ps1) | `powershell -ExecutionPolicy Bypass -File util/postar_chrome.ps1` | ~1s | **Deploy Unidirecional (Push-Only):** Copia exclusivamente `manifest.json` e a pasta `src/` para a extensão online ativa em `Z:\AddonChrome-GovBR.chrome`. |
+| [`limpar_git.ps1`](file:///z:/AddonChrome-GovBR/util/limpar_git.ps1) | `powershell -ExecutionPolicy Bypass -File util/limpar_git.ps1` | ~4s | **Reset Limpo do Git:** Consolida o repositório em 1 commit inicial limpo (`v<versao>`), força push ao GitHub e sincroniza `Z:\AddonChrome-GovBR.chrome` sob comando expresso (`"limpar git"`). |
 | [`configurar_ambiente.ps1`](file:///z:/AddonChrome-GovBR/util/configurar_ambiente.ps1) | `powershell -ExecutionPolicy Bypass -File util/configurar_ambiente.ps1` | ~2s | **Setup Idempotente de PC:** Configura Git global, variáveis de ambiente e restaura settings da IDE ao abrir o projeto em novo computador. |
 | [`configurar_ambiente.bat`](file:///z:/AddonChrome-GovBR/util/configurar_ambiente.bat) | `util\configurar_ambiente.bat` | ~2s | **Atalho Interativo:** Invoca `configurar_ambiente.ps1` com pausa ao final para duplo clique no Explorer. |
 | [`gerar_exemplos_js.ps1`](file:///z:/AddonChrome-GovBR/util/gerar_exemplos_js.ps1) | `powershell -ExecutionPolicy Bypass -File util/gerar_exemplos_js.ps1` | ~1s | **Compilador do Catálogo (Build):** Compila o centralizador `src/cfg/exemplos.json` (ADR-005) gerando `src/cfg/exemplos.js` com `Object.freeze` profundo. |

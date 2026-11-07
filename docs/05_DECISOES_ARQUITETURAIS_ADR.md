@@ -24,7 +24,8 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 - **ADR-004:** Arquitetura Plana de Classes Especializadas em Diretório Único (copia-*.js e mod-copia.js)
 - **ADR-005:** Centralização Append-Only de Exemplos Forenses e Máscaras em exemplos.json
 - **ADR-006:** Resiliência em POO JavaScript via Injeção Opcional e Padrão Null Object
-- **ADR-007:** Governança do Fluxo de Trabalho — Fila de Tarefas Obrigatória, Anotar Primeiro no Backlog e Implementar sob Comando Expresso
+- **ADR-007:** Governança do Fluxo de Trabalho — Fila de Tarefas Obrigatória, Anotar Primeiro no Backlog, Sugestões Proativas (`+`) e Implementar sob Comando Expresso
+- **ADR-008:** Paridade Estrutural dos 4 Grupos de Opções em Subdiretórios Físicos Exclusivos com SRP e DIP
 
 ---
 
@@ -32,10 +33,9 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 
 - **Status:** Aprovado e Vigente.
 - **Contexto:** Ambientes corporativos do Poder Judiciário e computadores de servidores públicos frequentemente possuem restrições severas de instalação de runtimes como Node.js, Python ou ferramentas baseadas em NPM.
-- **Decisão:** A compilação, análise de sintaxe e suítes de testes automatizados são executadas via scripts nativos PowerShell (util/executar_auditoria.ps1), lançando instâncias headless do próprio Google Chrome para verificação estrita em runtime V8 genuíno.
+- **Decisão:** A compilação, análise de sintaxe e suítes de testes automatizados são executadas via scripts nativos PowerShell (`util/executar_auditoria.ps1`), lançando instâncias headless do próprio Google Chrome para verificação estrita em runtime V8 genuíno.
 - **Consequências:**
-  * Zero dependências externas ou 
-ode_modules no repositório.
+  * Zero dependências externas ou `node_modules` no repositório.
   * Ambiente 100% portável e reproduzível em qualquer máquina Windows padrão.
   * Validação no mesmo motor JavaScript V8 utilizado pelo usuário final em produção.
 
@@ -44,11 +44,10 @@ ode_modules no repositório.
 ### ADR-002: Simulação de Clipboard em Memória sem Permissões Nativas de Leitura
 
 - **Status:** Aprovado e Vigente.
-- **Contexto:** A invocação da API 
-avigator.clipboard.readText() pelo navegador aciona alertas invasivos de segurança ( O site deseja ler a área de transferência), quebrando a experiência de cópia silenciosa e gerando desconfiança no usuário.
-- **Decisão:** Implementação de um buffer simulado em memória (window.__JUSGOV_ULTIMO_CLIPBOARD__ e window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__) mantido sincronizado no momento da cópia (salvarClipboardInternoComBackup), com trava de segurança de 512KB.
+- **Contexto:** A invocação da API `navigator.clipboard.readText()` pelo navegador aciona alertas invasivos de segurança ("O site deseja ler a área de transferência"), quebrando a experiência de cópia silenciosa e gerando desconfiança no usuário.
+- **Decisão:** Implementação de um buffer simulado em memória de 2 níveis (`window.__JUSGOV_ULTIMO_CLIPBOARD__` e `window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__`, sincronizado via `chrome.storage.local` na Seção 6.63) mantido no momento da cópia (`salvarClipboardInternoComBackup`), com trava de segurança de 512KB.
 - **Consequências:**
-  * O clique com o Botão do Meio (e Ctrl + Botão do Meio) cola dados instantaneamente sem solicitar nenhuma permissão especial do Chrome.
+  * O clique com o Botão do Meio (último item) e `Ctrl + Botão do Meio` (penúltimo item, sem rotacionar o último) colam dados instantaneamente sem solicitar nenhuma permissão de leitura ao Chrome e sem depender do `Win+V` do SO.
   * Privacidade forense garantida e compatibilidade com iframes restritos.
 
 ---
@@ -57,9 +56,9 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 
 - **Status:** Aprovado e Vigente.
 - **Contexto:** Disparar expressões regulares complexas a cada micro-movimento ou clique de mouse causa engasgos (*jank*) e consumo excessivo de CPU no renderer do Chromium.
-- **Decisão:** Criação de uma tabela Uint8Array(128) pré-computada em ConstantesPadroes.js para classificação bitmask imediata de delimitadores, letras, dígitos e pontuações em ~2 nanossegundos por caractere.
+- **Decisão:** Criação de uma tabela `Uint8Array(128)` pré-computada em `ConstantesPadroes.js` para classificação bitmask imediata de delimitadores, letras, dígitos e pontuações em ~2 nanossegundos por caractere.
 - **Consequências:**
-  * Tempo de processamento (1)$ na identificação de unidades atômicas.
+  * Tempo de processamento $O(1)$ na identificação de unidades atômicas.
   * Expressões regulares são invocadas apenas após o isolamento inicial das fronteiras do token.
 
 ---
@@ -67,10 +66,10 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 ### ADR-004: Arquitetura de Classes Especializadas em Diretório Plano Único
 
 - **Status:** Aprovado e Implementado.
-- **Contexto:** O arquivo SelecionarCopiar.js concentrava ~8.600 linhas. A criação de subpastas profundas aumentava a complexidade de paths e o consumo de tokens de IA em prompts de leitura de arquivos.
-- **Decisão:** Desacoplar o motor em arquivos concisos (copia-estagio1.js até copia-visual.js) orquestrados por uma fachada mod-copia.js, mantendo todos dentro do mesmo diretório src/mod-copia/.
+- **Contexto:** O arquivo `SelecionarCopiar.js` concentrava ~8.600 linhas. A criação de subpastas profundas aumentava a complexidade de paths e o consumo de tokens de IA em prompts de leitura de arquivos.
+- **Decisão:** Desacoplar o motor em arquivos concisos (`copia-estagio1.js` até `copia-visual.js`) orquestrados por uma fachada `mod-copia.js`, mantendo todos dentro do mesmo diretório `src/mod-copia/`.
 - **Consequências:**
-  * Classes coesas com responsabilidade única e campos privados (#).
+  * Classes coesas com responsabilidade única e campos privados (`#`).
   * Máxima economia de tokens de IA e facilidade de localização em buscas no repositório.
 
 ---
@@ -78,10 +77,10 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 ### ADR-005: Centralização Append-Only de Exemplos e Máscaras em exemplos.json
 
 - **Status:** Aprovado e Vigente.
-- **Contexto:** Anteriormente existia duplicidade entre exemplos.txt, exemplos.js e a Central de Ajuda.
-- **Decisão:** Centralizar 100% dos exemplos positivos e negativos no arquivo src/cfg/exemplos.json, com política estrita append-only (nunca remover dados válidos, apenas incrementar casos).
+- **Contexto:** Anteriormente existia duplicidade entre `exemplos.txt`, `exemplos.js` e a Central de Ajuda.
+- **Decisão:** Centralizar 100% dos exemplos positivos e negativos no arquivo `src/cfg/exemplos.json` (compilado para `src/cfg/exemplos.js`), com política estrita append-only (nunca remover dados válidos, apenas incrementar casos).
 - **Consequências:**
-  * Fonte única de verdade compartilhada entre a página de opções, os testes em debug.js e a auditoria automatizada.
+  * Fonte única de verdade compartilhada entre a página de opções, os testes em `debug.js` e a auditoria automatizada.
 
 ---
 
@@ -101,7 +100,7 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 
 - **Status:** Aprovado e Vigente.
 - **Contexto:** Em projetos de alta complexidade com interações contínuas entre desenvolvedor humano e IA, comandos imediatos de codificação podem gerar refatorações precipitadas, desalinhamento conceitual ou efeitos colaterais indesejados caso uma solicitação seja implementada antes de sua análise técnica e estruturação documental.
-- **Decisão:** Formalizar na Diretriz Root 1 a regra estrita: toda solicitação cai obrigatoriamente na fila do Backlog (`docs/03_BACKLOG_TAREFAS_E_FEATURES.md`). O agente NUNCA implementa de imediato; ele primeiro expõe com clareza seu entendimento técnico e salva o plano na documentação (sem depender de confirmação para salvar o registro). A codificação em `src/` e `manifest.json` só é iniciada mediante comando expresso "implementar". O agente gerencia as prioridades técnicas (Alta, Média, Baixa) segundo as melhores práticas de engenharia de software, marcando de forma explícita caso o usuário solicite alteração de prioridade (`[Prioridade Alterada pelo Usuário]`).
+- **Decisão:** Formalizar na Diretriz Root 1 a regra estrita: toda solicitação cai obrigatoriamente na fila do Backlog (`docs/03_BACKLOG_TAREFAS_E_FEATURES.md`), acompanhada de sugestões automatizadas proativas da IA sinalizadas com `+`. O agente NUNCA implementa de imediato; ele primeiro expõe com clareza seu entendimento técnico e salva o plano na documentação. A codificação em `src/` e `manifest.json` só é iniciada mediante comando expresso `"implementar"`.
 - **Consequências:**
   * Zero risco de refatorações ou modificações não deliberadas em código de produção.
   * Registro documental completo e histórico de decisões antes de qualquer linha de código ser alterada.
@@ -111,10 +110,10 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 
 ### ADR-008: Paridade Estrutural dos 4 Grupos de Opções em Subdiretórios Físicos Exclusivos com SRP e DIP
 
-- **Status:** Aprovado e Vigente (Versão 261106.4.8).
+- **Status:** Aprovado e Vigente (Versão 261106.6.18).
 - **Contexto:** A interface de opções (`options.html`) divide as configurações do usuário em 4 grandes grupos: (1) Cópia Inteligente & Forense, (2) Acelerador PJe Turbo, (3) Teclado/Mouse: Navegação por Teclado e Botões Laterais, e (4) Navegador: Gerenciamento de Guias e Janelas. Anteriormente, as rotinas de teclado/mouse e guias estavam parcialmente concentradas em `background.js` e em trechos utilitários, sem isolamento de classes especializadas em pastas dedicadas.
 - **Decisão:** Estabelecer paridade 1:1 rigorosa entre os 4 grupos visíveis de opções e a estrutura física de subdiretórios em `src/`:
-  1. `src/mod-copia/` (12 classes POO especializadas + fachada `mod-copia.js`);
+  1. `src/mod-copia/` (15 classes/módulos POO especializados + fachada `mod-copia.js`);
   2. `src/mod-pje/` (`PJE-anti_ampuletas.css`);
   3. `src/mod-input/` (4 classes especializadas + fachada `mod-input.js`);
   4. `src/mod-navegador/` (4 classes especializadas + fachada `mod-navegador.js`).
@@ -122,4 +121,4 @@ avigator.clipboard.readText() pelo navegador aciona alertas invasivos de seguran
 - **Consequências:**
   * Coesão física e lógica perfeita entre o modelo mental da UI (`options.html`) e o código-fonte em `src/`.
   * Modularidade plug-and-play: cada módulo pode ser testado, mantido, reconfigurado ou excluído de forma totalmente independente.
-  * Suíte de testes V8 Chromium Headless com 300 asserções determinísticas (100% de cobertura).
+  * Suíte de testes V8 Chromium Headless com 460 asserções determinísticas (100% de cobertura em 32 arquivos JS).

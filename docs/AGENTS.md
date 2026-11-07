@@ -17,27 +17,29 @@ Finalidade: Regras de automação, conduta e carregamento de contexto para o age
 - Ao iniciar uma nova sessão ou receber qualquer comando, consulte imediatamente o índice central em:
   [`00_INDICE_GERAL.md`](00_INDICE_GERAL.md)
 - Este índice é o **roteador semântico** do projeto. Ele indica o arquivo exato para cada objetivo, economizando tokens e evitando a leitura desnecessária de múltiplos arquivos.
+- **Economia Extrema de Tokens (`@MAPA-IA`):** Ao inspecionar arquivos `.js`, consulte primeiro o cabeçalho `@MAPA-IA` / Blueprint no topo e leia apenas as faixas de linhas necessárias (`StartLine`/`EndLine`).
 
-## 2. Governança do Fluxo de Trabalho: Fila Obrigatória de Backlog e Deliberação Prévia (Diretriz Root 1)
+## 2. Governança do Fluxo de Trabalho: Fila Obrigatória de Backlog, Sugestões Proativas (`+`) e Deliberação Prévia (Diretriz Root 1)
 - **Fila Obrigatória de Backlog:** Toda e qualquer solicitação, nova funcionalidade, alteração comportamental, refatoração ou reporte de bug enviado pelo usuário no chat deve obrigatoriamente entrar na fila de coisas a fazer em [`03_BACKLOG_TAREFAS_E_FEATURES.md`](03_BACKLOG_TAREFAS_E_FEATURES.md).
+- **Sugestão Proativa Contínua da IA (`+`):** Sempre sugerir e anotar silenciosamente prováveis bugs e novas features identificados durante inspeções em [`03_BACKLOG_TAREFAS_E_FEATURES.md`](03_BACKLOG_TAREFAS_E_FEATURES.md) e [`04_RADAR_BUGS_E_QUALIDADE.md`](04_RADAR_BUGS_E_QUALIDADE.md), sinalizando-os com **`+`** (`<span title="Sugestão automatizada da IA (Bug provável / Nova feature)">+</span>`) na coluna `#` do Quadro de Pendências.
 - **Proibição Inegociável de Implementação Imediata:** NUNCA IMPLEMENTAR NA MESMA HORA. É expressamente proibido ao agente alterar arquivos de código de produção (`src/`, `manifest.json`, etc.) imediatamente ao receber a mensagem de solicitação.
 - **Comportamento Imediato do Agente:**
   1. Exibir com clareza o entendimento técnico da solicitação, especificando o escopo, impacto arquitetural e plano de ação;
   2. Salvar imediatamente (sem confirmação prévia para salvar na documentação) a proposta nos arquivos competentes de documentação e backlog;
   3. Aguardar o direcionamento do usuário (caso ele queira alterar ou ajustar algo antes de codificar).
 - **Gatilho de Execução:** Apenas quando o usuário enviar expressamente o comando "implementar" (ou gatilho inequívoco de codificação), o código de produção é alterado e os testes são executados.
-- **Controle Dinâmico de Prioridades:** O agente atribui a prioridade técnica das tarefas (Alta, Média, Baixa) no Backlog com base nas melhores práticas de engenharia de software. Caso o usuário solicite a mudança de prioridade, a solicitação prevalece e o agente deve sinalizar expressamente na tabela de pendências: `[Prioridade Alterada pelo Usuário]`.
+- **Controle Dinâmico de Prioridades:** O agente atribui a prioridade técnica em 5 níveis (`↑`, `↗`, `→`, `↘`, `↓`), aplicando sublinhado `<u>` quando ajustada pelo usuário, `!` para urgentes, `?` para revisão e `+` para sugestões automatizadas da IA.
 
 ## 3. Padrão Visual Obrigatório de Resposta (Diretriz Root 13)
 - Todas as respostas com planos, relatórios parciais ou conclusões devem utilizar o formato estruturado em tabelas Markdown:
-  - Tabela `📋 Próximas ações pendentes` (com colunas `# | ID / Seção | Tipo | Prioridade | Descrição da Pendência | Próximo Passo`), onde a coluna `Prioridade` exibe o nível técnico avaliado (Alta, Média, Baixa) e, quando alterada pelo usuário, a tag explícita `[Prioridade Alterada pelo Usuário]`;
-  - Tabela `✅ Ações implementadas` (com colunas `Item / Arquivo | Tipo de Ação | Detalhamento da Solução`);
+  - Tabela `📋 Quadro de Pendências Priorizadas` (5 colunas: `# | ID / Seção | Tipo | P | Descrição da Pendência`), exibindo rigorosamente **10 casos**, com `#2` e `#1` nos dois últimos slots para os itens mais antigos do histórico;
+  - Tabela `✅ Ações Implementadas (v<versao>)` (com colunas `Item / Arquivo | Tipo de Ação | Detalhamento da Solução`), omitindo commits Git e instruções de recarga;
   - Seguidas de tópicos objetivos e hierárquicos com links clicáveis para os arquivos.
 
 ## 4. Reúso Estrito dos Utilitários em `util/` (Economia Máxima de Tokens)
 - Sempre utilize os scripts prontos de terminal em `util/` em vez de reescrever lógica no chat ou inventar comandos alternativos:
   - `powershell -ExecutionPolicy Bypass -File util/verificar_codificacao.ps1` (Valida UTF-8, entidades e links MD);
-  - `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` (Executa os 290 testes headless V8);
+  - `powershell -ExecutionPolicy Bypass -File util/executar_auditoria.ps1` (Executa os 460 testes headless V8);
   - `powershell -ExecutionPolicy Bypass -File util/fazer_backup.ps1` (Gera backup versionado e sincroniza o README.md);
   - `powershell -ExecutionPolicy Bypass -File util/gerar_exemplos_js.ps1` (Compila `exemplos.json` para `exemplos.js`).
 

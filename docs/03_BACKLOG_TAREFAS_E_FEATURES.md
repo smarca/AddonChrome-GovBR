@@ -28,9 +28,15 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 >    - `implementar`: executa automaticamente a tarefa no topo das prioridades (`#1`);
 >    - `implementar #X`: executa especificamente o item de índice `#X` da tabela de pendências;
 >    - `implementar <ID/Seção/BUG>`: executa diretamente pelo identificador (ex.: `implementar BUG-06`, `implementar Seção 6.59`).
-> 4. **Controle Técnico de Prioridades em 5 Níveis:** O agente avalia e atribui as prioridades técnicas nos 5 níveis canônicos (Alta `↑`, Média alta `↗`, Média `→`, Média baixa `↘`, Baixa `↓`) com base em melhores práticas (segurança, riscos, bloqueios e impacto). Caso o usuário solicite alteração, a prioridade solicitada prevalece e deve ser sinalizada com sublinhado (`<u>`), adicionando `!` se urgente. Na tabela de pendências, exibem-se 10 casos com os 2 últimos reservados para os mais antigos (`#2` e `#1`).
+> 4. **Controle Técnico de Prioridades em 5 Níveis e Modificadores (`!`, `?`, `+`, `#1`/`#2`):** O agente avalia e atribui as prioridades técnicas nos 5 níveis canônicos (Alta `↑`, Média alta `↗`, Média `→`, Média baixa `↘`, Baixa `↓`). Caso o usuário solicite alteração, a prioridade solicitada prevalece com sublinhado (`<u>`). Na coluna `#`, utilizam-se `!` (urgente), `?` (revisar), **`+`** (sugestão automatizada contínua da IA para prováveis bugs e novas features) e `#2`/`#1` nos 2 últimos slots das 10 linhas para os itens mais antigos do histórico.
 > 5. **Salvaguarda de Não-Baixa Prematura:** Jamais marcar itens como implementados antes da efetiva implementação no código, testes aprovados e commit.
 > 6. **Persistência Compulsória de Perguntas Finalizadoras com Indexação:** Perguntas de fechamento de turno em aberto são mantidas na fila com link clicável de retorno para o diálogo original (`conversation://<conversation-id>`). Se não houver perguntas pendentes, a seção correspondente nas respostas do chat é 100% omitida (não mostrar nada).
+
+### 🔎 Matriz Consolidada de Reconciliação Empírica com o Código (`v261106.6.18` — 32/32 JS V8 • 460/460 Testes Aprovados)
+- **Seções já implementadas e homologadas em produção (`HEAD`):** `6.1`, `6.3`, `6.4`, `6.5`, `6.6`, `6.7`, `6.9`, `6.11`, `6.14`, `6.15`, `6.16`, `6.17` (evoluída na `6.63`), `6.18`, `6.21`, `6.22`, `6.23`, `6.24`, `6.25`, `6.26`, `6.27`, `6.28`, `6.29`, `6.30`, `6.31`, `6.32`, `6.33`, `6.34`, `6.35`, `6.36`, `6.37`, `6.39` a `6.44`, `6.46` a `6.63`, além de `BUG-01`, `BUG-02`, `BUG-04`, `BUG-05`, `BUG-06` e `BUG-07`.
+- **Seções descartadas pelo usuário:** `6.2`, `6.8` (já corrigido), `6.38` e `BUG-03`.
+- **Pendências históricas abertas:** `6.10` (`#1` mais antiga), `6.12` (`#2` segunda mais antiga), `6.13` (desacoplamento residual em `SelecionarCopiar.js`), `6.20` (mapeamento manual XPath/CSS) e `6.45` (protocolos de 9 dígitos).
+- **Novas pendências anotadas na varredura atual (`2026-11-07`):** `6.64` (mandato do usuário: comentários de reconstrução, `@MAPA-IA` e blindagem POO) + sugestões automatizadas da IA marcadas com **`+`**: `BUG-08` a `BUG-13` (em [`04_RADAR_BUGS_E_QUALIDADE.md`](04_RADAR_BUGS_E_QUALIDADE.md)) e `6.65` a `6.67` (abaixo).
 
 ### ❓ Fila de Perguntas Finalizadoras e Confirmações Pendentes de Resposta
 > As perguntas e chamadas de decisão/confirmação feitas pelo agente ao final de cada turno que não forem respondidas de imediato pelo usuário são obrigatoriamente salvas nesta fila com link nativo navegável (`conversation://<conversation-id>`). Em cumprimento à **Regra de Auto-Aceite ("Accept All" Compulsório)**, implementações autorizadas não demandam perguntas de confirmação.
@@ -166,7 +172,7 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
        - **Módulo de Mudança de Interface (UI / Interação):** Responsável isoladamente pelas rotinas de mouse (botões laterais 4 e 5, gestos), teclado (atalhos de sistema), tratamento de foco, clique em controles e auto-seleção específica em campos de formulários (`<input>`, `<textarea>`, editores e forms).
      * O código de intervenção em formulários e interface não deve poluir a lógica de parsing e seleção de texto corrido.
   2. **Preservação Unificada das Telas de Opções e Ajuda:**
-     * As páginas centrais de configuração ([options.html](../src/cfg/options.html)) e a Central de Ajuda ([ajuda.html](../src/cfg/ajuda.html)) devem **continuar centralizadas em arquivos únicos**, contendo todos os módulos integrados.
+     * As páginas centrais de configuração e a Central de Ajuda integrada ([options.html](../src/cfg/options.html)) devem **continuar centralizadas em arquivo único**, contendo todos os módulos integrados.
      * Manter a excelente organização já consolidada, onde as preferências e documentações são agrupadas de forma clara e intuitiva em seções/abas temáticas por módulo.
   3. **Aderência Obrigatória aos Princípios de Engenharia (Item 11 das Diretrizes Root):**
      * Estruturação de cada arquivo `.js` por Orientação a Objetos com encapsulamento de estado interno e guardas defensivas (`typeof ... === 'function'`) antes de qualquer chamada intermodular, garantindo que o desligamento de qualquer módulo de UI ou cópia jamais aborte ou quebre os demais módulos em execução.
@@ -385,7 +391,7 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
   1. Ficam estritamente **excluídos** do tratamento de conteúdo editável todos os elementos pertencentes à interface/barra de ferramentas do editor: elementos com `id` ou `class` iniciados por `cke_*` (`cke_top`, `cke_toolbox`, `cke_toolbar`, `cke_combo`, `cke_button`, `cke_reset`, `cke_chrome`, `cke_inner`, `cke_voice_label`) ou cujo pai/avô/ancestral seja o contêiner de interface `cke_*editor` (ex.: `id="cke_ckEditor-frame-editorTexto"` / `class="cke_editor_..."`), bem como barras `.ql-toolbar`, `.tox-toolbar`, `.mce-toolbar` e `.editor-toolbar-main`.
   2. A única exceção dentro do prefixo `cke_` que representa documento editável é `.cke_editable` (ou elemento com `contenteditable="true"` explícito).
 
-### 6.32 Seleção de Texto de Leitura em PDF Embedded (`pdf-viewer` / `<embed type="application/x-google-chrome-pdf">` / PDF.js) e Exceção da Interface do PDF (`viewer-toolbar` / `#toolbar` / `input#pageSelector`) [ANOTADO — PENDENTE DE AUTORIZAÇÃO]
+### 6.32 Seleção de Texto de Leitura em PDF Embedded (`pdf-viewer` / `<embed type="application/x-google-chrome-pdf">` / PDF.js) e Exceção da Interface do PDF (`viewer-toolbar` / `#toolbar` / `input#pageSelector`) [IMPLEMENTADO E COBERTO POR TESTES]
 - **Estrutura Identificada nas Imagens (PDF Embedded no PJe):**
   1. **Conteúdo de Leitura do PDF Embedded (Imagem 1):**
      * Host customizado `<pdf-viewer id="viewer">` com `#shadow-root (open)` contendo `<div id="container">` -> `<div id="main">` -> `<div id="scroller">` -> `<div id="content">` -> `<embed id="plugin" type="application/x-google-chrome-pdf" original-url="https://pje1g.trf1.jus.br/pje/downloadBinario.seam" src="chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/...">` (ou camada textual PDF.js `.textLayer` / `.pdfViewer` / `.page`).
@@ -427,7 +433,7 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
   * O bloco da opção "Retirar Seleções do Sistema após Copiar" apresenta estilo visual de fonte divergente das demais seções.
   * Padronizar as tags, tamanhos de fonte, cores e margens para seguir rigorosamente o padrão visual consolidado das demais opções do painel de configurações.
 
-### 6.35 Diagnóstico e Correção de Seleções em Editores CKEditor e em Visualizadores de PDF [ANOTADO — PENDENTE DE IMPLEMENTAÇÃO]
+### 6.35 Diagnóstico e Correção de Seleções em Editores CKEditor e em Visualizadores de PDF [IMPLEMENTADO E COBERTO POR TESTES]
 - **Diagnóstico Aprofundado via DevTools / Imagens Anexadas:**
   1. **Estrutura Real do CKEditor no PJe (Imagem `media_1793860964286_f8a38622.jpg`):**
      * O container externo é `<div id="taskInstanceForm:Minutar_ato-10552541588:editorTexto">` -> `<div class="col-sm-12">`.
@@ -855,7 +861,51 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 
 ---
 
-### 6.19 Status de Implementacao (2026-10-30) e Historico de Entregas
+### 6.64 Varredura Integral de Comentários de Reconstrução, Cabeçalhos `@MAPA-IA` (Economia de Tokens) e Blindagem POO nos 32 Arquivos JS [ANOTADO NO BACKLOG]
+- **Origem da Demanda:** Solicitação do usuário em 07/11/2026 (Itens 1, 3 e 5 da varredura global do repositório).
+- **Prioridade Técnica Avaliada:** Alta (`↑`).
+- **Escopo Técnico Detalhado para Execução sob `"implementar"`:**
+  1. **Comentários de Reconstrução (`Passo X.Y`) e Cabeçalhos `@MAPA-IA`:**
+     * Inserir em todos os 32 arquivos `.js` de `src/` um bloco `@MAPA-IA` compacto nas primeiras linhas mapeando classes, métodos públicos, dependências injetadas, eventos IPC e regras de negócio associadas, permitindo leitura seletiva em $O(1)$ com drástica redução de consumo de tokens de IA.
+     * Revisar e completar os intra-comentários `Passo X.Y` nos métodos de `src/mod-copia/`, `src/mod-input/`, `src/mod-navegador/` e `src/cfg/`, além de corrigir `'marco'` -> `'março'` no cabeçalho de `ConstantesPadroes.js`.
+  2. **Blindagem Estrita de Orientação a Objetos (Diretriz Root 11 e 16):**
+     * Aplicar `Object.freeze(Classe.prototype)` e `Object.freeze(Classe)` nas 22 classes POO do ecossistema (`copia-*.js`, `input-*.js`, `navegador-*.js`, `AvisoFlutuante.js` e `AcumuladorCopia.js`).
+     * Adicionar getters/setters no-op compatíveis com `'use strict'` nos `NULL_OBJECTS` congelados de `mod-copia.js`, `mod-input.js` e `mod-navegador.js` (prevenindo `TypeError: Cannot add property ..., object is not extensible` em mutações diretas de propriedades de estado quando um submódulo estiver ausente).
+     * Substituir `instanceof Element` / `instanceof HTMLElement` por duck-typing seguro cross-realm (`el && el.nodeType === 1`) em `mod-input/` e `mod-copia/`, garantindo compatibilidade plena com nós de subframes (`iframe`).
+     * Introduzir cache `WeakMap` para expressões regulares ancoradas em `copia-validadores.js` e `SelecionarCopiar.js` (concluindo `BP-03`) e guardas de idempotência `window.__JUSGOV_*_CARREGADO__` em `popup.js` e `editor_demo.js`.
+- **Status:** **ANOTADO NO BACKLOG (Aguardando comando `"implementar"`)**.
+
+---
+
+### 6.65 Visor Duplo de Memória Interna (Slot 1 + Slot 2) no Laboratório (`options.html`) e Higienização de Ajuda [SUGESTÃO AUTOMATIZADA IA +]
+- **Origem:** Sugestão automatizada da IA (`+`) após reconciliação da Seção 6.63 com `options.html` e `options.js`.
+- **Prioridade Técnica Avaliada:** Média (`→`).
+- **Proposta Técnica:**
+  * Expandir o painel `"Última Seleção"` da aba Laboratório (`src/cfg/options.html` e `src/cfg/options.js`) para exibir lado a lado o **Slot 1 (Última Seleção — Botão do Meio)** e o **Slot 2 (Penúltima Seleção — `Ctrl + Botão do Meio`)**, permitindo homologação visual instantânea do histórico interno de 2 níveis sem leitura do clipboard do SO, além de atualizar o texto residual de ajuda da colagem rápida com botão direito.
+- **Status:** **SUGESTÃO AUTOMATIZADA IA `+` (Anotado na fila)**.
+
+---
+
+### 6.66 Salto Rápido Forense (`GovBR Quick-Jump`) por Código CNJ (`J.TR`) e Ações Rápidas de Guias no `popup.html` [SUGESTÃO AUTOMATIZADA IA +]
+- **Origem:** Sugestão automatizada da IA (`+`) para aceleração operacional forense.
+- **Prioridade Técnica Avaliada:** Média baixa (`↘`).
+- **Proposta Técnica:**
+  * Aproveitar o decodificador `J.TR` já existente na Wiki Forense (`ConstantesPadroes.js` / `AvisoFlutuante.js`) para oferecer atalho opcional de abertura/reutilização direta da consulta pública ou painel PJe/eproc do tribunal correspondente ao número CNJ selecionado, além de adicionar botões compactos `"Fechar Duplicadas"` e `"Agrupar por Domínio"` no `src/cfg/popup.html` acionando `ModuloNavegador`.
+- **Status:** **SUGESTÃO AUTOMATIZADA IA `+` (Anotado na fila)**.
+
+---
+
+### 6.67 Migração do Economizador de RAM (`setInterval`) para `chrome.alarms` MV3 e Debounce de `storage.sync` [SUGESTÃO AUTOMATIZADA IA +]
+- **Origem:** Sugestão automatizada da IA (`+`) em auditoria de arquitetura Manifest V3 (`background.js` e `options.js`).
+- **Prioridade Técnica Avaliada:** Média alta (`↗`).
+- **Proposta Técnica:**
+  1. Em `src/cfg/background.js`, substituir `setInterval(..., 5 * 60 * 1000)` do descarte de abas inativas por `chrome.alarms.create('jusgov-descarte-ram', { periodInMinutes: 5 })` + `chrome.alarms.onAlarm`, pois o Chromium hiberna o Service Worker MV3 após ~30s de ociosidade, impedindo que `setInterval` dispare;
+  2. Em `src/cfg/options.js`, aplicar debounce de `250ms` na gravação de sliders e seletor de cores (`input`/`change`) para evitar estouro da cota `MAX_WRITE_OPERATIONS_PER_MINUTE` (120 escritas/min) do `chrome.storage.sync`.
+- **Status:** **SUGESTÃO AUTOMATIZADA IA `+` (Anotado na fila)**.
+
+---
+
+### 6.19 Status de Implementacao (Reconciliado em 2026-11-07 — 460/460 Testes) e Historico de Entregas
 * **Implementado e coberto por auditoria (182/182 testes):**
   * **Performance e Eliminação de Lentidão (Idempotência O(1) e Debounce de Injeção):**
     * Guardas de idempotência imediatas (`__JUSGOV_*_CARREGADO__` / `__JUSGOV_MOTOR_SELECAO_ATIVO__`) em `ConstantesPadroes.js`, `AvisoFlutuante.js`, `AcumuladorCopia.js` e `SelecionarCopiar.js`, impedindo recompilação repetitiva de dezenas de Regex e recriação de listeners DOM.

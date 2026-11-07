@@ -274,43 +274,26 @@ O motor opera um ciclo deterministico de transicao dinamica de estados baseado n
 A estrutura do projeto segue estrita separacao de responsabilidades em subpastas dentro de src/:
 
 ### MODULO 1: COPIA INTELIGENTE & FORENSE (src/mod-copia/)
-1. src/mod-copia/ConstantesPadroes.js: Tabela Uint8Array(128) O(1), configuracoes de motor, expressoes regulares atomicas, regexes de auditoria matematica, todos os 13 grupos do catalogo forense congelados via Object.freeze, alem das tabelas da Wiki Forense (tabela de 90+ especies INSS, ramos/tribunais J.TR do CNJ e regioes fiscais da RFB).
-2. src/mod-copia/AvisoFlutuante.js: Validador matematico nao-bloqueante (CPF Modulo 11, CNPJ classico e alfanumerico ASCII-48, Processo CNJ Modulo 97 BigInt, Datas/Bissextos e Beneficio INSS NB Modulo 11). Sistema contextual Wiki Forense com cartoes informativos em verde (decodificacao de especies INSS, orgaos/tribunais CNJ, regioes fiscais CPF e CNPJ Matriz/Filial com calculo automatico de Matriz). Shadow DOM fechado + Popover API manual.
-3. src/mod-copia/AcumuladorCopia.js: Gerenciador do Modo Acumulador (Ctrl+Alt). Desacoplamento de Sliced Strings V8, ordenacao DOM vs Modo Baralho (Shift), Toggle-Off, Desfazer, selecao de tabelas por colunas/linhas e CSS Custom Highlight API.
-4. src/mod-copia/SelecionarCopiar.js: Motor de selecao contextual em 6 estagios. Captura cliques, gerencia modificadores Ctrl/Alt/Shift, processa duplicidade de espaco=2 cliques, minoracao de 3 cliques, ciclo circular continuo de 5 degraus (expansao e reducao), arquitetura progressiva de filtros HTML em 5 niveis (0 a 4), atalho F1 Gemini, Duplo Esc, conversao automatica nativa de cabecalhos PJe ("Num. 2297820154 - Pag. 1" para "id 2297820154, pg. 1") e Colagem Rapida via Botao Direito (1 clique: modo normal/avancado; 2 cliques rapidos: texto puro; autorizacao nativa em dominios PJe/jus.br; link para download do X-Mouse Button Control em options).
+Arquitetura em diretório plano único com 16 arquivos JS (`ConstantesPadroes.js`, `AvisoFlutuante.js`, `AcumuladorCopia.js`, `copia-geometria.js`, `copia-filtros.js`, `copia-visual.js`, `copia-validadores.js`, `copia-minutas.js`, `copia-estagio1.js`..`copia-estagio6.js`, fachada `mod-copia.js` e motor integrado `SelecionarCopiar.js`), cobrindo os 13 grupos do catálogo forense, Wiki Forense, auditoria Mod 11/97/10, 6 estágios de seleção, 5 níveis de filtros HTML e memória interna de 2 slots no clipboard.
 
 ### MODULO 2: ACELERADOR PJE TURBO (src/mod-pje/)
-5. src/mod-pje/PJE-anti_ampuletas.css: Folha de estilos injetada em document_start nos dominios PJe para neutralizar cortinas modais de bloqueio visual ("Aguarde..."), ampulhetas e travamento de cursor.
+`src/mod-pje/PJE-anti_ampuletas.css`: Folha de estilos injetada em `document_start` nos domínios PJe (`opacity: 0.01 !important; pointer-events: none !important; z-index: -99999 !important`) preservando o ciclo AJAX do RichFaces e barras de progresso em lote.
 
-### MODULO 3: MOUSE (NAVEGACAO POR BOTOES LATERAIS)
-6. Captura nativa dos botoes 4 e 5 do mouse (botoes de navegacao lateral): Botao 4 retrocede a aba anterior a esquerda; Botao 5 avanca para a proxima aba aberta a direita na mesma janela, operando em ciclo circular continuo com supressao nativa do historico.
+### MODULO 3: TECLADO/MOUSE (src/mod-input/)
+5 arquivos POO especializados (`input-botoes-laterais.js`, `input-botao-meio.js`, `input-teclado-campos.js`, `input-atalho-f1.js` e fachada `mod-input.js` com Null Objects): troca circular de guias pelos botões 4/5, colagem do último buffer (Botão do Meio) e do penúltimo buffer (`Ctrl + Botão do Meio`, Seção 6.63), navegação `ArrowUp`/`ArrowDown` em inputs e atalho `F1` para IA.
 
-### MODULO 4: NAVEGADOR (GERENCIAMENTO DE GUIAS E JANELAS)
-7. Single Window (bloqueio de novas janelas avulsas e popups, forcando criacao de abas na janela principal ativa sem falhas de reparenting), controle de plano de abertura (segundo plano padrao vs primeiro plano), reutilizacao inteligente e anti-duplicacao de abas (comparacao de URL original e URL atual) e ordenacao automatica de guias ao abrir (por URL, dominio ou titulo, sentido A-Z ou Z-A, com suporte a guias fixadas).
+### MODULO 4: NAVEGADOR (src/mod-navegador/)
+5 arquivos POO especializados (`navegador-janela-unica.js`, `navegador-anti-duplicacao.js`, `navegador-ordenacao.js`, `navegador-descarte.js` e fachada `mod-navegador.js` com Null Objects): Janela Única preservando Gov.br/ICP/PJeOffice, reuso e anti-duplicação de abas, ordenação hierárquica / Tab Groups e Tab Discarding de RAM.
 
 ### CONFIGURACOES, NUCLEO E INTERFACES (src/cfg/ e src/ico/)
-8. manifest.json: Manifesto Oficial V3 (Chromium 116+) mantido na raiz do addon. Declaracao de permissoes minimas (clipboardWrite, scripting, storage, tabs), host_permissions: ["<all_urls>"], service worker ("src/cfg/background.js"), popup ("src/cfg/popup.html"), options ("src/cfg/options.html") e icones ("src/ico/icon128.png").
-9. src/cfg/background.js: Orquestrador em Service Worker. Injeta CSS Anti-Ampulhetas e modulos JS por match patterns, gerencia Single Window, anti-duplicacao de abas, ordenacao automatica de guias, chaveamento circular de abas pelos botoes 4 e 5 do mouse e atalho F1 Gemini.
-10. src/cfg/popup.html & src/cfg/popup.js: Interface popup minimalista de 350px.
-11. src/cfg/options.html & src/cfg/options.js: Painel de controle em 3 abas: (1) Preferencias e Opcoes Avancadas (incluindo grupos MOUSE e NAVEGADOR); (2) Central de Ajuda Completa com Help Blueprint; (3) Laboratorio Interativo com 7 blocos de teste, console (>= WARN), botao de download do X-Mouse Button Control e suite de testes.
-12. src/cfg/debug.js: Suite automatizada completa com 149 testes de blueprint deterministico (100% aprovados) cobrindo todos os grupos forenses, numeros assinados (+ e -), colagem rapida via botao direito, botoes laterais do mouse, Single Window, ordenacao de guias e varredura exaustiva de cliques em todas as palavras dos HTMLs (popup.html e options.html), alem de suite de fuzzing randomico temporal (1s/T por tipo de teste).
-13. src/ico/icon128.png: Icone mestre oficial da extensao.
-14. docs/: Diretrizes de desenvolvimento, regras root e blueprints tecnicos com referencia cruzada.
-15. util/: Scripts oficiais de automacao de backup (fazer_backup.ps1 e fazer_backup.bat).
-16. bkp/: Repositorio padronizado de backups compactados (.zip).
+`manifest.json`, `src/cfg/background.js`, `popup.html`/`popup.js`, `options.html`/`options.js`, `editor_demo.js`, `exemplos.json`/`exemplos.js`, `src/cfg/debug.js` (460 testes determinísticos 100% aprovados em 32 arquivos JS + Fuzzing 1s/T), `src/ico/icon128.png`, `docs/`, `util/` (18 scripts) e `bkp/`.
 
 ---
 
 ## 4. ESTADO DE IMPLEMENTACAO E HOMOLOGACAO
 
-Todos os modulos do ecossistema estao 100% implementados, organizados, testados e homologados:
-- Sem pendencias de unificacao ou correcao em options.html/options.js.
-- Sincronizacao fina entre SelecionarCopiar.js e ConstantesPadroes.js 100% operacional.
-- Selecao cirurgica de Datas com Horario Contiguo ("18/09/2026 10:03:34" e "28/10/2026 - 06:28:50") 100% homologada (1 clique no espaco/separador seleciona o bloco completo sem truncamentos).
-- Atalho F1 (Prompt de IA) integrado com mascara personalizavel, alinhamento a esquerda e botao de restauracao instantanea de fabrica.
-- Modulos MOUSE e NAVEGADOR 100% integrados em background.js, options e content scripts.
-- Listeners onMessage em background.js 100% operacionais.
-- Suite automatizada de testes (debug.js) executada com 149/149 testes aprovados (0 falhas) em modo deterministico e cobertura de Fuzzing (1s/T).
-- 100% dos arquivos em conformidade estrita com US-ASCII puro de 7-bits (0 caracteres > 127).
-- Sistema oficial de backup automatizado configurado em util/ e gerando em bkp/.
+Todos os 4 módulos temáticos (32 arquivos JS) estão implementados, testados e homologados:
+- Suíte automatizada de testes (`debug.js`) executada com 460/460 testes aprovados (0 falhas) no Chromium Headless V8.
+- 100% dos arquivos em conformidade estrita com UTF-8 nativo direto sem BOM e zero entidades HTML proibidas (Diretriz Root 4).
+- Sistema oficial de auditoria, codificação, deploy e backup configurado em `util/` e gerando em `bkp/`.
 

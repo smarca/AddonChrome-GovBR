@@ -63,43 +63,63 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
     3. Usuário pode livremente continuar e estender a seleção para cima ou para baixo via teclado (`Shift + Setas`) ou via mouse (`Shift + Clique`);
     4. Adicionado teste determinístico na Bateria 19 de `src/cfg/debug.js` (`PRESERVACAO_SELECAO_TECLA_SHIFT`), elevando a suíte para 450/450 testes 100% aprovados no Chromium Headless.
 
+- **BUG-08: Dessincronização de IPC, Estado Inicial e Fachadas POO entre Background, Content Scripts e Opções [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:*
+    1. `SelecionarCopiar.js` aceita apenas `'basico'` e `'avancado'` no boot de `storage.sync.get`, descartando `'texto_puro'`, `'intermediario'` e `'estendido'`;
+    2. `background.js` não implementa os handlers de runtime `'TROCAR_GUIA_ANTERIOR'`, `'TROCAR_GUIA_PROXIMA'` e `'ABRIR_PAINEL_F1_GEMINI'` despachados por `ModuloInput`, não propaga `modoRetirarSelecao`/`nivelFiltroFormatacao` em `sincronizarEstado` e retém entradas órfãs em `mapaDebounceInjecaoTab` ao fechar abas (`tabs.onRemoved`);
+    3. `input-atalho-f1.js` lê `window.__JUSGOV_ULTIMO_CLIPBOARD__` como string direta, interpolando `[object Object]` quando o slot armazena `{ txt, html }`;
+    4. `mod-copia.js` (`ModuloCopia`) instancia um segundo `MotorValidacao` duplicado por divergência de chave (`avisoFlutuante` vs `validadorFlutuante`);
+    5. `copia-filtros.js` referencia `rx.PONTUACAO_FINAL_ISOLADA` inexistente em `REGEX_MOTOR` e duplica marcadores `<!--StartFragment-->` no retorno HTML;
+    6. `options.js` condiciona a habilitação das sub-opções de reuso a `optReutilizarAbasFoco` em vez do interruptor mestre `optReutilizarAbasAbertas`.
+  * *Plano de Correção:* Alinhar chaves IPC/storage, tratar os 3 comandos em `background.js`, extrair `.txt` em `AtalhoF1Gemini`, unificar injeção de `MotorValidacao`, corrigir regex/fragmento em `FiltrosHtml` e corrigir o gate em `options.js`, cobrindo tudo em `debug.js`.
+- **BUG-09: Colagens e Eventos DOM em Casos de Borda (Botão do Meio sobre Links, Inputs Tipados, Textarea, Flash 0ms e BFCache) [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:*
+    1. `input-botao-meio.js` invoca `e.preventDefault()` antes de validar se o alvo é editável (quebrando abertura de `<a href>` em nova aba com clique do meio) e aplica fallback com `setSelectionRange` após `execCommand('insertText')` em `<input type="number"|"email">`, lançando `InvalidStateError` e duplicando texto;
+    2. `SelecionarCopiar.js` usa o setter nativo de `HTMLInputElement.prototype` mesmo quando o alvo é `<textarea>`, trava `flashExclusivoSemSelecao = true` quando `tempoFlashBorderMs === 0`, não reseta flags transitórias em `pageshow` (`event.persisted === true` do BFCache) e invoca `ancestral.closest(...)` sem guarda defensiva para `DocumentFragment`/`ShadowRoot`;
+    3. `popup.js` interpola `hostnameAbaAtual` via `innerHTML` em vez de construção DOM segura (`textContent`).
+  * *Plano de Correção:* Restringir `preventDefault()` a alvos editáveis, separar setters `HTMLInputElement` vs `HTMLTextAreaElement`, proteger `setSelectionRange` com `try/catch`, respeitar `tempoFlashBorderMs === 0`, adicionar reset em `pageshow` e substituir `innerHTML` por DOM seguro em `popup.js`.
+- **BUG-10: Seletores Excessivamente Amplos em `src/mod-pje/PJE-anti_ampuletas.css` Ocultando Controles Numéricos e Alertas Críticos [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:*
+    1. `[id*="spinner" i], [class*="spinner" i]` oculta inputs numéricos legítimos PrimeNG (`<p-spinner>`, `.ui-spinner`, `.ui-spinner-input`);
+    2. `#toast-container, .toast-container, .ui-growl, .p-toast` suprime indiscriminadamente alertas vermelhos de erro de assinatura digital PJeOffice/Shodô e avisos de sessão expirada;
+    3. Regras de ícones spinner aplicam `display: none !important`, contrariando a salvaguarda RichFaces AJAX (`opacity: 0.01 !important`).
+  * *Plano de Correção:* Excluir explicitamente `:not(.ui-spinner):not(.ui-spinner-input):not(p-spinner)`, preservar toasts de erro/aviso (`.toast-error`, `.toast-warning`, `.ui-growl-message-error`, `.p-toast-message-error`) e padronizar `opacity: 0.01 !important`.
+- **BUG-11: Falsos Positivos em Janela Única, Divergência de QueryString na Anti-Duplicação e Injeção `<all_urls>` [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:*
+    1. `GerenciadorJanelaUnica` (`navegador-janela-unica.js` e `background.js`) usa `.includes('sso')` no título/URL (casando qualquer janela cujo título contenha `"Processo"` / `"acesso"`) e `.includes('gov.br')` isentando portais inteiros como `compras.gov.br` em vez de subdomínios de autenticação (`sso.acesso.gov.br`, `assinador`);
+    2. `GerenciadorAntiDuplicacao.normalizarUrl` descarta `u.search` inteira (colidindo processos distintos no SEI/eproc diferenciados por `?id_procedimento=...`), divergindo de `normalizarUrlComparacao` em `background.js`, além de `fecharGuiasDuplicadas` poder encerrar a aba ativa (`t.active`) quando outra duplicata tem ID menor;
+    3. `manifest.json` injeta `content_scripts` estaticamente em `<all_urls>` mesmo quando `modoAtivacao === 'url'`.
+  * *Plano de Correção:* Substituir `.includes('sso')` por regex de fronteira `/(?:^|[./-])sso(?:[./-]|$)/i` e lista estrita de endpoints OAuth/ICP, unificar normalização preservando parâmetros de negócio e blindando `t.active`, e avaliar `early-exit` ultrarrápido por lista de sites.
+- **BUG-12: Omissão da Validação do DV Geral Módulo 11 (Campo 4, Posição 33) em `validarBoletoBancario` (`AvisoFlutuante.js`) [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:* `validarBoletoBancario` valida apenas os 3 DVs parciais em Módulo 10 (Campos 1, 2 e 3), omitindo a reconstrução do código de barras de 44 posições e o cálculo do DV Geral Módulo 11 FEBRABAN (pesos 2..9), deixando alterações de fator de vencimento ou valor no Campo 5 sem alerta âmbar.
+  * *Plano de Correção:* Reconstruir as 43 posições base do código de barras e aferir o DV Geral (posição 33 da linha digitável) em `AvisoFlutuante.js` e `copia-validadores.js`.
+- **BUG-13: Ausência de Sublinhado (`_`) em `SIMBOLO_REPETIVEL` e Desalinhamento de Tabelas com `colspan`/`rowspan` no Acumulador [SUGESTÃO AUTOMATIZADA IA +]:**
+  * *Diagnóstico Estático:*
+    1. `ConstantesPadroes.js` não marca `'_'` (ASCII 95) com a bitmask `SIMBOLO_REPETIVEL`, impedindo que 1 clique expanda lacunas clássicas de minutas `__________`;
+    2. `AcumuladorCopia.js` indexa colunas por `cellIndex` bruto (desalinhando grades com `colspan`/`rowspan`) e `removerUltimoItem()` não sincroniza `this.itensTexto` com `this.itensOrdenados`.
+  * *Plano de Correção:* Incluir código 95 na máscara `SIMBOLO_REPETIVEL` (com guarda para `snake_case`), calcular mapa virtual de grade 2D em `AcumuladorCopia.js` e sincronizar `itensTexto` em `removerUltimoItem()`.
+
 ### 7.2 Oportunidades de Boas Práticas e Refatoração Arquitetural (Futura Otimização)
 - **BP-04: Resiliência em POO JavaScript via Injeção Opcional e Padrão Null Object (Diretriz Root 16 / ADR-006) [IMPLEMENTADO]:**
-- **BP-05: Governança do Fluxo de Trabalho e Controle Técnico de Prioridades (Diretriz Root 1 / ADR-007) [IMPLEMENTADO]:**
-  * *Descrição:* Fila compulsória para toda solicitação recebida, proibição inegociável de implementação imediata, anotação preliminar transparente na documentação e execução em código exclusivamente mediante o comando expresso "implementar".
-  * *Solução Implementada:* Matriz de priorização técnica (Alta, Média, Baixa) controlada pelo agente segundo as melhores práticas de engenharia de software, com identificação visual explícita `[Prioridade Alterada pelo Usuário]` quando ajustada a pedido do usuário.
   * *Descrição:* Eliminação definitiva do risco de `TypeError: Cannot read properties of undefined/null` quando qualquer arquivo ou submódulo for excluído, desabilitado ou falhar ao carregar.
-  * *Solução Implementada:* Todas as classes orquestradoras (`ModuloCopia`) adotam Null Objects com implementações neutras seguras (`null`, `false`, `""`, `{ ok: false }`), garantindo que qualquer chamada do teclado, mouse ou API execute de forma tolerante a falhas sem jamais interromper a extensão.
+  * *Solução Implementada:* Todas as classes orquestradoras (`ModuloCopia`, `ModuloInput`, `ModuloNavegador`) adotam Null Objects com implementações neutras seguras (`null`, `false`, `""`, `{ ok: false }`), garantindo tolerância total a falhas.
+- **BP-05: Governança do Fluxo de Trabalho, Sugestões Automatizadas (`+`) e Controle Técnico de Prioridades (Diretriz Root 1 / ADR-007) [IMPLEMENTADO]:**
+  * *Descrição:* Fila compulsória para toda solicitação recebida, proibição inegociável de implementação imediata, inclusão contínua de sugestões automatizadas da IA (`+`) e execução em código exclusivamente mediante o comando expresso `"implementar"`.
+  * *Solução Implementada:* Matriz de priorização técnica em 5 níveis (`↑`, `↗`, `→`, `↘`, `↓`) controlada pelo agente, com modificadores `!` (urgente), `?` (revisar), `+` (sugestão automatizada da IA) e `#1`/`#2` (itens mais antigos do histórico).
 - **BP-01: Desacoplamento Físico em 4 Módulos e POO Blindada (`src/mod-copia/`, `src/mod-pje/`, `src/mod-input/`, `src/mod-navegador/`) [IMPLEMENTADO]:**
   * *Descrição:* Em cumprimento às Diretrizes Root 9, 11 e 16, criação de classes especializadas em subdiretórios físicos dedicados para cada um dos 4 grupos de opções do addon, com classes seladas via `Object.freeze` e campos privados (`#propriedade`).
 - **BP-02: Barramento de Eventos e Padrão Null Object Intermodular [IMPLEMENTADO]:**
   * *Descrição:* Comunicação intermodular desacoplada via mensagens e injeção de dependências (DIP) com suporte a Null Objects em todos os orquestradores (`ModuloCopia`, `ModuloInput`, `ModuloNavegador`), garantindo ausência total de falhas caso arquivos sejam removidos.
-- **BP-03: Pré-Compilação de Expressões Regulares Ancoradas em `ConstantesPadroes.js` [IMPLEMENTADO]:**
-  * *Descrição:* Eliminação de `new RegExp('^(?:' + rx.source + ')$')` em tempo de execução, pré-compilando-as estaticamente no dicionário do catálogo forense.
+- **BP-03: Pré-Compilação e Cache `WeakMap` de Expressões Regulares Ancoradas [PARCIAL — COMPLEMENTO ANOTADO NA SEÇÃO 6.64]:**
+  * *Descrição:* `ConstantesPadroes.js` pré-compila as expressões centrais, restando eliminar alocações residuais `new RegExp('^(?:' + rx.source + ')$')` em `copia-validadores.js` e `SelecionarCopiar.js` via cache `WeakMap` (agendado na Seção 6.64).
 
 ### 7.3 Previsibilidade de Novas Funcionalidades e Evolução do Sistema
 - **FEAT-03: Validação Matemática Genérica Fallback para Números Não-Identificados em Balão Cinza (Seção 6.42) [IMPLEMENTADO]:**
   * Mecanismo de última barreira que testa algoritmos de dígitos verificadores (Mod 11 múltiplos pesos, Mod 97, Mod 10, CPF, CNPJ, etc.) em números puros, pontuados incompletos ou alfanuméricos.
   * Se aprovado, exibe balão em cinza neutro no formato `[Mod11]: <u>nnnnnnnn</u> ✓`; se não aprovado, permanece 100% silencioso.
 - **Alt + 3 Cliques em Links (Seção 6.28) [IMPLEMENTADO]:** Seleção integral multilinhas de links unificando o texto em linha única separada por espaços.
+- **FEAT-04: Visor Duplo de Memória Interna (Slot 1 + Slot 2) no Laboratório (`options.html` — Seção 6.65) [SUGESTÃO AUTOMATIZADA IA +].**
+- **FEAT-05: Salto Rápido Forense CNJ (`GovBR Quick-Jump`) e Ações Rápidas de Guias no `popup.html` (Seção 6.66) [SUGESTÃO AUTOMATIZADA IA +].**
+- **FEAT-06: Migração do Economizador de RAM para `chrome.alarms` MV3 + Debounce de Escrita `storage.sync` (Seção 6.67) [SUGESTÃO AUTOMATIZADA IA +].**
 - *(FEAT-01 e FEAT-02 dispensadas pelo usuário).*
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

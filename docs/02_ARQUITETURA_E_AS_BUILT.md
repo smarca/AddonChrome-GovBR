@@ -304,7 +304,7 @@ Arquitetura desacoplada em 12 classes especializadas em diretório plano único,
 ### MODULO 3: TECLADO/MOUSE: NAVEGAÇÃO POR TECLADO E BOTÕES LATERAIS (src/mod-input/)
 Arquitetura desacoplada em 5 classes especializadas em diretório plano dedicado, com tolerância total a falhas via Null Object Pattern:
 1. `input-botoes-laterais.js` (`BotoesLateraisMouse`): Captura nativa dos botões 4 e 5 do mouse (navegação lateral) para troca circular entre abas (Botão 4: aba anterior à esquerda; Botão 5: próxima aba à direita), com debounce de hardware (80ms) e cancelamento de propagação.
-2. `input-botao-meio.js` (`BotaoMeioColagem`): Colagem rápida do buffer da última seleção via clique com botão do meio (scroll click) em campos editáveis (`<input>`, `<textarea>`, `contenteditable`) e ativação do Histórico da Área de Transferência (`Win+V`) ao pressionar `Ctrl + Botão do Meio`.
+2. `input-botao-meio.js` (`BotaoMeioColagem`): Colagem rápida do buffer da última seleção via clique com botão do meio (scroll click) em campos editáveis (`<input>`, `<textarea>`, `contenteditable`) e colagem imediata do penúltimo buffer interno (memória de 2 níveis sem rotacionar o último item, conforme Seção 6.63) ao pressionar `Ctrl + Botão do Meio`.
 3. `input-teclado-campos.js` (`NavegacaoTecladoCampos`): Alternância sequencial de foco entre campos de entrada de formulários (`<input>`, exceto hidden/checkbox/radio) ao pressionar as setas verticais `ArrowUp` (campo anterior) e `ArrowDown` (próximo campo), com auto-seleção do texto contido.
 4. `input-atalho-f1.js` (`AtalhoF1Gemini`): Interceptação inteligente da tecla `F1`, suprimindo a ajuda nativa do Chrome/Windows e despachando a seleção ativa ou último buffer para processamento no Google Gemini sem poluir a área de transferência do usuário.
 5. `mod-input.js` (`ModuloInput`): Fachada orquestradora selada com `Object.freeze` que constrói o grafo de dependências via injeção opcional e Padrão Null Object tolerante a falhas, garantindo integridade caso qualquer arquivo de input seja removido.
@@ -319,27 +319,25 @@ Arquitetura desacoplada em 5 classes especializadas em diretório plano dedicado
 
 ### CONFIGURACOES, NUCLEO E INTERFACES (src/cfg/ e src/ico/)
 8. manifest.json: Manifesto Oficial V3 (Chromium 116+) mantido na raiz do addon. Declaracao de permissoes minimas (clipboardWrite, scripting, storage, tabs), host_permissions: ["<all_urls>"], service worker ("src/cfg/background.js"), popup ("src/cfg/popup.html"), options ("src/cfg/options.html") e icones ("src/ico/icon128.png").
-9. src/cfg/background.js: Orquestrador em Service Worker. Injeta CSS Anti-Ampulhetas e modulos JS por match patterns, gerencia Single Window, anti-duplicacao de abas, ordenacao automatica de guias, chaveamento circular de abas pelos botoes 4 e 5 do mouse e atalho F1 Gemini.
+9. src/cfg/background.js: Orquestrador em Service Worker. Injeta CSS Anti-Ampulhetas e os 32 scripts JS modulares por match patterns, gerencia Single Window, anti-duplicacao de abas, ordenacao automatica de guias, chaveamento circular de abas pelos botoes 4 e 5 do mouse e atalho F1 Gemini.
 10. src/cfg/popup.html & src/cfg/popup.js: Interface popup minimalista de 350px.
-11. src/cfg/options.html & src/cfg/options.js: Painel de controle em 3 abas: (1) Preferencias e Opcoes Avancadas (incluindo grupos MOUSE e NAVEGADOR); (2) Central de Ajuda Completa com Help Blueprint; (3) Laboratorio Interativo com 7 blocos de teste, console (>= WARN), botao de download do X-Mouse Button Control e suite de testes.
-12. src/cfg/debug.js: Suite automatizada completa com 149 testes de blueprint deterministico (100% aprovados) cobrindo todos os grupos forenses, numeros assinados (+ e -), colagem rapida via botao direito, botoes laterais do mouse, Single Window, ordenacao de guias e varredura exaustiva de cliques em todas as palavras dos HTMLs (popup.html e options.html), alem de suite de fuzzing randomico temporal (1s/T por tipo de teste).
+11. src/cfg/options.html & src/cfg/options.js: Painel de controle em 3 abas: (1) Preferencias e Opcoes Avancadas (4 grupos modulares); (2) Central de Ajuda Completa com Help Blueprint; (3) Laboratorio Interativo com blocos de teste, console (>= WARN), botao de download do X-Mouse Button Control e suite de testes.
+12. src/cfg/debug.js: Suite automatizada completa com 460 testes de blueprint deterministico (100% aprovados em 32 arquivos JS) cobrindo todos os grupos forenses, tributos DARF/GRU/IPTU, memoria interna de 2 slots do clipboard, ciclo de vida AbortController em subframes, anti-truncamento, precedencia Alt+Clique e fuzzing randomico temporal (1s/T por tipo de teste).
 13. src/ico/icon128.png: Icone mestre oficial da extensao.
 14. docs/: Diretrizes de desenvolvimento, regras root e blueprints tecnicos com referencia cruzada.
-15. util/: Scripts oficiais de automacao de backup (fazer_backup.ps1 e fazer_backup.bat).
+15. util/: 18 scripts oficiais de auditoria V8, codificacao, deploy e backup (fazer_backup.ps1 e fazer_backup.bat).
 16. bkp/: Repositorio padronizado de backups compactados (.zip).
 
 ---
 
 ## 4. ESTADO DE IMPLEMENTACAO E HOMOLOGACAO
 
-Todos os modulos do ecossistema estao 100% implementados, organizados, testados e homologados:
-- Sem pendencias de unificacao ou correcao em options.html/options.js.
-- Sincronizacao fina entre SelecionarCopiar.js e ConstantesPadroes.js 100% operacional.
-- Selecao cirurgica de Datas com Horario Contiguo ("18/09/2026 10:03:34" e "28/10/2026 - 06:28:50") 100% homologada (1 clique no espaco/separador seleciona o bloco completo sem truncamentos).
+Todos os 4 modulos do ecossistema estao implementados, organizados, testados e homologados:
+- Sincronizacao fina entre SelecionarCopiar.js, ConstantesPadroes.js e as 3 fachadas POO (`ModuloCopia`, `ModuloInput`, `ModuloNavegador`) operacional.
+- Selecao cirurgica de Datas com Horario Contiguo ("18/09/2026 10:03:34" e "28/10/2026 - 06:28:50") 100% homologada.
 - Atalho F1 (Prompt de IA) integrado com mascara personalizavel, alinhamento a esquerda e botao de restauracao instantanea de fabrica.
-- Modulos MOUSE e NAVEGADOR 100% integrados em background.js, options e content scripts.
-- Listeners onMessage em background.js 100% operacionais.
-- Suite automatizada de testes (debug.js) executada com 149/149 testes aprovados (0 falhas) em modo deterministico e cobertura de Fuzzing (1s/T).
-- 100% dos arquivos em conformidade estrita com US-ASCII puro de 7-bits (0 caracteres > 127).
+- Modulos TECLADO/MOUSE (`src/mod-input/`) e NAVEGADOR (`src/mod-navegador/`) integrados em background.js, options e content scripts.
+- Suite automatizada de testes (debug.js) executada com 460/460 testes aprovados (0 falhas) em modo deterministico e cobertura de Fuzzing (1s/T).
+- 100% dos arquivos em conformidade estrita com UTF-8 nativo direto sem BOM e zero entidades HTML proibidas (Diretriz Root 4).
 - Sistema oficial de backup automatizado configurado em util/ e gerando em bkp/.
 
