@@ -13,8 +13,18 @@
     // Aceita automaticamente edições aplicadas no editor sem exigir Accept All manual
     "antigravity.autoAcceptEdits": true,
 
-    // Tempo de delay (em segundos) para auto-aceite de edições no chat (0 = imediato)
-    "chat.editing.autoAcceptDelay": 0,
+    // Tempo de delay (em segundos) para auto-aceite de edições no chat (1s = aceite automático ativo; 0 desativa)
+    "chat.editing.autoAcceptDelay": 1,
+
+    // Aprova e aceita automaticamente edições em todos os arquivos sem intervenção manual
+    "chat.tools.edits.autoApprove": {
+        "**/*": true
+    },
+
+    // Habilita auto-aceite irrestrito de edições de arquivo e comandos do agente Antigravity
+    "antigravity.autoAccept.enabled": true,
+    "antigravity.autoAccept.fileEdits": true,
+    "antigravity.autoAccept.runCommands": true,
 
     // Salva automaticamente arquivos com edições geradas pela IA
     "chat.editing.alwaysSaveWithGeneratedChanges": true,
