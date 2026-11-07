@@ -785,43 +785,32 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 
 ---
 
-### 6.59 Correção de Expansão de Sequências Numéricas Espaçadas Genéricas (BUG-06) [PENDENTE]
+### 6.59 Correção de Expansão de Sequências Numéricas Espaçadas Genéricas (BUG-06) [IMPLEMENTADO E COBERTO POR TESTES]
 - **Origem e Diagnóstico:**
   * Solicitação do usuário acompanhada de evidência no Sandbox: dar dois cliques sobre a numeração `215 7014 6992 8831` ou clicar sobre o espaço intermediário não seleciona todo o bloco com números separados por espaço. O comportamento funciona para máscaras rígidas ("Chave NF-e", "Boleto FEBRABAN" e "Boleto Concessionária"), mas falha para blocos numéricos genéricos.
-  * Causa-Raiz: A expressão `MULTIPLOS_NUMEROS_ESPACADOS` foi declarada em `ConstantesPadroes.js`, porém não foi associada ao array ativo `CATALOGO_PADROES_JURIDICOS` dentro do grupo `CHAVES_FISCAIS_E_BOLETOS_ESPACADOS` com a flag `exigeEspacoOuDuploClique: true`. Como resultado, os estágios de expansão contextual não reconhecem a cadeia numérica espaçada genérica como um padrão composto agregável.
-- **Plano de Implementação Técnica (`src/mod-copia/ConstantesPadroes.js` e `SelecionarCopiar.js`):**
-  1. Inserir a regra de múltiplos números espaçados em `CATALOGO_PADROES_JURIDICOS` com `exigeEspacoOuDuploClique: true` e `suportaFiltroShiftDigitos: true`.
-  2. Blindar contra falsos positivos com números de telefone de formato padrão `(##) ####-####` ou `(##) #####-####` para assegurar que números telefônicos continuem sendo tratados com suas regras próprias.
-  3. Validar nos métodos `simularCliqueEmTexto` e nos listeners do DOM (`click` e `dblclick`) para garantir que 1 clique isolado selecione apenas a palavra/bloco numérico sob o cursor (ex: `215`), enquanto o duplo clique ou clique em espaço capture a cadeia completa (`215 7014 6992 8831`).
-  4. Adicionar asserções determinísticas de teste na Bateria 1 de `src/cfg/debug.js`.
-- **Prioridade Técnica:** **Alta** (resolução de inconsistência funcional com a especificação explícita do Sandbox).
-- **Status:** **PENDENTE (Aguardando comando expresso `implementar`)**.
+  * Causa-Raiz: A expressão `MULTIPLOS_NUMEROS_ESPACADOS` foi declarada em `ConstantesPadroes.js`, porém não foi associada ao array ativo `CATALOGO_PADROES_JURIDICOS` dentro do grupo `CHAVES_FISCAIS_E_BOLETOS_ESPACADOS` com a flag `exigeEspacoOuDuploClique: true`. Como resultado, os estágios de expansão contextual não reconheciam a cadeia numérica espaçada genérica como um padrão composto agregável.
+- **Solução Técnica Implementada (`src/mod-copia/ConstantesPadroes.js`, `SelecionarCopiar.js` e `copia-estagio2.js`):**
+  1. Integrada a regra de múltiplos números espaçados no grupo `CHAVES_FISCAIS_E_BOLETOS_ESPACADOS` de `CATALOGO_PADROES_JURIDICOS` com `exigeEspacoOuDuploClique: true` e `suportaFiltroShiftDigitos: true`, blindada com `(?<![\p{L}\p{N}\/.:])` e `(?![\p{L}\p{N}\/.:])` contra falsos positivos com datas (`/`), horários (`:`) e telefones.
+  2. Clique simples (1 clique) em qualquer bloco numérico sob o cursor seleciona e copia exclusivamente o bloco atômico (ex.: `215`), enquanto o clique no espaço ou duplo clique captura a sequência completa (`215 7014 6992 8831`).
+  3. Adicionados testes determinísticos na suíte de testes de `src/cfg/debug.js` (`BUG06_EXPANSAO_SEQUENCIA_NUMERICA_ESPACADA`).
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES**.
 
 ---
 
-### 6.60 Máscaras e Validação Algorítmica de Guias e Tributos Governamentais (DARF, GRU, IPTU / Arrecadação FEBRABAN Segmentos 1 e 5) [PENDENTE]
+### 6.60 Máscaras e Validação Algorítmica de Guias e Tributos Governamentais (DARF, GRU, IPTU / Arrecadação FEBRABAN Segmentos 1 e 5) [IMPLEMENTADO E COBERTO POR TESTES]
 - **Origem e Requisitos:**
   * Solicitação do usuário: Adicionar máscaras de boletos de pagamentos para o governo, como **DARF** (Receita Federal), **GRU** (Guia de Recolhimento da União) e **IPTU** (Tributos Municipais), realizando se possível a validação algorítmica de seus números.
-- **Especificação Técnica de Domínio:**
-  1. **Linhas Digitáveis de Arrecadação e Tributos Governamentais (Padrão FEBRABAN):**
-     * Estrutura de 48 dígitos dividida em 4 campos de 11 dígitos acompanhados de 1 dígito verificador (DV) por campo: `XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D`.
-     * Começam compulsoriamente com o dígito `8` (arrecadação).
-     * O 2º dígito identifica o segmento favorecido:
-       - `1` = Prefeituras / IPTU / ISS / Taxas Municipais;
-       - `5` = Órgãos Governamentais Federais / Estaduais / DARF / GRU Simples;
-       - `6` ou `7` = Demais arrecadações governamentais e carnês.
-     * O 3º dígito determina o módulo matemático para cálculo do DV:
-       - Se `6` ou `7`: Módulo 10 (Luhn);
-       - Se `8` ou `9`: Módulo 11 (pesos 2..9).
-  2. **Validação Algorítmica em `AvisoFlutuante.js`:**
-     * Integrar no validador a verificação algorítmica dos 4 DVs de bloco e do DV geral da linha digitável de 48 dígitos.
-     * Exibir balão informativo contextual: `[Boleto Tributo/IPTU/GRU/DARF]: 816... ✓` em caso de aprovação, ou alerta âmbar em caso de divergência matemática de DV.
-  3. **GRU Cobrança Bancária (Banco do Brasil):**
-     * Guias emitidas na modalidade cobrança bancária tradicional (iniciadas em `0019...`, 47 dígitos) continuam validadas pela regra de Boleto Bancário FEBRABAN, exibindo a identificação específica de `[GRU Cobrança]`.
-  4. **Atualização no SandBox (`options.html` e `exemplos.js`):**
-     * Incluir casos de teste e exemplos reais no Bloco 2 de amostras forenses do Sandbox.
-- **Prioridade Técnica:** **Média** (expansão da capacidade de detecção fiscal/tributária para órgãos públicos e execuções fiscais).
-- **Status:** **PENDENTE (Aguardando comando expresso `implementar`)**.
+- **Especificação Técnica e Implementação (`AvisoFlutuante.js`, `ConstantesPadroes.js` e `exemplos.js`):**
+  1. **Linhas Digitáveis de Arrecadação e Tributos Governamentais (Padrão FEBRABAN 48 dígitos):**
+     * Estrutura de 4 campos de 11 dígitos acompanhados de 1 DV por campo (`XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D`).
+     * Início obrigatório com dígito `8`. Segmentos identificados: `1` = Prefeituras / IPTU / ISS; `5` = Órgãos Federais / Estaduais / DARF / GRU Simples; `6`/`7` = Demais arrecadações governamentais; `2`/`3`/`4` = Concessionárias.
+     * Módulo matemático automático via 3º dígito: `6`/`7` = Módulo 10 (Luhn); `8`/`9` = Módulo 11 (pesos 2..9).
+  2. **Validação Algorítmica em `AvisoFlutuante.js` (`validarLinhaArrecadacaoTributos`):**
+     * Validação rigorosa dos 4 DVs de bloco com emissão de balão informativo Wiki Forense verde em caso de aprovação (`[Boleto Tributo/Arrecadação]: <segmento> ✓`) ou alerta âmbar em caso de divergência matemática de DV.
+  3. **GRU Cobrança Bancária Banco do Brasil (`validarBoletoBancario`):**
+     * Guias emitidas na modalidade cobrança bancária tradicional (iniciadas em `0019...`, 47 dígitos) validadas e identificadas especificamente como `[Boleto Bancário]: GRU Cobrança (BB) ✓`.
+  4. **Atualização no SandBox e Baterias de Teste:** Casos de teste homologados em `src/cfg/exemplos.js` e asserções automatizadas em `src/cfg/debug.js` (`SECAO_6_60_VALIDACAO_TRIBUTOS_DARF_GRU_IPTU`).
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES**.
 
 ---
 
@@ -846,25 +835,20 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
 
 ---
 
-### 6.63 Controle Interno do Histórico de Clipboard (Penúltimo Buffer via Ctrl + Clique e Substituição do Win+V) [PENDENTE — MARCADO PARA IMPLEMENTAR ASSIM QUE POSSÍVEL (!)]
+### 6.63 Controle Interno do Histórico de Clipboard (Penúltimo Buffer via Ctrl + Clique e Substituição do Win+V) [IMPLEMENTADO E COBERTO POR TESTES]
 - **Origem da Demanda:** Usuário em 06/11/2026: *"anotar: 'Com Ctrl + botão do meio, envia ao sistema as teclas Win+V para abrir o histórico da área de transferência do Windows (se habilitado no sistema).' não está funcinando, então preciso que controle 'por dentro' o clipboard. Assim como botão direito cola o clipboard interno, control+botão direito colaria o penultimo clipboard interno (mantendo o ultimo caso fosse clicado com o botão do meio novamente)."*
-- **Priorização de Execução:** Marcado pelo usuário com o modificador de urgência `!` ("Marcar para implementar assim que possível, nesta ordem: Seção 6.63").
-- **Diagnóstico Técnico:**
-  1. *Limitação do Sandbox do Navegador:* As extensões Chrome/Chromium não possuem permissão de hardware/SO para sintetizar atalhos de teclado globais de sistema operacional (como a tecla `Windows` / `Meta` combinada com `V`). A tentativa legada de envio de mensagem de background para disparar `Win+V` é ineficaz na sandbox.
-  2. *Texto de Ajuda / UI Obsoleto:* Em `src/cfg/options.html`, a descrição do botão do meio ainda promete a abertura do histórico nativo `Win+V`, o que gera expectativa inverídica de comportamento do SO.
-- **Especificação da Solução Interna de 2 Níveis:**
-  1. *Gestão de Pilha Interna em Memória / Storage:*
-     * Manter dois slots de buffer interno:
-       - Buffer 1 (Último): `window.__JUSGOV_ULTIMO_CLIPBOARD__` (conteúdo mais recente copiado).
-       - Buffer 2 (Penúltimo): `window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__` (conteúdo imediatamente anterior).
-     * Sincronização persistente via `chrome.storage.local` (`ultimoClipboardInterno` e `penultimoClipboardInterno`) para garantir paridade entre abas e janelas.
-  2. *Regra de Inserção via Clique do Mouse:*
-     * *Clique Simples (Botão do Meio ou Botão Direito se configurado para colar):* Insere no cursor o conteúdo do **Último Clipboard** (`window.__JUSGOV_ULTIMO_CLIPBOARD__`).
-     * *Ctrl + Clique (Ctrl + Botão do Meio ou Ctrl + Botão Direito):* Insere no cursor o conteúdo do **Penúltimo Clipboard** (`window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__`).
-     * *Regra de Preservação Imutável:* Ao colar o penúltimo conteúdo com `Ctrl + Clique`, o buffer do último conteúdo **NÃO** deve ser alterado nem rotacionado. Se o usuário clicar em seguida apenas com o botão simples (meio ou direito), o último conteúdo continua intacto e pronto para colagem sucessiva.
-  3. *Atualização de UI e Textos:*
-     * Atualizar a descrição em `src/cfg/options.html` (e tooltips associadas), substituindo a promessa de envio de `Win+V` pela explicação fidedigna: *"Clique do meio cola a última seleção copiada; Ctrl + clique do meio cola a penúltima seleção copiada, mantendo a última preservada na memória."*
-- **Status:** **PENDENTE — MARCADO PARA IMPLEMENTAR ASSIM QUE POSSÍVEL (!)** (Posicionado no topo da fila prioritária).
+- **Solução Implementada (`SelecionarCopiar.js`, `input-botao-meio.js` e `options.html`):**
+  1. *Eliminação da Dependência do Win+V do SO:* Substituição definitiva da tentativa inoperante de sintetizar teclas globais de sistema operacional pelo gerenciamento nativo interno de 2 slots no motor.
+  2. *Buffer Interno de 2 Níveis:*
+     - Buffer 1 (Último): `window.__JUSGOV_ULTIMO_CLIPBOARD__` (conteúdo mais recente copiado).
+     - Buffer 2 (Penúltimo): `window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__` (conteúdo imediatamente anterior).
+     - Sincronização persistente via `chrome.storage.local` (`ultimoClipboardInterno` e `ultimoClipboardAnteriorInterno`).
+  3. *Regra de Inserção via Clique do Mouse:*
+     - *Clique Simples (Botão do Meio ou Botão Direito se configurado para colar):* Cola o **Último Clipboard**.
+     - *Ctrl + Clique (Ctrl + Botão do Meio ou Ctrl + Botão Direito):* Cola o **Penúltimo Clipboard** (`usarAnterior = true`).
+     - *Preservação Imutável:* Colar o penúltimo conteúdo **NÃO** rotaciona nem altera o último clipboard. Cliques subsequentes normais continuam colando o último conteúdo intacto.
+  4. *Atualização de UI e Testes:* Textos em `src/cfg/options.html` atualizados para documentar a memória interna de 2 níveis. Teste determinístico `CTRL_MEIO_COLA_PENULTIMO_CLIPBOARD` em `src/cfg/debug.js` 100% aprovado.
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES**.
 
 ---
 

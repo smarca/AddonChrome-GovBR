@@ -2040,29 +2040,36 @@
                 );
             }
 
-            if (typeof motorTeste.emularTeclasWinV === 'function') {
-                /* Ctrl + Botao do Meio envia Win+V (historico do Windows) e nao faz mais rollback interno */
-                const estadoOrigMeioWV = (typeof motorTeste.obterColarBotaoMeioAtivo === 'function') ? motorTeste.obterColarBotaoMeioAtivo() : true;
+            if (typeof motorTeste.salvarClipboardInternoComBackup === 'function') {
+                /* Seção 6.63: Ctrl + Botão do Meio cola a penúltima seleção sem alterar nem rotacionar a última cópia */
+                const estadoOrigMeio = (typeof motorTeste.obterColarBotaoMeioAtivo === 'function') ? motorTeste.obterColarBotaoMeioAtivo() : true;
                 if (typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(true);
-                const campoWV = document.createElement('input');
-                campoWV.type = 'text';
-                document.body.appendChild(campoWV);
-                let recebeuWinV = false;
-                campoWV.addEventListener('keydown', (ev) => { if (ev.metaKey && ev.key === 'v') recebeuWinV = true; });
+
+                motorTeste.salvarClipboardInternoComBackup({ texto: 'Primeiro Texto Copiado', html: '', formatado: false });
+                motorTeste.salvarClipboardInternoComBackup({ texto: 'Segundo Texto Copiado', html: '', formatado: false });
+
+                const campoCtrlMeio = document.createElement('input');
+                campoCtrlMeio.type = 'text';
+                document.body.appendChild(campoCtrlMeio);
+
                 const evtCtrlMeio = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1, ctrlKey: true });
-                campoWV.dispatchEvent(evtCtrlMeio);
-                const valorInalterado = (campoWV.value === '');
-                document.body.removeChild(campoWV);
-                if (typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(estadoOrigMeioWV);
+                campoCtrlMeio.dispatchEvent(evtCtrlMeio);
+
+                const colouPenultimo = (campoCtrlMeio.value === 'Primeiro Texto Copiado');
+                const ultimoPermaneceIntacto = Boolean(window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto === 'Segundo Texto Copiado');
+
+                document.body.removeChild(campoCtrlMeio);
+                if (typeof motorTeste.definirColarBotaoMeioAtivo === 'function') motorTeste.definirColarBotaoMeioAtivo(estadoOrigMeio);
+
                 registrar(
-                    Boolean(recebeuWinV && valorInalterado && evtCtrlMeio.defaultPrevented),
-                    'CTRL_MEIO_ENVIA_WIN_V',
-                    'Ctrl + Botao do Meio envia as teclas Win+V ao sistema, sem colar nem fazer rollback interno',
+                    Boolean(colouPenultimo && ultimoPermaneceIntacto && evtCtrlMeio.defaultPrevented),
+                    'CTRL_MEIO_COLA_PENULTIMO_CLIPBOARD',
+                    'Ctrl + Botao do Meio cola a penultima selecao interna (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__) mantendo a ultima intacta (Seção 6.63)',
                     {
-                        textoTestado: 'Ctrl + Botao do Meio',
+                        textoTestado: 'Ctrl + Botao do Meio (Penultimo Buffer)',
                         idxCursor: 0,
-                        esperado: 'winV=true, valorInalterado=true',
-                        obtido: `winV=${recebeuWinV}, valorInalterado=${valorInalterado}`
+                        esperado: 'penultimo=Primeiro Texto Copiado, ultimoIntacto=true',
+                        obtido: `penultimo=${campoCtrlMeio.value}, ultimoIntacto=${ultimoPermaneceIntacto}`
                     }
                 );
             }
@@ -6470,6 +6477,84 @@
             secao647IntegracaoOk,
             'SECAO_6_47_SEPARACAO_MODULOS_E_FACHADAS_INTEGRADAS',
             'Separação de domínios (Cópia, Input e Navegador), selamento Object.freeze das 3 fachadas e paridade bidirecional com chaves do storage'
+        );
+
+        /* 16) BUG-06 (Seção 6.59): Expansão de Sequências Numéricas Espaçadas Genéricas */
+        let bug06EspacadoOk = false;
+        try {
+            const amostraEspacada = 'Código: 215 7014 6992 8831 ativo';
+            const idxNum1 = amostraEspacada.indexOf('215');
+            const idxEspacoInter = amostraEspacada.indexOf(' ', idxNum1);
+            const idxNum2 = amostraEspacada.indexOf('7014');
+
+            const res1Clique = motorTeste.simularCliqueEmTexto(amostraEspacada, idxNum1, 1);
+            const resEspaco = motorTeste.simularCliqueEmTexto(amostraEspacada, idxEspacoInter, 1);
+            const res2Cliques = motorTeste.simularCliqueEmTexto(amostraEspacada, idxNum2, 2);
+
+            bug06EspacadoOk = Boolean(
+                res1Clique === '215' &&
+                resEspaco === '215 7014 6992 8831' &&
+                res2Cliques === '215 7014 6992 8831'
+            );
+        } catch (_) {
+            bug06EspacadoOk = false;
+        }
+        registrar(
+            bug06EspacadoOk,
+            'BUG06_EXPANSAO_SEQUENCIA_NUMERICA_ESPACADA',
+            'Sequência numérica espaçada genérica (215 7014 6992 8831): 1 clique isola o bloco (215); clique no espaço ou duplo clique seleciona a cadeia completa',
+            {
+                textoTestado: '215 7014 6992 8831',
+                idxCursor: 0,
+                esperado: '1clique=215, espaco=215 7014 6992 8831, 2cliques=215 7014 6992 8831',
+                obtido: bug06EspacadoOk ? 'ok' : 'falha'
+            }
+        );
+
+        /* 17) Seção 6.60: Validação de Guias e Tributos Governamentais (DARF, GRU, IPTU FEBRABAN) */
+        let secao660TributosOk = false;
+        let resDarfValida = null;
+        let resDarfInvalida = null;
+        let resGruCobranca = null;
+        let erro660 = '';
+        try {
+            // Linha real de 48 dígitos (DARF/GRU Segmento 5, Mod 11)
+            const linhaDarfGru = '85800000001-1 45470179261-7 10734260388-8 91040854216-5';
+            resDarfValida = validador.validarLinhaArrecadacaoTributos(linhaDarfGru);
+
+            // Linha com DV incorreto no Bloco 1 (esperado 1, informado 9)
+            const linhaDarfInvalida = '85800000001-9 45470179261-7 10734260388-8 91040854216-5';
+            resDarfInvalida = validador.validarLinhaArrecadacaoTributos(linhaDarfInvalida);
+
+            // GRU Cobrança Bancária (Banco do Brasil - 47 dígitos iniciando em 0019)
+            const gruCobrancaBB = '00190.00009 01234.567806 00000.000000 1 90000000000000';
+            resGruCobranca = validador.validarBoletoBancario(gruCobrancaBB);
+
+            secao660TributosOk = Boolean(
+                resDarfValida &&
+                resDarfValida.valido === true &&
+                resDarfValida.ehWiki === true &&
+                resDarfValida.tituloDoc.includes('Federal') &&
+                resDarfInvalida &&
+                resDarfInvalida.valido === false &&
+                resDarfInvalida.motivos &&
+                resDarfInvalida.motivos.length > 0 &&
+                resGruCobranca &&
+                resGruCobranca.valido === true &&
+                resGruCobranca.ehWiki === true &&
+                resGruCobranca.tituloDoc.includes('GRU Cobrança')
+            );
+        } catch (e660) {
+            secao660TributosOk = false;
+            erro660 = String(e660 && (e660.stack || e660.message || e660));
+        }
+        registrar(
+            secao660TributosOk,
+            'SECAO_6_60_VALIDACAO_TRIBUTOS_DARF_GRU_IPTU',
+            'Validação algorítmica de linhas digitáveis de 48 dígitos (DARF/GRU/IPTU FEBRABAN) e GRU Cobrança BB de 47 dígitos',
+            {
+                detalhe: erro660 || `darfVal=${resDarfValida && resDarfValida.valido} (erros=${resDarfValida && resDarfValida.motivos && resDarfValida.motivos.join(';')}), darfInval=${resDarfInvalida && !resDarfInvalida.valido}, gruCobranca=${resGruCobranca && resGruCobranca.valido} (erros=${resGruCobranca && resGruCobranca.motivos && resGruCobranca.motivos.join(';')})`
+            }
         );
 
         /* ==================================================================

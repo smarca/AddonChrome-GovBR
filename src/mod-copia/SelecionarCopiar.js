@@ -7181,8 +7181,10 @@
             const itemInterno = usarAnterior
                 ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
                 : window.__JUSGOV_ULTIMO_CLIPBOARD__;
-            const textoEmulado = (itemInterno && itemInterno.texto) || (!usarAnterior ? ultimoTextoSelecionadoLimpo : '') || '';
-            const htmlEmulado = (itemInterno && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
+            const textoEmulado = (typeof itemInterno === 'string')
+                ? itemInterno
+                : ((itemInterno && itemInterno.texto) || (!usarAnterior ? ultimoTextoSelecionadoLimpo : '') || '');
+            const htmlEmulado = (itemInterno && typeof itemInterno === 'object' && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
 
             if (textoEmulado && textoEmulado.trim().length > 0) {
                 if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
@@ -7228,16 +7230,16 @@
                 ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
                 : e.target;
 
-            /* Ctrl + Botao do Meio: envia as teclas Win+V ao sistema operacional
-             * (sem colar diretamente nem alterar o campo interno, permitindo selecao no historico nativo do SO). */
+            /* Ctrl + Botao do Meio: cola diretamente a penultima selecao copiada (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__),
+             * preservando a ultima selecao intacta e sem rotacionar a memoria interna (Seção 6.63). */
             if (e.ctrlKey && !e.altKey && !e.shiftKey) {
                 e.preventDefault();
                 e.stopPropagation();
-                try {
-                    if (typeof emularTeclasWinV === 'function') {
-                        emularTeclasWinV(alvo);
-                    }
-                } catch (_) { }
+                if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
+                    try {
+                        executarColagemBotaoDireito(alvo, 'normal', true);
+                    } catch (_) { }
+                }
                 return;
             }
 
@@ -7294,17 +7296,19 @@
         const diff = agora - ultimoCliqueDireitoTimestamp;
         ultimoCliqueDireitoTimestamp = agora;
 
+        const colarAnterior = Boolean(e.ctrlKey && !e.altKey && !e.shiftKey);
+
         if (diff < 350 && timerCliqueDireitoColagem) {
             clearTimeout(timerCliqueDireitoColagem);
             timerCliqueDireitoColagem = null;
-            executarColagemBotaoDireito(alvo, 'texto_puro');
+            executarColagemBotaoDireito(alvo, 'texto_puro', colarAnterior);
         } else {
             if (timerCliqueDireitoColagem) {
                 clearTimeout(timerCliqueDireitoColagem);
             }
             timerCliqueDireitoColagem = setTimeout(() => {
                 timerCliqueDireitoColagem = null;
-                executarColagemBotaoDireito(alvo, 'normal');
+                executarColagemBotaoDireito(alvo, 'normal', colarAnterior);
             }, 300);
         }
     }
@@ -8769,6 +8773,7 @@
             inserirTextoEmElemento(alvo, textoSimulado || '', ehHtml);
             return true;
         },
+        executarColagemBotaoDireito,
         simularNavegacaoBotoesMouse(botao, totalAbas, idxAtual) {
             if (typeof totalAbas !== 'number' || totalAbas <= 1) return idxAtual;
             if (botao === 3) {

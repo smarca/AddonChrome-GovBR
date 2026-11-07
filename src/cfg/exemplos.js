@@ -300,10 +300,13 @@ const CATALOGO_EXEMPLOS_JUSGOVBR = Object.freeze({
                         Object.freeze({ valor: '215 7014 6992 8831', idxClique: 0, cliques: 1, esperadoClique1: '215', comentario: 'Sequência numérica espaçada (1 clique copia o bloco; livre de falso positivo de telefone) — Sandbox Bloco 2' }),
                         Object.freeze({ valor: '3524 0112 3456 7800 0195 5500 1000 0001 2310 0000 0124', idxClique: 0, cliques: 2, comentario: 'Chave de Acesso NF-e 44 dígitos — Auditoria Grupo 2' }),
                         Object.freeze({ valor: '34191.79001 01043.510047 91020.150008 5 95680000015000', idxClique: 0, cliques: 2, comentario: 'Linha Digitável de Boleto FEBRABAN — Auditoria Grupo 2' }),
+                        Object.freeze({ valor: '85800000001-1 45470179261-7 10734260388-8 91040854216-5', idxClique: 0, cliques: 2, comentario: 'Linha Digitável DARF / GRU Simples 48 dígitos (Segmento 5, Mod 11)' }),
+                        Object.freeze({ valor: '00190.00009 01234.567806 00000.000000 1 90000000000000', idxClique: 0, cliques: 2, comentario: 'GRU Cobrança Bancária Banco do Brasil 47 dígitos' }),
                         Object.freeze({ valor: '3524 0100 0000 0000 0000 5500 1000 0000 0110 0000 0000', idxClique: 0, cliques: 2, comentario: 'Chave NF-e 44 dígitos espaçada em quartetos' }),
                         Object.freeze({ valor: '84670000001 7 43590024020 9 02403173010 8 00010000000 0', idxClique: 0, cliques: 2, comentario: 'Linha Digitável Convênio Arrecadação 48 dígitos' })
                     ]),
                     negativos: Object.freeze([
+                        Object.freeze({ valor: '85800000001-9 45470179261-7 10734260388-8 91040854216-5', comentario: 'Linha Digitável Tributo com DV do Bloco 1 incorreto' }),
                         Object.freeze({ valor: '23793.38128 60083.01234', comentario: 'Linha digitável incompleta apenas 2 campos' }),
                         Object.freeze({ valor: '1234 5678 9012', comentario: 'Sequência numérica curta inferior a 16 dígitos' }),
                         Object.freeze({ valor: '23793.38128 60083.012340 90006.333306 1 90000000', comentario: 'Boleto com campo corrompido' }),

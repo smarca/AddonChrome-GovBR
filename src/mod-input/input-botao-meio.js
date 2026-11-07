@@ -135,9 +135,10 @@
          * @param {MouseEvent} e - Evento de mouseup ou auxclick
          * @param {string} [bufferUltimaSelecao=""] - Conteúdo em memória da última seleção
          * @param {Function} [callbackSucesso=null] - Callback opcional executado ao colar com sucesso
+         * @param {string} [bufferPenultimaSelecao=""] - Conteúdo em memória da penúltima seleção
          * @returns {boolean} True se o evento foi interceptado
          */
-        tratarCliqueBotaoMeio(e, bufferUltimaSelecao = '', callbackSucesso = null) {
+        tratarCliqueBotaoMeio(e, bufferUltimaSelecao = '', callbackSucesso = null, bufferPenultimaSelecao = '') {
             /* Passo 3.1: Validação do botão do meio (button === 1) */
             if (!this.#ativo || !e || e.button !== 1) {
                 return false;
@@ -156,20 +157,31 @@
             }
             this.#ultimoDisparoTimestamp = agora;
 
-            /* Passo 3.4: Tratamento de Ctrl + Botão do Meio (Histórico Win+V) */
+            /* Passo 3.4: Tratamento de Ctrl + Botão do Meio (Penúltimo Buffer de Clipboard - Seção 6.63) */
             if (e.ctrlKey) {
-                try {
-                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                        chrome.runtime.sendMessage({ acao: 'ABRIR_HISTORICO_WIN_V' }).catch(() => { });
+                const alvo = e.target;
+                if (this.#ehElementoEditavel(alvo)) {
+                    const textoParaColar = (typeof bufferPenultimaSelecao === 'string' && bufferPenultimaSelecao)
+                        || (typeof window !== 'undefined' && window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ && (typeof window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ === 'string' ? window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ : window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__.texto))
+                        || (typeof bufferUltimaSelecao === 'string' && bufferUltimaSelecao)
+                        || (typeof window !== 'undefined' && window.__JUSGOV_ULTIMO_CLIPBOARD__ && (typeof window.__JUSGOV_ULTIMO_CLIPBOARD__ === 'string' ? window.__JUSGOV_ULTIMO_CLIPBOARD__ : window.__JUSGOV_ULTIMO_CLIPBOARD__.texto))
+                        || '';
+                    if (textoParaColar) {
+                        this.#inserirTextoNoCursor(alvo, textoParaColar);
+                        if (typeof callbackSucesso === 'function') {
+                            callbackSucesso(textoParaColar, alvo);
+                        }
                     }
-                } catch (_) { }
+                }
                 return true;
             }
 
             /* Passo 3.5: Colagem da última seleção no alvo editável sob o cursor */
             const alvo = e.target;
             if (this.#ehElementoEditavel(alvo)) {
-                const textoParaColar = bufferUltimaSelecao || (typeof window !== 'undefined' && window.__JUSGOV_ULTIMO_CLIPBOARD__) || '';
+                const textoParaColar = (typeof bufferUltimaSelecao === 'string' && bufferUltimaSelecao)
+                    || (typeof window !== 'undefined' && window.__JUSGOV_ULTIMO_CLIPBOARD__ && (typeof window.__JUSGOV_ULTIMO_CLIPBOARD__ === 'string' ? window.__JUSGOV_ULTIMO_CLIPBOARD__ : window.__JUSGOV_ULTIMO_CLIPBOARD__.texto))
+                    || '';
                 if (textoParaColar) {
                     this.#inserirTextoNoCursor(alvo, textoParaColar);
                     if (typeof callbackSucesso === 'function') {

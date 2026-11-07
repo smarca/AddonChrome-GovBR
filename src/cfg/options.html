@@ -1534,7 +1534,7 @@
                             <div>
                                 <div class="setting-label">Colar com o botão do Meio (Scroll Click)</div>
                                 <div class="setting-help">
-                                    Cola, com <strong>1 clique no botão do meio</strong> do mouse, a <strong>Última Seleção</strong> (o conteúdo exato, TXT ou HTML conforme o nível de formatação, que este plugin enviou à área de transferência na última cópia) em campos de texto e editores, simulando <code>Ctrl+V</code>. Com <strong>Ctrl + botão do meio</strong>, envia ao sistema as teclas <code>Win+V</code> para abrir o histórico da área de transferência do Windows (se habilitado no sistema). O plugin <strong>não lê</strong> a área de transferência do sistema. Quando ativo, bloqueia a rolagem automática nativa (cursor de bússola/roda). Se desativado, o clique do meio não é interceptado e retorna integralmente ao comportamento padrão do navegador.
+                                    Cola, com <strong>1 clique no botão do meio</strong> (ou botão direito, se configurado) do mouse, a <strong>Última Seleção</strong> (o conteúdo exato, TXT ou HTML conforme o nível de formatação, que este plugin enviou à área de transferência na última cópia) em campos de texto e editores, simulando <code>Ctrl+V</code>. Com <strong>Ctrl + botão do meio</strong> (ou <strong>Ctrl + botão direito</strong>), cola a <strong>penúltima seleção</strong> copiada, mantendo a última preservada na memória interna. O plugin <strong>não lê</strong> a área de transferência do sistema. Quando ativo, bloqueia a rolagem automática nativa (cursor de bússola/roda). Se desativado, o clique do meio não é interceptado e retorna integralmente ao comportamento padrão do navegador.
                                 </div>
                             </div>
                             <label class="switch" id="lblSwitchColarBotaoMeio" style="flex-shrink: 0;">
@@ -1888,8 +1888,8 @@
                             colagem direta em campos editáveis com o botão do meio (scroll click) usando a
                             Última Seleção (sem ler o clipboard do sistema),
                             navegação vertical entre campos de entrada (<code>&lt;input&gt;</code>) pelas
-                            setas do teclado (↑/↓) e Win+V (histórico do Windows)
-                            via <code>Ctrl + Botão do Meio</code>.
+                            setas do teclado (↑/↓) e colagem da penúltima seleção
+                            via <code>Ctrl + Botão do Meio</code> (mantendo o último conteúdo preservado).
                         </p>
                     </div>
                     <div
@@ -1992,7 +1992,7 @@
                                 clicar de novo e desfaz com <code>Ctrl+Alt+Clique Direito</code>.</li>
                             <li><strong>Colar com o botão do Meio (<code>Scroll Click</code>):</strong> cola a Última Seleção
                                 (o que o plugin enviou à área de transferência na última cópia) simulando <code>Ctrl+V</code>.
-                                Com <code>Ctrl + Botão do Meio</code>, envia <code>Win+V</code> ao sistema (histórico do Windows).
+                                Com <code>Ctrl + Botão do Meio</code> (ou <code>Ctrl + Botão Direito</code>), cola a penúltima seleção copiada, mantendo a última intacta na memória interna.
                                 O plugin não lê a área de transferência do sistema.
                             </li>
                             <li><strong>Tabelas (Ctrl+Alt):</strong> Clique no cabeçalho da tabela (Coluna) ou na
@@ -2189,8 +2189,8 @@
                                 coluna inteira, e na borda esquerda copia a linha inteira.<br>
                                 • <strong>Colar com o botão do Meio (<code>Scroll Click</code>):</strong> cola a
                                 Última Seleção (conteúdo enviado por este plugin à área de transferência) simulando
-                                <code>Ctrl+V</code>; com <code>Ctrl + Botão do Meio</code> envia <code>Win+V</code> ao
-                                sistema (histórico do Windows). O plugin não lê a área de transferência do sistema.<br>
+                                <code>Ctrl+V</code>; com <code>Ctrl + Botão do Meio</code> (ou <code>Ctrl + Botão Direito</code>)
+                                cola a penúltima seleção copiada, preservando a última intacta na memória interna. O plugin não lê a área de transferência do sistema.<br>
                                 • <strong>Filtro Shift (<code>Shift+Clique</code>):</strong> Copia apenas os
                                 números/letras sem pontuação (completando os 7 dígitos
                                 iniciais do processo CNJ com zeros), ou marca início e fim de um trecho.<br>

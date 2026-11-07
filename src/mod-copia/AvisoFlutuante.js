@@ -961,6 +961,165 @@
         }
 
         /*
+         * METODO: validarLinhaArrecadacaoTributos
+         * SEÇÃO 6.60: Validação Algorítmica de Guias e Tributos Governamentais (DARF, GRU, IPTU, Concessionárias)
+         * - 48 dígitos divididos em 4 blocos de 11 dígitos + 1 DV por bloco.
+         * - 1º dígito é compulsoriamente '8' (Arrecadação).
+         * - 2º dígito indica o segmento: 1 (IPTU/Prefeituras), 5 (DARF/GRU/Federal), etc.
+         * - 3º dígito indica o módulo matemático: 6 ou 7 (Mod 10 / Luhn), 8 ou 9 (Mod 11 pesos 2..9).
+         */
+        validarLinhaArrecadacaoTributos(linhaStr) {
+            if (!linhaStr || typeof linhaStr !== 'string') return { valido: true, msg: '' };
+            const textoLimpo = linhaStr.trim();
+            const digitos = textoLimpo.replace(/\D/g, '');
+
+            if (digitos.length !== 48 || digitos[0] !== '8') {
+                return { valido: true, msg: '' };
+            }
+
+            const segCodigo = digitos[1];
+            const modCodigo = digitos[2];
+
+            let nomeSegmento = 'Arrecadação / Convênios';
+            if (segCodigo === '1') nomeSegmento = 'IPTU / Tributo Municipal';
+            else if (segCodigo === '5') nomeSegmento = 'DARF / GRU / Tributo Federal';
+            else if (segCodigo === '6' || segCodigo === '7') nomeSegmento = 'Guia / Arrecadação Governamental';
+            else if (segCodigo === '2') nomeSegmento = 'Saneamento / Água';
+            else if (segCodigo === '3') nomeSegmento = 'Energia Elétrica / Gás';
+            else if (segCodigo === '4') nomeSegmento = 'Telecomunicações';
+
+            const usaMod11 = (modCodigo === '8' || modCodigo === '9');
+            const erros = [];
+
+            for (let b = 0; b < 4; b++) {
+                const inicioBloco = b * 12;
+                const corpo = digitos.substring(inicioBloco, inicioBloco + 11);
+                const dvInformado = digitos.charCodeAt(inicioBloco + 11) - 48;
+                let dvEsperado;
+
+                if (usaMod11) {
+                    let soma = 0;
+                    let peso = 2;
+                    for (let i = 10; i >= 0; i--) {
+                        soma += (corpo.charCodeAt(i) - 48) * peso;
+                        peso = (peso === 9) ? 2 : peso + 1;
+                    }
+                    const resto = soma % 11;
+                    dvEsperado = (resto === 0 || resto === 1) ? 0 : ((resto === 10) ? 1 : (11 - resto));
+                } else {
+                    let soma = 0;
+                    let alternar = true;
+                    for (let i = 10; i >= 0; i--) {
+                        let d = (corpo.charCodeAt(i) - 48);
+                        if (alternar) {
+                            d *= 2;
+                            if (d > 9) d -= 9;
+                        }
+                        soma += d;
+                        alternar = !alternar;
+                    }
+                    const resto = soma % 10;
+                    dvEsperado = (resto === 0) ? 0 : (10 - resto);
+                }
+
+                if (dvEsperado !== dvInformado) {
+                    erros.push(`Dígito verificador do Bloco ${b + 1} incorreto`);
+                }
+            }
+
+            if (erros.length > 0) {
+                return formatarRespostaErro(
+                    'Boleto Arrecadação/Tributo Inválido',
+                    'Boleto Arrecadacao Invalido',
+                    textoLimpo,
+                    erros
+                );
+            }
+
+            return formatarRespostaWiki(
+                'Boleto Tributo/Arrecadação',
+                nomeSegmento,
+                textoLimpo,
+                `Linha de 48 dígitos validada (Mod ${usaMod11 ? 11 : 10})\nSegmento: ${nomeSegmento}`,
+                {
+                    tipo: 'ARRECADACAO_FEBRABAN',
+                    segmento: nomeSegmento,
+                    modulo: usaMod11 ? 11 : 10
+                }
+            );
+        }
+
+        /*
+         * METODO: validarBoletoBancario
+         * SEÇÃO 6.60: Validação Algorítmica de Linha Digitável de Boleto Bancário (FEBRABAN / GRU Cobrança BB)
+         * - 47 dígitos divididos em 5 campos (Campos 1, 2, 3 com DVs Mod 10).
+         */
+        validarBoletoBancario(linhaStr) {
+            if (!linhaStr || typeof linhaStr !== 'string') return { valido: true, msg: '' };
+            const textoLimpo = linhaStr.trim();
+            const digitos = textoLimpo.replace(/\D/g, '');
+
+            if (digitos.length !== 47) {
+                return { valido: true, msg: '' };
+            }
+
+            const ehGruCobranca = digitos.startsWith('0019');
+            const rotuloDoc = ehGruCobranca ? 'GRU Cobrança (BB)' : 'Cobrança Bancária';
+
+            const calcularDvMod10 = (blocoStr) => {
+                let soma = 0;
+                let alternar = true;
+                for (let i = blocoStr.length - 1; i >= 0; i--) {
+                    let d = blocoStr.charCodeAt(i) - 48;
+                    if (alternar) {
+                        d *= 2;
+                        if (d > 9) d -= 9;
+                    }
+                    soma += d;
+                    alternar = !alternar;
+                }
+                const resto = soma % 10;
+                return (resto === 0) ? 0 : (10 - resto);
+            };
+
+            const erros = [];
+            // Campo 1: 9 dígitos + DV
+            const c1Corpo = digitos.substring(0, 9);
+            const c1Dv = digitos.charCodeAt(9) - 48;
+            if (calcularDvMod10(c1Corpo) !== c1Dv) erros.push('Dígito do Campo 1 incorreto');
+
+            // Campo 2: 10 dígitos + DV
+            const c2Corpo = digitos.substring(10, 20);
+            const c2Dv = digitos.charCodeAt(20) - 48;
+            if (calcularDvMod10(c2Corpo) !== c2Dv) erros.push('Dígito do Campo 2 incorreto');
+
+            // Campo 3: 10 dígitos + DV
+            const c3Corpo = digitos.substring(21, 31);
+            const c3Dv = digitos.charCodeAt(31) - 48;
+            if (calcularDvMod10(c3Corpo) !== c3Dv) erros.push('Dígito do Campo 3 incorreto');
+
+            if (erros.length > 0) {
+                return formatarRespostaErro(
+                    ehGruCobranca ? 'GRU Cobrança Inválida' : 'Boleto Bancário Inválido',
+                    'Boleto Bancario Invalido',
+                    textoLimpo,
+                    erros
+                );
+            }
+
+            return formatarRespostaWiki(
+                'Boleto Bancário',
+                rotuloDoc,
+                textoLimpo,
+                `Linha de 47 dígitos validada (FEBRABAN)\n${ehGruCobranca ? 'Guia de Recolhimento da União (Banco do Brasil)' : 'Cobrança Bancária Registrada'}`,
+                {
+                    tipo: 'BOLETO_BANCARIO_FEBRABAN',
+                    ehGruCobranca: ehGruCobranca
+                }
+            );
+        }
+
+        /*
          * METODO: validarNumeroGenericoFallback
          * DIRETRIZ ROOT 6.42 e FEAT-03 (Ultima Barreira de Verificacao Matematica):
          * Quando o texto e estritamente numerico (ou CNPJ alfanumerico de 14 chars) e nao casou
@@ -1442,21 +1601,34 @@
                 resultado = this.validarCNJ(matchCnjIso[1]);
             } else if (matchPisIso) {
                 resultado = this.validarPIS(matchPisIso[1] || matchPisIso[2]);
+            } else if (window.JusGovConstantes && window.JusGovConstantes.REGEX_AUDITORIA && window.JusGovConstantes.REGEX_AUDITORIA.BOLETO_ARRECADACAO_ISOLADO && window.JusGovConstantes.REGEX_AUDITORIA.BOLETO_ARRECADACAO_ISOLADO.test(t)) {
+                resultado = this.validarLinhaArrecadacaoTributos(t);
+            } else if (window.JusGovConstantes && window.JusGovConstantes.REGEX_AUDITORIA && window.JusGovConstantes.REGEX_AUDITORIA.BOLETO_BANCARIO_ISOLADO && window.JusGovConstantes.REGEX_AUDITORIA.BOLETO_BANCARIO_ISOLADO.test(t)) {
+                resultado = this.validarBoletoBancario(t);
             } else {
-                /* Verificar se eh NB de 10 digitos precedido por especie no DOM ou pontuado (ex: 31/6506589241) */
-                let especiePrefixo = null;
-                if (rangeDOM && rangeDOM.startContainer && rangeDOM.startContainer.nodeType === 3) {
-                    const textoNo = rangeDOM.startContainer.textContent || '';
-                    const offset = rangeDOM.startOffset;
-                    const trechoAntes = textoNo.substring(Math.max(0, offset - 5), offset);
-                    const mEsp = trechoAntes.match(/(\d{2})\/$/);
-                    if (mEsp) {
-                        especiePrefixo = mEsp[1];
-                    }
-                }
+                /* Verificar se eh linha digitavel de 48 ou 47 digitos sem pontuacao estrita */
                 const digitosPuros = t.replace(/\D/g, '');
-                if ((especiePrefixo && digitosPuros.length === 10) || (/^\d{3}\.\d{3}\.\d{3}-\d$/.test(t))) {
-                    resultado = this.validarNumeroBeneficioINSS(t, especiePrefixo);
+                if (digitosPuros.length === 48 && digitosPuros[0] === '8') {
+                    resultado = this.validarLinhaArrecadacaoTributos(t);
+                } else if (digitosPuros.length === 47 && (digitosPuros.startsWith('0019') || t.includes('.'))) {
+                    resultado = this.validarBoletoBancario(t);
+                }
+
+                /* Verificar se eh NB de 10 digitos precedido por especie no DOM ou pontuado (ex: 31/6506589241) */
+                if (resultado.valido && !resultado.ehWiki) {
+                    let especiePrefixo = null;
+                    if (rangeDOM && rangeDOM.startContainer && rangeDOM.startContainer.nodeType === 3) {
+                        const textoNo = rangeDOM.startContainer.textContent || '';
+                        const offset = rangeDOM.startOffset;
+                        const trechoAntes = textoNo.substring(Math.max(0, offset - 5), offset);
+                        const mEsp = trechoAntes.match(/(\d{2})\/$/);
+                        if (mEsp) {
+                            especiePrefixo = mEsp[1];
+                        }
+                    }
+                    if ((especiePrefixo && digitosPuros.length === 10) || (/^\d{3}\.\d{3}\.\d{3}-\d$/.test(t))) {
+                        resultado = this.validarNumeroBeneficioINSS(t, especiePrefixo);
+                    }
                 }
 
                 /* ULTIMA BARREIRA: Se nao foi identificado por nenhuma mascara especifica com contexto,

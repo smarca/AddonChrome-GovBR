@@ -384,6 +384,10 @@
         BENEFICIO_INSS_ISOLADO: /^(?:(?:nb|benef[i\u00ED]cio)\s*[:\-]?\s*)?(\d{1,3}\.\d{3}\.\d{3}-\d)$|^(?:(?:nb|benef[i\u00ED]cio)\s*[:\-]?\s*)(\d{10})$/i,
         /* Extrai PIS / PASEP / NIT isolado pontuado ou rotulado (ex: "PIS/NIT: 120.43256.72-8", "120.43256.72-8", "PIS: 12043256728") */
         PIS_ISOLADO: /^(?:(?:pis(?:\/nit|\/pasep)?|nit|pasep)\s*[:\-]?\s*)?(\d{3}\.\d{5}\.\d{2}-\d{1})(?:\s*\((?:pis|nit|pasep)\))?$|^(?:(?:pis(?:\/nit|\/pasep)?|nit|pasep)\s*[:\-]?\s*)(\d{11})(?:\s*\((?:pis|nit|pasep)\))?$/i,
+        /* Extrai Linha Digitavel de Arrecadacao / Tributos (48 digitos com hifens/espacos opcionais iniciada em 8 - Seção 6.60) */
+        BOLETO_ARRECADACAO_ISOLADO: /^(?:(?:boleto|guia|darf|gru|iptu|tributo)\s*[:\-]?\s*)?(8\d{10}[\-\s\u00A0]*\d[\s\u00A0]+\d{11}[\-\s\u00A0]*\d[\s\u00A0]+\d{11}[\-\s\u00A0]*\d[\s\u00A0]+\d{11}[\-\s\u00A0]*\d|8\d{47})$/iu,
+        /* Extrai Linha Digitavel de Boleto Bancario tradicional (47 digitos com pontuacao padrao FEBRABAN) */
+        BOLETO_BANCARIO_ISOLADO: /^(?:(?:boleto|linha|gru)\s*[:\-]?\s*)?(\d{5}\.\d{5}[\s\u00A0]+\d{5}\.\d{6}[\s\u00A0]+\d{5}\.\d{6}[\s\u00A0]+\d[\s\u00A0]+\d{14}|\d{47})$/iu,
         /* Remove acentos apos normalizacao NFD na chave do mes */
         APENAS_LETRAS_ASCII_LOWER: /[^a-z]/g
     });
@@ -416,8 +420,12 @@
                 /(?<![\p{L}\p{N}])(?:\d{4}[\t \u00A0]+){10}\d{4}(?![\p{L}\p{N}])/gu,
                 /* Sub-tipo 2.2: Linha Digitavel de Boleto Bancario padrao FEBRABAN e variacoes */
                 /(?<![\p{L}\p{N}])\d{4,6}\.\d{4,6}[\t \u00A0]+\d{4,6}\.\d{4,7}[\t \u00A0]+\d{4,6}\.\d{4,7}[\t \u00A0]+\d[\t \u00A0]+\d{10,14}(?![\p{L}\p{N}])/gu,
-                /* Sub-tipo 2.3: Linha Digitavel de Arrecadacao, Tributos e Concessionarias padrao FEBRABAN (4 campos de 11 digitos + DV de 1 digito) */
-                /(?<![\p{L}\p{N}])(?:\d{11}[\t \u00A0]+\d[\t \u00A0]+){3}\d{11}[\t \u00A0]+\d(?![\p{L}\p{N}])/gu
+                /* Sub-tipo 2.3: Linha Digitavel de Arrecadacao, Tributos e Concessionarias padrao FEBRABAN (4 campos de 11 digitos + DV de 1 digito com espacos ou hifens) */
+                /(?<![\p{L}\p{N}])(?:\d{11}[\t \u00A0\-]*\d[\t \u00A0]+){3}\d{11}[\t \u00A0\-]*\d(?![\p{L}\p{N}])/gu,
+                /* Sub-tipo 2.4: Linha Digitavel de Tributos com Hifen (DARF / GRU / IPTU FEBRABAN 48 digitos: XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D XXXXXXXXXXX-D) */
+                /(?<![\p{L}\p{N}])(?:\d{11}-\d[\t \u00A0]+){3}\d{11}-\d(?![\p{L}\p{N}])/gu,
+                /* Sub-tipo 2.5: Sequencias Numericas Espacadas Genericas (BUG-06: ex: "215 7014 6992 8831") */
+                /(?<![\p{L}\p{N}\/.:])\d{1,8}(?:[\t \u00A0]+\d{1,8}){2,}(?![\p{L}\p{N}\/.:])/gu
             ]
         },
         {
