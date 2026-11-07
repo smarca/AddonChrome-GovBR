@@ -56,11 +56,12 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
   * Garantir a reconstrução do mapa de texto contínuo mesmo com quebras virtuais de linhas geradas pela disposição CSS dos `<span>` posicionados da camada de texto (`textLayer`) do visualizador de PDF.
 
 
-### 6.3 Supressão de Quebras de Linha em Linha Única com Espaçamento Obrigatório Anti-Truncamento
+### 6.3 Supressão de Quebras de Linha em Linha Única com Espaçamento Obrigatório Anti-Truncamento [IMPLEMENTADO E COBERTO POR TESTES]
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES (460/460 Aprovados)**.
 - **Contexto Operacional:** Em cards e painéis do PJe (ex.: listas de tarefas `col-sm-11`, cartões de processo com `dtPoloAtivo`, `dtPoloPassivo`, `ÚLTIMA MOVIMENTAÇÃO: REMETIDOS OS AUTOS...`, etiquetas e classes `col-sm-12 no-padding`), elementos irmãos ou `<span>`/`<div>` quebrados em múltiplas linhas visuais contêm trechos contíguos de texto.
-- **Comportamento Previsto para Futura Implementação:**
-  * Ao suprimir quebras de linha (`\n`, `<br>`) para condensar o conteúdo copiado em uma única linha (linha só), é **estritamente obrigatório** inserir um espaço em branco separador (`' '`) entre os blocos e linhas conectadas.
-  * **Regra Anti-Truncamento:** Jamais colar ou fundir o final de uma linha com o início da linha seguinte sem espaço (ex.: evitar concatenar `"DISTRIBUIÇÃO AO VARA FEDERAL"` com `"CÍVEL E CRIMINAL"` gerando `"FEDERALCÍVEL"`). Toda unificação de linhas deve assegurar espaçamento limpo e normalizado sem truncamento de palavras.
+- **Comportamento Implementado (`copia-filtros.js`, `SelecionarCopiar.js` e `debug.js`):**
+  * Ao suprimir quebras de linha (`\n`, `<br>`) para condensar o conteúdo copiado em uma única linha (linha só), é **estritamente obrigatório** inserir um espaço em branco separador (`' '`) entre os blocos e linhas conectadas (`unificarLinhasComEspacamentoAntiTruncamento`).
+  * **Regra Anti-Truncamento:** Jamais colar ou fundir o final de uma linha com o início da linha seguinte sem espaço (ex.: evitar concatenar `"DISTRIBUIÇÃO AO VARA FEDERAL"` com `"CÍVEL E CRIMINAL"` gerando `"FEDERALCÍVEL"`). Toda unificação de linhas assegura espaçamento limpo e normalizado sem truncamento de palavras. Inserção explícita de `\n` em elementos de coluna e blocos do PJe (`col-*`, `dtPolo*`, `polo`, `tarefa`, `card`) em `extrairTextoPuroSanitizado` e espaçamento preventivo em `extrairTextoVisivelLimpoDeElemento`.
 
 ### 6.4 Investigação de Seleção Dupla Cruzada / Efeito Fantasma Multi-Frame (Ex.: "Parnaíba-PI" e "Prevenção")
 - **Comportamento Estranho Observado:**
@@ -77,24 +78,26 @@ Documento Relacionado: [01_DIRETRIZES_E_REGRAS_ROOT.md](01_DIRETRIZES_E_REGRAS_R
   * **Permissão de Cópia Completa:** Assegurar que tanto a seleção automatizada por clique quanto a seleção nativa/manual de datas isoladas (`23/10/2026`), horários isolados (`10:14:18`) e blocos contíguos de data com horário (`23/10/2026 10:14:18`) sejam sempre copiados fielmente para a Área de Transferência.
   * **Preservação de Formato:** Tratar a expressão combinada `DD/MM/AAAA HH:MM:SS` como entidade temporal forense de primeira classe no motor, garantindo que o clique simples, clique no espaço intermediário ou arrasto manual envie exatamente os dados limpos para a Área de Transferência com validação matemática e contorno visual verde imediato.
 
-### 6.6 Escopo de Seleção em Alt + Clique sobre Botões, Etiquetas e Itens de Interface (Regra de Mínimo Possível)
-- **Regra de Precedência em 3 Níveis Estritos:**
+### 6.6 Escopo de Seleção em Alt + Clique sobre Botões, Etiquetas e Itens de Interface (Regra de Mínimo Possível) [IMPLEMENTADO E COBERTO POR TESTES]
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES (460/460 Aprovados)**.
+- **Regra de Precedência em 3 Níveis Estritos Implementada:**
   1. **Nível 1 (Bloco/Registro Forense):** Se o clique incidir sobre um campo ou registro estruturado (Data, Hora, CPF, CNPJ, NB, RG, Processo CNJ, etc.), copia estritamente o bloco/máscara forense.
   2. **Nível 2 (Objeto Real de Interface):** Se for controle real de interface (botão `<button>`, link `<a>`, aba, switch, menu, ou etiqueta/badge/chip):
      * Em etiquetas/badges/chips com botão irmão de exclusão (ex.: `<div class="label label-etiqueta"><span data-jusgov-selecionavel="true">HOMOLOGAR ACORDO</span><span class="icon-desvincular-tag"><i class="fa fa-times"></i></span></div>`), o `Alt + Clique` seleciona e copia **exclusivamente o rótulo da etiqueta** (`HOMOLOGAR ACORDO`), ignorando o ícone "X" irmão e jamais capturando o contêiner externo (card de tarefa, linha da tabela ou painel).
-     * O contorno visual do Flash e a cópia incidem estritamente sobre o texto visível do rótulo, sem envolver a estrutura física do contêiner externo.
-     * Contêineres compostos (cards de tarefas do PJe, linhas com múltiplos controles, listas de processos) são expressamente rejeitados como objetos interativos únicos.
+     * O contorno visual do Flash e a cópia incidem estritamente sobre o texto visível do rótulo (`criarRangeTextoParaEtiquetaOuObjeto`), sem envolver a estrutura física do contêiner externo.
+     * Contêineres compostos (cards de tarefas do PJe, linhas com múltiplos controles, listas de processos) são expressamente rejeitados como objetos interativos únicos (`isContainerComposto`).
   3. **Nível 3 (Unidade Palavra):** Caso o clique não incida sobre um campo estruturado nem sobre um controle real de interface (ex.: parágrafo de texto ou texto comum dentro de um card), o `Alt + Clique` seleciona e copia pontualmente a **palavra sob o cursor**, mantendo a regra de mínima seleção e nunca capturando o contêiner por inteiro.
 
-### 6.7 Prioridade de Bloco / Máscara Útil vs. Linha do Link vs. Texto Total em Alt + Clique
-- **Regra de Negócio Estabelecida:**
-  * Ao clicar em um link (`<a href>`) com a tecla `Alt` pressionada, o motor obedece a seguinte ordem estrita de precedência:
+### 6.7 Prioridade de Bloco / Máscara Útil vs. Linha do Link vs. Texto Total em Alt + Clique [IMPLEMENTADO E COBERTO POR TESTES]
+- **Status:** **IMPLEMENTADO E COBERTO POR TESTES (460/460 Aprovados)**.
+- **Regra de Negócio Estabelecida e Implementada:**
+  * Ao clicar em um link (`<a href>` ou `[role="link"]`) com a tecla `Alt` pressionada, o motor obedece a seguinte ordem estrita de precedência:
     1. **Passo 1 (Teste Prévio de Bloco sob o Cursor):** Primeiramente testa-se se a posição exata do clique corresponde a um bloco/padrão estruturado do catálogo forense ou máscara útil (ex.: ID, processo CNJ, CPF, CNPJ, data, valor em dinheiro, etc.). Havendo bloco sob o cursor, segue-se a regra geral de textos com base nas máscaras e regras tradicionais (clique no número isola o número; clique no hífen ou separador expande o bloco completo; clique no espaço segue o comportamento consolidado).
-    2. **Passo 2 (Links Multilinhas -> Cópia da Linha Inteira Clicada):** Caso o clique NÃO tenha incidido sobre um bloco específico, mas o texto do link possua **múltiplas linhas** (seja por quebras explícitas `<br>`/`\n` ou por quebra visual de layout/bloco), o motor copia **apenas a linha inteira onde ocorreu o clique**, e não todo o texto das demais linhas do link.
+    2. **Passo 2 (Links Multilinhas -> Cópia da Linha Inteira Clicada):** Caso o clique NÃO tenha incidido sobre um bloco específico, mas o texto do link possua **múltiplas linhas** (seja por quebras explícitas `<br>`/`\n` ou por quebra visual de layout/bloco via `isLinkMultilinha`), o motor copia **apenas a linha inteira onde ocorreu o clique** (`extrairLinhaClicadaDeLink`), e não todo o texto das demais linhas do link.
     3. **Passo 3 (Link de Linha Única):** Caso o link seja composto por uma única linha e não contenha bloco específico sob o cursor, copia-se o texto visível integral do link.
 
-
-### 6.8 Correção de Sobrescrita e Acúmulo de Retângulos / Cor do Flash Verde (Ex.: CNPJ com Múltiplas Bordas)
+### 6.8 Correção de Sobrescrita e Acúmulo de Retângulos / Cor do Flash Verde (Ex.: CNPJ com Múltiplas Bordas) [DESCARTADO PELO USUÁRIO — JÁ CORRIGIDO]
+- **Status:** **DESCARTADO PELO USUÁRIO — JÁ CORRIGIDO** (Descartado expressamente pelo usuário em 06/11/2026, pois o mecanismo de limpeza atômica e fusão contígua de retângulos já corrigiu a sobreposição de bordas).
 - **Comportamento Estranho Observado:**
   * Em números formatados como CNPJ (`41.522.194/0001-72`), ao selecionar partes ou o bloco, surgem múltiplos retângulos verdes sobrepostos (ex.: uma caixa para a base `41.522.194/0001` e duas ou mais caixas coladas/deslocadas sobre o dígito `-72`), gerando um efeito visual estranho de bordas duplicadas com tonalidade escurecida/acumulada e caixas sobrepostas.
 - **Diagnóstico Técnico Preliminar:**

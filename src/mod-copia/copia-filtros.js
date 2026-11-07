@@ -57,6 +57,20 @@
         }
 
         /**
+         * DIRETRIZ SEÇÃO 6.3: Supressão de quebras de linha em linha única com espaçamento obrigatório anti-truncamento.
+         * Garante que a unificação de quebras (\r\n, \r, \n, <br>) sempre insira espaço simples entre blocos,
+         * impedindo que o final de uma linha funda com o início da próxima (ex.: "FEDERAL" + "CÍVEL" -> "FEDERAL CÍVEL").
+         */
+        unificarLinhasComEspacamentoAntiTruncamento(texto) {
+            if (!texto || typeof texto !== 'string') return '';
+            return texto
+                .replace(/[\r\n\t\f\v]+/g, ' ')
+                .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
+                .replace(/ {2,}/g, ' ')
+                .trim();
+        }
+
+        /**
          * FILTRO 3: Normalização de linhas, trim e conversão de cabeçalhos PJe em linha única.
          * Suprime linhas em branco excessivas e padroniza cabeçalhos do PJe ("id 123456, pg. 1").
          */

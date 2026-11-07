@@ -1296,6 +1296,11 @@
         if (!el) return '';
         try {
             let partes = [];
+            const TAGS_BLOCOS_ESPACAMENTO = new Set([
+                'DIV', 'P', 'LI', 'TR', 'TD', 'TH', 'SECTION', 'ARTICLE',
+                'HEADER', 'FOOTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE',
+                'DT', 'DD'
+            ]);
             const percorrer = (no) => {
                 if (!no) return;
                 if (no.nodeType === Node.ELEMENT_NODE) {
@@ -1314,9 +1319,22 @@
                         partes.push(' ');
                         return;
                     }
+                    const ehBlocoOuColuna = TAGS_BLOCOS_ESPACAMENTO.has(tag) || (
+                        typeof no.className === 'string' && (
+                            no.className.includes('col-') || no.className.includes('dtPolo') ||
+                            no.className.includes('polo') || no.className.includes('tarefa') ||
+                            no.className.includes('card')
+                        )
+                    );
+                    if (ehBlocoOuColuna && partes.length > 0 && !/\s$/.test(partes[partes.length - 1])) {
+                        partes.push(' ');
+                    }
                     const filhos = no.childNodes;
                     for (let i = 0; i < filhos.length; i++) {
                         percorrer(filhos[i]);
+                    }
+                    if (ehBlocoOuColuna && partes.length > 0 && !/\s$/.test(partes[partes.length - 1])) {
+                        partes.push(' ');
                     }
                 } else if (no.nodeType === Node.TEXT_NODE) {
                     const val = no.nodeValue || '';
@@ -1324,20 +1342,259 @@
                 }
             };
             percorrer(el);
-            const bruto = partes.join('')
-                .replace(/[\r\n\t]+/g, ' ')
-                .replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ')
-                .trim();
+            const bruto = unificarLinhasComEspacamentoAntiTruncamento(partes.join(''));
             if (bruto) {
                 return higienizarTextoParaCopia(bruto) || bruto;
             }
             const fallbackInner = (typeof el.innerText === 'string')
-                ? el.innerText.replace(/[\r\n\t]+/g, ' ').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim()
+                ? unificarLinhasComEspacamentoAntiTruncamento(el.innerText)
                 : '';
             return fallbackInner ? (higienizarTextoParaCopia(fallbackInner) || fallbackInner) : '';
         } catch (_) {
-            return (el.innerText || '').replace(/[\r\n\t]+/g, ' ').replace(EXPRESSOES_REGULARES.ESPACOS_MULTIPLOS, ' ').trim();
+            return unificarLinhasComEspacamentoAntiTruncamento(el.innerText || '');
         }
+    }
+
+    /*
+     * FUNCAO: unificarLinhasComEspacamentoAntiTruncamento
+     * DIRETRIZ SEÇÃO 6.3:
+     * Ao suprimir quebras de linha (\n, \r, <br>) para condensar o conteúdo copiado em uma
+     * única linha (linha só), é estritamente obrigatório inserir um espaço em branco separador
+     * (' ') entre os blocos e linhas conectadas, garantindo que o final de uma linha jamais
+     * se funda com o início da linha seguinte (ex.: evitar concatenar "DISTRIBUIÇÃO AO VARA FEDERAL"
+     * com "CÍVEL E CRIMINAL" gerando "FEDERALCÍVEL").
+     */
+    function unificarLinhasComEspacamentoAntiTruncamento(texto) {
+        if (!texto || typeof texto !== 'string') return '';
+        return texto
+            .replace(/[\r\n\t\f\v]+/g, ' ')
+            .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
+            .replace(/ {2,}/g, ' ')
+            .trim();
+    }
+
+    /*
+     * FUNCAO: isLinkMultilinha
+     * DIRETRIZ SEÇÃO 6.7:
+     * Identifica se um link (<a> ou [role="link"]) possui múltiplas linhas, seja por
+     * quebras explícitas no DOM (<br>, \n, divs/p/li internas) ou por quebra visual
+     * de layout (getClientRects com posições verticais 'top' distintas).
+     */
+    function isLinkMultilinha(elLink) {
+        if (!elLink) return false;
+        try {
+            if (elLink.querySelector('br, hr, p, div, li, tr, blockquote')) return true;
+            const txt = (elLink.innerText || elLink.textContent || '');
+            if (txt.includes('\n') || txt.includes('\r')) return true;
+
+            const rects = Array.from(elLink.getClientRects());
+            if (rects.length > 1) {
+                const primeiroTop = rects[0].top;
+                for (let i = 1; i < rects.length; i++) {
+                    if (Math.abs(rects[i].top - primeiroTop) >= 5) {
+                        return true;
+                    }
+                }
+            }
+        } catch (_) { }
+        return false;
+    }
+
+    /*
+     * FUNCAO: extrairLinhaClicadaDeLink
+     * DIRETRIZ SEÇÃO 6.7 (Passo 2):
+     * Em links multilinhas com Alt + 1 clique, quando o clique não incide sobre bloco/máscara
+     * forense, extrai e isola APENAS A LINHA INTEIRA ONDE OCORREU O CLIQUE.
+     */
+    function extrairLinhaClicadaDeLink(elLink, clientX, clientY) {
+        if (!elLink) return null;
+        try {
+            const ponto = obterPontoDoClique(clientX, clientY);
+            let noAlvo = (ponto && ponto.no) ? ponto.no : null;
+            if (!noAlvo || !elLink.contains(noAlvo)) {
+                noAlvo = elLink.firstChild;
+            }
+            if (!noAlvo) return null;
+
+            // 1. Quebras explicitas no texto do link (<br>, \n, tags de bloco)
+            const mapa = (noAlvo.nodeType === Node.TEXT_NODE)
+                ? construirMapaTextoBlocoComJanela(noAlvo, (ponto && typeof ponto.offset === 'number') ? ponto.offset : 0)
+                : null;
+
+            if (mapa && mapa.texto && (mapa.texto.includes('\n') || mapa.texto.includes('\r'))) {
+                const textoCompleto = mapa.texto;
+                const idxCursor = Math.max(0, Math.min(mapa.idxCursor, textoCompleto.length));
+                let inicioLinha = textoCompleto.lastIndexOf('\n', Math.max(0, idxCursor - 1));
+                inicioLinha = (inicioLinha === -1) ? 0 : inicioLinha + 1;
+                let fimLinha = textoCompleto.indexOf('\n', idxCursor);
+                fimLinha = (fimLinha === -1) ? textoCompleto.length : fimLinha;
+
+                while (inicioLinha < fimLinha && /[\s\u00A0]/.test(textoCompleto[inicioLinha])) {
+                    inicioLinha++;
+                }
+                while (fimLinha > inicioLinha && /[\s\u00A0]/.test(textoCompleto[fimLinha - 1])) {
+                    fimLinha--;
+                }
+                if (fimLinha > inicioLinha) {
+                    const rLinha = criarRangeDOMAPartirDeIndices(mapa, inicioLinha, fimLinha);
+                    const tLinha = unificarLinhasComEspacamentoAntiTruncamento(textoCompleto.substring(inicioLinha, fimLinha));
+                    if (rLinha && tLinha) {
+                        return { range: rLinha, texto: tLinha };
+                    }
+                }
+            }
+
+            // 2. Quebra por tags <br> filhas de elLink
+            const brs = Array.from(elLink.querySelectorAll('br'));
+            if (brs.length > 0) {
+                const segmentos = [];
+                let rangeAtual = document.createRange();
+                rangeAtual.setStart(elLink, 0);
+
+                for (let i = 0; i < elLink.childNodes.length; i++) {
+                    const filho = elLink.childNodes[i];
+                    if (filho.tagName === 'BR') {
+                        rangeAtual.setEndBefore(filho);
+                        const txtSeg = unificarLinhasComEspacamentoAntiTruncamento(rangeAtual.toString());
+                        if (txtSeg.length > 0) {
+                            segmentos.push({ range: rangeAtual, texto: txtSeg });
+                        }
+                        rangeAtual = document.createRange();
+                        if (i + 1 < elLink.childNodes.length) {
+                            rangeAtual.setStartAfter(filho);
+                        }
+                    }
+                }
+                if (rangeAtual.startContainer) {
+                    try {
+                        rangeAtual.setEnd(elLink, elLink.childNodes.length);
+                        const txtFinal = unificarLinhasComEspacamentoAntiTruncamento(rangeAtual.toString());
+                        if (txtFinal.length > 0) {
+                            segmentos.push({ range: rangeAtual, texto: txtFinal });
+                        }
+                    } catch (_) { }
+                }
+
+                if (segmentos.length > 0) {
+                    for (const seg of segmentos) {
+                        try {
+                            if (noAlvo && seg.range.isPointInRange(noAlvo, (ponto && ponto.offset) || 0)) {
+                                return seg;
+                            }
+                        } catch (_) { }
+                    }
+                    let melhorSeg = segmentos[0];
+                    let menorDist = Infinity;
+                    for (const seg of segmentos) {
+                        const rect = seg.range.getBoundingClientRect();
+                        if (rect && rect.height > 0) {
+                            const dist = Math.abs(clientY - (rect.top + rect.height / 2));
+                            if (dist < menorDist) {
+                                menorDist = dist;
+                                melhorSeg = seg;
+                            }
+                        }
+                    }
+                    return melhorSeg;
+                }
+            }
+
+            // 3. Quebra visual de linha (via DOMRects no mesmo clientY)
+            if (noAlvo && noAlvo.nodeType === Node.TEXT_NODE) {
+                const val = noAlvo.nodeValue || '';
+                const off = Math.max(0, Math.min((ponto && ponto.offset) || 0, Math.max(0, val.length - 1)));
+                const rChar = document.createRange();
+                rChar.setStart(noAlvo, off);
+                rChar.setEnd(noAlvo, Math.min(off + 1, val.length));
+                const rc = rChar.getBoundingClientRect();
+                const refTop = (rc && rc.height > 0) ? rc.top : clientY;
+
+                let inicioOff = off;
+                let fimOff = off;
+
+                while (inicioOff > 0) {
+                    const ch = val[inicioOff - 1];
+                    if (ch === '\n' || ch === '\r') break;
+                    const rT = document.createRange();
+                    rT.setStart(noAlvo, inicioOff - 1);
+                    rT.setEnd(noAlvo, inicioOff);
+                    const rectT = rT.getBoundingClientRect();
+                    if (rectT && rectT.height > 0 && Math.abs(rectT.top - refTop) > 5) break;
+                    inicioOff--;
+                }
+
+                while (fimOff < val.length) {
+                    const ch = val[fimOff];
+                    if (ch === '\n' || ch === '\r') break;
+                    const rT = document.createRange();
+                    rT.setStart(noAlvo, fimOff);
+                    rT.setEnd(noAlvo, fimOff + 1);
+                    const rectT = rT.getBoundingClientRect();
+                    if (rectT && rectT.height > 0 && Math.abs(rectT.top - refTop) > 5) break;
+                    fimOff++;
+                }
+
+                while (inicioOff < fimOff && /[\s\u00A0]/.test(val[inicioOff])) inicioOff++;
+                while (fimOff > inicioOff && /[\s\u00A0]/.test(val[fimOff - 1])) fimOff--;
+
+                if (fimOff > inicioOff) {
+                    const rVisual = document.createRange();
+                    rVisual.setStart(noAlvo, inicioOff);
+                    rVisual.setEnd(noAlvo, fimOff);
+                    const tVisual = unificarLinhasComEspacamentoAntiTruncamento(val.substring(inicioOff, fimOff));
+                    if (tVisual) {
+                        return { range: rVisual, texto: tVisual };
+                    }
+                }
+            }
+
+            const rAll = document.createRange();
+            rAll.selectNodeContents(elLink);
+            return { range: rAll, texto: extrairTextoVisivelLimpoDeElemento(elLink) };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /*
+     * FUNCAO: criarRangeTextoParaEtiquetaOuObjeto
+     * DIRETRIZ SEÇÃO 6.6:
+     * Para etiquetas, badges, chips e itens de interface que possuam botões de exclusão
+     * irmãos (.fa-times, .icon-desvincular-tag, etc.), cria o range de seleção e contorno
+     * Flash Verde incidindo EXCLUSIVAMENTE sobre o rótulo da etiqueta, sem envolver o botão
+     * de desvinculação nem a estrutura física de contêineres externos.
+     */
+    function criarRangeTextoParaEtiquetaOuObjeto(elInterativo) {
+        if (!elInterativo) return null;
+        const range = document.createRange();
+        const SELETOR_BOTAO_EXCLUSAO = '[class*="desvincular"], [class*="icon-desvincular"], [class*="close"], [class*="remove"], [class*="delete"], [class*="excluir"], [title*="Excluir"], [title*="Remover"], [title*="Desvincular"], .fa-times, .fa-close, .fa-remove, mat-icon';
+
+        try {
+            const temBotaoRemover = (typeof elInterativo.querySelector === 'function') && elInterativo.querySelector(SELETOR_BOTAO_EXCLUSAO);
+            if (temBotaoRemover) {
+                const spans = Array.from(elInterativo.querySelectorAll('span, b, strong, em'));
+                const spanRotulo = spans.find(sp => {
+                    return !sp.closest(SELETOR_BOTAO_EXCLUSAO) && (sp.innerText || sp.textContent || '').trim().length > 0;
+                });
+                if (spanRotulo) {
+                    range.selectNodeContents(spanRotulo);
+                    return range;
+                }
+
+                const filhos = elInterativo.childNodes;
+                for (let i = 0; i < filhos.length; i++) {
+                    const f = filhos[i];
+                    if (f.nodeType === Node.TEXT_NODE && f.nodeValue && f.nodeValue.trim().length > 0) {
+                        range.setStart(f, 0);
+                        range.setEnd(f, f.nodeValue.length);
+                        return range;
+                    }
+                }
+            }
+        } catch (_) { }
+
+        range.selectNodeContents(elInterativo);
+        return range;
     }
 
     /*
@@ -1391,26 +1648,19 @@
                 }
             };
             percorrer(elLink);
-            const brutoUmaLinha = partes
-                .join('')
-                .replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
-                .trim();
+            const brutoUmaLinha = unificarLinhasComEspacamentoAntiTruncamento(partes.join(''));
             if (brutoUmaLinha) {
                 const higienizado = higienizarTextoParaCopia(brutoUmaLinha) || brutoUmaLinha;
-                return higienizado
-                    .replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ')
-                    .trim();
+                return unificarLinhasComEspacamentoAntiTruncamento(higienizado);
             }
             const fallbackInner = (typeof elLink.innerText === 'string' ? elLink.innerText : (elLink.textContent || ''))
                 .replace(/[\r\n\t\f\v \u00A0]+/gu, ' ')
                 .trim();
             if (!fallbackInner) return '';
             const higFallback = higienizarTextoParaCopia(fallbackInner) || fallbackInner;
-            return higFallback.replace(/[\r\n\t\f\v \u00A0]+/gu, ' ').trim();
+            return unificarLinhasComEspacamentoAntiTruncamento(higFallback);
         } catch (_) {
-            return ((elLink && (elLink.innerText || elLink.textContent)) || '')
-                .replace(/[\r\n\t\f\v \u00A0]+/gu, ' ')
-                .trim();
+            return unificarLinhasComEspacamentoAntiTruncamento((elLink && (elLink.innerText || elLink.textContent)) || '');
         }
     }
 
@@ -1990,11 +2240,14 @@
             cls.includes('panel') ||
             cls.includes('row') ||
             cls.includes('container') ||
-            cls.includes('list-group')
+            cls.includes('list-group') ||
+            cls.includes('col-') ||
+            cls.includes('dtpolo') ||
+            cls.includes('polo')
         )) {
             return true;
         }
-        if (el.querySelector('table, tr, td, p, h1, h2, h3, h4, h5, h6, [class*="card"], [class*="tarefa"], [class*="timeline"], [class*="row"]')) {
+        if (el.querySelector('table, tr, td, p, h1, h2, h3, h4, h5, h6, [class*="card"], [class*="tarefa"], [class*="timeline"], [class*="row"], [class*="col-"], [class*="dtPolo"], [class*="polo"]')) {
             return true;
         }
         // Descarta botoes/icones de exclusao de tags para nao contar indevidamente como multiplos controles
@@ -2923,7 +3176,13 @@
             for (let i = 0; i < celulas.length; i++) {
                 celulas[i].appendChild(document.createTextNode('\t'));
             }
-            const blocos = container.querySelectorAll('p, div, tr, li, h1, h2, h3, h4, h5, h6, blockquote, pre, header, footer, section, article');
+            /* DIRETRIZ SEÇÃO 6.3 - ANTI-TRUNCAMENTO:
+             * Garante quebra de linha \n explícita para blocos e colunas do PJe (col-*, dtPolo*, polo, tarefa, etc.),
+             * impedindo que o final de uma linha funda com o início da próxima (ex.: "FEDERAL" + "CÍVEL" -> "FEDERAL CÍVEL"). */
+            const blocos = container.querySelectorAll(
+                'p, div, tr, li, h1, h2, h3, h4, h5, h6, blockquote, pre, header, footer, section, article, dt, dd, ' +
+                '[class*="col-"], [class*="dtPolo"], [class*="polo"], [class*="tarefa"], [class*="card"], [class*="movimentacao"]'
+            );
             for (let i = 0; i < blocos.length; i++) {
                 blocos[i].appendChild(document.createTextNode('\n'));
             }
@@ -4236,7 +4495,7 @@
         if (textoSobrescrito !== null) {
             textoLimpo = higienizarTextoParaCopia(textoSobrescrito);
             if (opcoesCopia && opcoesCopia.forcarUmaLinha) {
-                textoLimpo = textoLimpo.replace(/[\r\n\t\f\v \u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/gu, ' ').trim();
+                textoLimpo = unificarLinhasComEspacamentoAntiTruncamento(textoLimpo);
             }
         } else if (rangeAlvo) {
             textoLimpo = extrairTextoPuroSanitizado(rangeAlvo);
@@ -6760,7 +7019,22 @@
                 }
             }
 
-            /* 2. Prioridade 2 (Clique Unico): Se nao for campo estruturado e for objeto de interface: */
+            /* SEÇÃO 6.7 (Passo 2): Links Multilinhas -> Cópia da Linha Inteira Clicada
+             * Caso o clique com Alt NÃO tenha incidido sobre um bloco específico, mas o texto do link
+             * possua múltiplas linhas (por <br>, \n ou quebra visual), copia APENAS A LINHA ONDE OCORREU O CLIQUE. */
+            if (!textoParaCopiar && elLinkDireto && isLinkMultilinha(elLinkDireto)) {
+                const resLinhaLink = extrairLinhaClicadaDeLink(elLinkDireto, e.clientX, e.clientY);
+                if (resLinhaLink && resLinhaLink.texto && resLinhaLink.range) {
+                    textoParaCopiar = resLinhaLink.texto;
+                    rangeParaFlash = resLinhaLink.range;
+                    forcarUmaLinhaAltLink = true;
+                }
+            }
+
+            /* SEÇÃO 6.6 (Nível 2) & SEÇÃO 6.7 (Passo 3): Objeto Real de Interface / Link de Linha Única
+             * Se for controle real de interface (botão, link de linha única, aba, switch, menu, ou etiqueta/badge/chip):
+             * Em etiquetas/badges com botão irmão de exclusão, seleciona e copia EXCLUSIVAMENTE o rótulo da etiqueta,
+             * ignorando o ícone "X" irmão e jamais capturando o contêiner externo. */
             if (!textoParaCopiar && elInterativo) {
                 if (elInterativo.tagName === 'INPUT') {
                     textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
@@ -6772,8 +7046,7 @@
                     rangeParaFlash.selectNode(elInterativo);
                 } else {
                     textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNodeContents(elInterativo);
+                    rangeParaFlash = criarRangeTextoParaEtiquetaOuObjeto(elInterativo);
                 }
             }
 
@@ -8909,6 +9182,11 @@
         executarColagemBotaoDireito,
         extrairTextoVisivelLimpoDeElemento,
         extrairTextoLinkUmaLinha,
+        unificarLinhasComEspacamentoAntiTruncamento,
+        isLinkMultilinha,
+        extrairLinhaClicadaDeLink,
+        criarRangeTextoParaEtiquetaOuObjeto,
+        isContainerComposto,
         obterObjetoInterativoParaSelecaoCompleta,
         dispararFlashBorderVisual,
         limparFlashBorderImediatamente,

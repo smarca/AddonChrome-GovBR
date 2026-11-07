@@ -6557,6 +6557,134 @@
             }
         );
 
+        /* 18) Seção 6.3: Supressão de Quebras de Linha em Linha Única com Espaçamento Obrigatório Anti-Truncamento */
+        let secao63AntiTruncamentoOk = false;
+        try {
+            const fCopia = window.JusGovFiltrosHtml ? new window.JusGovFiltrosHtml() : null;
+            const unificador = (motorTeste && typeof motorTeste.unificarLinhasComEspacamentoAntiTruncamento === 'function')
+                ? motorTeste.unificarLinhasComEspacamentoAntiTruncamento
+                : (fCopia && typeof fCopia.unificarLinhasComEspacamentoAntiTruncamento === 'function' ? fCopia.unificarLinhasComEspacamentoAntiTruncamento.bind(fCopia) : null);
+
+            // Teste 1: Quebra explícita de linha nunca funde palavras adjacentes
+            const textoQuebrado = 'DISTRIBUIÇÃO AO VARA FEDERAL\nCÍVEL E CRIMINAL';
+            const textoUnificado = unificador ? unificador(textoQuebrado) : '';
+            const semFusaoFederalCivel = textoUnificado === 'DISTRIBUIÇÃO AO VARA FEDERAL CÍVEL E CRIMINAL' && !textoUnificado.includes('FEDERALCÍVEL');
+
+            // Teste 2: Elementos irmãos adjacentes (spans de grid col-sm-11 e col-sm-12 do PJe)
+            const divContainerGrid = document.createElement('div');
+            divContainerGrid.innerHTML = '<span class="col-sm-11">DISTRIBUIÇÃO AO VARA FEDERAL</span><span class="col-sm-12 no-padding">CÍVEL E CRIMINAL</span>';
+            const txtExtraidoLimpo = motorTeste.extrairTextoVisivelLimpoDeElemento(divContainerGrid);
+            const txtSanitizado = motorTeste.extrairTextoPuroSanitizado(divContainerGrid);
+            const semFusaoDom = !txtExtraidoLimpo.includes('FEDERALCÍVEL') && txtExtraidoLimpo.includes('FEDERAL CÍVEL');
+
+            secao63AntiTruncamentoOk = Boolean(
+                semFusaoFederalCivel &&
+                semFusaoDom &&
+                !txtSanitizado.includes('FEDERALCÍVEL')
+            );
+        } catch (_) {
+            secao63AntiTruncamentoOk = false;
+        }
+        registrar(
+            secao63AntiTruncamentoOk,
+            'SECAO_6_3_ANTI_TRUNCAMENTO_ESPACO_OBRIGATORIO',
+            'Supressão de quebras de linha com espaçamento obrigatório anti-truncamento: preserva espaço entre blocos e spans de grid ("FEDERAL CÍVEL", nunca "FEDERALCÍVEL")'
+        );
+
+        /* 19) Seção 6.6: Escopo de Seleção em Alt + Clique sobre Botões, Etiquetas e Itens de Interface */
+        let secao66EscopoEtiquetaOk = false;
+        try {
+            // Cria etiqueta com botão de desvincular tag irmão
+            const divEtiqueta = document.createElement('div');
+            divEtiqueta.className = 'label label-etiqueta';
+            divEtiqueta.innerHTML = '<span data-jusgov-selecionavel="true">HOMOLOGAR ACORDO</span><span class="icon-desvincular-tag"><i class="fa fa-times"></i></span>';
+            document.body.appendChild(divEtiqueta);
+
+            const spanTextoTag = divEtiqueta.querySelector('span[data-jusgov-selecionavel]');
+            const iconeRemover = divEtiqueta.querySelector('.icon-desvincular-tag');
+
+            // 1. Objeto interativo isola o rótulo
+            const objInterativo = motorTeste.obterObjetoInterativoParaSelecaoCompleta(spanTextoTag);
+            const txtEtiqueta = motorTeste.extrairTextoVisivelLimpoDeElemento(divEtiqueta);
+
+            // 2. Range para flash envolve estritamente o rótulo, ignorando o botão de fechar
+            const rangeRotulo = motorTeste.criarRangeTextoParaEtiquetaOuObjeto(divEtiqueta);
+            const txtRange = rangeRotulo ? rangeRotulo.toString().trim() : '';
+
+            // 3. Contêiner composto de card de tarefa deve ser rejeitado
+            const divCardComposto = document.createElement('div');
+            divCardComposto.className = 'card tarefa pje-task col-sm-12';
+            divCardComposto.innerHTML = '<p>Texto da Tarefa</p><button>Ação 1</button><button>Ação 2</button>';
+            const ehComposto = motorTeste.isContainerComposto(divCardComposto);
+
+            secao66EscopoEtiquetaOk = Boolean(
+                objInterativo &&
+                txtEtiqueta === 'HOMOLOGAR ACORDO' &&
+                txtRange === 'HOMOLOGAR ACORDO' &&
+                ehComposto === true
+            );
+
+            divEtiqueta.remove();
+        } catch (_) {
+            secao66EscopoEtiquetaOk = false;
+        }
+        registrar(
+            secao66EscopoEtiquetaOk,
+            'SECAO_6_6_ALT_CLIQUE_ESCOPO_ETIQUETA_MINIMO',
+            'Alt + Clique em etiquetas/badges: extrai e destaca estritamente o rótulo ("HOMOLOGAR ACORDO"), ignorando botão irmão "X" e rejeitando cards compostos'
+        );
+
+        /* 20) Seção 6.7: Precedência de 3 Passos em Links com Alt + Clique */
+        let secao67PrecedenciaLinksOk = false;
+        try {
+            // Passo 1: Link contendo bloco estruturado (processo CNJ)
+            const aBloco = document.createElement('a');
+            aBloco.href = '#';
+            aBloco.textContent = 'Autos nº 1015306-38.2026.4.01.4002 em tramitação';
+            document.body.appendChild(aBloco);
+            const idxProc = aBloco.textContent.indexOf('1015306');
+            const resBlocoLink = motorTeste.simularCliqueEmTexto(aBloco.textContent, idxProc, 1, true);
+
+            // Passo 2: Link com múltiplas linhas (por <br>)
+            const aMultilinha = document.createElement('a');
+            aMultilinha.href = '#';
+            aMultilinha.innerHTML = 'Linha 1 do Link<br>Linha 2 Onde Clicou<br>Linha 3 Final';
+            document.body.appendChild(aMultilinha);
+
+            const ehMulti = motorTeste.isLinkMultilinha(aMultilinha);
+            const noLinha2 = aMultilinha.childNodes[2]; // Nó de texto da linha 2
+            const resLinha2 = motorTeste.extrairLinhaClicadaDeLink(aMultilinha, 0, 0);
+
+            // Passo 3: Link de linha única sem bloco sob o cursor
+            const aLinhaUnica = document.createElement('a');
+            aLinhaUnica.href = '#';
+            aLinhaUnica.textContent = 'Certidão de Intimação Expedida';
+            document.body.appendChild(aLinhaUnica);
+
+            const ehMultiUnica = motorTeste.isLinkMultilinha(aLinhaUnica);
+            const txtUnica = motorTeste.extrairTextoVisivelLimpoDeElemento(aLinhaUnica);
+
+            secao67PrecedenciaLinksOk = Boolean(
+                resBlocoLink.includes('1015306-38.2026.4.01.4002') &&
+                ehMulti === true &&
+                resLinha2 &&
+                resLinha2.texto &&
+                ehMultiUnica === false &&
+                txtUnica === 'Certidão de Intimação Expedida'
+            );
+
+            aBloco.remove();
+            aMultilinha.remove();
+            aLinhaUnica.remove();
+        } catch (_) {
+            secao67PrecedenciaLinksOk = false;
+        }
+        registrar(
+            secao67PrecedenciaLinksOk,
+            'SECAO_6_7_ALT_CLIQUE_LINKS_PRECEDENCIA_3_PASSOS',
+            'Ordem de precedência em links com Alt + Clique: Passo 1 (bloco forense sob cursor), Passo 2 (link multilinha copia linha clicada), Passo 3 (link de linha única)'
+        );
+
         /* ==================================================================
          * BATERIA 13: FUZZING MUTACIONAL E RESISTÊNCIA A MUTANTES DE DV (MUTATION TESTING +1/-1)
          * Diretriz de Verificação Dupla (Paridade Correto -> Mutado):
