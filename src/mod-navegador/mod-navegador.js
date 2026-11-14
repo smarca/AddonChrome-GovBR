@@ -255,7 +255,7 @@
          */
         async tratarNovaJanela(janela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (this.#janelaUnica && typeof this.#janelaUnica.processarNovaJanela === 'function') {
-                await this.#janelaUnica.processarNovaJanela(janela, chromeApi);
+                await this.#janelaUnica.processarNovaJanela(janela, chromeApi, this.#configuracoes);
             }
         }
 
@@ -265,9 +265,24 @@
          * @param {Object} [chromeApi]
          */
         async tratarNovaAba(tab, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            let res = { duplicada: false };
             if (this.#antiDuplicacao && typeof this.#antiDuplicacao.processarNovaAba === 'function') {
-                const res = await this.#antiDuplicacao.processarNovaAba(tab, chromeApi, this.#configuracoes);
+                res = await this.#antiDuplicacao.processarNovaAba(tab, chromeApi, this.#configuracoes);
                 if (res && res.duplicada) return;
+            }
+
+            /* Seção 6.129 / BUG-51: Quando abaEmPrimeiroPlano está desmarcado, mantém foco na guia de origem */
+            const emPrimeiroPlano = (this.#configuracoes.abaEmPrimeiroPlano !== undefined)
+                ? Boolean(this.#configuracoes.abaEmPrimeiroPlano)
+                : (this.#configuracoes.abaEmSegundoPlano !== undefined ? (this.#configuracoes.abaEmSegundoPlano === false) : true);
+            const urlTab = (tab && (tab.pendingUrl || tab.url)) || '';
+            const ehNovaGuiaNavegador = !urlTab || urlTab === 'chrome://newtab/' || urlTab === 'about:blank' || urlTab.startsWith('chrome://') || urlTab.startsWith('edge://');
+            if (!emPrimeiroPlano && tab && tab.active && tab.openerTabId && !(res && res.duplicacaoManualPermitida) && !ehNovaGuiaNavegador && chromeApi && chromeApi.tabs) {
+                chromeApi.tabs.update(tab.openerTabId, { active: true }).catch(() => { });
+            }
+
+            if (tab && tab.id && tab.openerTabId && this.#ordenacao && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
+                this.#ordenacao.registrarRelacaoPaiFilha(tab.id, tab.openerTabId);
             }
 
             if (tab && tab.windowId && this.#ordenacao && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
@@ -303,6 +318,24 @@
          * @param {Object} [chromeApi]
          */
         tratarAbaRemovida(tabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (this.#ordenacao) {
+                const emCascata = typeof this.#ordenacao.consumirFechamentoCascata === 'function'
+                    && this.#ordenacao.consumirFechamentoCascata(tabId);
+                const fecharTodos = Boolean(this.#configuracoes && this.#configuracoes.fecharHierarquiaEmCascata);
+                const crit = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio;
+                if (!emCascata && fecharTodos && crit === 'hierarquia_arvore' && typeof this.#ordenacao.obterDescendentesDaAba === 'function') {
+                    const descendentes = this.#ordenacao.obterDescendentesDaAba(tabId);
+                    if (descendentes.length > 0 && chromeApi && chromeApi.tabs && typeof chromeApi.tabs.remove === 'function') {
+                        if (typeof this.#ordenacao.marcarFechamentoCascata === 'function') {
+                            this.#ordenacao.marcarFechamentoCascata(descendentes);
+                        }
+                        chromeApi.tabs.remove(descendentes).catch(() => { });
+                    }
+                }
+                if (typeof this.#ordenacao.removerDaArvore === 'function') {
+                    this.#ordenacao.removerDaArvore(tabId);
+                }
+            }
             if (this.#antiDuplicacao && typeof this.#antiDuplicacao.processarAbaRemovida === 'function') {
                 this.#antiDuplicacao.processarAbaRemovida(tabId, chromeApi);
             }

@@ -1209,9 +1209,321 @@
              ABA 1: CONFIGURACOES OPERACIONAIS, LISTA DE SITES E AVANCADO
              ================================================================== -->
         <div id="abaConfiguracoes" class="painel-aba ativa">
-            <!-- Passo 2.1: Bloco Basico Limpo -->
+            <!-- Secao 1: COPIA INTELIGENTE -->
             <section class="cartao">
-                <h2>Preferências Gerais de Operação e Formatação</h2>
+                <h2>1. CÓPIA INTELIGENTE: Editores de Minutas e Validação</h2>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
+                        para <code>id ..., pg. ...</code></div>
+                    <div class="setting-help">Ao selecionar cabeçalhos nativos de peças do PJe
+                        (ex: <code>Num. 2297820154 - Pág. 1</code>), copia automaticamente no formato
+                        padronizado e simplificado <code>id 2297820154, pg. 1</code>.</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="optConverterCabecalhoPje" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Seleção Automática de Placeholders em Editores</div>
+                    <div class="setting-help">Em caixas de texto, campos editáveis e editores de minutas
+                        online (como CKEditor, TinyMCE e editores HTML), seleciona marcadores de preenchimento
+                        sem substituir o que você já tinha copiado no teclado: <strong>Desabilitado</strong> (cursor
+                        nativo sem pré-seleção alguma); <strong>Seleção apenas dos
+                            placeholders</strong> (marca <code>#[digite aqui]#</code>, <code>[@@...@@]</code>, <code>##/##/20##</code>,
+                        <code>######</code> com 1 clique); <strong>Seleção Avançada com
+                            Control</strong> (placeholders sem Ctrl; seleção avançada
+                        apenas com <code>Ctrl</code> pressionado); ou <strong>Seleção
+                            Avançada</strong> (seleciona blocos, linhas e texto em qualquer clique,
+                        <strong>sem jamais alterar o seu Ctrl+C</strong>).</div>
+                </div>
+                <select id="selectModoPlaceholdersMinutasHtml" class="seletor-modo">
+                    <option value="desabilitado">Desabilitado (sem seleção alguma)</option>
+                    <option value="placeholders" selected>Seleção apenas dos placeholders
+                        (Padrão)</option>
+                    <option value="ctrl_avancado">Seleção Avançada se pressionado "Control"
+                        (Placeholders sem Ctrl)</option>
+                    <option value="avancado">Seleção Avançada (blocos, linhas e texto sem
+                        alterar o Ctrl+C)</option>
+                </select>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Conferência Automática de Documentos e Datas (CPF,
+                            CNPJ, Processo e Datas)</div>
+                        <div class="setting-help">Avisa na tela quando um número de documento copiado tiver
+                            dígitos incorretos ou a data for inválida no calendário (ex: 31 de
+                            abril ou ano não-bissexto). Defina <code>0</code> para desativar a conferência.</div>
+                    </div>
+                    <div class="controle-slider-composto">
+                        <input type="checkbox" id="optValidacaoMatematicaAtiva" checked style="display: none;">
+                        <input type="range" id="optTempoConferenciaDocumentos" class="input-range-custom" min="0" max="6" step="1" value="6" title="Tempo de exibição do cartão de conferência de documentos e datas (0 = Desabilitado)">
+                        <span id="lblValorTempoConferencia" class="badge-valor-slider">Até Interação (Padrão)</span>
+                    </div>
+                </div>
+                <div id="containerModoExibicaoValidacao" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px dashed var(--borda-suave); padding-top: 10px; transition: opacity 0.2s ease;">
+                    <div style="font-size: 13px; font-weight: 500; color: var(--texto-secundario);">
+                        Exibição dos Avisos na Tela:
+                    </div>
+                    <select id="optModoExibicaoValidacao" class="input-select"
+                        style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                        <option value="sempre" selected>Sucesso e Falhas (Padrão)</option>
+                        <option value="apenas_erros">Apenas Falhas (Erros na validação)</option>
+                    </select>
+                </div>
+                <div id="containerPosicaoAvisosValidacao" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px dashed var(--borda-suave); padding-top: 10px; transition: opacity 0.2s ease;">
+                    <div style="font-size: 13px; font-weight: 500; color: var(--texto-secundario);">
+                        Posição dos Avisos na Tela:
+                    </div>
+                    <select id="optPosicaoAvisosValidacao" class="input-select"
+                        style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                        <option value="abaixo" selected>Abaixo do mouse (Padrão)</option>
+                        <option value="acima">Acima do mouse</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Separador do Modo Acumulador (Ctrl + Alt)</div>
+                    <div class="setting-help">Símbolos ou pontuações inseridos entre os
+                        itens acumulados com <code>Ctrl + Alt</code> (máx. 5 caracteres, sem
+                        letras/dígitos; padrão <code>;</code>).</div>
+                </div>
+                <input type="text" id="optAcumuladorSeparador" class="input-text" value=";" maxlength="5">
+            </div>
+
+            <div id="containerTempoExibicaoAlerta" class="setting-item" style="transition: opacity 0.2s ease;">
+                <div>
+                    <div class="setting-label">Tempo de Exibição dos Avisos na Tela</div>
+                    <div class="setting-help">Tempo que os avisos gerais do sistema (resumo estatístico de tabelas,
+                        modo acumulador e alternância de formatação <code>Esc+Esc</code>) permanecem visíveis na tela (defina 0 para desligar
+                        os avisos).</div>
+                </div>
+                <div class="controle-slider-composto">
+                    <input type="range" id="optTempoExibicaoAlerta" class="input-range-custom" min="0" max="6"
+                        step="1" value="6">
+                    <span id="lblValorTempoAlerta" class="badge-valor-slider">Até Interação (Padrão)</span>
+                </div>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Contorno Visual Rápido ao Copiar (Flash Temporizado)</div>
+                        <div class="setting-help">Exibe um discreto contorno colorido ancorado ao texto selecionado ao copiar um trecho simples
+                            para confirmar a captura sem balões intrusivos.</div>
+                    </div>
+                    <div class="controle-slider-composto" style="flex-wrap: wrap;">
+                        <span id="previewFlashBorderExemplo" style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; border: 2px solid #0d9488; background: rgba(13, 148, 136, 0.12); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
+                        <div class="paleta-cores-basicas" data-target-color="optCorFlashBorder" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de cores básicas">
+                            <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #0d9488; cursor: pointer; padding: 0;" title="Verde Esmeralda"></button>
+                            <button type="button" class="btn-swatch-cor" data-cor="#16a34a" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #16a34a; cursor: pointer; padding: 0;" title="Verde"></button>
+                            <button type="button" class="btn-swatch-cor" data-cor="#2563eb" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #2563eb; cursor: pointer; padding: 0;" title="Azul"></button>
+                            <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #d97706; cursor: pointer; padding: 0;" title="Âmbar"></button>
+                            <button type="button" class="btn-swatch-cor" data-cor="#dc2626" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #dc2626; cursor: pointer; padding: 0;" title="Vermelho"></button>
+                            <button type="button" class="btn-swatch-cor" data-cor="#7c3aed" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #7c3aed; cursor: pointer; padding: 0;" title="Roxo"></button>
+                        </div>
+                        <input type="color" id="optCorFlashBorder" class="input-cor-compacto" value="#0d9488"
+                            title="Cor do contorno e destaque do Flash">
+                        <input type="range" id="optTempoFlashMs" class="input-range-custom" min="0" max="5250"
+                            step="250" value="5250">
+                        <span id="lblValorTempoFlash" class="badge-valor-slider">Até Interação (Padrão)</span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px dashed var(--borda-suave); padding-top: 10px;">
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: var(--texto-principal);">Retirar Seleções do Sistema após Copiar</div>
+                        <div class="setting-help" style="margin-top: 2px;">Define o comportamento da seleção nativa azul do navegador após a cópia com Flash.</div>
+                    </div>
+                    <select id="optModoRetirarSelecao" class="input-select"
+                        style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                        <option value="total" selected>Total (interface web e texto de leitura) (Padrão)</option>
+                        <option value="total_exceto_arrasto">Total (exceto ao arrastar o mouse)</option>
+                        <option value="interface">Das partes com interface</option>
+                        <option value="nenhuma">Nenhuma (manter selecionado)</option>
+                    </select>
+                </div>
+                <div id="containerSubOpcaoMarcadorColado" style="display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--borda-suave); padding-top: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--texto-principal);">
+                                Marcador Permanente de Conteúdo Colado (Numeração Ordinal 1, 2, 3...)
+                            </div>
+                            <div class="setting-help" style="margin-top: 2px;">
+                                Ao colar efetivamente um trecho copiado, remove o contorno temporário de cópia e fixa na página de origem uma marcação permanente suave com etiqueta sobrescrita ordinal (<code>1</code>, <code>2</code>, <code>3</code>...) indicando a ordem das colagens realizadas na guia.
+                            </div>
+                        </div>
+                        <label class="switch" title="Ativa o marcador permanente numerado na página de origem ao colar o conteúdo copiado">
+                            <input type="checkbox" id="optMarcadorConteudoColadoAtivo" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="painelCustomizacaoMarcadorColado" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <label for="optPresetMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Tema:</label>
+                            <select id="optPresetMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                                <option value="verde_forense" selected>Verde Esmeralda Forense (Padrão)</option>
+                                <option value="marca_texto_classico">Marca-Texto Clássico</option>
+                                <option value="azul_indigo">Azul Índigo</option>
+                                <option value="ambar_suave">Âmbar Suave</option>
+                                <option value="alto_contraste">Alto Contraste</option>
+                            </select>
+                            <label for="optTipoContornoMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Contorno:</label>
+                            <select id="optTipoContornoMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                                <option value="solido" selected>Sólido (Padrão)</option>
+                                <option value="tracejado">Tracejado</option>
+                                <option value="sem_borda">Sem Borda (Só Fundo)</option>
+                                <option value="ondulado">Ondulado</option>
+                                <option value="taxado">Taxado</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
+                                <span>Borda:</span>
+                                <input type="color" id="optCorContornoMarcadorColado" class="input-cor-compacto" value="#0d9488" title="Cor da borda do marcador permanente">
+                                <div class="paleta-cores-basicas" data-target-color="optCorContornoMarcadorColado" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de borda">
+                                    <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #0d9488; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#eab308" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #eab308; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#4f46e5" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #4f46e5; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #d97706; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#1e293b" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #1e293b; cursor: pointer; padding: 0;"></button>
+                                </div>
+                            </div>
+                            <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
+                                <span>Fundo:</span>
+                                <input type="color" id="optCorFundoMarcadorColado" class="input-cor-compacto" value="#ccfbf1" title="Cor de preenchimento suave do marcador permanente">
+                                <div class="paleta-cores-basicas" data-target-color="optCorFundoMarcadorColado" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de fundo">
+                                    <button type="button" class="btn-swatch-cor" data-cor="#ccfbf1" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #ccfbf1; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#fef08a" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #fef08a; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#e0e7ff" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #e0e7ff; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#fde68a" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #fde68a; cursor: pointer; padding: 0;"></button>
+                                    <button type="button" class="btn-swatch-cor" data-cor="#facc15" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #facc15; cursor: pointer; padding: 0;"></button>
+                                </div>
+                            </div>
+                            <label for="optEstiloBadgeMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Etiqueta:</label>
+                            <select id="optEstiloBadgeMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                                <option value="sobrescrito" selected>Sobrescrito Discreto Circular (Padrão)</option>
+                                <option value="translucido">Circular Translúcido</option>
+                                <option value="circular">Circular Compacto</option>
+                                <option value="sobrescrito_retangular">Sobrescrito Discreto Retangular</option>
+                                <option value="retangular_translucido">Retangular Translúcido</option>
+                                <option value="retangular_compacto">Retangular Compacto</option>
+                                <option value="sem_etiqueta">Sem Etiqueta</option>
+                            </select>
+                            <span id="previewMarcadorColadoExemploWrap" style="position: relative; display: inline-flex; align-items: center; margin: 4px 10px 0 6px;">
+                                <span id="previewMarcadorColadoExemplo" style="display: inline-block; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #0d9488; background: rgba(204, 251, 241, 0.35); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
+                                <span id="previewMarcadorColadoBadge" style="position: absolute; top: -7px; right: -8px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #0d9488; background: rgba(255,255,255,0.88); border: 1px solid #0d9488; border-radius: 999px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box;">1</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Tamanho Mínimo de Texto para Cópia</div>
+                    <div class="setting-help">Em textos da página ou elementos de interface, caso não seja um campo estruturado, evita a perda acidental do conteúdo da Área de Transferência quando inexistem teclas modificadoras (clique único, duplo ou arrasto sem combinações das teclas Ctrl ou Alt). Assim, se não for campo estruturado (data, CPF, etc.), exige no mínimo esta quantidade de caracteres para confirmar a cópia e o contorno.</div>
+                </div>
+                <select id="optMinimoCaracteresInterface" class="input-select"
+                    style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                    <option value="0">0 (Sem proteção mínima)</option>
+                    <option value="1">1 caractere</option>
+                    <option value="2">2 caracteres</option>
+                    <option value="3">3 caracteres</option>
+                    <option value="4">4 caracteres</option>
+                    <option value="5" selected>5 caracteres (Padrão)</option>
+                    <option value="10">10 caracteres</option>
+                </select>
+            </div>
+
+            <!-- Subgrupo Recolhido para Usuarios Experientes: Mapeamento Manual Avancado de Elementos (XPath / CSS) (Secao 6.20 e Secao 6.85) -->
+            <details class="subsecao-recolhida-avancada" id="detalhesMapeamentoXPath" style="margin-top: 18px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; overflow: hidden;">
+                <summary style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #38bdf8; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: #38bdf8;">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        Mapeamento Manual Avançado de Elementos (XPath / CSS)
+                    </span>
+                </summary>
+                <div style="padding: 14px; border-top: 1px solid #334155; display: flex; flex-direction: column; gap: 12px;">
+                    <div class="setting-help" style="margin: 0; font-size: 12px; color: #cbd5e1; line-height: 1.55;">
+                        <p style="margin: 0 0 8px 0; color: #94a3b8;">
+                            Use esta área quando uma parte do site não se comportar como você espera (por exemplo, um botão que copia texto sem querer ou um quadro de processo que não deixa selecionar). Aqui você ensina à extensão como tratar cada tipo de área:
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-bottom: 10px;">
+                            <div style="background: #1e293b; border: 1px solid rgba(251, 191, 36, 0.35); border-radius: 6px; padding: 8px 10px;">
+                                <div style="font-weight: 700; color: #fbbf24; margin-bottom: 3px;">🟡 Interface (Botões, Menus e Links)</div>
+                                <div style="font-size: 11.5px; color: #cbd5e1;"><strong>Na prática:</strong> Clicar normalmente apenas aperta o botão ou navega no site — não copia palavras por engano e limpa a seleção na hora. Se precisar copiar o texto de um botão, segure <code>Alt + Clique</code>.<br><span style="color: #94a3b8;"><em>Ex.: botão Salvar, menus, abas, ícones.</em></span></div>
+                            </div>
+                            <div style="background: #1e293b; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 6px; padding: 8px 10px;">
+                                <div style="font-weight: 700; color: #38bdf8; margin-bottom: 3px;">🔵 SemiFlexível (Quadros e Tabelas de Dados)</div>
+                                <div style="font-size: 11.5px; color: #cbd5e1;"><strong>Na prática:</strong> Ignora palavras comuns ao redor (como rótulos &quot;Nome:&quot; ou &quot;Status:&quot;), mas permite copiar com <strong>1 clique</strong> apenas dados úteis: nº de processo, CPF, CNPJ, datas, horas e valores.<br><span style="color: #94a3b8;"><em>Ex.: cabeçalho do processo, linha de tabela, Polo Ativo/Passivo.</em></span></div>
+                            </div>
+                            <div style="background: #1e293b; border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 6px; padding: 8px 10px;">
+                                <div style="font-weight: 700; color: #34d399; margin-bottom: 3px;">🟢 Textual (Leitura de Documentos e PDFs)</div>
+                                <div style="font-size: 11.5px; color: #cbd5e1;"><strong>Na prática:</strong> Trata a área como texto comum de leitura: 1 clique seleciona palavra, 2 ou mais cliques expandem frases/parágrafos e o destaque continua marcado na tela.<br><span style="color: #94a3b8;"><em>Ex.: decisões, petições, PDFs e blocos de leitura.</em></span></div>
+                            </div>
+                            <div style="background: #1e293b; border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 6px; padding: 8px 10px;">
+                                <div style="font-weight: 700; color: #c084fc; margin-bottom: 3px;">🟣 Editável (Campos de Digitação e Minutas)</div>
+                                <div style="font-size: 11.5px; color: #cbd5e1;"><strong>Na prática:</strong> Deixa você digitar e posicionar o cursor livremente, permite colar com o botão do meio do mouse e ativa a detecção de <em>placeholders</em> (<code>#campo#</code>, <code>@@@@</code>) em minutas.<br><span style="color: #94a3b8;"><em>Ex.: caixas de texto, datas, textarea e editor de minuta.</em></span></div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11.5px; color: #94a3b8; line-height: 1.5;">
+                            <strong>Como capturar na própria página:</strong> passe o mouse segurando <code>Ctrl + Alt + Shift</code> para ver um cartão explicando como a extensão está enxergando aquele item; se quiser mudar o comportamento, faça <code>Ctrl + Alt + Shift + Clique</code> (ou <code>Ctrl + Alt + Botão Direito</code>), use <strong>👁️ Testar</strong> para ver o destaque atrás da janela e salve.<br>
+                            <strong>Ordem de decisão automática:</strong> 0) Padrão <em>Textual</em> ➔ 1) Formato do cursor (setinha, mãozinha, barra de texto) ➔ 2) Ações de clique do site ➔ 3) Aparência/conteúdo (datas, textos longos, bloqueio de seleção) ➔ 4) <em>Regras do Usuário</em> (suas regras têm prioridade!) e, se nenhuma bater, <em>Regras Internas</em> (<em>Continuar</em> passa para a próxima regra do mesmo grupo). Ao usar <em>Restaurar Padrões</em>, os exemplos iniciais voltam para <em>Regras do Usuário</em>.
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+                        <button type="button" id="tabRegrasUsuario" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; border-color: #38bdf8; color: #38bdf8;">Regras do Usuário</button>
+                        <button type="button" id="tabRegrasInternas" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; opacity: 0.7;">Regras Internas</button>
+                    </div>
+                    <div id="containerListaRegrasMapeamento" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- As regras cadastradas sao renderizadas dinamicamente aqui -->
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="btnTestarAdicaoManualMapeamento" class="btn btn-secundario" title="Abrir caixa modal de adição manual de regra XPath/CSS com todos os campos vazios e desmarcados" style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; margin-right: auto;">
+                            <span>🧪</span> Testar Adição Manual
+                        </button>
+                        <button type="button" id="btnAdicionarRegraMapeamento" class="btn btn-secundario" title="Adicionar Regra Manualmente" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>➕</span> Adicionar Regra
+                        </button>
+                        <button type="button" id="btnSalvarRegrasMapeamento" class="btn btn-primario" title="Salvar Regras de Mapeamento" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>💾</span> Salvar
+                        </button>
+                        <button type="button" id="btnExportarMapeamentoJson" class="btn btn-secundario" title="Exportar Regras para JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>📤</span> Exportar JSON
+                        </button>
+                        <button type="button" id="btnImportarMapeamentoJson" class="btn btn-secundario" title="Importar Regras de JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>📥</span> Importar JSON
+                        </button>
+                        <input type="file" id="inputImportarMapeamentoArquivo" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </details>
+
+                <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                    <div>
+                        <div class="setting-label">Lista de Domínios do Motor de Seleção e Cópia</div>
+                        <div class="setting-help">
+                            Utilizada quando o modo "Só Sites da Lista" está selecionado. Informe um
+                            padrão por linha (ex: <code>*://*.jus.br/*</code>).
+                        </div>
+                    </div>
+                    <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
+                </div>
+            </section>
+
+            <!-- Secao 2: Preferencias Gerais -->
+            <section class="cartao">
+                <h2>2. Preferências Gerais de Operação e Formatação</h2>
                 <p class="subtitulo">
                     Escolha como a seleção inteligente e a cópia de textos devem funcionar no seu
                     navegador. Todas as alterações entram em vigor imediatamente, sem precisar recarregar
@@ -1257,16 +1569,16 @@
                         <div>
                             <h3 style="margin-bottom: 4px;">Remover Formatações (Somente Texto)</h3>
                             <p>
-                                Quando marcado (padrão), copia apenas o texto limpo, sem nenhuma
+                                Quando marcado, copia apenas o texto limpo, sem nenhuma
                                 formatação visual (ideal para colar em formulários, campos de
-                                pesquisa ou sistemas que não aceitam estilos). Desmarcado (ou pressionando as
+                                pesquisa ou sistemas que não aceitam estilos). Desmarcado (padrão, ou pressionando as
                                 teclas <code>Esc + Esc</code>): preserva a formatação visual do texto
                                 copiado conforme o nível selecionado no controle deslizante abaixo. O tipo e
                                 tamanho da letra original são sempre limpos para se adaptarem ao seu documento de
                                 destino.
                             </p>
                         </div>
-                        <input type="checkbox" id="checkOpcaoRemoverFormatacoes" checked
+                        <input type="checkbox" id="checkOpcaoRemoverFormatacoes"
                             style="width:20px;height:20px;cursor:pointer;flex-shrink:0;">
                     </div>
 
@@ -1331,589 +1643,534 @@
                 </div>
             </section>
 
-            <!-- Passo 2.2: Lista de Dominios do Motor de Selecao e Copia -->
+            <!-- Secao 3: ACELERADOR DO SISTEMA JUDICIAL TURBO (ANTI-AMPULHETAS) -->
             <section class="cartao">
-                <h2>Lista de Domínios do Motor de Seleção e Cópia</h2>
-                <p class="subtitulo">
-                    Utilizada quando o modo "Só Sites da Lista" está selecionado. Informe um
-                    padrão por linha (ex: <code>*://*.jus.br/*</code>).
-                </p>
-                <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
+                <h2>3. ACELERADOR DO SISTEMA JUDICIAL TURBO (ANTI-AMPULHETAS)</h2>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Acelerador do Sistema Judicial Turbo (Anti-Ampulhetas)</div>
+                    <div class="setting-help">
+                        Evita que a tela fique travada com mensagens de "Aguarde..." ou ampulhetas
+                        durante o carregamento de páginas nos sistemas judiciais (todos sob a zona
+                        <code>*.jus.br</code>). Ordem de prioridade e cobertura:<br>
+                        <b>1º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Neutraliza cortinas AJAX do RichFaces (#mpLoading, status.start), spinners e bloqueios de clique no PJe 1G/2G.">PJe</span> •
+                        <b>2º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Neutraliza overlays de espera e bloqueios transientes de cursor/clique no Eproc.">Eproc</span> •
+                        <b>3º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Otimiza carregamentos e remove máscaras bloqueadoras na Plataforma Digital do Poder Judiciário (PDPJ / PrevJud / STF / STJ).">PDPJ</span> •
+                        <b>4º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Remove bloqueios visuais de espera e ampulhetas nas telas do Projudi.">Projudi</span> •
+                        <b>5º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Neutraliza cortinas de carregamento e travas visuais no Portal e-SAJ.">SAJ</span> •
+                        <b>6º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Desbloqueia telas de espera e cursores travados no sistema Creta.">Creta</span> •
+                        <b>7º</b> <span style="cursor: help; text-decoration: underline dotted;" title="Remove bloqueios visuais transientes no Sistema Eletrônico de Execução Unificado (SEEU).">SEEU</span>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="checkOpcaoAmpuletas" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
             </section>
 
-            <!-- Passo 2.3: Secao Recolhivel de Configuracoes Avancadas Categorizadas -->
-            <details class="secao-avancada">
-                <summary>Configurações Avançadas</summary>
-                <div class="conteudo-avancado">
-                    <div class="categoria-avancada-titulo">1. ACELERADOR PJE TURBO (ANTI-AMPULHETAS)</div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Acelerador PJe Turbo (Anti-Ampulhetas)</div>
-                            <div class="setting-help">
-                                Evita que a tela fique travada com mensagens de "Aguarde..." ou ampulhetas
-                                durante o carregamento de páginas no PJe.<br>
-                                O sistema atua com foco primário no <b>Processo Judiciário
-                                    Eletrônico (PJe)</b> e suporte secundário aos sistemas processuais
-                                judiciários <b>Eproc</b> e <b>Projudi</b> (todos sob a zona
-                                <code>*.jus.br</code>). A lista do PJe Anti-Ampulhetas é gerenciada internamente
-                                para domínios do PJe.
-                            </div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="checkOpcaoAmpuletas" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="categoria-avancada-titulo">2. CÓPIA INTELIGENTE: Editores de Minutas e
-                        Validação</div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
-                                para <code>id ..., pg. ...</code></div>
-                            <div class="setting-help">Ao selecionar cabeçalhos nativos de peças do PJe
-                                (ex: <code>Num. 2297820154 - Pág. 1</code>), copia automaticamente no formato
-                                padronizado e simplificado <code>id 2297820154, pg. 1</code>.</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="optConverterCabecalhoPje" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Seleção Automática de Placeholders em Editores</div>
-                            <div class="setting-help">Em caixas de texto, campos editáveis e editores de minutas
-                                online (como CKEditor, TinyMCE e editores HTML), seleciona marcadores de preenchimento
-                                sem substituir o que você já tinha copiado no teclado: <strong>Desabilitado</strong> (cursor
-                                nativo sem pré-seleção alguma); <strong>Seleção apenas dos
-                                    placeholders</strong> (marca <code>#[digite aqui]#</code>, <code>[@@...@@]</code>, <code>##/##/20##</code>,
-                                <code>######</code> com 1 clique); <strong>Seleção Avançada com
-                                    Control</strong> (placeholders sem Ctrl; seleção avançada
-                                apenas com <code>Ctrl</code> pressionado); ou <strong>Seleção
-                                    Avançada</strong> (seleciona blocos, linhas e texto em qualquer clique,
-                                <strong>sem jamais alterar o seu Ctrl+C</strong>).</div>
-                        </div>
-                        <select id="selectModoPlaceholdersMinutasHtml" class="seletor-modo">
-                            <option value="desabilitado">Desabilitado (sem seleção alguma)</option>
-                            <option value="placeholders" selected>Seleção apenas dos placeholders
-                                (Padrão)</option>
-                            <option value="ctrl_avancado">Seleção Avançada se pressionado "Control"
-                                (Placeholders sem Ctrl)</option>
-                            <option value="avancado">Seleção Avançada (blocos, linhas e texto sem
-                                alterar o Ctrl+C)</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Conferência Automática de Documentos e Datas (CPF,
-                                    CNPJ, Processo e Datas)</div>
-                                <div class="setting-help">Avisa na tela quando um número de documento copiado tiver
-                                    dígitos incorretos ou a data for inválida no calendário (ex: 31 de
-                                    abril ou ano não-bissexto). Defina <code>0</code> para desativar a conferência.</div>
-                            </div>
-                            <div class="controle-slider-composto">
-                                <input type="checkbox" id="optValidacaoMatematicaAtiva" checked style="display: none;">
-                                <input type="range" id="optTempoConferenciaDocumentos" class="input-range-custom" min="0" max="6" step="1" value="6" title="Tempo de exibição do cartão de conferência de documentos e datas (0 = Desabilitado)">
-                                <span id="lblValorTempoConferencia" class="badge-valor-slider">Até Interação (Padrão)</span>
-                            </div>
-                        </div>
-                        <div id="containerModoExibicaoValidacao" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px dashed var(--borda-suave); padding-top: 10px; transition: opacity 0.2s ease;">
-                            <div style="font-size: 13px; font-weight: 500; color: var(--texto-secundario);">
-                                Exibição dos Avisos na Tela:
-                            </div>
-                            <select id="optModoExibicaoValidacao" class="input-select"
-                                style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                                <option value="sempre" selected>Sucesso e Falhas (Padrão)</option>
-                                <option value="apenas_erros">Apenas Falhas (Erros na validação)</option>
-                            </select>
-                        </div>
-                        <div id="containerPosicaoAvisosValidacao" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px dashed var(--borda-suave); padding-top: 10px; transition: opacity 0.2s ease;">
-                            <div style="font-size: 13px; font-weight: 500; color: var(--texto-secundario);">
-                                Posição dos Avisos na Tela:
-                            </div>
-                            <select id="optPosicaoAvisosValidacao" class="input-select"
-                                style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                                <option value="abaixo" selected>Abaixo do mouse (Padrão)</option>
-                                <option value="acima">Acima do mouse</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Separador do Modo Acumulador (Ctrl + Alt)</div>
-                            <div class="setting-help">Símbolos ou pontuações inseridos entre os
-                                itens acumulados com <code>Ctrl + Alt</code> (máx. 5 caracteres, sem
-                                letras/dígitos; padrão <code>;</code>).</div>
-                        </div>
-                        <input type="text" id="optAcumuladorSeparador" class="input-text" value=";" maxlength="5">
-                    </div>
-
-                    <div id="containerTempoExibicaoAlerta" class="setting-item" style="transition: opacity 0.2s ease;">
-                        <div>
-                            <div class="setting-label">Tempo de Exibição dos Avisos na Tela</div>
-                            <div class="setting-help">Tempo que os avisos gerais do sistema (resumo estatístico de tabelas,
-                                modo acumulador e alternância de formatação <code>Esc+Esc</code>) permanecem visíveis na tela (defina 0 para desligar
-                                os avisos).</div>
-                        </div>
-                        <div class="controle-slider-composto">
-                            <input type="range" id="optTempoExibicaoAlerta" class="input-range-custom" min="0" max="6"
-                                step="1" value="6">
-                            <span id="lblValorTempoAlerta" class="badge-valor-slider">Até Interação (Padrão)</span>
-                        </div>
-                    </div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Contorno Visual Rápido ao Copiar (Flash Temporizado)</div>
-                                <div class="setting-help">Exibe um discreto contorno colorido ancorado ao texto selecionado ao copiar um trecho simples
-                                    para confirmar a captura sem balões intrusivos.</div>
-                            </div>
-                            <div class="controle-slider-composto">
-                                <input type="color" id="optCorFlashBorder" class="input-cor-compacto" value="#0d9488"
-                                    title="Cor do contorno e destaque do Flash">
-                                <input type="range" id="optTempoFlashMs" class="input-range-custom" min="0" max="5250"
-                                    step="250" value="5250">
-                                <span id="lblValorTempoFlash" class="badge-valor-slider">Até Interação (Padrão)</span>
-                            </div>
-                        </div>
-                        <div id="containerSubOpcaoMarcadorColado" style="display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--borda-suave); padding-top: 10px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px;">
-                                <div>
-                                    <div style="font-size: 13px; font-weight: 600; color: var(--texto-principal);">
-                                        Marcador Permanente de Conteúdo Colado (Numeração Ordinal 1, 2, 3...)
-                                    </div>
-                                    <div class="setting-help" style="margin-top: 2px;">
-                                        Ao colar efetivamente um trecho copiado, remove o contorno temporário de cópia e fixa na página de origem uma marcação permanente suave com etiqueta sobrescrita ordinal (<code>1</code>, <code>2</code>, <code>3</code>...) indicando a ordem das colagens realizadas na guia.
-                                    </div>
-                                </div>
-                                <label class="switch" title="Ativa o marcador permanente numerado na página de origem ao colar o conteúdo copiado">
-                                    <input type="checkbox" id="optMarcadorConteudoColadoAtivo" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div id="painelCustomizacaoMarcadorColado" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
-                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                    <label for="optPresetMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Tema:</label>
-                                    <select id="optPresetMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                                        <option value="verde_forense" selected>Verde Esmeralda Forense (Padrão)</option>
-                                        <option value="marca_texto_classico">Marca-Texto Clássico</option>
-                                        <option value="azul_indigo">Azul Índigo</option>
-                                        <option value="ambar_suave">Âmbar Suave</option>
-                                        <option value="alto_contraste">Alto Contraste</option>
-                                    </select>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
-                                        Contorno:
-                                        <input type="color" id="optCorContornoMarcadorColado" class="input-cor-compacto" value="#0d9488" title="Cor da borda do marcador permanente">
-                                    </label>
-                                    <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
-                                        Fundo:
-                                        <input type="color" id="optCorFundoMarcadorColado" class="input-cor-compacto" value="#ccfbf1" title="Cor de preenchimento suave do marcador permanente">
-                                    </label>
-                                    <label for="optEstiloBadgeMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Etiqueta:</label>
-                                    <select id="optEstiloBadgeMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                                        <option value="sobrescrito" selected>Sobrescrito Discreto (Padrão)</option>
-                                        <option value="circular">Circular Compacto</option>
-                                        <option value="chip">Pílula / Chip</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Retirar Seleções do Sistema após Copiar</div>
-                            <div class="setting-help">Define o comportamento da seleção nativa azul do navegador após a cópia com Flash.</div>
-                        </div>
-                        <select id="optModoRetirarSelecao" class="input-select"
-                            style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                            <option value="total_exceto_arrasto" selected>Total (exceto ao arrastar o mouse) (Padrão)</option>
-                            <option value="interface">Das partes com interface</option>
-                            <option value="total">Total (interface web e texto de leitura)</option>
-                            <option value="nenhuma">Nenhuma (manter selecionado)</option>
-                        </select>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Tamanho Mínimo de Texto para Cópia</div>
-                            <div class="setting-help">Em textos da página ou elementos de interface, caso não seja um campo estruturado, evita a perda acidental do conteúdo da Área de Transferência quando inexistem teclas modificadoras (clique único, duplo ou arrasto sem combinações das teclas Ctrl ou Alt). Assim, se não for campo estruturado (data, CPF, etc.), exige no mínimo esta quantidade de caracteres para confirmar a cópia e o contorno.</div>
-                        </div>
-                        <select id="optMinimoCaracteresInterface" class="input-select"
-                            style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                            <option value="0">0 (Sem proteção mínima)</option>
-                            <option value="1">1 caractere</option>
-                            <option value="2">2 caracteres</option>
-                            <option value="3">3 caracteres</option>
-                            <option value="4">4 caracteres</option>
-                            <option value="5" selected>5 caracteres (Padrão)</option>
-                            <option value="10">10 caracteres</option>
-                        </select>
-                    </div>
-
-                    <div class="categoria-avancada-titulo">3. TECLADO/MOUSE: Navegação por Teclado e
-                        Botões Laterais</div>
-
-                    <!-- FEAT-24: Alternar entre as duas guias usadas mais recentemente com Ctrl+Tab -->
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Alternar entre as duas guias usadas mais recentemente com Ctrl+Tab</div>
-                            <div class="setting-help">Alterna em ciclo dinâmico (ping-pong LRU) diretamente entre as duas abas mais recentemente utilizadas pelo operador no navegador com o atalho nativo Ctrl+Tab. Ativado por padrão para produtividade acelerada.</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="optAlternarAbasRecentesCtrlTab" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Navegação entre Abas com os Botões Laterais do Mouse (Botão 4 e Botão 5)</div>
-                            <div class="setting-help">Caso o mouse seja compatível e possua estes botões laterais físicos: <strong>Botão 4 (Voltar)</strong> atua Alternar entre as duas guias usadas mais recentemente; <strong>Botão 5 (Avançar)</strong> avança para a próxima aba à direita. Opera via comando direto da API do Chrome.</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="optCapturaBotoesMouse4e5" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <!-- Bloco Principal de Mouse: Colar com o Botao do Meio e suas Sub-opcoes -->
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Colar com o botão do Meio (Scroll Click) e Memória Interna (2 Níveis)</div>
-                                <div class="setting-help">
-                                    Cola, com <strong>1 clique no botão do meio</strong>, a <strong>Última Seleção</strong> (Slot 1) em campos de texto e editores, simulando <code>Ctrl+V</code>. Com <strong>Ctrl + botão do meio</strong>, cola a <strong>penúltima seleção</strong> (Slot 2), mantendo a última intacta na memória interna. O plugin <strong>não lê</strong> a área de transferência do sistema, garantindo privacidade total. Se desativado, o clique do meio retorna integralmente ao comportamento padrão do navegador.
-                                </div>
-                            </div>
-                            <label class="switch" id="lblSwitchColarBotaoMeio" style="flex-shrink: 0;">
-                                <input type="checkbox" id="optColarBotaoMeio" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Permitir navegação em campos de entrada usando o
-                                teclado</div>
-                            <div class="setting-help">Permite usar as teclas <strong>Seta para Cima (↑)</strong> e
-                                <strong>Seta para Baixo (↓)</strong> para alternar o foco continuamente entre
-                                campos de entrada simples (&lt;input&gt;), avançando ou retrocedendo mesmo
-                                estando alinhados lado a lado na mesma linha.</div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="optNavegacaoTecladoCampos" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Caixa de Entrada Rápida de Texto (Ins + Ins / Ctrl + Ins + Ins)</div>
-                            <div class="setting-help">Pressionar <strong>Insert + Insert</strong> (duplo Insert rápido) ou <strong>Ctrl + Insert + Insert</strong> (em até 400ms) abre uma caixa flutuante e arrastável perto do mouse para digitar ou colar dados manualmente (datas, números de processo, CPF) em telas ou imagens sem OCR, copiando para a Área de Transferência e para o histórico ao teclar Enter.</div>
-                        </div>
-                        <label class="switch" title="Ativa a caixa flutuante de entrada rápida por duplo Insert (Ins+Ins ou Ctrl+Ins+Ins)">
-                            <input type="checkbox" id="optCaixaEntradaRapida" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
-                        <div
-                            style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;">
-                            <div>
-                                <div class="setting-label">Atalho Inteligente F1 (Prompt de IA / Assistente)</div>
-                                <div class="setting-help">Ao acionar o comando de IA (ou atalho <code>F1</code>), abre ou localiza a aba do Google Gemini e preenche automaticamente este comando estruturado no campo de texto, substituindo <code>{{TEXTO}}</code> pelo conteúdo selecionado, sem sobrescrever a sua Área de Transferência.</div>
-                            </div>
-                            <label class="switch" title="Ativa o atalho F1 para enviar prompt estruturado com o texto selecionado ao Google Gemini">
-                                <input type="checkbox" id="optAtalhoF1GeminiAtivo" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="containerSubOpcaoF1Gemini" style="display: flex; flex-direction: column; gap: 6px; width: 100%; transition: opacity 0.2s ease;">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
-                                <label for="optPromptF1Gemini"
-                                    style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
-                                    Comando contendo o texto selecionado <code>{{TEXTO}}</code> a ser usado por comando na página de IA da Gemini:
-                                </label>
-                                <button type="button" id="btnRestaurarPromptF1Padrao" class="btn-restaurar-campo"
-                                    title="Restaurar comando para o padrão original">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-                                        aria-hidden="true">
-                                        <polyline points="1 4 1 10 7 10"></polyline>
-                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                            <textarea id="optPromptF1Gemini" class="textarea-prompt-ia" rows="2"
-                                spellcheck="true" lang="pt-BR" autocorrect="on" autocapitalize="sentences">'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;</textarea>
-                        </div>
-                    </div>
-
-                    <div class="categoria-avancada-titulo">4. NAVEGADOR: Gerenciamento de Guias e Janelas</div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Janela Única (Bloquear Novas Janelas / Forçar Novas Guias)</div>
-                                <div class="setting-help">Impede a abertura de novas janelas avulsas ou popups no navegador, convertendo-as automaticamente em novas guias na mesma janela ativa (padrão ativada).</div>
-                            </div>
-                            <label class="switch" style="flex-shrink: 0;" title="Ativa o bloqueio de novas janelas avulsas, forçando abertura em novas guias">
-                                <input type="checkbox" id="optBloquearNovasJanelas" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="containerSubOpcaoJanelaUnica" style="padding: 8px 12px; margin-top: 2px; background: rgba(0, 0, 0, 0.02); border: 1px solid var(--borda-suave); border-radius: 6px; transition: opacity 0.2s ease;">
-                            <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                title="Permite que janelas essenciais de autenticação governamental e certificados digitais abram normalmente sem serem forçadas em guias">
-                                <input type="checkbox" id="optPreservarJanelasAutenticacao" checked>
-                                <span>Preservar janelas de autenticação e certificados digitais (Gov.br, ICP-Brasil, PJEOffice, SSO, Shodô)</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="setting-item">
-                        <div>
-                            <div class="setting-label">Abertura de Novas Guias em Primeiro Plano</div>
-                            <div class="setting-help">Ao abrir uma nova guia, foca e ativa a nova guia imediatamente em primeiro plano. Quando desativada (padrão), abre silenciosamente em segundo plano, mantendo o foco na página atual.</div>
-                        </div>
-                        <label class="switch" title="Ativa a abertura de novas guias em primeiro plano (foco imediato); desmarcado abre em segundo plano">
-                            <input type="checkbox" id="optAbaEmPrimeiroPlano">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Reutilizar Guias Já Abertas (Anti-Duplicação de Links)</div>
-                                <div class="setting-help">Ao abrir um link, se a página já estiver aberta em outra guia da janela ativa, reaproveita a guia existente em vez de abrir uma cópia duplicada. Permite duplicação manual caso o usuário utilize o menu nativo "Duplicar" da guia.</div>
-                            </div>
-                            <label class="switch" style="flex-shrink: 0;" title="Ativa a prevenção de guias duplicadas, reaproveitando abas já abertas">
-                                <input type="checkbox" id="optReutilizarAbasAbertas" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="containerSubOpcoesReutilizarAbas" style="display: flex; flex-direction: column; gap: 11px; margin-top: 6px; padding-top: 11px; border-top: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
-                                <div>
-                                    <div class="setting-label" style="font-size: 13px;">Trazer a guia reutilizada imediatamente para o Primeiro Plano (Foco)</div>
-                                    <div class="setting-help" style="margin-top: 2px;">Garante que a guia existente seja ativada e focada imediatamente, eliminando a sensação de clique fantasma.</div>
-                                </div>
-                                <label class="switch" style="flex-shrink: 0;" title="Garante que a guia existente seja ativada e trazida imediatamente para o primeiro plano (foco), eliminando a sensação de clique fantasma">
-                                    <input type="checkbox" id="optReutilizarFocoPrimeiroPlano" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div id="containerSubCriteriosAcoesReutilizar" style="display: flex; flex-direction: column; gap: 11px; border-top: 1px solid var(--borda-suave); padding-top: 11px; transition: opacity 0.2s ease;">
-                                <div style="display: flex; flex-direction: column; gap: 6px;">
-                                    <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Critérios de Correspondência e Proteção:</span>
-                                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Monitora e compara a URL original informada no momento da criação da guia">
-                                            <input type="checkbox" id="optMonitorarUrlOriginal">
-                                            <span>Monitora a URL original de abertura</span>
-                                        </label>
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Monitora e compara a URL em tempo real atualmente carregada na guia">
-                                            <input type="checkbox" id="optMonitorarUrlAtual" checked>
-                                            <span>Monitora a URL atual da página</span>
-                                        </label>
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Protege o trabalho do operador: se a página existente tiver formulários em edição, minutas sendo digitadas ou navegação interna SPA, não a reutiliza para evitar descarte ou perda de dados">
-                                            <input type="checkbox" id="optProtegerGuiasModificadas" checked>
-                                            <span>Proteger guias modificadas (Não reutiliza se houver formulário em edição ou SPA)</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div style="display: flex; flex-direction: column; gap: 6px;">
-                                    <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Ação sobre o Conteúdo da Guia Reutilizada:</span>
-                                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Apenas foca a guia existente, mantendo seu conteúdo intacto e a posição de rolagem preservada">
-                                            <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoManter" value="manter" checked>
-                                            <span>Manter conteúdo intacto (Sem recarregar)</span>
-                                        </label>
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Recarrega a página da guia existente (F5 automático) para buscar dados frescos do servidor">
-                                            <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregar" value="recarregar">
-                                            <span>Recarregar página (Refresh automático)</span>
-                                        </label>
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Recarrega a página apenas se houver formulário em edição, digitação ou navegação interna SPA detectada">
-                                            <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregarSeModificada" value="recarregar_se_modificada">
-                                            <span>Recarregar apenas se a página foi modificada</span>
-                                        </label>
-                                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                            title="Recarrega a página apenas se ela for de leitura estática; se tiver formulários ou modificações, preserva sem recarregar">
-                                            <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregarSeNaoModificada" value="recarregar_se_nao_modificada">
-                                            <span>Recarregar apenas se a página não foi modificada</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 10px; padding-top: 4px;">
-                                    <button type="button" class="btn btn-secundario" id="btnFecharDuplicadasAgora"
-                                        style="padding: 4px 10px; font-size: 12px; height: 26px;"
-                                        title="Fecha imediatamente todas as guias abertas na janela ativa que possuírem URLs duplicadas">Limpar e Fechar Guias
-                                        Duplicadas Agora</button>
-                                    <span id="feedbackFecharDuplicadas"
-                                        style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
-                        <div>
-                            <div class="setting-label">Ordenação e Agrupamento Automático de Guias</div>
-                            <div class="setting-help">Organiza e ordena as guias da janela ativa com base no critério e sentido configurados, com suporte nativo a Grupos de Abas coloridos do Chrome (Tab Groups API). Ao alterar o critério, as guias são imediatamente ordenadas.</div>
-                        </div>
-                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <label for="optCriterioOrdenacaoGuias"
-                                    style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);"
-                                    title="Selecione o critério para reorganizar as guias">Ordenar
-                                    por:</label>
-                                <select id="optCriterioOrdenacaoGuias" class="input-select"
-                                    style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);"
-                                    title="Critério para reorganizar as guias da janela ativa">
-                                    <option value="nenhum">Nenhum (Desativado)</option>
-                                    <option value="dominio" style="font-weight: 600;">Domínio Site</option>
-                                    <option value="url">&nbsp;&nbsp;&nbsp;&nbsp;↳ URL Completa (com Caminho)</option>
-                                    <option value="dominio_criacao">&nbsp;&nbsp;&nbsp;&nbsp;↳ Abertura / Criação (Cronológica)</option>
-                                    <option value="dominio_acesso">&nbsp;&nbsp;&nbsp;&nbsp;↳ Último Acesso (Navegação)</option>
-                                    <optgroup label="Acesso">
-                                        <option value="ordem_criacao">↳ Abertura / Criação (Cronológica)</option>
-                                        <option value="tempo_acesso">↳ Último Acesso (Navegação)</option>
-                                    </optgroup>
-                                    <option value="titulo">Título da Página</option>
-                                </select>
-                            </div>
-                            <div id="containerSubControlesOrdenacao" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; transition: opacity 0.2s ease;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Sentido:</span>
-                                    <label class="switch" for="optSentidoOrdenacaoGuiasSwitch" style="flex-shrink: 0; user-select: none; cursor: pointer;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z) ou Da Direita para a Esquerda (Z-A)">
-                                        <input type="checkbox" id="optSentidoOrdenacaoGuiasSwitch" checked>
-                                        <span class="slider"></span>
-                                    </label>
-                                    <span id="lblSentidoOrdenacaoGuias" style="font-size: 12px; color: var(--texto-principal); cursor: pointer; user-select: none;" title="Clique para alternar o sentido da ordenação">Da Esquerda para a Direita (A-Z)</span>
-                                    <select id="optSentidoOrdenacaoGuias" style="display: none;">
-                                        <option value="esq_dir" selected>Da Esquerda para a Direita (A-Z / Antigos)</option>
-                                        <option value="dir_esq">Da Direita para a Esquerda (Z-A / Recentes)</option>
-                                    </select>
-                                </div>
-                                <label
-                                    style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                                    title="Quando marcado, move e ordena também as guias fixadas no início da barra">
-                                    <input type="checkbox" id="optOrdenarGuiasFixadas">
-                                    <span>Ordenar guias fixadas</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px;">
-                            <button type="button" class="btn btn-secundario" id="btnOrdenarGuiasAgora"
-                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
-                                title="Reorganiza imediatamente todas as guias abertas na janela ativa na ordem do critério e sentido selecionados">Ordenar Guias Agora</button>
-                            <button type="button" class="btn btn-secundario" id="btnAgruparDominioAgora"
-                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
-                                title="Alterna entre agrupar guias por domínio em caixas coloridas do Chrome ou desagrupar todas as guias">Agrupar por Domínio Agora (Tab Groups)</button>
-                            <button type="button" id="btnDesagruparGuiasAgora" style="display: none;"></button>
-                            <button type="button" class="btn btn-secundario" id="btnRestaurarOrdemGuiasPadrao"
-                                style="padding: 4px 10px; font-size: 12px; height: 26px;" title="Restaura o padrão do navegador: desativa a ordenação automática e desagrupa todas as guias da janela ativa">Restaurar Padrão do Navegador</button>
-                            <span id="feedbackAcoesGuias"
-                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
-                        </div>
-                    </div>
-
-                    <div class="setting-item" style="display: none;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                            <div>
-                                <div class="setting-label">Economizador de Memória (Descarte de Guias Inativas /
-                                    Tab Discarding)</div>
-                                <div class="setting-help">
-                                    Diferente do recurso básico nativo do navegador (que opera em horários fixos e opacos), este módulo permite <strong>ativar, desativar e personalizar livremente o tempo mínimo de inatividade</strong> para descarregar da memória RAM guias pesadas em segundo plano (via Chrome Tab Discarding). A guia permanece visível na barra e é recarregada instantaneamente com 1 clique ao retornar.
-                                </div>
-                            </div>
-                            <label class="switch" style="flex-shrink: 0;">
-                                <input type="checkbox" id="optDescarteGuiasInativas">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="containerOpcoesDescarte" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; transition: opacity 0.2s ease;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <label for="optTempoInatividadeDescarteMinutos" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Descartar guias após:</label>
-                                <select id="optTempoInatividadeDescarteMinutos" class="input-select" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                                    <option value="5">5 minutos</option>
-                                    <option value="10">10 minutos</option>
-                                    <option value="15">15 minutos</option>
-                                    <option value="20" selected>20 minutos (Padrão)</option>
-                                    <option value="30">30 minutos</option>
-                                    <option value="60">1 hora (60 minutos)</option>
-                                    <option value="120">2 horas (120 minutos)</option>
-                                </select>
-                            </div>
-                            <button type="button" class="btn btn-secundario" id="btnDescartarGuiasInativasAgora"
-                                style="padding: 4px 10px; font-size: 12px; height: 26px;">Liberar Memória RAM Agora (Descartar Inativas)</button>
-                            <span id="feedbackDescarteGuias"
-                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
-                        </div>
-                    </div>
-
-                    <!-- Subgrupo Recolhido para Usuarios Experientes: Mapeamento Manual Avancado de Elementos (XPath / CSS) (Secao 6.20 e Secao 6.85) -->
-                    <details class="subsecao-recolhida-avancada" id="detalhesMapeamentoXPath" style="margin-top: 18px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; overflow: hidden;">
-                        <summary style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #38bdf8; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span style="display: flex; align-items: center; gap: 8px;">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: #38bdf8;">
-                                    <polyline points="16 18 22 12 16 6"></polyline>
-                                    <polyline points="8 6 2 12 8 18"></polyline>
-                                </svg>
-                                Mapeamento Manual Avançado de Elementos (XPath / CSS)
-                            </span>
-                        </summary>
-                        <div style="padding: 14px; border-top: 1px solid #334155; display: flex; flex-direction: column; gap: 12px;">
-                            <div class="setting-help" style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                                Permite cadastrar regras locais explícitas para forçar o comportamento de elementos específicos como <strong>Interface</strong> (bloqueia cópia sem Alt e desseleciona imediatamente com flash), <strong>Semiflexível</strong> (restrito à cópia rápida de máscaras forenses com 1 clique) ou <strong>Textual</strong> (leitura documental com seleção mantida no DOM). Pressione <code>Ctrl + Alt + Shift + Clique</code> sobre qualquer elemento em páginas web para abrir o assistente e salvar a regra diretamente.
-                            </div>
-                            <div style="display: flex; gap: 6px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
-                                <button type="button" id="tabRegrasUsuario" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; border-color: #38bdf8; color: #38bdf8;">Regras do Usuário</button>
-                                <button type="button" id="tabRegrasInternas" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; opacity: 0.7;">Regras Internas</button>
-                            </div>
-                            <div id="containerListaRegrasMapeamento" style="display: flex; flex-direction: column; gap: 10px;">
-                                <!-- As regras cadastradas sao renderizadas dinamicamente aqui -->
-                            </div>
-                            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
-                                <button type="button" id="btnAdicionarRegraMapeamento" class="btn btn-secundario" title="Adicionar Regra Manualmente" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
-                                    <span>➕</span> Adicionar Regra
-                                </button>
-                                <button type="button" id="btnSalvarRegrasMapeamento" class="btn btn-primario" title="Salvar Regras de Mapeamento" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; margin-right: auto;">
-                                    <span>💾</span> Salvar
-                                </button>
-                                <button type="button" id="btnExportarMapeamentoJson" class="btn btn-secundario" title="Exportar Regras para JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
-                                    <span>📤</span> Exportar JSON
-                                </button>
-                                <button type="button" id="btnImportarMapeamentoJson" class="btn btn-secundario" title="Importar Regras de JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
-                                    <span>📥</span> Importar JSON
-                                </button>
-                                <input type="file" id="inputImportarMapeamentoArquivo" accept=".json" style="display: none;">
-                            </div>
-                        </div>
-                    </details>
+            <!-- Secao 4: TECLADO/MOUSE -->
+            <section class="cartao">
+                <h2>4. TECLADO/MOUSE: Navegação por Teclado e Botões Laterais</h2>
+            <!-- FEAT-24: Alternar entre as duas guias usadas mais recentemente com Ctrl+Tab -->
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Alternar entre as duas guias usadas mais recentemente com Ctrl+Tab</div>
+                    <div class="setting-help">Alterna em ciclo dinâmico (ping-pong LRU) diretamente entre as duas abas mais recentemente utilizadas pelo operador no navegador com o atalho nativo Ctrl+Tab. Ativado por padrão para produtividade acelerada.</div>
                 </div>
-            </details>
+                <label class="switch">
+                    <input type="checkbox" id="optAlternarAbasRecentesCtrlTab" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Navegação entre Abas com os Botões Laterais do Mouse (Botão 4 e Botão 5)</div>
+                    <div class="setting-help">Caso o mouse seja compatível e possua estes botões laterais físicos: <strong>Botão 4 (Voltar)</strong> alterna (bate-e-volta) entre as duas guias usadas mais recentemente; <strong>Ctrl + Botão 4</strong> retorna continuamente pelas guias anteriores; <strong>Botão 5 (Avançar)</strong> avança para a próxima aba à direita. Opera via comando direto da API <code>chrome.tabs.update</code> do Chrome.</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="optCapturaBotoesMouse4e5" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Bloco Principal de Mouse: Colar com o Botao do Meio e suas Sub-opcoes -->
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Colar com o botão do Meio (Scroll Click) e Memória Interna (2 Níveis)</div>
+                        <div class="setting-help">
+                            Cola, com <strong>1 clique no botão do meio</strong>, a <strong>Última Seleção</strong> (Slot 1) em campos de texto e editores, simulando <code>Ctrl+V</code>. Com <strong>Ctrl + botão do meio</strong>, cola a <strong>penúltima seleção</strong> (Slot 2), mantendo a última intacta na memória interna. Com <strong>Alt + botão do meio</strong>, ativa o campo, aguarda <code>250ms</code> e cola. O plugin <strong>não lê</strong> a área de transferência do sistema, garantindo privacidade total. Se desativado, o clique do meio retorna integralmente ao comportamento padrão do navegador.
+                        </div>
+                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <a href="https://www.highrez.co.uk/downloads/xmousebuttoncontrol.htm" target="_blank" rel="noopener noreferrer" class="btn btn-secundario" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">
+                                ⬇️ Baixar X-Mouse-Button Control (Colar com botão do meio fora do Chrome)
+                            </a>
+                        </div>
+                    </div>
+                    <label class="switch" id="lblSwitchColarBotaoMeio" style="flex-shrink: 0;">
+                        <input type="checkbox" id="optColarBotaoMeio" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Permitir navegação em campos de entrada usando o
+                        teclado</div>
+                    <div class="setting-help">Permite usar as teclas <strong>Seta para Cima (↑)</strong> e
+                        <strong>Seta para Baixo (↓)</strong> para alternar o foco continuamente entre
+                        campos de entrada simples (&lt;input&gt;), avançando ou retrocedendo mesmo
+                        estando alinhados lado a lado na mesma linha.</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="optNavegacaoTecladoCampos" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Caixa de Entrada Rápida de Texto (Ins + Ins / Ctrl + Ins + Ins)</div>
+                    <div class="setting-help">Pressionar <strong>Insert + Insert</strong> (duplo Insert rápido) ou <strong>Ctrl + Insert + Insert</strong> (em até 400ms) abre uma caixa flutuante e arrastável perto do mouse para digitar ou colar dados manualmente (datas, números de processo, CPF) em telas ou imagens sem OCR, copiando para a Área de Transferência e para o histórico ao teclar Enter.</div>
+                </div>
+                <div style="display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                    <button type="button" id="btnTestarCaixaEntradaRapida" class="btn btn-secundario" title="Exibir agora a Caixa de Entrada Rápida para teste interativo" style="font-size: 11.5px; padding: 4px 10px; height: 26px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span>🧪</span> Testar
+                    </button>
+                    <label class="switch" title="Ativa a caixa flutuante de entrada rápida por duplo Insert (Ins+Ins ou Ctrl+Ins+Ins)">
+                        <input type="checkbox" id="optCaixaEntradaRapida" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div
+                    style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;">
+                    <div>
+                        <div class="setting-label">Atalho Inteligente F1 (Prompt de IA / Assistente)</div>
+                        <div class="setting-help">Ao acionar o comando de IA (ou atalho <code>F1</code>), abre ou localiza a aba do Google Gemini e preenche automaticamente este comando estruturado no campo de texto, substituindo <code>{{TEXTO}}</code> pelo conteúdo selecionado, sem sobrescrever a sua Área de Transferência.</div>
+                    </div>
+                    <label class="switch" title="Ativa o atalho F1 para enviar prompt estruturado com o texto selecionado ao Google Gemini">
+                        <input type="checkbox" id="optAtalhoF1GeminiAtivo" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="containerSubOpcaoF1Gemini" style="display: flex; flex-direction: column; gap: 6px; width: 100%; transition: opacity 0.2s ease;">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+                        <label for="optPromptF1Gemini"
+                            style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                            Comando contendo o texto selecionado <code>{{TEXTO}}</code> a ser usado por comando na página de IA da Gemini:
+                        </label>
+                        <button type="button" id="btnRestaurarPromptF1Padrao" class="btn-restaurar-campo"
+                            title="Restaurar comando para o padrão original">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                aria-hidden="true">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <textarea id="optPromptF1Gemini" class="textarea-prompt-ia" rows="2"
+                        spellcheck="true" lang="pt-BR" autocorrect="on" autocapitalize="sentences">'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;</textarea>
+                </div>
+            </div>
+            </section>
+
+            <!-- Secao 5: NAVEGADOR -->
+            <section class="cartao">
+                <h2>5. NAVEGADOR: Gerenciamento de Guias e Janelas</h2>
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Janela Única (Bloquear Novas Janelas / Forçar Novas Guias)</div>
+                        <div class="setting-help">Impede a abertura de novas janelas avulsas ou popups no navegador, convertendo-as automaticamente em novas guias na mesma janela ativa (padrão ativada).</div>
+                    </div>
+                    <label class="switch" style="flex-shrink: 0;" title="Ativa o bloqueio de novas janelas avulsas, forçando abertura em novas guias">
+                        <input type="checkbox" id="optBloquearNovasJanelas" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="containerSubOpcaoJanelaUnica" style="padding: 8px 12px; margin-top: 2px; background: rgba(0, 0, 0, 0.02); border: 1px solid var(--borda-suave); border-radius: 6px; transition: opacity 0.2s ease;">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                        title="Permite que janelas essenciais de autenticação governamental e certificados digitais abram normalmente sem serem forçadas em guias">
+                        <input type="checkbox" id="optPreservarJanelasAutenticacao" checked>
+                        <span>Preservar janelas de autenticação e certificados digitais (Gov.br, ICP-Brasil, PJEOffice, SSO, Shodô)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Abertura de Novas Guias em Primeiro Plano</div>
+                    <div class="setting-help">Ao abrir uma nova guia, foca e ativa a nova guia imediatamente em primeiro plano (padrão). Quando desativada, abre silenciosamente em segundo plano, mantendo o foco na página atual.</div>
+                </div>
+                <label class="switch" title="Ativa a abertura de novas guias em primeiro plano (foco imediato); desmarcado abre em segundo plano">
+                    <input type="checkbox" id="optAbaEmPrimeiroPlano" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Reutilizar Guias Já Abertas (Anti-Duplicação de Links)</div>
+                        <div class="setting-help">Ao abrir um link, se a página já estiver aberta em outra guia da janela ativa, reaproveita a guia existente em vez de abrir uma cópia duplicada. Permite duplicação manual caso o usuário utilize o menu nativo "Duplicar" da guia.</div>
+                    </div>
+                    <label class="switch" style="flex-shrink: 0;" title="Ativa a prevenção de guias duplicadas, reaproveitando abas já abertas">
+                        <input type="checkbox" id="optReutilizarAbasAbertas" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="containerSubOpcoesReutilizarAbas" style="display: flex; flex-direction: column; gap: 11px; margin-top: 6px; padding-top: 11px; border-top: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+                        <div>
+                            <div class="setting-label" style="font-size: 13px;">Trazer a guia reutilizada imediatamente para o Primeiro Plano (Foco)</div>
+                            <div class="setting-help" style="margin-top: 2px;">Garante que a guia existente seja ativada e focada imediatamente, eliminando a sensação de clique fantasma.</div>
+                        </div>
+                        <label class="switch" style="flex-shrink: 0;" title="Garante que a guia existente seja ativada e trazida imediatamente para o primeiro plano (foco), eliminando a sensação de clique fantasma">
+                            <input type="checkbox" id="optReutilizarFocoPrimeiroPlano" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="containerSubCriteriosAcoesReutilizar" style="display: flex; flex-direction: column; gap: 11px; border-top: 1px solid var(--borda-suave); padding-top: 11px; transition: opacity 0.2s ease;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Critérios de Correspondência e Proteção:</span>
+                            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Monitora e compara a URL original informada no momento da criação da guia">
+                                    <input type="checkbox" id="optMonitorarUrlOriginal">
+                                    <span>Monitora a URL original de abertura</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Monitora e compara a URL em tempo real atualmente carregada na guia">
+                                    <input type="checkbox" id="optMonitorarUrlAtual" checked>
+                                    <span>Monitora a URL atual da página</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Protege o trabalho do operador: se a página existente tiver formulários em edição, minutas sendo digitadas ou navegação interna SPA, não a reutiliza para evitar descarte ou perda de dados">
+                                    <input type="checkbox" id="optProtegerGuiasModificadas" checked>
+                                    <span>Proteger guias modificadas (Não reutiliza se houver formulário em edição ou SPA)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Ação sobre o Conteúdo da Guia Reutilizada:</span>
+                            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Apenas foca a guia existente, mantendo seu conteúdo intacto e a posição de rolagem preservada">
+                                    <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoManter" value="manter" checked>
+                                    <span>Manter conteúdo intacto (Sem recarregar)</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Recarrega a página da guia existente (F5 automático) para buscar dados frescos do servidor">
+                                    <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregar" value="recarregar">
+                                    <span>Recarregar página (Refresh automático)</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Recarrega a página apenas se houver formulário em edição, digitação ou navegação interna SPA detectada">
+                                    <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregarSeModificada" value="recarregar_se_modificada">
+                                    <span>Recarregar apenas se a página foi modificada</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                                    title="Recarrega a página apenas se ela for de leitura estática; se tiver formulários ou modificações, preserva sem recarregar">
+                                    <input type="radio" name="reutilizarAbasAcaoConteudo" id="optReutilizarAcaoRecarregarSeNaoModificada" value="recarregar_se_nao_modificada">
+                                    <span>Recarregar apenas se a página não foi modificada</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding-top: 4px;">
+                            <button type="button" class="btn btn-secundario" id="btnFecharDuplicadasAgora"
+                                style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                                title="Fecha imediatamente todas as guias abertas na janela ativa que possuírem URLs duplicadas">Limpar e Fechar Guias
+                                Duplicadas Agora</button>
+                            <span id="feedbackFecharDuplicadas"
+                                style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div>
+                    <div class="setting-label">Ordenação e Agrupamento Automático de Guias</div>
+                    <div class="setting-help">Organiza e ordena as guias da janela ativa com base no critério e sentido configurados, com suporte nativo a Grupos de Abas coloridos do Chrome (Tab Groups API). Ao alterar o critério, as guias são imediatamente ordenadas.</div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="optCriterioOrdenacaoGuias"
+                            style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);"
+                            title="Selecione o critério para reorganizar as guias">Ordenar
+                            por:</label>
+                        <select id="optCriterioOrdenacaoGuias" class="input-select"
+                            style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);"
+                            title="Critério para reorganizar as guias da janela ativa">
+                            <option value="nenhum">Nenhum (Desativado)</option>
+                            <option value="hierarquia_arvore" selected>Por Hierarquia (em Formato de Árvore)</option>
+                            <option value="dominio" style="font-weight: 600;">Domínio Site</option>
+                            <option value="dominio_titulo">&nbsp;&nbsp;&nbsp;&nbsp;↳ Título da Página</option>
+                            <option value="url">&nbsp;&nbsp;&nbsp;&nbsp;↳ URL Completa (com Caminho)</option>
+                            <option value="dominio_criacao">&nbsp;&nbsp;&nbsp;&nbsp;↳ Abertura / Criação (Cronológica)</option>
+                            <option value="dominio_acesso">&nbsp;&nbsp;&nbsp;&nbsp;↳ Último Acesso (Navegação)</option>
+                            <optgroup label="Acesso">
+                                <option value="ordem_criacao">↳ Abertura / Criação (Cronológica)</option>
+                                <option value="tempo_acesso">↳ Último Acesso (Navegação)</option>
+                            </optgroup>
+                            <option value="titulo">Título da Página (Geral)</option>
+                        </select>
+                    </div>
+                    <div id="containerSubControlesOrdenacao" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; transition: opacity 0.2s ease;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Sentido:</span>
+                            <label class="switch" for="optSentidoOrdenacaoGuiasSwitch" style="flex-shrink: 0; user-select: none; cursor: pointer;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z) ou Da Direita para a Esquerda (Z-A)">
+                                <input type="checkbox" id="optSentidoOrdenacaoGuiasSwitch" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span id="lblSentidoOrdenacaoGuias" style="font-size: 12px; color: var(--texto-principal); cursor: pointer; user-select: none;" title="Clique para alternar o sentido da ordenação">Da Esquerda para a Direita (A-Z)</span>
+                            <select id="optSentidoOrdenacaoGuias" style="display: none;">
+                                <option value="esq_dir" selected>Da Esquerda para a Direita (A-Z / Antigos)</option>
+                                <option value="dir_esq">Da Direita para a Esquerda (Z-A / Recentes)</option>
+                            </select>
+                        </div>
+                        <label
+                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
+                            title="Quando marcado, move e ordena também as guias fixadas no início da barra">
+                            <input type="checkbox" id="optOrdenarGuiasFixadas">
+                            <span>Ordenar guias fixadas</span>
+                        </label>
+                        <label id="containerFecharHierarquiaCascata"
+                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #f59e0b; font-weight: 600; cursor: pointer;"
+                            title="No modo Por Hierarquia, fechar uma guia pai fecha automaticamente todas as guias filhas e descendentes abertas a partir dela">
+                            <input type="checkbox" id="optFecharHierarquiaEmCascata">
+                            <span>Ao fechar, fechar todos!</span>
+                        </label>
+                    </div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px;">
+                    <button type="button" class="btn btn-secundario" id="btnRestaurarOrdemGuiasPadrao"
+                        style="padding: 4px 10px; font-size: 12px; height: 26px;" title="Restaura o padrão do navegador: desativa a ordenação automática e desagrupa todas as guias da janela ativa">Restaurar Padrão do Navegador</button>
+                    <span id="feedbackAcoesGuias"
+                        style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                </div>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div>
+                        <div class="setting-label">5. NAVEGADOR: Aparência (Barra de Favoritos e Barras do Chrome)</div>
+                        <div class="setting-help">
+                            Preferência de organização visual no topo (<strong>Camada 1: Barra de Favoritos com auto-ocultação ao passar o mouse</strong> ➔ <strong>Camada 2: Guias</strong> ➔ <strong>Camada 3: URL + Addons</strong>). Como extensões Chrome (Manifest V3) não podem reordenar nativamente a barra de ferramentas do navegador, utilize os atalhos abaixo para alternar/restaurar ou abrir diretamente as configurações nativas de aparência do Chrome (<code>Ctrl+Shift+B</code> alterna a Barra de Favoritos).
+                        </div>
+                    </div>
+                    <label class="switch" title="Alternar preferência de Barra de Favoritos superior com auto-ocultação">
+                        <input type="checkbox" id="optModoBarraFavoritosSuperior">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                    <button type="button" class="btn btn-secundario" id="btnRestaurarBarraFerramentasPadrao"
+                        style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                        title="Restaura o layout padrão da barra de ferramentas nas preferências do addon">🔄 Restaurar Barra de Ferramentas Padrão</button>
+                    <button type="button" class="btn btn-secundario" id="btnAbrirAparenciaChrome"
+                        style="padding: 4px 10px; font-size: 12px; height: 26px;"
+                        title="Abre diretamente chrome://settings/appearance em uma nova guia">🎨 Aparência do Chrome (chrome://settings/appearance)</button>
+                    <span id="feedbackAparenciaChrome"
+                        style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                </div>
+            </div>
+
+            <div class="setting-item" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div>
+                        <div class="setting-label">Economizador de Memória (Descarte de Guias Inativas /
+                            Tab Discarding)</div>
+                        <div class="setting-help">
+                            Diferente do recurso básico nativo do navegador (que opera em horários fixos e opacos), este módulo permite <strong>ativar, desativar e personalizar livremente o tempo mínimo de inatividade</strong> para descarregar da memória RAM guias pesadas em segundo plano (via Chrome Tab Discarding). A guia permanece visível na barra e é recarregada instantaneamente com 1 clique ao retornar.
+                        </div>
+                    </div>
+                    <label class="switch" style="flex-shrink: 0;">
+                        <input type="checkbox" id="optDescarteGuiasInativas">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="containerOpcoesDescarte" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; transition: opacity 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="optTempoInatividadeDescarteMinutos" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Descartar guias após:</label>
+                        <select id="optTempoInatividadeDescarteMinutos" class="input-select" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                            <option value="5">5 minutos</option>
+                            <option value="10">10 minutos</option>
+                            <option value="15">15 minutos</option>
+                            <option value="20" selected>20 minutos (Padrão)</option>
+                            <option value="30">30 minutos</option>
+                            <option value="60">1 hora (60 minutos)</option>
+                            <option value="120">2 horas (120 minutos)</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-secundario" id="btnDescartarGuiasInativasAgora"
+                        style="padding: 4px 10px; font-size: 12px; height: 26px;">Liberar Memória RAM Agora (Descartar Inativas)</button>
+                    <span id="feedbackDescarteGuias"
+                        style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
+                </div>
+            </div>
+            </section>
+
+            <!-- Secao 6: Produtividade - Tempo de Trabalho e Pomodoro -->
+            <section class="cartao">
+                <h2>6. Produtividade: Tempo de Trabalho &amp; Pomodoro</h2>
+                <p class="subtitulo">
+                    Acompanhe sua jornada diária e receba alertas modais em todas as janelas abertas ao atingir metas de tempo corrido, tempo ativo ou ciclos Pomodoro.
+                </p>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">Tempo de Trabalho Corrido (Meta Diária)</div>
+                        <div class="setting-help">Conta o tempo corrido total da jornada no dia (padrão: 7h, de 1h a 12h) e exibe modal de aviso ao completar a meta.</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <select id="optTempoTrabalhoCorridoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                            <option value="1">1 hora</option>
+                            <option value="2">2 horas</option>
+                            <option value="3">3 horas</option>
+                            <option value="4">4 horas</option>
+                            <option value="5">5 horas</option>
+                            <option value="6">6 horas</option>
+                            <option value="7" selected>7 horas (Padrão)</option>
+                            <option value="8">8 horas</option>
+                            <option value="9">9 horas</option>
+                            <option value="10">10 horas</option>
+                            <option value="11">11 horas</option>
+                            <option value="12">12 horas</option>
+                        </select>
+                        <label class="switch" title="Ativar alerta de tempo de trabalho corrido">
+                            <input type="checkbox" id="optTempoTrabalhoCorridoAtivo">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">Tempo Ativo de Trabalho (Estilo Workrave)</div>
+                        <div class="setting-help">Conta apenas minutos com atividade real no navegador e pausa automaticamente após 5 minutos sem interação (padrão: 6h, de 1h a 12h).</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <select id="optTempoTrabalhoAtivoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                            <option value="1">1 hora</option>
+                            <option value="2">2 horas</option>
+                            <option value="3">3 horas</option>
+                            <option value="4">4 horas</option>
+                            <option value="5">5 horas</option>
+                            <option value="6" selected>6 horas (Padrão)</option>
+                            <option value="7">7 horas</option>
+                            <option value="8">8 horas</option>
+                            <option value="9">9 horas</option>
+                            <option value="10">10 horas</option>
+                            <option value="11">11 horas</option>
+                            <option value="12">12 horas</option>
+                        </select>
+                        <label class="switch" title="Ativar alerta de tempo ativo estilo Workrave">
+                            <input type="checkbox" id="optTempoTrabalhoAtivoAtivo">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+                        <div>
+                            <div class="setting-label">Temporizador Pomodoro Inteligente</div>
+                            <div class="setting-help">Calcula automaticamente o tempo de Alívio e a Pausa Maior com base na proporção Foco:Pausa e quantidade de ciclos.</div>
+                        </div>
+                        <label class="switch" title="Ativar ciclos Pomodoro com notificação modal entre janelas">
+                            <input type="checkbox" id="optPomodoroAtivo">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="painelConfigPomodoro" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave);">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                            Proporção:
+                            <select id="optPomodoroProporcao" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                                <option value="5">5:1</option>
+                                <option value="4.5" selected>4.5:1 (Padrão)</option>
+                                <option value="4">4:1</option>
+                                <option value="3.5">3.5:1</option>
+                                <option value="3">3:1</option>
+                            </select>
+                        </label>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                            Foco:
+                            <select id="optPomodoroFocoMinutos" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                                <option value="25" selected>25 min (Padrão)</option>
+                                <option value="30">30 min</option>
+                                <option value="35">35 min</option>
+                                <option value="40">40 min</option>
+                                <option value="45">45 min</option>
+                                <option value="50">50 min</option>
+                                <option value="55">55 min</option>
+                                <option value="60">60 min</option>
+                                <option value="65">65 min</option>
+                                <option value="70">70 min</option>
+                                <option value="75">75 min</option>
+                                <option value="80">80 min</option>
+                                <option value="85">85 min</option>
+                                <option value="90">90 min</option>
+                            </select>
+                        </label>
+                        <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
+                            Alívio: <span id="lblPomodoroAlivioCalculado" style="color: #0d9488;">6 min</span>
+                        </span>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                            Ciclos:
+                            <select id="optPomodoroCiclos" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                                <option value="2">2 ciclos</option>
+                                <option value="3">3 ciclos</option>
+                                <option value="4" selected>4 ciclos (Padrão)</option>
+                                <option value="5">5 ciclos</option>
+                            </select>
+                        </label>
+                        <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
+                            Pausa Maior: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">24 min</span>
+                        </span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                    <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje: Corrido 0 min • Ativo 0 min • Pomodoro: Foco</span>
+                    <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
+                </div>
+            </section>
+
+            <!-- Secao 7: Privacidade e Manutencao do Navegador -->
+            <section class="cartao">
+                <h2>7. Privacidade e Manutenção do Navegador</h2>
+                <p class="subtitulo">
+                    Limpeza automática de cache e cookies antigos na inicialização do Chrome (+1 min e +15 min) para manter o desempenho e a privacidade da sessão.
+                </p>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">Auto-Limpeza de Cache e Cookies Antigos</div>
+                        <div class="setting-help">Quando ativada, limpa cache e cookies se a última limpeza for mais antiga que o período escolhido (disparada ao iniciar o Chrome, +1 min e +15 min).</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <select id="optAutoLimpezaIdade" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                            <option value="12h">Mais de 12 horas</option>
+                            <option value="1d">Mais de 1 dia</option>
+                            <option value="3d">Mais de 3 dias</option>
+                            <option value="7d" selected>Mais de 7 dias (Padrão)</option>
+                            <option value="15d">Mais de 15 dias</option>
+                            <option value="30d">Mais de 30 dias</option>
+                        </select>
+                        <button type="button" id="btnExecutarLimpezaCacheAgora" class="btn btn-secundario" style="font-size: 12px; padding: 5px 10px;">🧹 Limpar Agora</button>
+                        <label class="switch" title="Ativar auto-limpeza periódica de cache e cookies">
+                            <input type="checkbox" id="optAutoLimpezaCacheCookiesAtiva" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div id="lblStatusLimpezaCache" class="setting-help" style="margin-top: 4px; font-size: 11px; color: var(--texto-secundario);"></div>
+            </section>
 
             <!-- Passo 2.4: Barra Global de Sincronizacao na Nuvem, Restauracao de Fabrica e Backup Geral -->
             <section class="cartao" style="margin-top: 18px;">
@@ -1975,7 +2232,7 @@
                         style="padding: 14px 16px; background: rgba(13, 148, 136, 0.05); border: 1px solid rgba(13, 148, 136, 0.25); border-radius: 8px;">
                         <div
                             style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                            <strong style="color: #0d9488; font-size: 14px;">Acelerador PJe Turbo
+                            <strong style="color: #0d9488; font-size: 14px;">Acelerador do Sistema Judicial Turbo
                                 (Anti-Ampulhetas)</strong>
                             <span class="badge-stage" style="background: #0d9488; color: #fff;">Navegação
                                 Fluida</span>
@@ -1983,8 +2240,8 @@
                         <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
                             Neutralização automática de telas cinzas de carregamento
                             ("Aguarde...", ampulhetas e bloqueios visuais de cursor) e destravamento
-                            imediato da barra de rolagem em páginas e movimentações processuais no
-                            PJe, proporcionando leitura contínua e sem interrupções.
+                            imediato da barra de rolagem em páginas e movimentações processuais nos
+                            sistemas judiciais (PJe, Eproc, PDPJ, Projudi, SAJ, Creta e SEEU), proporcionando leitura contínua e sem interrupções.
                         </p>
                     </div>
                     <div
@@ -2536,6 +2793,85 @@
                     estruturado (CNPJ, CPF, CNJ, Data, Moeda etc.) copia estritamente como somente texto puro,
                     independentemente do nível ativo.
                 </p>
+            </section>
+
+            <!-- Passo 3.5: Guia Leigo e Prático de Mapeamento Manual e Tipos de Elementos -->
+            <section class="cartao">
+                <h2>Mapeamento Manual de Elementos e Modos de Comportamento (Guia Prático)</h2>
+                <p class="subtitulo">
+                    Nem todo lugar de um site funciona do mesmo jeito: às vezes você quer apenas ler um despacho, outras vezes quer clicar em um botão sem copiar nada sem querer, ou copiar rápido só o número do processo em um quadro cheio de informações. A extensão separa a página em <strong>4 tipos de comportamento</strong> — e você pode ensinar exceções manualmente quando quiser.
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px;">
+                    <div style="padding: 13px 15px; background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px;">
+                            <strong style="color: #d97706; font-size: 13.5px;">1. Interface</strong>
+                            <span class="badge-stage" style="background: #d97706; color: #fff;">Botões e Menus</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            <strong>Para que serve:</strong> Evitar que cliques normais em botões, menus, abas ou links copiem palavras por acidente.<br>
+                            <strong>O que acontece na prática:</strong> Um clique comum só executa a função do site e apaga qualquer seleção acidental. Precisa copiar o texto escrito dentro de um botão ou menu? Segure <code>Alt + Clique</code>.<br>
+                            <strong>Exemplos no dia a dia:</strong> Botões &quot;Salvar&quot;/&quot;Assinar&quot;, menus laterais, barras de ferramentas, caixinhas de seleção.
+                        </p>
+                    </div>
+
+                    <div style="padding: 13px 15px; background: rgba(2, 132, 199, 0.06); border: 1px solid rgba(2, 132, 199, 0.35); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px;">
+                            <strong style="color: #0284c7; font-size: 13.5px;">2. SemiFlexível</strong>
+                            <span class="badge-stage" style="background: #0284c7; color: #fff;">Dados Úteis (1 Clique)</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            <strong>Para que serve:</strong> Copiar dados importantes que ficam dentro de painéis, cabeçalhos e tabelas sem ficar copiando rótulos inúteis.<br>
+                            <strong>O que acontece na prática:</strong> Palavras comuns soltas (como &quot;Autuação:&quot;, &quot;Órgão:&quot; ou &quot;Juntado&quot;) são ignoradas no clique simples, mas <strong>números de processo (CNJ), CPF, CNPJ, datas, horários e valores</strong> são copiados instantaneamente com 1 clique.<br>
+                            <strong>Exemplos no dia a dia:</strong> Cabeçalho do processo, linhas de movimentação, cards de Polo Ativo/Passivo.
+                        </p>
+                    </div>
+
+                    <div style="padding: 13px 15px; background: rgba(5, 150, 105, 0.06); border: 1px solid rgba(5, 150, 105, 0.35); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px;">
+                            <strong style="color: #059669; font-size: 13.5px;">3. Textual</strong>
+                            <span class="badge-stage" style="background: #059669; color: #fff;">Leitura Normal</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            <strong>Para que serve:</strong> Ler e selecionar qualquer palavra, frase ou parágrafo inteiro em áreas de texto corrido ou documentos.<br>
+                            <strong>O que acontece na prática:</strong> Todos os cliques funcionam livremente (1 clique pega palavra, cliques seguidos pegam frase/parágrafo) e o texto selecionado permanece marcado na tela.<br>
+                            <strong>Exemplos no dia a dia:</strong> Sentenças, decisões, petições abertas no navegador e visualizadores de PDF.
+                        </p>
+                    </div>
+
+                    <div style="padding: 13px 15px; background: rgba(147, 51, 234, 0.06); border: 1px solid rgba(147, 51, 234, 0.35); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px;">
+                            <strong style="color: #9333ea; font-size: 13.5px;">4. Editável</strong>
+                            <span class="badge-stage" style="background: #9333ea; color: #fff;">Digitação e Minutas</span>
+                        </div>
+                        <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
+                            <strong>Para que serve:</strong> Identificar onde você digita informações ou redige minutas, sem que a cópia automática atrapalhe seu cursor.<br>
+                            <strong>O que acontece na prática:</strong> Preserva a digitação normal, libera a colagem rápida com o botão do meio (scroll) e ativa a seleção inteligente de <strong>placeholders</strong> (<code>#campo#</code>, <code>@@@@</code>, <code>#####</code>) em minutas.<br>
+                            <strong>Exemplos no dia a dia:</strong> Caixas de texto, campos de data, áreas grandes de texto (<code>textarea</code>) e editores HTML de minuta.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grade-estagios" style="margin-top: 14px;">
+                    <div class="card-estagio">
+                        <h3>Como espiar e criar uma regra na hora (sem saber programar)</h3>
+                        <ul>
+                            <li><strong>1. Espiar o que a extensão decidiu:</strong> Segure <code>Ctrl + Alt + Shift</code> e passe o mouse por cima de qualquer parte da página. Aparecerá um quadro mostrando qual dos 4 tipos está ativo ali e por qual motivo.</li>
+                            <li><strong>2. Abrir o assistente no local desejado:</strong> Clique sobre o elemento segurando <code>Ctrl + Alt + Shift + Clique</code> (ou <code>Ctrl + Alt + Botão Direito</code>).</li>
+                            <li><strong>3. Ajustar o alcance (Pai / Filho):</strong> Se você clicou em uma palavrinha dentro de um quadro e quer que a regra valha para o quadro inteiro, use <strong>↑ Pai</strong> no canto direito; para voltar, use <strong>↓ Filho</strong>.</li>
+                            <li><strong>4. Conferir antes de salvar:</strong> Clique em <strong>👁️ Testar</strong> — a janelinha fica transparente por alguns instantes e contorna na página tudo o que aquela regra vai atingir. Depois basta escolher o modo desejado (<em>Interface</em>, <em>SemiFlexível</em>, <em>Textual</em> ou <em>Editável</em>) e clicar em <strong>Salvar Regra</strong>.</li>
+                        </ul>
+                    </div>
+                    <div class="card-estagio">
+                        <h3>Opções extras e prioridade das regras</h3>
+                        <ul>
+                            <li><strong>Suas regras mandam primeiro:</strong> Tudo que você cria fica em <em>Regras do Usuário</em> e tem prioridade sobre as <em>Regras Internas</em> que já vêm de fábrica na extensão.</li>
+                            <li><strong>Aplicar regra aos elementos filhos:</strong> Marcada por padrão. Faz a regra valer não só para a caixa selecionada, mas também para todos os textos e botões que estiverem dentro dela.</li>
+                            <li><strong>Continuar avaliando próximas regras:</strong> Útil para casos avançados — em vez de parar na primeira regra encontrada, permite que outra regra logo abaixo na mesma lista dê a palavra final para itens mais específicos dentro daquela área.</li>
+                            <li><strong>Desfazer / Compartilhar:</strong> Na aba <em>Configurações ➔ 1. Cópia Inteligente ➔ Mapeamento Manual Avançado</em>, você pode desativar temporariamente, excluir, exportar para JSON ou importar regras prontas de colegas.</li>
+                        </ul>
+                    </div>
+                </div>
             </section>
         </div>
 
@@ -3155,6 +3491,7 @@
     <script src="../lib/lib-config.js"></script>
     <script src="../mod-copia/copia-constantes.js"></script>
     <script src="../mod-copia/copia-aviso-flutuante.js"></script>
+    <script src="../mod-copia/copia-dialogo-mapeamento.js"></script>
     <script src="../mod-copia/copia-acumulador.js"></script>
     <script src="../mod-copia/copia-geometria.js"></script>
     <script src="../mod-copia/copia-filtros.js"></script>

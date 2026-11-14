@@ -88,8 +88,11 @@
          * @returns {boolean}
          */
         #ehBotao4Voltar(e) {
-            /* Passo 1.2: Checagem por button padronizado (3), which (4) ou bitmask (8) */
+            /* Passo 1.2: Checagem por teclado driver (BrowserBack), button (3), which (4) ou bitmask (8) */
             if (!e) return false;
+            if (e.type === 'keydown' || e.type === 'keyup') {
+                return e.key === 'BrowserBack' || e.keyCode === 166;
+            }
             return e.button === 3 || e.which === 4 || (typeof e.buttons === 'number' && (e.buttons & 8) === 8);
         }
 
@@ -99,8 +102,11 @@
          * @returns {boolean}
          */
         #ehBotao5Avancar(e) {
-            /* Passo 1.3: Checagem por button padronizado (4), which (5) ou bitmask (16) */
+            /* Passo 1.3: Checagem por teclado driver (BrowserForward), button (4), which (5) ou bitmask (16) */
             if (!e) return false;
+            if (e.type === 'keydown' || e.type === 'keyup') {
+                return e.key === 'BrowserForward' || e.keyCode === 167;
+            }
             return e.button === 4 || e.which === 5 || (typeof e.buttons === 'number' && (e.buttons & 16) === 16);
         }
 
@@ -111,7 +117,8 @@
          */
         processarEventoMouse(e) {
             /* Passo 2.1: Guarda de ativação e integridade do evento */
-            if (!this.#ativo || !e || typeof e.button !== 'number') {
+            const ehEventoTecladoBotao = Boolean(e && (e.type === 'keydown' || e.type === 'keyup'));
+            if (!this.#ativo || !e || (!ehEventoTecladoBotao && typeof e.button !== 'number')) {
                 return false;
             }
 
@@ -141,22 +148,20 @@
             }
             this.#ultimoDisparoTimestamp = agora;
 
-            /* Passo 2.4 (FEAT-29 / BUG-48): Despacho de ação para Botão 4 e Botão 5.
+            /* Passo 2.4 (FEAT-29 / BUG-56): Despacho de ação para Botão 4 e Botão 5 via API nativa chrome.tabs.update.
              * Botão 4 sem Ctrl: Alterna entre as duas abas mais recentes (LRU ping-pong).
-             * Botão 4 com Ctrl: Retorna no histórico da página atual (window.history.back()).
+             * Botão 4 com Ctrl: Retrocede continuamente para a guia anterior à esquerda.
              * Botão 5: Avança para a próxima aba aberta à direita. */
-            if (ehVoltar && e.ctrlKey) {
-                try {
-                    if (typeof window !== 'undefined' && window.history && typeof window.history.back === 'function') {
-                        window.history.back();
-                    }
-                } catch (_) { }
-                return true;
-            }
-            const acaoAlvo = ehVoltar ? 'TROCAR_GUIA_ULTIMA_ATIVA' : 'TROCAR_GUIA_PROXIMA';
+            const payload = (ehVoltar && e.ctrlKey)
+                ? { acao: 'navegarAba', direcao: 'anterior' }
+                : { acao: ehVoltar ? 'TROCAR_GUIA_ULTIMA_ATIVA' : 'TROCAR_GUIA_PROXIMA' };
             try {
+                if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) return true;
                 if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                    chrome.runtime.sendMessage({ acao: acaoAlvo }).catch(() => { });
+                    const promessa = chrome.runtime.sendMessage(payload);
+                    if (promessa && typeof promessa.catch === 'function') {
+                        promessa.catch(() => { });
+                    }
                 }
             } catch (_) { }
 

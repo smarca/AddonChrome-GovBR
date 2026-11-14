@@ -42,11 +42,13 @@
     'use strict';
 
     class GerenciadorOrdenacaoGuias {
-        #criterio = 'nenhum'; // 'nenhum', 'dominio', 'url', 'titulo', 'dominio_criacao', 'dominio_acesso'
+        #criterio = 'hierarquia_arvore'; // 'nenhum', 'hierarquia_arvore', 'dominio', 'dominio_titulo', 'url', 'titulo', 'dominio_criacao', 'dominio_acesso'
         #sentido = 'esq_dir';  // 'esq_dir' (A-Z / Antigos), 'dir_esq' (Z-A / Recentes)
         #ordenarGuiasFixadas = false;
         #timerOrdenacaoAbas = null;
         #estaOrdenandoGuias = false;
+        #arvoreOpener = new Map();
+        #emFechamentoCascata = new Set();
 
         /**
          * @param {Object} [opcoes={}]
@@ -190,6 +192,13 @@
             if (!infoA.ehPuro && infoB.ehPuro) return 1;
 
             // 3. Sub-critérios subordinados ao Domínio:
+            if (criterio === 'dominio_titulo') {
+                const titA = (a.title || '').toLowerCase();
+                const titB = (b.title || '').toLowerCase();
+                const cmpTit = titA.localeCompare(titB);
+                return (sentido === 'dir_esq') ? -cmpTit : cmpTit;
+            }
+
             if (criterio === 'dominio_criacao') {
                 const tA = extrairTimestampCriacao(a, regA);
                 const tB = extrairTimestampCriacao(b, regB);
@@ -214,6 +223,137 @@
             // Critério padrão 'dominio': compara subdomínios
             const cmpSub = infoA.subDominio.localeCompare(infoB.subDominio);
             return (sentido === 'dir_esq') ? -cmpSub : cmpSub;
+        }
+
+        /**
+         * Registra relação genealógica Pai -> Filha (Seção 6.92)
+         * @param {number} tabId
+         * @param {number} openerTabId
+         */
+        registrarRelacaoPaiFilha(tabId, openerTabId) {
+            if (typeof tabId === 'number' && typeof openerTabId === 'number' && tabId !== openerTabId) {
+                this.#arvoreOpener.set(tabId, openerTabId);
+            }
+        }
+
+        /**
+         * Obtém todos os IDs de abas filhas/descendentes de uma aba pai em DFS
+         * @param {number} tabId
+         * @returns {number[]}
+         */
+        obterDescendentesDaAba(tabId) {
+            const resultado = [];
+            const visitados = new Set([tabId]);
+            const fila = [tabId];
+            while (fila.length > 0) {
+                const atual = fila.shift();
+                for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
+                    if (paiId === atual && !visitados.has(filhaId)) {
+                        visitados.add(filhaId);
+                        resultado.push(filhaId);
+                        fila.push(filhaId);
+                    }
+                }
+            }
+            return resultado;
+        }
+
+        /**
+         * Remove aba da árvore de aberturas (e religa filhas ao avô caso não esteja em fechamento em cascata)
+         * @param {number} tabId
+         */
+        removerDaArvore(tabId) {
+            const avoId = this.#arvoreOpener.get(tabId);
+            this.#arvoreOpener.delete(tabId);
+            for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
+                if (paiId === tabId) {
+                    if (avoId !== undefined && avoId !== filhaId) {
+                        this.#arvoreOpener.set(filhaId, avoId);
+                    } else {
+                        this.#arvoreOpener.delete(filhaId);
+                    }
+                }
+            }
+        }
+
+        marcarFechamentoCascata(ids = []) {
+            ids.forEach((id) => this.#emFechamentoCascata.add(id));
+        }
+
+        consumirFechamentoCascata(tabId) {
+            if (this.#emFechamentoCascata.has(tabId)) {
+                this.#emFechamentoCascata.delete(tabId);
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Ordena abas em formato de árvore genealógica DFS:
+         * Pai A -> Filha A.1 -> Subfilha A.1.1 -> Filha A.2 -> Pai B (Seção 6.92)
+         * @param {Array<Object>} abasAlvo
+         * @param {string} [sentido]
+         * @param {Map|null} [mapa]
+         * @returns {Array<Object>}
+         */
+        ordenarPorHierarquiaArvore(abasAlvo, sentido = 'esq_dir', mapa = null) {
+            const conjuntoIds = new Set(abasAlvo.map(t => t.id));
+            for (const t of abasAlvo) {
+                if (typeof t.openerTabId === 'number' && t.openerTabId !== t.id) {
+                    this.#arvoreOpener.set(t.id, t.openerTabId);
+                }
+            }
+
+            const filhosPorPai = new Map();
+            const raizes = [];
+
+            const obterTs = (tab) => {
+                const reg = mapa ? mapa.get(tab.id) : null;
+                if (reg && reg.criadaEm) return reg.criadaEm;
+                return tab.id || 0;
+            };
+
+            for (const t of abasAlvo) {
+                const paiId = (typeof t.openerTabId === 'number' && conjuntoIds.has(t.openerTabId))
+                    ? t.openerTabId
+                    : this.#arvoreOpener.get(t.id);
+                if (paiId !== undefined && paiId !== t.id && conjuntoIds.has(paiId)) {
+                    if (!filhosPorPai.has(paiId)) filhosPorPai.set(paiId, []);
+                    filhosPorPai.get(paiId).push(t);
+                } else {
+                    raizes.push(t);
+                }
+            }
+
+            const cmpCrono = (a, b) => {
+                const diff = obterTs(a) - obterTs(b);
+                return (diff !== 0) ? diff : ((a.index || 0) - (b.index || 0));
+            };
+
+            raizes.sort((a, b) => (sentido === 'dir_esq') ? -cmpCrono(a, b) : cmpCrono(a, b));
+            for (const lista of filhosPorPai.values()) {
+                lista.sort(cmpCrono);
+            }
+
+            const resultado = [];
+            const visitados = new Set();
+            const visitar = (no) => {
+                if (!no || visitados.has(no.id)) return;
+                visitados.add(no.id);
+                resultado.push(no);
+                const filhos = filhosPorPai.get(no.id) || [];
+                for (const f of filhos) {
+                    visitar(f);
+                }
+            };
+
+            for (const r of raizes) {
+                visitar(r);
+            }
+            for (const t of abasAlvo) {
+                if (!visitados.has(t.id)) visitar(t);
+            }
+            return resultado;
         }
 
         /**
@@ -271,9 +411,9 @@
                     await this.desagruparTodas(windowId, chromeApi);
                 }
 
-                const abasOrdenadas = [...abasAlvo].sort((a, b) => {
-                    return this.compararAbasParaOrdenacao(a, b, criterio, sentido, mapaAbasUrls);
-                });
+                const abasOrdenadas = (criterio === 'hierarquia_arvore')
+                    ? this.ordenarPorHierarquiaArvore(abasAlvo, sentido, mapaAbasUrls)
+                    : [...abasAlvo].sort((a, b) => this.compararAbasParaOrdenacao(a, b, criterio, sentido, mapaAbasUrls));
 
                 const indexInicial = abasAlvo[0].index;
 

@@ -154,9 +154,9 @@
                 config.ativoAmpuletas = true;
                 precisaSalvar = true;
             }
-            /* Por padrao, manterFormatacaoBasica e false ("Remover Formatacoes / Somente Texto" marcado) */
+            /* Por padrao, manterFormatacaoBasica e true ("Remover Formatacoes / Somente Texto" desmarcado) */
             if (config.manterFormatacaoBasica === undefined) {
-                config.manterFormatacaoBasica = false;
+                config.manterFormatacaoBasica = true;
                 precisaSalvar = true;
             }
             const niveisValidos = ['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido', 'extendido', 'sem_filtro'];
@@ -164,8 +164,8 @@
                 config.nivelFiltroFormatacao = 'basico';
                 precisaSalvar = true;
             }
-            if (!['total_exceto_arrasto', 'total', 'interface', 'nenhuma'].includes(config.modoRetirarSelecao)) {
-                config.modoRetirarSelecao = 'total_exceto_arrasto';
+            if (!['total', 'total_exceto_arrasto', 'interface', 'nenhuma'].includes(config.modoRetirarSelecao)) {
+                config.modoRetirarSelecao = 'total';
                 precisaSalvar = true;
             }
             if (config.modoPlaceholdersMinutasHtml === undefined) {
@@ -224,8 +224,12 @@
                 config.opacidadeFundoMarcadorColado = 0.24;
                 precisaSalvar = true;
             }
-            if (typeof config.estiloBadgeMarcadorColado !== 'string' || !['sobrescrito', 'circular', 'chip'].includes(config.estiloBadgeMarcadorColado)) {
+            if (typeof config.estiloBadgeMarcadorColado !== 'string' || !['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(config.estiloBadgeMarcadorColado)) {
                 config.estiloBadgeMarcadorColado = 'sobrescrito';
+                precisaSalvar = true;
+            }
+            if (typeof config.tipoContornoMarcadorColado !== 'string' || !['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(config.tipoContornoMarcadorColado)) {
+                config.tipoContornoMarcadorColado = 'solido';
                 precisaSalvar = true;
             }
             if (typeof config.minimoCaracteresInterface !== 'number' || ![0, 1, 2, 3, 4, 5, 10].includes(config.minimoCaracteresInterface)) {
@@ -270,6 +274,46 @@
                 config.separadorAcumulador = config.separadorAcumulador.slice(0, 5);
                 precisaSalvar = true;
             }
+            if (typeof config.autoLimpezaCacheCookiesAtiva !== 'boolean') {
+                config.autoLimpezaCacheCookiesAtiva = true;
+                precisaSalvar = true;
+            }
+            if (typeof config.autoLimpezaIdade !== 'string' || !['12h', '1d', '3d', '7d', '15d', '30d'].includes(config.autoLimpezaIdade)) {
+                config.autoLimpezaIdade = '7d';
+                precisaSalvar = true;
+            }
+            if (typeof config.tempoTrabalhoCorridoAtivo !== 'boolean') {
+                config.tempoTrabalhoCorridoAtivo = false;
+                precisaSalvar = true;
+            }
+            if (typeof config.tempoTrabalhoCorridoHoras !== 'number' || config.tempoTrabalhoCorridoHoras < 1 || config.tempoTrabalhoCorridoHoras > 12) {
+                config.tempoTrabalhoCorridoHoras = 7;
+                precisaSalvar = true;
+            }
+            if (typeof config.tempoTrabalhoAtivoAtivo !== 'boolean') {
+                config.tempoTrabalhoAtivoAtivo = false;
+                precisaSalvar = true;
+            }
+            if (typeof config.tempoTrabalhoAtivoHoras !== 'number' || config.tempoTrabalhoAtivoHoras < 1 || config.tempoTrabalhoAtivoHoras > 12) {
+                config.tempoTrabalhoAtivoHoras = 6;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroAtivo !== 'boolean') {
+                config.pomodoroAtivo = false;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroProporcao !== 'number' || ![5, 4.5, 4, 3.5, 3].includes(config.pomodoroProporcao)) {
+                config.pomodoroProporcao = 4.5;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroFocoMinutos !== 'number' || config.pomodoroFocoMinutos < 25 || config.pomodoroFocoMinutos > 90 || config.pomodoroFocoMinutos % 5 !== 0) {
+                config.pomodoroFocoMinutos = 25;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroCiclos !== 'number' || ![2, 3, 4, 5].includes(config.pomodoroCiclos)) {
+                config.pomodoroCiclos = 4;
+                precisaSalvar = true;
+            }
 
             /* Validacao e defaults para modulo MOUSE e modulo NAVEGADOR */
             if (config.colagemBotaoDireitoAtiva === undefined) {
@@ -305,7 +349,7 @@
                 precisaSalvar = true;
             }
             if (config.abaEmPrimeiroPlano === undefined) {
-                config.abaEmPrimeiroPlano = (config.abaEmSegundoPlano === false);
+                config.abaEmPrimeiroPlano = (config.abaEmSegundoPlano !== undefined) ? (config.abaEmSegundoPlano === false) : true;
                 precisaSalvar = true;
             }
             if (config.abaEmSegundoPlano === undefined) {
@@ -340,8 +384,8 @@
                 config.monitorarUrlAtualPagina = true;
                 precisaSalvar = true;
             }
-            if (typeof config.criterioOrdenacaoGuias !== 'string' || !['nenhum', 'url', 'dominio', 'dominio_criacao', 'dominio_acesso', 'titulo', 'tempo_acesso', 'ordem_criacao', 'agrupar_dominio'].includes(config.criterioOrdenacaoGuias)) {
-                config.criterioOrdenacaoGuias = 'nenhum';
+            if (typeof config.criterioOrdenacaoGuias !== 'string' || !['nenhum', 'hierarquia_arvore', 'url', 'dominio', 'dominio_titulo', 'dominio_criacao', 'dominio_acesso', 'titulo', 'tempo_acesso', 'ordem_criacao', 'agrupar_dominio'].includes(config.criterioOrdenacaoGuias)) {
+                config.criterioOrdenacaoGuias = 'hierarquia_arvore';
                 precisaSalvar = true;
             }
             if (typeof config.sentidoOrdenacaoGuias !== 'string' || !['esq_dir', 'dir_esq'].includes(config.sentidoOrdenacaoGuias)) {
@@ -350,6 +394,14 @@
             }
             if (config.ordenarGuiasFixadas === undefined) {
                 config.ordenarGuiasFixadas = false;
+                precisaSalvar = true;
+            }
+            if (config.fecharHierarquiaEmCascata === undefined) {
+                config.fecharHierarquiaEmCascata = false;
+                precisaSalvar = true;
+            }
+            if (config.modoBarraFavoritosSuperior === undefined) {
+                config.modoBarraFavoritosSuperior = false;
                 precisaSalvar = true;
             }
             if (config.descarteGuiasInativasAtivo === undefined || config.descarteGuiasInativasAtivo === true) {
@@ -361,7 +413,21 @@
                 precisaSalvar = true;
             }
             if (!Array.isArray(config.regrasMapeamentoElementos)) {
-                config.regrasMapeamentoElementos = [];
+                let padraoUsuario = [];
+                try {
+                    if (typeof fetch === 'function' && apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
+                        const respInt = await fetch(apiChrome.runtime.getURL('src/cfg/interface.json'));
+                        if (respInt && respInt.ok) {
+                            const dadosInt = await respInt.json();
+                            if (Array.isArray(dadosInt)) {
+                                padraoUsuario = dadosInt
+                                    .filter(r => r && r.origem === 'usuario')
+                                    .map(({ origem, ...resto }) => ({ ...resto }));
+                            }
+                        }
+                    }
+                } catch (_) { }
+                config.regrasMapeamentoElementos = padraoUsuario;
                 precisaSalvar = true;
             }
 
@@ -412,6 +478,7 @@
                     corFundoMarcadorColado: config.corFundoMarcadorColado || '#ccfbf1',
                     opacidadeFundoMarcadorColado: typeof config.opacidadeFundoMarcadorColado === 'number' ? config.opacidadeFundoMarcadorColado : 0.24,
                     estiloBadgeMarcadorColado: config.estiloBadgeMarcadorColado || 'sobrescrito',
+                    tipoContornoMarcadorColado: config.tipoContornoMarcadorColado || 'solido',
                     minimoCaracteresInterface: config.minimoCaracteresInterface,
                     converterCabecalhoPjeAtivo: config.converterCabecalhoPjeAtivo,
                     atalhoF1GeminiAtivo: config.atalhoF1GeminiAtivo,
@@ -420,7 +487,17 @@
                     separadorTabelas: config.separadorTabelas,
                     promptF1Gemini: config.promptF1Gemini,
                     tempoExibicaoAlertaMs: config.tempoExibicaoAlertaMs,
-                    separadorAcumulador: config.separadorAcumulador
+                    separadorAcumulador: config.separadorAcumulador,
+                    autoLimpezaCacheCookiesAtiva: config.autoLimpezaCacheCookiesAtiva,
+                    autoLimpezaIdade: config.autoLimpezaIdade,
+                    tempoTrabalhoCorridoAtivo: config.tempoTrabalhoCorridoAtivo,
+                    tempoTrabalhoCorridoHoras: config.tempoTrabalhoCorridoHoras,
+                    tempoTrabalhoAtivoAtivo: config.tempoTrabalhoAtivoAtivo,
+                    tempoTrabalhoAtivoHoras: config.tempoTrabalhoAtivoHoras,
+                    pomodoroAtivo: config.pomodoroAtivo,
+                    pomodoroProporcao: config.pomodoroProporcao,
+                    pomodoroFocoMinutos: config.pomodoroFocoMinutos,
+                    pomodoroCiclos: config.pomodoroCiclos
                 });
             }
 

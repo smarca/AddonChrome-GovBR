@@ -211,11 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const optSentidoOrdenacaoGuiasSwitch = document.getElementById('optSentidoOrdenacaoGuiasSwitch');
     const lblSentidoOrdenacaoGuias = document.getElementById('lblSentidoOrdenacaoGuias');
     const optOrdenarGuiasFixadas = document.getElementById('optOrdenarGuiasFixadas');
-    const btnOrdenarGuiasAgora = document.getElementById('btnOrdenarGuiasAgora');
-    const btnAgruparDominioAgora = document.getElementById('btnAgruparDominioAgora');
-    const btnDesagruparGuiasAgora = document.getElementById('btnDesagruparGuiasAgora');
+    const optFecharHierarquiaEmCascata = document.getElementById('optFecharHierarquiaEmCascata');
+    const containerFecharHierarquiaCascata = document.getElementById('containerFecharHierarquiaCascata');
     const btnRestaurarOrdemGuiasPadrao = document.getElementById('btnRestaurarOrdemGuiasPadrao');
     const feedbackAcoesGuias = document.getElementById('feedbackAcoesGuias');
+    const optModoBarraFavoritosSuperior = document.getElementById('optModoBarraFavoritosSuperior');
+    const btnRestaurarBarraFerramentasPadrao = document.getElementById('btnRestaurarBarraFerramentasPadrao');
+    const btnAbrirAparenciaChrome = document.getElementById('btnAbrirAparenciaChrome');
+    const feedbackAparenciaChrome = document.getElementById('feedbackAparenciaChrome');
+    const btnTestarCaixaEntradaRapida = document.getElementById('btnTestarCaixaEntradaRapida');
+    const btnTestarAdicaoManualMapeamento = document.getElementById('btnTestarAdicaoManualMapeamento');
     const optDescarteGuiasInativas = document.getElementById('optDescarteGuiasInativas');
     const containerOpcoesDescarte = document.getElementById('containerOpcoesDescarte');
     const optTempoInatividadeDescarteMinutos = document.getElementById('optTempoInatividadeDescarteMinutos');
@@ -234,13 +239,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblValorTempoAlerta = document.getElementById('lblValorTempoAlerta');
     const optTempoFlashMs = document.getElementById('optTempoFlashMs');
     const optCorFlashBorder = document.getElementById('optCorFlashBorder');
+    const previewFlashBorderExemplo = document.getElementById('previewFlashBorderExemplo');
     const lblValorTempoFlash = document.getElementById('lblValorTempoFlash');
     const optMarcadorConteudoColadoAtivo = document.getElementById('optMarcadorConteudoColadoAtivo');
     const painelCustomizacaoMarcadorColado = document.getElementById('painelCustomizacaoMarcadorColado');
     const optPresetMarcadorColado = document.getElementById('optPresetMarcadorColado');
+    const optTipoContornoMarcadorColado = document.getElementById('optTipoContornoMarcadorColado');
     const optCorContornoMarcadorColado = document.getElementById('optCorContornoMarcadorColado');
     const optCorFundoMarcadorColado = document.getElementById('optCorFundoMarcadorColado');
     const optEstiloBadgeMarcadorColado = document.getElementById('optEstiloBadgeMarcadorColado');
+    const previewMarcadorColadoExemplo = document.getElementById('previewMarcadorColadoExemplo');
+    const previewMarcadorColadoBadge = document.getElementById('previewMarcadorColadoBadge');
     const optModoRetirarSelecao = document.getElementById('optModoRetirarSelecao');
     const optMinimoCaracteresInterface = document.getElementById('optMinimoCaracteresInterface');
     const optAcumuladorSeparador = document.getElementById('optAcumuladorSeparador');
@@ -255,6 +264,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblTotalAlertas = document.getElementById('lblTotalAlertas');
     const lblDataInicioContadores = document.getElementById('lblDataInicioContadores');
     const btnResetarEstatisticas = document.getElementById('btnResetarEstatisticas');
+
+    /* Privacidade e Produtividade (Secoes 6.141 e 6.142) */
+    const optAutoLimpezaCacheCookiesAtiva = document.getElementById('optAutoLimpezaCacheCookiesAtiva');
+    const optAutoLimpezaIdade = document.getElementById('optAutoLimpezaIdade');
+    const btnExecutarLimpezaCacheAgora = document.getElementById('btnExecutarLimpezaCacheAgora');
+    const lblStatusLimpezaCache = document.getElementById('lblStatusLimpezaCache');
+    const optTempoTrabalhoCorridoAtivo = document.getElementById('optTempoTrabalhoCorridoAtivo');
+    const optTempoTrabalhoCorridoHoras = document.getElementById('optTempoTrabalhoCorridoHoras');
+    const optTempoTrabalhoAtivoAtivo = document.getElementById('optTempoTrabalhoAtivoAtivo');
+    const optTempoTrabalhoAtivoHoras = document.getElementById('optTempoTrabalhoAtivoHoras');
+    const optPomodoroAtivo = document.getElementById('optPomodoroAtivo');
+    const optPomodoroProporcao = document.getElementById('optPomodoroProporcao');
+    const optPomodoroFocoMinutos = document.getElementById('optPomodoroFocoMinutos');
+    const lblPomodoroAlivioCalculado = document.getElementById('lblPomodoroAlivioCalculado');
+    const optPomodoroCiclos = document.getElementById('optPomodoroCiclos');
+    const lblPomodoroPausaMaiorCalculada = document.getElementById('lblPomodoroPausaMaiorCalculada');
+    const painelConfigPomodoro = document.getElementById('painelConfigPomodoro');
+    const lblStatusProdutividadeTrabalho = document.getElementById('lblStatusProdutividadeTrabalho');
+    const btnResetarContadoresTrabalho = document.getElementById('btnResetarContadoresTrabalho');
 
     /* Botoes de Persistencia e Backup */
     const btnSalvarConfiguracoes = document.getElementById('btnSalvarConfiguracoes');
@@ -273,9 +301,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const containerListaRegrasMapeamento = document.getElementById('containerListaRegrasMapeamento');
     let regrasMapeamentoAtuais = [];
 
+    function normalizarExpressaoAtributoOptions(expressao, tipoSeletor = '') {
+        if (typeof expressao !== 'string') return '';
+        let expr = expressao.trim();
+        const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
+        if (!ehXPath && !expr.startsWith('[') && /^[a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=/.test(expr)) {
+            if (/^[a-zA-Z_][\w-]*=$/.test(expr)) {
+                expr = `[${expr.slice(0, -1)}]`;
+            } else {
+                const m = expr.match(/^([a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=)(.+)$/);
+                if (m) {
+                    const val = m[2].trim();
+                    const jaAspas = (val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"));
+                    expr = `[${m[1]}${jaAspas ? val : `"${val.replace(/"/g, '\\"')}"`}]`;
+                }
+            }
+        }
+        return expr;
+    }
+
     function validarExpressaoSeletorOptions(expressao, tipoSeletor = '') {
         if (typeof expressao !== 'string' || !expressao.trim()) return true; // vazio ainda em edição
-        const expr = expressao.trim();
+        const expr = normalizarExpressaoAtributoOptions(expressao, tipoSeletor);
         try {
             const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
             if (ehXPath) {
@@ -353,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const [movida] = regrasMapeamentoAtuais.splice(idxArrastando, 1);
                     regrasMapeamentoAtuais.splice(idx, 0, movida);
                     renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                    salvarRegrasMapeamento();
+                    marcarAlteracoesPendentesMapeamento(true);
                 });
 
                 const alca = document.createElement('span');
@@ -377,30 +424,35 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             selectTipoSeletor.addEventListener('change', () => {
                 regrasMapeamentoAtuais[idx].tipoSeletor = selectTipoSeletor.value;
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
 
-            // Campo Expressao (XPath / CSS / JS Path)
+            // Campo Expressao (XPath / CSS)
             const inputExpr = document.createElement('input');
             inputExpr.type = 'text';
             inputExpr.className = 'campo-input-escuro';
             inputExpr.style.cssText = 'flex: 2 1 200px; min-width: 160px; font-family: monospace; font-size: 11px; padding: 4px 8px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px;';
             inputExpr.value = regra.expressao || '';
-            inputExpr.placeholder = 'Expressão (XPath, CSS, JS Path)';
+            inputExpr.placeholder = 'Expressão (XPath ou CSS)';
+            inputExpr.addEventListener('input', () => {
+                regrasMapeamentoAtuais[idx].expressao = inputExpr.value.trim();
+                marcarAlteracoesPendentesMapeamento(true);
+            });
             inputExpr.addEventListener('change', () => {
-                const valor = inputExpr.value.trim();
                 const tipoSel = selectTipoSeletor ? selectTipoSeletor.value : '';
+                const valor = normalizarExpressaoAtributoOptions(inputExpr.value, tipoSel);
                 if (!validarExpressaoSeletorOptions(valor, tipoSel)) {
                     inputExpr.style.borderColor = '#ef4444';
                     exibirToast(`⚠️ Expressão inválida para ${tipoSel || 'regra'}. Corrija antes de salvar.`);
                     return;
                 }
+                inputExpr.value = valor;
                 inputExpr.style.borderColor = '#475569';
                 regrasMapeamentoAtuais[idx].expressao = valor;
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
 
-            // Seletor de Modo Comportamental (Interface, SemiFlexível, Textual)
+            // Seletor de Modo Comportamental (Interface, SemiFlexível, Textual, Editável)
             const selectTipo = document.createElement('select');
             selectTipo.className = 'select-customizado';
             selectTipo.style.cssText = 'padding: 4px 8px; font-size: 11px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; cursor: pointer; flex: 0 0 auto; width: auto;';
@@ -423,13 +475,20 @@ document.addEventListener('DOMContentLoaded', () => {
             optTextual.title = 'Leitura / Manter';
             if (regra.tipo === 'textual') optTextual.selected = true;
 
+            const optEditavel = document.createElement('option');
+            optEditavel.value = 'editavel';
+            optEditavel.textContent = 'Editável';
+            optEditavel.title = 'Inputs, Textarea, Datas e Placeholders';
+            if (regra.tipo === 'editavel') optEditavel.selected = true;
+
             selectTipo.appendChild(optInterface);
             selectTipo.appendChild(optSemiflexivel);
             selectTipo.appendChild(optTextual);
+            selectTipo.appendChild(optEditavel);
 
             selectTipo.addEventListener('change', () => {
                 regrasMapeamentoAtuais[idx].tipo = selectTipo.value;
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
 
             // Campo Observação (até 150 caracteres)
@@ -441,9 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
             inputObs.value = regra.observacao || '';
             inputObs.placeholder = 'Observação (até 150 carac.)';
             inputObs.title = regra.observacao || 'Observação identificadora da regra';
-            inputObs.addEventListener('change', () => {
+            inputObs.addEventListener('input', () => {
                 regrasMapeamentoAtuais[idx].observacao = inputObs.value.trim().substring(0, 150);
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
 
             // Checkbox Herdar Filhos
@@ -454,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chkHerdar.checked = regra.herdarFilhos !== false;
             chkHerdar.addEventListener('change', () => {
                 regrasMapeamentoAtuais[idx].herdarFilhos = chkHerdar.checked;
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
             labelHerdar.appendChild(chkHerdar);
             labelHerdar.appendChild(document.createTextNode('Filhos'));
@@ -467,10 +526,24 @@ document.addEventListener('DOMContentLoaded', () => {
             chkAtivo.checked = regra.ativo !== false;
             chkAtivo.addEventListener('change', () => {
                 regrasMapeamentoAtuais[idx].ativo = chkAtivo.checked;
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
             labelAtivo.appendChild(chkAtivo);
             labelAtivo.appendChild(document.createTextNode('Ativo'));
+
+            // Checkbox Permitir Próxima Regra (padrão: parar nesta regra)
+            const labelContinuar = document.createElement('label');
+            labelContinuar.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; cursor: pointer; user-select: none; margin: 0;';
+            labelContinuar.title = 'Permitir processar próxima regra após esta (padrão: parar aqui)';
+            const chkContinuar = document.createElement('input');
+            chkContinuar.type = 'checkbox';
+            chkContinuar.checked = regra.continuarProxima === true;
+            chkContinuar.addEventListener('change', () => {
+                regrasMapeamentoAtuais[idx].continuarProxima = chkContinuar.checked;
+                marcarAlteracoesPendentesMapeamento(true);
+            });
+            labelContinuar.appendChild(chkContinuar);
+            labelContinuar.appendChild(document.createTextNode('Continuar'));
 
             // Botao Excluir
             const btnExcluir = document.createElement('button');
@@ -482,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnExcluir.addEventListener('click', () => {
                 regrasMapeamentoAtuais.splice(idx, 1);
                 renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                salvarRegrasMapeamento();
+                marcarAlteracoesPendentesMapeamento(true);
             });
 
             if (somenteLeitura) {
@@ -492,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputObs.readOnly = true;
                 chkHerdar.disabled = true;
                 chkAtivo.disabled = true;
+                chkContinuar.disabled = true;
             }
 
             item.appendChild(selectTipoSeletor);
@@ -500,6 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.appendChild(inputObs);
             item.appendChild(labelHerdar);
             item.appendChild(labelAtivo);
+            item.appendChild(labelContinuar);
             if (!somenteLeitura) {
                 item.appendChild(btnExcluir);
             }
@@ -883,13 +958,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizarEstiloBadgeMarcadorColado(val) {
         const v = String(val || '').trim().toLowerCase();
-        if (v === 'circular' || v === 'chip') return v;
+        if (['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(v)) return v;
         return 'sobrescrito';
+    }
+
+    function normalizarTipoContornoMarcadorColado(val) {
+        const v = String(val || '').trim().toLowerCase();
+        if (['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(v)) return v;
+        return 'solido';
+    }
+
+    function atualizarPreviewsVisuaisMarcadorEFlash() {
+        const corFlash = optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : '#0d9488';
+        if (previewFlashBorderExemplo) {
+            previewFlashBorderExemplo.style.borderColor = corFlash;
+            const r = parseInt(corFlash.slice(1, 3), 16) || 13;
+            const g = parseInt(corFlash.slice(3, 5), 16) || 148;
+            const b = parseInt(corFlash.slice(5, 7), 16) || 136;
+            previewFlashBorderExemplo.style.background = `rgba(${r}, ${g}, ${b}, 0.14)`;
+        }
+        const corBorda = optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : '#0d9488';
+        const corFundo = optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : '#ccfbf1';
+        const tipoContorno = optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido';
+        const estiloBadge = optEstiloBadgeMarcadorColado ? normalizarEstiloBadgeMarcadorColado(optEstiloBadgeMarcadorColado.value) : 'sobrescrito';
+        if (previewMarcadorColadoExemplo) {
+            const rf = parseInt(corFundo.slice(1, 3), 16) || 204;
+            const gf = parseInt(corFundo.slice(3, 5), 16) || 251;
+            const bf = parseInt(corFundo.slice(5, 7), 16) || 241;
+            previewMarcadorColadoExemplo.style.background = `rgba(${rf}, ${gf}, ${bf}, 0.36)`;
+            previewMarcadorColadoExemplo.style.textDecoration = tipoContorno === 'taxado' ? `line-through 2px ${corBorda}` : (tipoContorno === 'ondulado' ? `underline wavy ${corBorda}` : 'none');
+            if (tipoContorno === 'sem_borda' || tipoContorno === 'ondulado' || tipoContorno === 'taxado') {
+                previewMarcadorColadoExemplo.style.border = '1.5px solid transparent';
+            } else if (tipoContorno === 'tracejado') {
+                previewMarcadorColadoExemplo.style.border = `1.5px dashed ${corBorda}`;
+            } else {
+                previewMarcadorColadoExemplo.style.border = `1.5px solid ${corBorda}`;
+            }
+        }
+        if (previewMarcadorColadoBadge) {
+            if (estiloBadge === 'sem_etiqueta') {
+                previewMarcadorColadoBadge.style.display = 'none';
+            } else {
+                const rb = parseInt(corBorda.slice(1, 3), 16) || 13;
+                const gb = parseInt(corBorda.slice(3, 5), 16) || 148;
+                const bb = parseInt(corBorda.slice(5, 7), 16) || 136;
+                previewMarcadorColadoBadge.style.display = 'inline-flex';
+                previewMarcadorColadoBadge.style.borderRadius = '999px';
+                previewMarcadorColadoBadge.style.minWidth = '15px';
+                previewMarcadorColadoBadge.style.height = '15px';
+                previewMarcadorColadoBadge.style.padding = '0 3.5px';
+                previewMarcadorColadoBadge.style.fontSize = '9px';
+                previewMarcadorColadoBadge.textContent = '1';
+                const ehRetangular = estiloBadge.startsWith('retangular_') || estiloBadge === 'sobrescrito_retangular';
+                previewMarcadorColadoBadge.style.borderRadius = ehRetangular ? '3px' : '999px';
+                if (estiloBadge === 'circular' || estiloBadge === 'retangular_compacto') {
+                    previewMarcadorColadoBadge.style.borderColor = corBorda;
+                    previewMarcadorColadoBadge.style.color = '#ffffff';
+                    previewMarcadorColadoBadge.style.background = corBorda;
+                    previewMarcadorColadoBadge.style.opacity = '1';
+                } else if (estiloBadge === 'translucido' || estiloBadge === 'retangular_translucido') {
+                    previewMarcadorColadoBadge.style.borderColor = `rgba(${rb}, ${gb}, ${bb}, 0.45)`;
+                    previewMarcadorColadoBadge.style.color = corBorda;
+                    previewMarcadorColadoBadge.style.background = `rgba(${rb}, ${gb}, ${bb}, 0.16)`;
+                    previewMarcadorColadoBadge.style.opacity = '0.82';
+                } else {
+                    previewMarcadorColadoBadge.style.borderColor = corBorda;
+                    previewMarcadorColadoBadge.style.color = corBorda;
+                    previewMarcadorColadoBadge.style.background = 'rgba(255,255,255,0.88)';
+                    previewMarcadorColadoBadge.style.opacity = '1';
+                }
+            }
+        }
     }
 
     function atualizarVisibilidadeSubOpcoesMarcadorColado() {
         const ativo = optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true;
         if (optPresetMarcadorColado) optPresetMarcadorColado.disabled = !ativo;
+        if (optTipoContornoMarcadorColado) optTipoContornoMarcadorColado.disabled = !ativo;
         if (optCorContornoMarcadorColado) optCorContornoMarcadorColado.disabled = !ativo;
         if (optCorFundoMarcadorColado) optCorFundoMarcadorColado.disabled = !ativo;
         if (optEstiloBadgeMarcadorColado) optEstiloBadgeMarcadorColado.disabled = !ativo;
@@ -897,6 +1042,33 @@ document.addEventListener('DOMContentLoaded', () => {
             painelCustomizacaoMarcadorColado.style.opacity = ativo ? '1' : '0.45';
             painelCustomizacaoMarcadorColado.style.pointerEvents = ativo ? 'auto' : 'none';
         }
+        atualizarPreviewsVisuaisMarcadorEFlash();
+    }
+
+    function atualizarCalculoPomodoroUI() {
+        const ativo = optPomodoroAtivo ? optPomodoroAtivo.checked : false;
+        const proporcao = optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5;
+        const foco = optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25;
+        const ciclos = optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4;
+        const alivio = Math.max(1, Math.round(foco / proporcao));
+        const pausaMaior = Math.max(1, Math.round(alivio * ciclos));
+        if (lblPomodoroAlivioCalculado) lblPomodoroAlivioCalculado.textContent = `${alivio} min`;
+        if (lblPomodoroPausaMaiorCalculada) lblPomodoroPausaMaiorCalculada.textContent = `${pausaMaior} min`;
+        if (painelConfigPomodoro) {
+            painelConfigPomodoro.style.opacity = ativo ? '1' : '0.5';
+            painelConfigPomodoro.style.pointerEvents = ativo ? 'auto' : 'none';
+        }
+    }
+
+    function atualizarStatusProdutividadeUI() {
+        if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+        chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
+            if (chrome.runtime.lastError || !resp || !resp.ok || !resp.estado) return;
+            const st = resp.estado;
+            const faseMapa = { foco: 'Foco', alivio: 'Alívio', pausa_maior: 'Pausa Maior' };
+            const faseTxt = faseMapa[st.pomodoroFase] || 'Foco';
+            lblStatusProdutividadeTrabalho.textContent = `Hoje (${st.data}): Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pomodoro: ${faseTxt} (${st.pomodoroMinutosNaFase || 0} min, ciclo ${(st.pomodoroCicloAtual || 0) + 1})`;
+        });
     }
 
     function normalizarTempoFlashMs(valorBruto) {
@@ -955,8 +1127,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizarModoRetirarSelecao(val) {
         const v = String(val || '').trim().toLowerCase();
-        if (v === 'total' || v === 'interface' || v === 'nenhuma') return v;
-        return 'total_exceto_arrasto';
+        if (v === 'total_exceto_arrasto' || v === 'total' || v === 'interface' || v === 'nenhuma') return v;
+        return 'total';
     }
 
     function converterNivelFiltroParaIndice(nivel) {
@@ -1027,7 +1199,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.disabled = !ativoFoco;
         if (optMonitorarUrlOriginal) optMonitorarUrlOriginal.disabled = !ativoFoco;
         if (optMonitorarUrlAtual) optMonitorarUrlAtual.disabled = !ativoFoco;
-        if (optProtegerGuiasModificadas) optProtegerGuiasModificadas.disabled = !ativoFoco;
+
+        const recargaCondicionalAtiva = Boolean(
+            (optReutilizarAcaoRecarregarSeModificada && optReutilizarAcaoRecarregarSeModificada.checked) ||
+            (optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked) ||
+            (selectReutilizarAcaoConteudo && (selectReutilizarAcaoConteudo.value === 'recarregar_se_modificada' || selectReutilizarAcaoConteudo.value === 'recarregar_se_nao_modificada'))
+        );
+
+        if (optProtegerGuiasModificadas) {
+            optProtegerGuiasModificadas.disabled = !ativoFoco || recargaCondicionalAtiva;
+            const labelProteger = optProtegerGuiasModificadas.closest('label');
+            if (labelProteger) {
+                labelProteger.style.opacity = recargaCondicionalAtiva ? '0.5' : '1';
+                labelProteger.title = recargaCondicionalAtiva
+                    ? 'Desabilitado automaticamente enquanto uma ação de recarregamento condicional (por estado de modificação) estiver selecionada'
+                    : 'Protege o trabalho do operador: se a página existente tiver formulários em edição, minutas sendo digitadas ou navegação interna SPA, não a reutiliza para evitar descarte ou perda de dados';
+            }
+        }
         if (btnFecharDuplicadasAgora) btnFecharDuplicadasAgora.disabled = !ativoFoco;
 
         if (containerSubOpcoesReutilizarAbas) {
@@ -1083,10 +1271,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarVisibilidadeSubOpcoesOrdenacaoGuias() {
-        const ativo = optCriterioOrdenacaoGuias ? (optCriterioOrdenacaoGuias.value !== 'nenhum') : false;
-        if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = !ativo ? optSentidoOrdenacaoGuiasSwitch.checked : optSentidoOrdenacaoGuiasSwitch.checked;
+        const crit = optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore';
+        const ativo = crit !== 'nenhum';
         if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.disabled = !ativo;
         if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.disabled = !ativo;
+        if (containerFecharHierarquiaCascata) {
+            containerFecharHierarquiaCascata.style.display = (crit === 'hierarquia_arvore') ? 'inline-flex' : 'none';
+        }
         if (containerSubControlesOrdenacao) {
             containerSubControlesOrdenacao.style.opacity = ativo ? '1' : '0.45';
             containerSubControlesOrdenacao.style.pointerEvents = ativo ? 'auto' : 'none';
@@ -1166,10 +1357,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optBloquearNovasJanelas) optBloquearNovasJanelas.checked = (dados.bloquearNovasJanelas !== false);
             if (optPreservarJanelasAutenticacao) optPreservarJanelasAutenticacao.checked = (dados.preservarJanelasAutenticacao !== false);
             if (optAbaEmPrimeiroPlano) {
-                optAbaEmPrimeiroPlano.checked = Boolean(
+                optAbaEmPrimeiroPlano.checked = (
                     dados.abaEmPrimeiroPlano !== undefined
-                        ? dados.abaEmPrimeiroPlano
-                        : (dados.abaEmSegundoPlano === false)
+                        ? Boolean(dados.abaEmPrimeiroPlano)
+                        : (dados.abaEmSegundoPlano !== undefined ? (dados.abaEmSegundoPlano === false) : true)
                 );
             }
             if (optReutilizarAbasAbertas) optReutilizarAbasAbertas.checked = (dados.reutilizarAbasAbertas !== false);
@@ -1189,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 optReutilizarAcaoManter.checked = true;
             }
             atualizarVisibilidadeSubOpcoesReutilizar();
-            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = dados.criterioOrdenacaoGuias || 'nenhum';
+            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = dados.criterioOrdenacaoGuias || 'hierarquia_arvore';
             const sentidoEfetivo = dados.sentidoOrdenacaoGuias || 'esq_dir';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = sentidoEfetivo;
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (sentidoEfetivo === 'esq_dir');
@@ -1199,7 +1390,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     : 'Da Direita para a Esquerda (Z-A)';
             }
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = Boolean(dados.ordenarGuiasFixadas);
-            atualizarTextoBotaoAgrupamento();
+            if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = Boolean(dados.fecharHierarquiaEmCascata);
+            if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = Boolean(dados.modoBarraFavoritosSuperior);
             if (optDescarteGuiasInativas) optDescarteGuiasInativas.checked = false;
             if (optTempoInatividadeDescarteMinutos) {
                 optTempoInatividadeDescarteMinutos.value = String(dados.tempoInatividadeDescarteMinutos || '20');
@@ -1254,6 +1446,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optPresetMarcadorColado) {
                 optPresetMarcadorColado.value = normalizarPresetMarcadorColado(dados.presetMarcadorColado);
             }
+            if (optTipoContornoMarcadorColado) {
+                optTipoContornoMarcadorColado.value = normalizarTipoContornoMarcadorColado(dados.tipoContornoMarcadorColado);
+            }
             const presetAtivo = PRESETS_MARCADOR_CONTEUDO_COLADO[optPresetMarcadorColado ? optPresetMarcadorColado.value : 'verde_forense'] || PRESETS_MARCADOR_CONTEUDO_COLADO.verde_forense;
             if (optCorContornoMarcadorColado) {
                 optCorContornoMarcadorColado.value = normalizarCorHex(dados.corContornoMarcadorColado || presetAtivo.corContorno);
@@ -1264,6 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optEstiloBadgeMarcadorColado) {
                 optEstiloBadgeMarcadorColado.value = normalizarEstiloBadgeMarcadorColado(dados.estiloBadgeMarcadorColado);
             }
+            atualizarPreviewsVisuaisMarcadorEFlash();
             if (optModoRetirarSelecao) {
                 optModoRetirarSelecao.value = normalizarModoRetirarSelecao(dados.modoRetirarSelecao);
             }
@@ -1275,6 +1471,43 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optAcumuladorSeparador) {
                 optAcumuladorSeparador.value = normalizarSeparadorAcumulador(dados.separadorAcumulador);
             }
+            if (optAutoLimpezaCacheCookiesAtiva) {
+                optAutoLimpezaCacheCookiesAtiva.checked = dados.autoLimpezaCacheCookiesAtiva !== false;
+            }
+            if (optAutoLimpezaIdade) {
+                optAutoLimpezaIdade.value = ['12h', '1d', '3d', '7d', '15d', '30d'].includes(dados.autoLimpezaIdade) ? dados.autoLimpezaIdade : '7d';
+            }
+            if (optTempoTrabalhoCorridoAtivo) {
+                optTempoTrabalhoCorridoAtivo.checked = Boolean(dados.tempoTrabalhoCorridoAtivo);
+            }
+            if (optTempoTrabalhoCorridoHoras) {
+                const hc = Number(dados.tempoTrabalhoCorridoHoras);
+                optTempoTrabalhoCorridoHoras.value = (hc >= 1 && hc <= 12) ? String(hc) : '7';
+            }
+            if (optTempoTrabalhoAtivoAtivo) {
+                optTempoTrabalhoAtivoAtivo.checked = Boolean(dados.tempoTrabalhoAtivoAtivo);
+            }
+            if (optTempoTrabalhoAtivoHoras) {
+                const ha = Number(dados.tempoTrabalhoAtivoHoras);
+                optTempoTrabalhoAtivoHoras.value = (ha >= 1 && ha <= 12) ? String(ha) : '6';
+            }
+            if (optPomodoroAtivo) {
+                optPomodoroAtivo.checked = Boolean(dados.pomodoroAtivo);
+            }
+            if (optPomodoroProporcao) {
+                const prop = Number(dados.pomodoroProporcao);
+                optPomodoroProporcao.value = [5, 4.5, 4, 3.5, 3].includes(prop) ? String(prop) : '4.5';
+            }
+            if (optPomodoroFocoMinutos) {
+                const foco = Number(dados.pomodoroFocoMinutos);
+                optPomodoroFocoMinutos.value = (foco >= 25 && foco <= 90 && foco % 5 === 0) ? String(foco) : '25';
+            }
+            if (optPomodoroCiclos) {
+                const cic = Number(dados.pomodoroCiclos);
+                optPomodoroCiclos.value = [2, 3, 4, 5].includes(cic) ? String(cic) : '4';
+            }
+            atualizarCalculoPomodoroUI();
+            atualizarStatusProdutividadeUI();
 
             const urlsFiltradas = Array.isArray(dados.urlsTurbo)
                 ? dados.urlsTurbo.filter(u => u && u !== '<all_urls>')
@@ -1385,6 +1618,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const corFlash = optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : COR_PADRAO_FLASH_BORDER;
         const marcadorColadoAtivo = optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true;
         const presetMarcador = optPresetMarcadorColado ? normalizarPresetMarcadorColado(optPresetMarcadorColado.value) : 'verde_forense';
+        const tipoContornoMarcador = optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido';
         const corContornoMarcador = optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : COR_PADRAO_FLASH_BORDER;
         const corFundoMarcador = optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : COR_PADRAO_FUNDO_MARCADOR;
         const estiloBadgeMarcador = optEstiloBadgeMarcadorColado ? normalizarEstiloBadgeMarcadorColado(optEstiloBadgeMarcadorColado.value) : 'sobrescrito';
@@ -1426,9 +1660,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             : 'manter'))),
             monitorarUrlOriginalAbertura: optMonitorarUrlOriginal ? optMonitorarUrlOriginal.checked : false,
             monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
-            criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'nenhum',
+            criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
             sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
             ordenarGuiasFixadas: optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false,
+            fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
+            modoBarraFavoritosSuperior: optModoBarraFavoritosSuperior ? optModoBarraFavoritosSuperior.checked : false,
             descarteGuiasInativasAtivo: false,
             tempoInatividadeDescarteMinutos: optTempoInatividadeDescarteMinutos ? Number(optTempoInatividadeDescarteMinutos.value) : 20,
             validacaoMatematicaAtiva: validacaoAtivaEfetiva,
@@ -1443,12 +1679,23 @@ document.addEventListener('DOMContentLoaded', () => {
             corFlashBorder: corFlash,
             marcadorConteudoColadoAtivo: marcadorColadoAtivo,
             presetMarcadorColado: presetMarcador,
+            tipoContornoMarcadorColado: tipoContornoMarcador,
             corContornoMarcadorColado: corContornoMarcador,
             corFundoMarcadorColado: corFundoMarcador,
             estiloBadgeMarcadorColado: estiloBadgeMarcador,
-            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total_exceto_arrasto',
+            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total',
             minimoCaracteresInterface: optMinimoCaracteresInterface ? (parseInt(optMinimoCaracteresInterface.value, 10) || 0) : 5,
             separadorAcumulador: sepValor,
+            autoLimpezaCacheCookiesAtiva: optAutoLimpezaCacheCookiesAtiva ? optAutoLimpezaCacheCookiesAtiva.checked : true,
+            autoLimpezaIdade: optAutoLimpezaIdade ? optAutoLimpezaIdade.value : '7d',
+            tempoTrabalhoCorridoAtivo: optTempoTrabalhoCorridoAtivo ? optTempoTrabalhoCorridoAtivo.checked : false,
+            tempoTrabalhoCorridoHoras: optTempoTrabalhoCorridoHoras ? (Number(optTempoTrabalhoCorridoHoras.value) || 7) : 7,
+            tempoTrabalhoAtivoAtivo: optTempoTrabalhoAtivoAtivo ? optTempoTrabalhoAtivoAtivo.checked : false,
+            tempoTrabalhoAtivoHoras: optTempoTrabalhoAtivoHoras ? (Number(optTempoTrabalhoAtivoHoras.value) || 6) : 6,
+            pomodoroAtivo: optPomodoroAtivo ? optPomodoroAtivo.checked : false,
+            pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5,
+            pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
+            pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4,
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
             regrasMapeamentoElementos: Array.isArray(regrasMapeamentoAtuais) ? regrasMapeamentoAtuais : [...PADROES_FABRICA_REGRAS_MAPEAMENTO]
         };
@@ -1522,11 +1769,16 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (optReutilizarAcaoManter) optReutilizarAcaoManter.checked = true;
         }
         salvarConfiguracoes();
+        atualizarVisibilidadeSubOpcoesReutilizar();
     });
-    adicionarOuvinteSeguro(optReutilizarAcaoManter, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optReutilizarAcaoRecarregar, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optReutilizarAcaoRecarregarSeModificada, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optReutilizarAcaoRecarregarSeNaoModificada, 'change', salvarConfiguracoes);
+    const aoAlterarAcaoConteudoReutilizar = () => {
+        atualizarVisibilidadeSubOpcoesReutilizar();
+        salvarConfiguracoes();
+    };
+    adicionarOuvinteSeguro(optReutilizarAcaoManter, 'change', aoAlterarAcaoConteudoReutilizar);
+    adicionarOuvinteSeguro(optReutilizarAcaoRecarregar, 'change', aoAlterarAcaoConteudoReutilizar);
+    adicionarOuvinteSeguro(optReutilizarAcaoRecarregarSeModificada, 'change', aoAlterarAcaoConteudoReutilizar);
+    adicionarOuvinteSeguro(optReutilizarAcaoRecarregarSeNaoModificada, 'change', aoAlterarAcaoConteudoReutilizar);
 
     /* Garantir que ao menos uma opção de monitoramento permaneça ativa (não permitir ambas desmarcadas) */
     adicionarOuvinteSeguro(optMonitorarUrlOriginal, 'change', () => {
@@ -1617,9 +1869,91 @@ document.addEventListener('DOMContentLoaded', () => {
     adicionarOuvinteSeguro(optOrdenarGuiasFixadas, 'change', () => {
         salvarConfiguracoes();
         if (optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum') {
-            btnOrdenarGuiasAgora.click();
+            try {
+                chrome.runtime.sendMessage({
+                    acao: 'ordenarGuiasAgora',
+                    criterio: optCriterioOrdenacaoGuias.value,
+                    sentido: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
+                    ordenarFixadas: optOrdenarGuiasFixadas.checked
+                });
+            } catch (_) { }
         }
     });
+
+    adicionarOuvinteSeguro(optFecharHierarquiaEmCascata, 'change', salvarConfiguracoes);
+
+    adicionarOuvinteSeguro(optModoBarraFavoritosSuperior, 'change', () => {
+        salvarConfiguracoes();
+        if (feedbackAparenciaChrome) {
+            feedbackAparenciaChrome.textContent = optModoBarraFavoritosSuperior.checked
+                ? 'Preferência salva! Use Ctrl+Shift+B ou Aparência do Chrome para exibir a barra.'
+                : 'Preferência salva.';
+            feedbackAparenciaChrome.style.display = 'inline';
+            setTimeout(() => { if (feedbackAparenciaChrome) feedbackAparenciaChrome.style.display = 'none'; }, 4000);
+        }
+    });
+
+    adicionarOuvinteSeguro(btnRestaurarBarraFerramentasPadrao, 'click', () => {
+        if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = false;
+        salvarConfiguracoes();
+        if (feedbackAparenciaChrome) {
+            feedbackAparenciaChrome.textContent = 'Preferência de barra de ferramentas restaurada ao padrão.';
+            feedbackAparenciaChrome.style.display = 'inline';
+            setTimeout(() => { if (feedbackAparenciaChrome) feedbackAparenciaChrome.style.display = 'none'; }, 3500);
+        }
+    });
+
+    adicionarOuvinteSeguro(btnAbrirAparenciaChrome, 'click', () => {
+        try {
+            chrome.runtime.sendMessage({ acao: 'abrirPaginaAparenciaChrome' });
+        } catch (_) { }
+    });
+
+    if (btnTestarCaixaEntradaRapida) {
+        adicionarOuvinteSeguro(btnTestarCaixaEntradaRapida, 'click', () => {
+            try {
+                if (typeof window.JusGovCaixaEntradaRapida === 'function') {
+                    if (!window.__jusgovCaixaTesteOptions) {
+                        window.__jusgovCaixaTesteOptions = new window.JusGovCaixaEntradaRapida({ ativo: true });
+                    }
+                    window.__jusgovCaixaTesteOptions.abrirCaixa();
+                } else {
+                    exibirToast('Módulo da Caixa de Entrada Rápida não carregado.');
+                }
+            } catch (_) { }
+        });
+    }
+
+    if (btnTestarAdicaoManualMapeamento) {
+        adicionarOuvinteSeguro(btnTestarAdicaoManualMapeamento, 'click', () => {
+            try {
+                if (typeof window.JusGovDialogoMapeamentoRegra === 'function') {
+                    const dlg = new window.JusGovDialogoMapeamentoRegra();
+                    dlg.abrirModal(
+                        document.body,
+                        { cssSimples: '', xpathRel: '', xpathAbs: '', seletorCss: '', seletorCss2: '' },
+                        {
+                            modoManualVazio: true,
+                            aoSalvarRegras: (regrasNovas) => {
+                                if (Array.isArray(regrasNovas) && regrasNovas.length > 0) {
+                                    regrasNovas.forEach((rn) => {
+                                        if (rn && rn.expressao && rn.expressao.trim()) {
+                                            regrasMapeamentoAtuais.push(rn);
+                                        }
+                                    });
+                                    renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
+                                    salvarRegrasMapeamento();
+                                    exibirToast('Regra manual adicionada e salva!');
+                                }
+                            }
+                        }
+                    );
+                } else {
+                    exibirToast('Módulo de diálogo de mapeamento não carregado.');
+                }
+            } catch (_) { }
+        });
+    }
 
     adicionarOuvinteSeguro(optDescarteGuiasInativas, 'change', () => {
         atualizarEstadoVisualOpcoesDescarte();
@@ -1644,95 +1978,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_) { }
     });
 
-    adicionarOuvinteSeguro(btnOrdenarGuiasAgora, 'click', () => {
-        try {
-            salvarConfiguracoes();
-            const crit = (optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum')
-                ? optCriterioOrdenacaoGuias.value
-                : 'dominio';
-            const sent = optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir';
-            const fix = optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false;
-
-            chrome.runtime.sendMessage({
-                acao: 'ordenarGuiasAgora',
-                criterio: crit,
-                sentido: sent,
-                ordenarFixadas: fix
-            }, (res) => {
-                if (feedbackAcoesGuias) {
-                    feedbackAcoesGuias.textContent = 'Guias ordenadas com sucesso!';
-                    feedbackAcoesGuias.style.display = 'inline';
-                    setTimeout(() => { if (feedbackAcoesGuias) feedbackAcoesGuias.style.display = 'none'; }, 3000);
-                }
-            });
-        } catch (_) { }
-    });
-
-    /* Funcao auxiliar para sincronizar dinamicamente o texto do botao de agrupamento (Switch Agrupar <-> Desagrupar) */
-    async function atualizarTextoBotaoAgrupamento() {
-        if (!btnAgruparDominioAgora || !chrome.tabs || typeof chrome.tabs.query !== 'function') return;
-        try {
-            const abas = await chrome.tabs.query({ currentWindow: true });
-            const temGrupos = abas && abas.some(t => t.groupId !== undefined && t.groupId > 0);
-            if (temGrupos) {
-                btnAgruparDominioAgora.textContent = 'Desagrupar Todas as Guias';
-            } else {
-                btnAgruparDominioAgora.textContent = 'Agrupar por Domínio Agora (Tab Groups)';
-            }
-        } catch (_) { }
-    }
-
-    /* Botao Switch Unico: Agrupar por Dominio Agora <-> Desagrupar Todas as Guias */
-    adicionarOuvinteSeguro(btnAgruparDominioAgora, 'click', async () => {
-        try {
-            let temGrupos = false;
-            if (chrome.tabs && typeof chrome.tabs.query === 'function') {
-                const abas = await chrome.tabs.query({ currentWindow: true });
-                temGrupos = abas && abas.some(t => t.groupId !== undefined && t.groupId > 0);
-            }
-            if (temGrupos) {
-                chrome.runtime.sendMessage({ acao: 'desagruparGuiasAgora' }, (res) => {
-                    const total = res ? res.totalDesagrupadas || 0 : 0;
-                    btnAgruparDominioAgora.textContent = 'Agrupar por Domínio Agora (Tab Groups)';
-                    atualizarTextoBotaoAgrupamento();
-                    if (feedbackAcoesGuias) {
-                        feedbackAcoesGuias.textContent = (total > 0)
-                            ? `${total} ${total === 1 ? 'guia desagrupada' : 'guias desagrupadas'} com sucesso!`
-                            : 'Guias desagrupadas com sucesso!';
-                        feedbackAcoesGuias.style.display = 'inline';
-                        setTimeout(() => { if (feedbackAcoesGuias) feedbackAcoesGuias.style.display = 'none'; }, 3000);
-                    }
-                });
-            } else {
-                chrome.runtime.sendMessage({ acao: 'agruparDominioAgora' }, () => {
-                    btnAgruparDominioAgora.textContent = 'Desagrupar Todas as Guias';
-                    atualizarTextoBotaoAgrupamento();
-                    if (feedbackAcoesGuias) {
-                        feedbackAcoesGuias.textContent = 'Abas agrupadas por domínio (Chrome Tab Groups)!';
-                        feedbackAcoesGuias.style.display = 'inline';
-                        setTimeout(() => { if (feedbackAcoesGuias) feedbackAcoesGuias.style.display = 'none'; }, 3000);
-                    }
-                });
-            }
-        } catch (_) { }
-    });
-
-    adicionarOuvinteSeguro(btnDesagruparGuiasAgora, 'click', () => {
-        try {
-            chrome.runtime.sendMessage({ acao: 'desagruparGuiasAgora' }, (res) => {
-                const total = res ? res.totalDesagrupadas || 0 : 0;
-                if (btnAgruparDominioAgora) btnAgruparDominioAgora.textContent = 'Agrupar por Domínio Agora (Tab Groups)';
-                if (feedbackAcoesGuias) {
-                    feedbackAcoesGuias.textContent = (total > 0)
-                        ? `${total} ${total === 1 ? 'guia desagrupada' : 'guias desagrupadas'} com sucesso!`
-                        : 'Nenhuma guia agrupada na janela ativa.';
-                    feedbackAcoesGuias.style.display = 'inline';
-                    setTimeout(() => { if (feedbackAcoesGuias) feedbackAcoesGuias.style.display = 'none'; }, 3000);
-                }
-            });
-        } catch (_) { }
-    });
-
     adicionarOuvinteSeguro(btnRestaurarOrdemGuiasPadrao, 'click', () => {
         try {
             if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = 'nenhum';
@@ -1740,7 +1985,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = true;
             if (lblSentidoOrdenacaoGuias) lblSentidoOrdenacaoGuias.textContent = 'Da Esquerda para a Direita (A-Z)';
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = false;
-            if (btnAgruparDominioAgora) btnAgruparDominioAgora.textContent = 'Agrupar por Domínio Agora (Tab Groups)';
+            if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = false;
+            atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
             salvarConfiguracoes();
             chrome.runtime.sendMessage({ acao: 'restaurarOrdemGuiasPadrao' }, () => {
                 if (feedbackAcoesGuias) {
@@ -1801,9 +2047,13 @@ document.addEventListener('DOMContentLoaded', () => {
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optCorFlashBorder, 'input', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
         salvarConfiguracoesDebounced(250);
     });
-    adicionarOuvinteSeguro(optCorFlashBorder, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optCorFlashBorder, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
     adicionarOuvinteSeguro(optMarcadorConteudoColadoAtivo, 'change', () => {
         atualizarVisibilidadeSubOpcoesMarcadorColado();
         salvarConfiguracoes();
@@ -1813,19 +2063,94 @@ document.addEventListener('DOMContentLoaded', () => {
         const presetCores = PRESETS_MARCADOR_CONTEUDO_COLADO[presetChave] || PRESETS_MARCADOR_CONTEUDO_COLADO.verde_forense;
         if (optCorContornoMarcadorColado) optCorContornoMarcadorColado.value = presetCores.corContorno;
         if (optCorFundoMarcadorColado) optCorFundoMarcadorColado.value = presetCores.corFundo;
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optTipoContornoMarcadorColado, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optCorContornoMarcadorColado, 'input', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
         salvarConfiguracoesDebounced(250);
     });
-    adicionarOuvinteSeguro(optCorContornoMarcadorColado, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optCorContornoMarcadorColado, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
     adicionarOuvinteSeguro(optCorFundoMarcadorColado, 'input', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
         salvarConfiguracoesDebounced(250);
     });
-    adicionarOuvinteSeguro(optCorFundoMarcadorColado, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optEstiloBadgeMarcadorColado, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optCorFundoMarcadorColado, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optEstiloBadgeMarcadorColado, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
+    document.querySelectorAll('.paleta-cores-basicas .btn-swatch-cor').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const paleta = btn.closest('.paleta-cores-basicas');
+            const targetId = paleta ? paleta.getAttribute('data-target-color') : '';
+            const cor = btn.getAttribute('data-cor');
+            const inputAlvo = targetId ? document.getElementById(targetId) : null;
+            if (inputAlvo && cor) {
+                inputAlvo.value = cor;
+                atualizarPreviewsVisuaisMarcadorEFlash();
+                salvarConfiguracoes();
+            }
+        });
+    });
     adicionarOuvinteSeguro(optModoRetirarSelecao, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optMinimoCaracteresInterface, 'change', salvarConfiguracoes);
+
+    /* Privacidade e Produtividade (Secoes 6.141 e 6.142) */
+    adicionarOuvinteSeguro(optAutoLimpezaCacheCookiesAtiva, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optAutoLimpezaIdade, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(btnExecutarLimpezaCacheAgora, 'click', () => {
+        if (lblStatusLimpezaCache) lblStatusLimpezaCache.textContent = 'Executando limpeza de cache e cookies...';
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ acao: 'EXECUTAR_AUTO_LIMPEZA_AGORA' }, (resp) => {
+                if (chrome.runtime.lastError || !resp || !resp.ok) {
+                    if (lblStatusLimpezaCache) lblStatusLimpezaCache.textContent = 'Não foi possível executar a limpeza agora.';
+                } else {
+                    const hora = new Date(resp.timestamp || Date.now()).toLocaleTimeString();
+                    if (lblStatusLimpezaCache) lblStatusLimpezaCache.textContent = `Limpeza concluída às ${hora}.`;
+                }
+            });
+        }
+    });
+    adicionarOuvinteSeguro(optTempoTrabalhoCorridoAtivo, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optTempoTrabalhoCorridoHoras, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optTempoTrabalhoAtivoAtivo, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optTempoTrabalhoAtivoHoras, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optPomodoroAtivo, 'change', () => {
+        atualizarCalculoPomodoroUI();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optPomodoroProporcao, 'change', () => {
+        atualizarCalculoPomodoroUI();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optPomodoroFocoMinutos, 'change', () => {
+        atualizarCalculoPomodoroUI();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optPomodoroCiclos, 'change', () => {
+        atualizarCalculoPomodoroUI();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(btnResetarContadoresTrabalho, 'click', () => {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ acao: 'RESETAR_CONTADORES_TRABALHO' }, (resp) => {
+                if (!chrome.runtime.lastError && resp && resp.ok) {
+                    atualizarStatusProdutividadeUI();
+                }
+            });
+        }
+    });
 
     /* Validacao e selecao imediata do Separador do Modo Acumulador */
     if (optAcumuladorSeparador) {
@@ -1924,12 +2249,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* Passo 4.3: Restaurar Padroes de Fabrica, zerando contadores locais e dados extras */
-    adicionarOuvinteSeguro(btnRestaurarPadroes, 'click', () => {
+    adicionarOuvinteSeguro(btnRestaurarPadroes, 'click', async () => {
         /* O prompt 'confirm' do SO nao renderiza HTML Entities, entao a string deve ser ASCII puro e legivel */
         if (window.confirm('Deseja restaurar todas as configuracoes para os padroes originais de fabrica e apagar contadores e dados extras?')) {
             if (selectModoTurbo) selectModoTurbo.value = 'global';
             if (selectComportamentoIcone) selectComportamentoIcone.value = 'popup';
-            if (checkOpcaoRemoverFormatacoes) checkOpcaoRemoverFormatacoes.checked = true;
+            if (checkOpcaoRemoverFormatacoes) checkOpcaoRemoverFormatacoes.checked = false;
             if (optNivelFiltroEstilos) optNivelFiltroEstilos.value = '1';
             atualizarRotuloNivelFiltro();
             atualizarEstadoOfuscamentoNivelFiltro();
@@ -1947,7 +2272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optCaixaEntradaRapida) optCaixaEntradaRapida.checked = true;
             if (optBloquearNovasJanelas) optBloquearNovasJanelas.checked = true;
             if (optPreservarJanelasAutenticacao) optPreservarJanelasAutenticacao.checked = true;
-            if (optAbaEmPrimeiroPlano) optAbaEmPrimeiroPlano.checked = false;
+            if (optAbaEmPrimeiroPlano) optAbaEmPrimeiroPlano.checked = true;
             if (optReutilizarAbasAbertas) optReutilizarAbasAbertas.checked = true;
             if (optReutilizarFocoPrimeiroPlano) optReutilizarFocoPrimeiroPlano.checked = true;
             if (optProtegerGuiasModificadas) optProtegerGuiasModificadas.checked = true;
@@ -1956,12 +2281,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optMonitorarUrlOriginal) optMonitorarUrlOriginal.checked = false;
             if (optMonitorarUrlAtual) optMonitorarUrlAtual.checked = true;
             atualizarVisibilidadeSubOpcoesReutilizar();
-            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = 'nenhum';
+            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = 'hierarquia_arvore';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = 'esq_dir';
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = true;
             if (lblSentidoOrdenacaoGuias) lblSentidoOrdenacaoGuias.textContent = 'Da Esquerda para a Direita (A-Z)';
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = false;
-            if (btnAgruparDominioAgora) btnAgruparDominioAgora.textContent = 'Agrupar por Domínio Agora (Tab Groups)';
+            if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = false;
+            if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = false;
+            atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
             if (optDescarteGuiasInativas) optDescarteGuiasInativas.checked = false;
             if (optValidacaoMatematicaAtiva) optValidacaoMatematicaAtiva.checked = true;
             if (optTempoConferenciaDocumentos) {
@@ -1983,23 +2310,46 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optCorFlashBorder) optCorFlashBorder.value = COR_PADRAO_FLASH_BORDER;
             if (optMarcadorConteudoColadoAtivo) optMarcadorConteudoColadoAtivo.checked = true;
             if (optPresetMarcadorColado) optPresetMarcadorColado.value = 'verde_forense';
+            if (optTipoContornoMarcadorColado) optTipoContornoMarcadorColado.value = 'solido';
             if (optCorContornoMarcadorColado) optCorContornoMarcadorColado.value = COR_PADRAO_FLASH_BORDER;
             if (optCorFundoMarcadorColado) optCorFundoMarcadorColado.value = COR_PADRAO_FUNDO_MARCADOR;
             if (optEstiloBadgeMarcadorColado) optEstiloBadgeMarcadorColado.value = 'sobrescrito';
-            if (optModoRetirarSelecao) optModoRetirarSelecao.value = 'total_exceto_arrasto';
+            if (optModoRetirarSelecao) optModoRetirarSelecao.value = 'total';
             if (optAcumuladorSeparador) optAcumuladorSeparador.value = ';';
             if (optAtalhoF1GeminiAtivo) optAtalhoF1GeminiAtivo.checked = true;
             if (optPromptF1Gemini) optPromptF1Gemini.value = PROMPT_F1_GEMINI_PADRAO;
+            if (optAutoLimpezaCacheCookiesAtiva) optAutoLimpezaCacheCookiesAtiva.checked = true;
+            if (optAutoLimpezaIdade) optAutoLimpezaIdade.value = '7d';
+            if (optTempoTrabalhoCorridoAtivo) optTempoTrabalhoCorridoAtivo.checked = false;
+            if (optTempoTrabalhoCorridoHoras) optTempoTrabalhoCorridoHoras.value = '7';
+            if (optTempoTrabalhoAtivoAtivo) optTempoTrabalhoAtivoAtivo.checked = false;
+            if (optTempoTrabalhoAtivoHoras) optTempoTrabalhoAtivoHoras.value = '6';
+            if (optPomodoroAtivo) optPomodoroAtivo.checked = false;
+            if (optPomodoroProporcao) optPomodoroProporcao.value = '4.5';
+            if (optPomodoroFocoMinutos) optPomodoroFocoMinutos.value = '25';
+            if (optPomodoroCiclos) optPomodoroCiclos.value = '4';
+            atualizarCalculoPomodoroUI();
             if (textoUrlsTurbo) textoUrlsTurbo.value = PADROES_FABRICA_TURBO.join('\n');
             if (lblTotalCopias) lblTotalCopias.textContent = '0';
             if (lblTotalAlertas) lblTotalAlertas.textContent = '0';
             atualizarTodasVisibilidadesCascata();
 
+            let regrasPadraoUsuario = [];
+            try {
+                const respInt = await fetch(chrome.runtime.getURL('src/cfg/interface.json'));
+                const dadosInt = await respInt.json();
+                if (Array.isArray(dadosInt)) {
+                    regrasPadraoUsuario = dadosInt
+                        .filter(r => r && r.origem === 'usuario')
+                        .map(({ origem, ...resto }) => ({ ...resto }));
+                }
+            } catch (_) { }
+
             const padroesFabricaCompletos = {
                 modoTurbo: 'global',
                 comportamentoCliqueIcone: 'popup',
-                manterFormatacaoBasica: false,
-                nivelFiltroFormatacao: 'texto_puro',
+                manterFormatacaoBasica: true,
+                nivelFiltroFormatacao: 'basico',
                 ativoAmpuletas: true,
                 converterCabecalhoPjeAtivo: true,
                 selecaoEditavelAtiva: true,
@@ -2011,8 +2361,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 navegacaoTecladoCamposAtiva: true,
                 bloquearNovasJanelas: true,
                 preservarJanelasAutenticacao: true,
-                abaEmPrimeiroPlano: false,
-                abaEmSegundoPlano: true,
+                abaEmPrimeiroPlano: true,
+                abaEmSegundoPlano: false,
                 reutilizarAbasAbertas: true,
                 reutilizarAbasFocoPrimeiroPlano: true,
                 protegerGuiasModificadas: true,
@@ -2030,20 +2380,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 corFlashBorder: COR_PADRAO_FLASH_BORDER,
                 marcadorConteudoColadoAtivo: true,
                 presetMarcadorColado: 'verde_forense',
+                tipoContornoMarcadorColado: 'solido',
                 corContornoMarcadorColado: COR_PADRAO_FLASH_BORDER,
                 corFundoMarcadorColado: COR_PADRAO_FUNDO_MARCADOR,
                 estiloBadgeMarcadorColado: 'sobrescrito',
-                modoRetirarSelecao: 'total_exceto_arrasto',
+                modoRetirarSelecao: 'total',
                 minimoCaracteresInterface: 5,
                 separadorAcumulador: ';',
                 atalhoF1GeminiAtivo: true,
                 promptF1Gemini: PROMPT_F1_GEMINI_PADRAO,
+                autoLimpezaCacheCookiesAtiva: true,
+                autoLimpezaIdade: '7d',
+                tempoTrabalhoCorridoAtivo: false,
+                tempoTrabalhoCorridoHoras: 7,
+                tempoTrabalhoAtivoAtivo: false,
+                tempoTrabalhoAtivoHoras: 6,
+                pomodoroAtivo: false,
+                pomodoroProporcao: 4.5,
+                pomodoroFocoMinutos: 25,
+                pomodoroCiclos: 4,
                 urlsTurbo: [...PADROES_FABRICA_TURBO],
                 urlsAmpuletas: [...PADROES_FABRICA_AMPULETAS],
-                regrasMapeamentoElementos: []
+                regrasMapeamentoElementos: regrasPadraoUsuario
             };
-            regrasMapeamentoAtuais = [];
+            regrasMapeamentoAtuais = [...regrasPadraoUsuario];
             renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
+            marcarAlteracoesPendentesMapeamento(false);
             atualizarIconeModoOptions('global');
 
             /* Limpar storage local e de sessao para zerar contadores operacionais e dados residuais */
@@ -2060,14 +2422,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (chrome.storage.session) {
                     chrome.storage.session.clear().catch(() => { });
                 }
-                /* Limpar storage sync para remover todas as chaves extras/orfas e gravar os padroes puros */
+                /* Gravar os padroes completos atomicamente primeiro e remover apenas chaves orfas (evita race condition com background.js) */
                 if (chrome.storage.sync) {
-                    chrome.storage.sync.clear(() => {
-                        chrome.storage.sync.set(padroesFabricaCompletos, () => {
-                            if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                                chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                    const chavesPadrao = new Set(Object.keys(padroesFabricaCompletos));
+                    chrome.storage.sync.set(padroesFabricaCompletos, () => {
+                        chrome.storage.sync.get(null, (todasChaves) => {
+                            const chavesOrfas = Object.keys(todasChaves || {}).filter(k => !chavesPadrao.has(k));
+                            const finalizar = () => {
+                                if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                                }
+                                exibirToast('Padrões de fábrica restaurados e dados extras apagados com sucesso!');
+                            };
+                            if (chavesOrfas.length > 0) {
+                                chrome.storage.sync.remove(chavesOrfas, finalizar);
+                            } else {
+                                finalizar();
                             }
-                            exibirToast('Padrões de fábrica restaurados e dados extras apagados com sucesso!');
                         });
                     });
                     return;
@@ -2115,9 +2486,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             : 'manter'))),
             monitorarUrlOriginalAbertura: optMonitorarUrlOriginal ? optMonitorarUrlOriginal.checked : false,
             monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
-            criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'nenhum',
+            criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
             sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
             ordenarGuiasFixadas: optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false,
+            fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
+            modoBarraFavoritosSuperior: optModoBarraFavoritosSuperior ? optModoBarraFavoritosSuperior.checked : false,
             descarteGuiasInativasAtivo: false,
             tempoInatividadeDescarteMinutos: optTempoInatividadeDescarteMinutos ? Number(optTempoInatividadeDescarteMinutos.value) : 20,
             validacaoMatematicaAtiva: obterTempoConferenciaMsDoSlider() !== 0,
@@ -2129,10 +2502,11 @@ document.addEventListener('DOMContentLoaded', () => {
             corFlashBorder: optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : COR_PADRAO_FLASH_BORDER,
             marcadorConteudoColadoAtivo: optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true,
             presetMarcadorColado: optPresetMarcadorColado ? normalizarPresetMarcadorColado(optPresetMarcadorColado.value) : 'verde_forense',
+            tipoContornoMarcadorColado: optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido',
             corContornoMarcadorColado: optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : COR_PADRAO_FLASH_BORDER,
             corFundoMarcadorColado: optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : COR_PADRAO_FUNDO_MARCADOR,
             estiloBadgeMarcadorColado: optEstiloBadgeMarcadorColado ? normalizarEstiloBadgeMarcadorColado(optEstiloBadgeMarcadorColado.value) : 'sobrescrito',
-            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total_exceto_arrasto',
+            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total',
             minimoCaracteresInterface: optMinimoCaracteresInterface ? (parseInt(optMinimoCaracteresInterface.value, 10) || 0) : 5,
             separadorAcumulador: optAcumuladorSeparador ? normalizarSeparadorAcumulador(optAcumuladorSeparador.value) : ';',
             atalhoF1GeminiAtivo: optAtalhoF1GeminiAtivo ? optAtalhoF1GeminiAtivo.checked : true,
@@ -2303,6 +2677,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeof json.presetMarcadorColado === 'string' && optPresetMarcadorColado) {
                         optPresetMarcadorColado.value = normalizarPresetMarcadorColado(json.presetMarcadorColado);
                     }
+                    if (typeof json.tipoContornoMarcadorColado === 'string' && optTipoContornoMarcadorColado) {
+                        optTipoContornoMarcadorColado.value = normalizarTipoContornoMarcadorColado(json.tipoContornoMarcadorColado);
+                    }
                     if (typeof json.corContornoMarcadorColado === 'string' && optCorContornoMarcadorColado) {
                         optCorContornoMarcadorColado.value = normalizarCorHex(json.corContornoMarcadorColado);
                     }
@@ -2388,13 +2765,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const url = chrome.runtime.getURL('src/cfg/interface.json');
                 const resp = await fetch(url);
                 const internas = await resp.json();
-                renderizarListaRegrasMapeamento(Array.isArray(internas) ? internas : [], true);
+                const apenasInternas = Array.isArray(internas) ? internas.filter(r => r && r.origem !== 'usuario') : [];
+                renderizarListaRegrasMapeamento(apenasInternas, true);
             } catch (_) {
                 if (containerListaRegrasMapeamento) {
                     containerListaRegrasMapeamento.innerHTML = '<div style="color: #94a3b8; font-size: 12px;">Não foi possível carregar interface.json.</div>';
                 }
             }
         });
+    }
+
+    function marcarAlteracoesPendentesMapeamento(pendente) {
+        if (!btnSalvarRegrasMapeamento) return;
+        btnSalvarRegrasMapeamento.innerHTML = pendente ? '<span>💾</span> Salvar *' : '<span>💾</span> Salvar';
+        btnSalvarRegrasMapeamento.style.borderColor = pendente ? '#f59e0b' : '';
     }
 
     if (btnAdicionarRegraMapeamento) {
@@ -2406,10 +2790,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 tipo: 'interface',
                 observacao: '',
                 herdarFilhos: true,
-                ativo: true
+                ativo: true,
+                continuarProxima: false
             });
             renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-            salvarRegrasMapeamento();
+            marcarAlteracoesPendentesMapeamento(true);
         });
     }
 
@@ -2421,6 +2806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             salvarRegrasMapeamento();
+            marcarAlteracoesPendentesMapeamento(false);
             exibirToast('Regras de mapeamento salvas!');
         });
     }
@@ -3013,6 +3399,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (changes.presetMarcadorColado !== undefined && optPresetMarcadorColado) {
                     optPresetMarcadorColado.value = normalizarPresetMarcadorColado(changes.presetMarcadorColado.newValue);
+                }
+                if (changes.tipoContornoMarcadorColado !== undefined && optTipoContornoMarcadorColado) {
+                    optTipoContornoMarcadorColado.value = normalizarTipoContornoMarcadorColado(changes.tipoContornoMarcadorColado.newValue);
                 }
                 if (changes.corContornoMarcadorColado !== undefined && optCorContornoMarcadorColado) {
                     optCorContornoMarcadorColado.value = normalizarCorHex(changes.corContornoMarcadorColado.newValue);

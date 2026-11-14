@@ -249,74 +249,13 @@
                 tamanhoTotalBloco: texto.length
             };
 
-            if (numCliques >= 3) {
-                const res3 = this.#estagio5.resolverSelecaoTriploClique(mapaSimulado, idxZeroBased, this.#estagio1);
-                return res3 ? this.#filtros.higienizarTextoParaCopia(texto.substring(res3.inicio, res3.fim)) : '';
+            const motorBase = (typeof window !== 'undefined')
+                ? (window.JusGovCopiaSelecionar || window.JusGovMotorSelecaoTeste)
+                : null;
+            if (motorBase && typeof motorBase.simularCliqueEmTexto === 'function') {
+                return motorBase.simularCliqueEmTexto(texto, idxZeroBased, numCliques, ehAlt);
             }
-
-            const charNoCursor = texto[idxZeroBased] || '';
-            const charAnterior = idxZeroBased > 0 ? texto[idxZeroBased - 1] : '';
-
-            const cExt = (typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : {};
-            const tabAscii = cExt.TABELA_MASCARA_ASCII;
-            const masc = cExt.MASCARA_CARACTERE || {};
-
-            const ehEspaco = (ch) => {
-                if (!ch) return false;
-                const c = ch.charCodeAt(0);
-                if (tabAscii && c < 128) return (tabAscii[c] & masc.ESPACO_BRANCO) !== 0;
-                return c === 160 || /\s/.test(ch);
-            };
-
-            const ehAlfanum = (ch) => {
-                if (!ch) return false;
-                const c = ch.charCodeAt(0);
-                if (tabAscii && c < 128) return (tabAscii[c] & (masc.DIGITO | masc.LETRA_ASCII)) !== 0;
-                return /[\p{L}\p{N}]/u.test(ch);
-            };
-
-            const ehDelim = (ch) => {
-                if (!ch) return false;
-                const c = ch.charCodeAt(0);
-                return tabAscii && c < 128 && (tabAscii[c] & masc.DELIMITADOR_PAR) !== 0;
-            };
-
-            const ehAspas = (ch) => {
-                if (!ch) return false;
-                const c = ch.charCodeAt(0);
-                if (tabAscii && c < 128) return (tabAscii[c] & masc.DELIMITADOR_ASPAS) !== 0;
-                const aspas = cExt.CARACTERES_ASPAS_TODOS || '';
-                return aspas.indexOf(ch) !== -1;
-            };
-
-            const clicouEmEspaco = ehEspaco(charNoCursor) || (ehEspaco(charAnterior) && !ehAlfanum(charNoCursor));
-            const clicouEmDelimitadorOuAspas = ehDelim(charNoCursor) || ehDelim(charAnterior) || ehAspas(charNoCursor) || ehAspas(charAnterior);
-
-            let res = null;
-            if (numCliques === 2 || (ehAlt && numCliques === 1 && (clicouEmEspaco || clicouEmDelimitadorOuAspas))) {
-                if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
-                    res = this.#estagio4.tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
-                }
-                if (!res) res = this.#estagio2.tentarExpandirPadraoComposto(texto, idxZeroBased, true, true);
-                if (!res) res = this.#estagio2.tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
-                if (!res) res = this.#estagio2.tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
-                if (!res) res = this.#estagio4.tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
-                if (!res) res = this.#estagio3.expandirSentencaCompletaAtePonto(texto, idxZeroBased) || this.#estagio3.expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
-            } else if (clicouEmDelimitadorOuAspas) {
-                res = this.#estagio4.tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
-            } else if (clicouEmEspaco) {
-                res = this.#estagio3.tentarExpandirSentencaPorDoisPontos(texto, idxZeroBased);
-                if (!res) res = this.#estagio2.tentarExpandirPadraoComposto(texto, idxZeroBased, true, false);
-                if (!res) res = this.#estagio2.tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
-                if (!res) res = this.#estagio2.tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
-                if (!res) res = this.#estagio4.tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
-                if (!res) res = this.#estagio3.expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
-            } else {
-                res = this.#estagio2.tentarExpandirPadraoComposto(texto, idxZeroBased, false, false);
-                if (!res) res = this.#estagio1.expandirUnidadeAtomicaEstagio1(texto, idxZeroBased);
-            }
-
-            return res ? this.#filtros.higienizarTextoParaCopia(texto.substring(res.inicio, res.fim)) : '';
+            return '';
         }
     }
 

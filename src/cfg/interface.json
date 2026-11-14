@@ -1,93 +1,133 @@
 [
     {
-        "id": "interna_nav_toolbars",
+        "id": "interna_basico_html0_editaveis",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs, .nav-topo, .action-bar, .toolbar, .sidebar, .topbar, .breadcrumb",
-        "tipo": "interface",
-        "observacao": "Barras de navegação, menus e cabeçalhos de sistema",
+        "expressao": "input:not([type=\"button\"]):not([type=\"submit\"]):not([type=\"reset\"]):not([type=\"checkbox\"]):not([type=\"radio\"]):not([type=\"file\"]):not([type=\"image\"]):not([type=\"range\"]):not([type=\"color\"]):not([type=\"hidden\"]):not([readonly]):not([disabled]), textarea:not([readonly]):not([disabled]), [contenteditable]:not([contenteditable=\"false\"]), [role=\"textbox\"]:not([aria-readonly=\"true\"]):not([aria-disabled=\"true\"]), [role=\"searchbox\"]:not([aria-readonly=\"true\"]):not([aria-disabled=\"true\"])",
+        "tipo": "editavel",
+        "observacao": "Básico: Nível 0 (Formulários e Edição HTML) — Campos de entrada e regiões editáveis nativas (input textual, textarea, contenteditable, textbox)",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_modais_menus",
+        "id": "interna_basico_html1_controles_nativos",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".modal, .dialog, .dropdown, .popover, .context-menu, .mat-dialog, .p-dialog, .pje-modal, .drop-menu, .dropdown-menu, .dropdown-item, [aria-modal=\"true\"]",
+        "expressao": "a, button, select, option, optgroup, label, fieldset, legend, output, progress, meter, input[type=\"button\"], input[type=\"submit\"], input[type=\"reset\"], input[type=\"checkbox\"], input[type=\"radio\"], input[type=\"file\"], input[type=\"image\"], input[type=\"range\"], input[type=\"color\"]",
         "tipo": "interface",
-        "observacao": "Modais, diálogos, popovers e menus suspensos",
+        "observacao": "Básico: Nível 1 (Controles Interativos HTML) — Links, botões, seletores, rótulos de formulário e inputs não textuais",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_dropdowns_select",
+        "id": "interna_basico_html2_containers_ui",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".ui-selectonemenu, .select2, .p-dropdown, .mat-select, .ng-select, .ant-select, .form-select, .custom-select",
+        "expressao": "dialog, menu, details, summary, svg, canvas, video, audio",
         "tipo": "interface",
-        "observacao": "Componentes de seleção e caixas dropdown",
+        "observacao": "Básico: Nível 2 (Containers HTML UI e Mídia) — Diálogos, menus, acordeões (details/summary) e elementos multimídia/gráficos",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_badges_etiquetas",
+        "id": "interna_basico_html3_estrutural_ui",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".pje-etiquetas, .label-etiqueta, .label-info, .badge, .chip, .tag, .mais-detalhes, .tree, .card-header, .panel-heading, .btn",
+        "expressao": "nav, header, footer, aside",
         "tipo": "interface",
-        "observacao": "Etiquetas PJe, badges, chips, árvores e botões",
+        "observacao": "Básico: Nível 3 (Estrutura HTML5 de Interface) — Regiões de navegação, cabeçalho, rodapé e painel lateral",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_pje_cards_timeline",
+        "id": "interna_basico_html4_aria_interativos",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".ui-datalist, .datalist-content, .timeline, .item-timeline, .tarefa-card, .card-processo, .painel-tarefas, .pje-cabecalho, processo-datalist-card, ui-datalist",
+        "expressao": "[role=\"button\"], [role=\"link\"], [role=\"menu\"], [role=\"menuitem\"], [role=\"menuitemcheckbox\"], [role=\"menuitemradio\"], [role=\"menubar\"], [role=\"tab\"], [role=\"tablist\"], [role=\"switch\"], [role=\"combobox\"], [role=\"listbox\"], [role=\"option\"], [role=\"checkbox\"], [role=\"radio\"], [role=\"tree\"], [role=\"treeitem\"], [role=\"slider\"], [role=\"spinbutton\"], [role=\"scrollbar\"], [role=\"toolbar\"], [aria-haspopup][aria-expanded], [aria-pressed], [aria-checked]",
         "tipo": "interface",
-        "observacao": "Cards de processos, timeline e painéis de tarefas PJe",
+        "observacao": "Básico: Nível 4 (Semântica ARIA HTML) — Papéis e estados interativos acessíveis (botões, abas, menus, switches, seletores, árvores)",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_editores_toolbars",
+        "id": "interna_basico_html5_texto_inline",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": "[class*=\"cke_\"]:not(.cke_editable), [id^=\"cke_\"]:not(.cke_editable), .editor-toolbar-main, .ql-toolbar, .tox-toolbar, .tox-editor-header, .mce-toolbar",
-        "tipo": "interface",
-        "observacao": "Barras de ferramentas de editores ricos (CKEditor, TinyMCE, Quill)",
+        "expressao": "b, strong, i, em, u, ins, s, strike, del, sub, sup, mark, small, abbr, cite, q, dfn, kbd, samp, var, time, br",
+        "tipo": "textual",
+        "observacao": "Básico: Nível 5 (HTML Filtro 1 - Inline) — Formatação de caracteres e semântica em linha (b, strong, i, em, u, s, del, sub, sup, mark, small, abbr, time)",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": true
     },
     {
-        "id": "interna_ids_estruturais",
+        "id": "interna_basico_html6_texto_blocos",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": "[id*=\"polo\" i], [id*=\"detalhe\" i], [id*=\"navbar\" i], [id*=\"toolbar\" i], [id*=\"sidebar\" i], [id*=\"topbar\" i], [id*=\"menu\" i], [id*=\"header\" i]",
-        "tipo": "interface",
-        "observacao": "Contêineres estruturais por ID (polo, detalhe, menu, header)",
+        "expressao": "p, blockquote, ul, ol, li, dl, dt, dd, hr",
+        "tipo": "textual",
+        "observacao": "Básico: Nível 6 (HTML Filtro 2 - Parágrafos e Listas) — Blocos de texto corrido, citações e listas ordenadas/não ordenadas",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": true
     },
     {
-        "id": "interna_webcomponents_ui",
+        "id": "interna_basico_html7_texto_titulos_codigo",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": "mat-icon, g-icon, md-icon, [class*=\"-button\"], [class*=\"-btn\"], [class*=\"-picker\"], [class*=\"-switcher\"], [class*=\"-selector\"], [class*=\"-dropdown\"], [class*=\"-toggle\"], [class*=\"-toolbar\"], [class*=\"-menu\"]",
-        "tipo": "interface",
-        "observacao": "Ícones e Web Components de interface",
+        "expressao": "h1, h2, h3, h4, h5, h6, pre, code",
+        "tipo": "textual",
+        "observacao": "Básico: Nível 7 (HTML Filtro 3 - Títulos e Código) — Cabeçalhos documentais (h1 a h6) e trechos/blocos de código (pre, code)",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": true
+    },
+    {
+        "id": "interna_basico_html8_tabelas_documental",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "table, caption, colgroup, col, thead, tbody, tfoot, tr, th, td, figure, figcaption, address, article, section, main",
+        "tipo": "textual",
+        "observacao": "Básico: Nível 8 (HTML Filtro 4 - Tabelas e Documental) — Tabelas de dados (table, tr, th, td) e contêineres semânticos de leitura",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": true
+    },
+    {
+        "id": "interna_campos_editaveis_texto",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "rich-textarea:not([readonly]):not([disabled]), [data-slate-editor], [data-lexical-editor]",
+        "tipo": "editavel",
+        "observacao": "Editores customizados e web components de entrada textual (rich-textarea, Slate, Lexical)",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
     },
     {
         "id": "interna_leitura_editores_pdf",
         "tipoSeletor": "CSS (Simples)",
         "expressao": ".cke_editable, .pdfViewer, .textLayer, .pdf-container, pdf-viewer",
         "tipo": "textual",
-        "observacao": "Áreas de leitura documental, PDFs e editores editáveis",
+        "observacao": "Áreas de leitura documental, visualizadores de PDF e área editável de editores (CKEditor)",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
     },
     {
-        "id": "interna_controles_pdf",
+        "id": "interna_pdf_containers_extras",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": "viewer-toolbar, viewer-page-selector, viewer-pdf-sidenav, cr-icon-button, #toolbarviewer, #toolbarcontainer, #secondarytoolbar, #sidenav-container, #sidebarcontainer, #zoom-controls, #sidenavtoggle, #pageselector, .toolbarbutton, .doorhanger, .treeview",
-        "tipo": "interface",
-        "observacao": "Controles internos do visualizador de PDF e árvores de navegação",
+        "expressao": "embed[type*=\"pdf\"], object[type*=\"pdf\"], #viewerContainer, #viewercontainer, .page[data-page-number]",
+        "tipo": "textual",
+        "observacao": "Contêineres extras de leitura de documentos PDF embutidos",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_pdf_embutido_download_binario",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "iframe#frameBinario, iframe[src*=\"downloadBinario.seam\"]",
+        "tipo": "textual",
+        "observacao": "PDF embutido interno do PJe (downloadBinario.seam / frameBinario) e seus descendentes",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
     },
     {
         "id": "interna_tabelas_semiflexivel",
@@ -96,6 +136,140 @@
         "tipo": "semiflexivel",
         "observacao": "Cabeçalhos de processo e widgets semiflexíveis",
         "herdarFilhos": true,
-        "ativo": true
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_controles_pdf",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "viewer-toolbar, viewer-page-selector, viewer-pdf-sidenav, cr-icon-button, #toolbarviewer, #toolbarcontainer, #secondarytoolbar, #sidenav-container, #sidebarcontainer, #zoom-controls, #sidenavtoggle, #pageselector, .toolbarbutton, .doorhanger, .treeview",
+        "tipo": "interface",
+        "observacao": "Controles internos do visualizador de PDF e árvores de navegação",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_editores_toolbars",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[class*=\"cke_\"]:not(.cke_editable), [id^=\"cke_\"]:not(.cke_editable), .editor-toolbar-main, .ql-toolbar, .tox-toolbar, .tox-editor-header, .mce-toolbar",
+        "tipo": "interface",
+        "observacao": "Barras de ferramentas de editores ricos (CKEditor, TinyMCE, Quill)",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_nav_toolbars",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs, .nav-topo, .action-bar, .toolbar, .sidebar, .topbar, .breadcrumb",
+        "tipo": "interface",
+        "observacao": "Barras de navegação, menus e cabeçalhos de sistema",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_modais_menus",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".modal, .dialog, .dropdown, .popover, .context-menu, .mat-dialog, .p-dialog, .pje-modal, .drop-menu, .dropdown-menu, .dropdown-item, [aria-modal=\"true\"]",
+        "tipo": "interface",
+        "observacao": "Modais, diálogos, popovers e menus suspensos",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_dropdowns_select",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".ui-selectonemenu, .select2, .p-dropdown, .mat-select, .ng-select, .ant-select, .form-select, .custom-select",
+        "tipo": "interface",
+        "observacao": "Componentes de seleção e caixas dropdown",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_badges_etiquetas",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".pje-etiquetas, .label-etiqueta, .label-info, .badge, .chip, .tag, .mais-detalhes, .tree, .card-header, .panel-heading, .btn",
+        "tipo": "interface",
+        "observacao": "Etiquetas PJe, badges, chips, árvores e botões",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_pje_cards_timeline",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".ui-datalist, .datalist-content, .timeline, .item-timeline, .tarefa-card, .card-processo, .painel-tarefas, .pje-cabecalho, processo-datalist-card, ui-datalist",
+        "tipo": "interface",
+        "observacao": "Cards de processos, timeline e painéis de tarefas PJe",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_ids_estruturais",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[id*=\"polo\" i], [id*=\"detalhe\" i], [id*=\"navbar\" i], [id*=\"toolbar\" i], [id*=\"sidebar\" i], [id*=\"topbar\" i], [id*=\"menu\" i], [id*=\"header\" i]",
+        "tipo": "interface",
+        "observacao": "Contêineres estruturais por ID (polo, detalhe, menu, header)",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_webcomponents_ui",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "mat-icon, g-icon, md-icon, [class*=\"-button\"], [class*=\"-btn\"], [class*=\"-picker\"], [class*=\"-switcher\"], [class*=\"-selector\"], [class*=\"-dropdown\"], [class*=\"-toggle\"], [class*=\"-toolbar\"], [class*=\"-menu\"]",
+        "tipo": "interface",
+        "observacao": "Ícones e Web Components de interface",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "interna_botoes_icones_ui",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".button, .mat-button, .mat-icon-button, .mat-raised-button, .mat-flat-button, .mat-stroked-button, .p-button, .ui-button, .dropdown-toggle, .fa, .glyphicon, .material-icons, .mce-menubar, .mce-statusbar, .tox-menubar, .tox-statusbar, [class*=\"btn-\"]",
+        "tipo": "interface",
+        "observacao": "Classes de botões, ícones de frameworks (Material, PrimeNG, Bootstrap) e barras de editores",
+        "herdarFilhos": true,
+        "ativo": true,
+        "continuarProxima": false
+    },
+    {
+        "id": "usuario_padrao_navbar_itens",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "#navbarItens",
+        "tipo": "interface",
+        "observacao": "Itens do Menu",
+        "herdarFilhos": true,
+        "ativo": true,
+        "origem": "usuario",
+        "continuarProxima": false
+    },
+    {
+        "id": "usuario_padrao_name_menu",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[name^=\"menu\"]",
+        "tipo": "interface",
+        "observacao": "Atributo name^=\"menu\"",
+        "herdarFilhos": true,
+        "ativo": true,
+        "origem": "usuario",
+        "continuarProxima": false
+    },
+    {
+        "id": "usuario_padrao_id_menu",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[id*=\"menu\"]",
+        "tipo": "interface",
+        "observacao": "Atributo id*=\"menu\"",
+        "herdarFilhos": true,
+        "ativo": true,
+        "origem": "usuario",
+        "continuarProxima": false
     }
 ]

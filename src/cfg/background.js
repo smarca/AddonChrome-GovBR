@@ -6,9 +6,9 @@
  * @MAPA-IA:
  * - Arquivo: src/cfg/background.js
  * - Natureza: Service Worker Manifest V3 (Non-Persistent) + Orquestrador IPC Global
- * - Fachada Orquestrada: ModuloNavegador (self.JusGovModuloNavegador via importScripts)
- * - Canais IPC (onMessage): 'OBTER_CONFIGURACOES', 'TROCAR_GUIA_ANTERIOR', 'TROCAR_GUIA_PROXIMA', 'ABRIR_PAINEL_F1_GEMINI', 'NOTIFICAR_MODIFICACAO_PAGINA', 'FECHAR_GUIAS_DUPLICADAS', 'AGRUPAR_GUIAS_DOMINIO', 'DESAGRUPAR_GUIAS', 'DESCARTAR_GUIAS_INATIVAS'
- * - Listeners Chrome: runtime.onInstalled, storage.onChanged, tabs.onUpdated/onActivated/onRemoved, windows.onCreated, webNavigation.onCompleted/onHistoryStateUpdated, commands.onCommand
+ * - Fachadas Orquestradas: ModuloNavegador (self.JusGovModuloNavegador), ModuloManutencao (self.JusGovModuloManutencao), ModuloProdutividade (self.JusGovModuloProdutividade) via importScripts
+ * - Canais IPC (onMessage): 'OBTER_CONFIGURACOES', 'TROCAR_GUIA_ANTERIOR', 'TROCAR_GUIA_PROXIMA', 'TROCAR_GUIA_ULTIMA_ATIVA', 'ABRIR_PAINEL_F1_GEMINI', 'NOTIFICAR_MODIFICACAO_PAGINA', 'FECHAR_GUIAS_DUPLICADAS', 'AGRUPAR_GUIAS_DOMINIO', 'DESAGRUPAR_GUIAS', 'DESCARTAR_GUIAS_INATIVAS', 'EXECUTAR_AUTO_LIMPEZA_AGORA', 'PING_ATIVIDADE_TRABALHO', 'OBTER_STATUS_TRABALHO', 'RESETAR_CONTADORES_TRABALHO'
+ * - Listeners Chrome: runtime.onInstalled, runtime.onStartup, alarms.onAlarm, storage.onChanged, tabs.onUpdated/onActivated/onRemoved, windows.onCreated/onFocusChanged, webNavigation.onCompleted/onHistoryStateUpdated, commands.onCommand
  * - Regras / Seções: Diretrizes 11/15/16, Seção 6.19 (debounce de injeção 350ms), Seção 6.47, Seção 6.64
  *
  * DIRETIVAS DE GERACAO E MANUTENCAO IA [DEV - ENGENHARIA DE CODIGO]:
@@ -112,25 +112,34 @@
  * privilegiada do navegador (abas, janelas, anti-duplicação, Tab Groups e Tab Discarding no Service Worker)
  * e os domínios de Content Script (Grupo 2: Cópia Inteligente e Grupo 3: Periféricos Mouse/Teclado),
  * comunicando-se exclusivamente por barramento IPC assíncrono (chrome.runtime.onMessage / tabs.sendMessage). */
-try {
-    if (typeof importScripts === 'function') {
-        importScripts(
-            './cfg-defaults.js',
-            '../lib/lib-constantes.js',
-            '../lib/lib-block-addon.js',
-            '../lib/lib-verificadores.js',
-            '../lib/lib-geradores.js',
-            '../lib/lib-urls.js',
-            '../lib/lib-injecao.js',
-            '../lib/lib-config.js',
-            '../mod-navegador/navegador-janela-unica.js',
-            '../mod-navegador/navegador-anti-duplicacao.js',
-            '../mod-navegador/navegador-ordenacao.js',
-            '../mod-navegador/navegador-descarte.js',
-            '../mod-navegador/mod-navegador.js'
-        );
+/* Passo 1.1b: Importação isolada por arquivo (Diretriz Root 5.30): cada módulo é importado
+ * em chamada própria protegida por try/catch para garantir que a ausência física de
+ * qualquer diretório src/mod-* não impeça o carregamento e funcionamento dos demais módulos. */
+(function carregarScriptsComIsolamentoModular() {
+    if (typeof importScripts !== 'function') return;
+    const caminhosScripts = [
+        './cfg-defaults.js',
+        '../lib/lib-constantes.js',
+        '../lib/lib-block-addon.js',
+        '../lib/lib-verificadores.js',
+        '../lib/lib-geradores.js',
+        '../lib/lib-urls.js',
+        '../lib/lib-injecao.js',
+        '../lib/lib-config.js',
+        '../mod-navegador/navegador-janela-unica.js',
+        '../mod-navegador/navegador-anti-duplicacao.js',
+        '../mod-navegador/navegador-ordenacao.js',
+        '../mod-navegador/navegador-descarte.js',
+        '../mod-navegador/mod-navegador.js',
+        '../mod-manut/mod-manut.js',
+        '../mod-produt/mod-produt.js'
+    ];
+    for (let i = 0; i < caminhosScripts.length; i++) {
+        try {
+            importScripts(caminhosScripts[i]);
+        } catch (_) { }
     }
-} catch (_) { }
+})();
 
 const instanciaVerificadores = (() => {
     try {
@@ -187,6 +196,32 @@ const instanciaModuloNavegador = (() => {
     return null;
 })();
 
+const instanciaModuloManutencao = (() => {
+    try {
+        if (typeof self !== 'undefined' && typeof self.JusGovModuloManutencao === 'function') {
+            const inst = new self.JusGovModuloManutencao({
+                obterConfiguracoes: () => obterConfiguracoesGerais()
+            });
+            self.JusGovInstanciaManutencao = inst;
+            return inst;
+        }
+    } catch (_) { }
+    return null;
+})();
+
+const instanciaModuloProdutividade = (() => {
+    try {
+        if (typeof self !== 'undefined' && typeof self.JusGovModuloProdutividade === 'function') {
+            const inst = new self.JusGovModuloProdutividade({
+                obterConfiguracoes: () => obterConfiguracoesGerais()
+            });
+            self.JusGovInstanciaProdutividade = inst;
+            return inst;
+        }
+    } catch (_) { }
+    return null;
+})();
+
 const instanciaConfig = (() => {
     try {
         if (typeof self !== 'undefined' && typeof self.JusGovConfiguracoes === 'function') {
@@ -225,6 +260,7 @@ const ARQUIVOS_NUCLEO_MODULO_COPIA = instanciaInjecao ? instanciaInjecao.obterAr
     'src/lib/lib-verificadores.js',
     'src/mod-copia/copia-constantes.js',
     'src/mod-copia/copia-aviso-flutuante.js',
+    'src/mod-copia/copia-dialogo-mapeamento.js',
     'src/mod-copia/copia-acumulador.js',
     'src/mod-copia/copia-geometria.js',
     'src/mod-copia/copia-filtros.js',
@@ -460,6 +496,18 @@ chrome.runtime.onStartup.addListener(async () => {
     if (instanciaModuloNavegador && typeof instanciaModuloNavegador.inicializarSessaoAbas === 'function') {
         try { await instanciaModuloNavegador.inicializarSessaoAbas(); } catch (_) { }
     }
+    try {
+        if (instanciaModuloProdutividade) {
+            await instanciaModuloProdutividade.registrarAtividadeTrabalho();
+        }
+        if (instanciaModuloManutencao) {
+            await instanciaModuloManutencao.executarAutoLimpezaCacheECookies(false, true, obterConfiguracoesGerais);
+        }
+        if (typeof chrome !== 'undefined' && chrome.alarms) {
+            chrome.alarms.create('JUSGOV_AUTO_LIMPEZA_1M', { delayInMinutes: 1 });
+            chrome.alarms.create('JUSGOV_AUTO_LIMPEZA_15M', { delayInMinutes: 15 });
+        }
+    } catch (_) { }
 });
 
 /* Passo 6.3: Injetar e sincronizar antecipadamente já no início do carregamento (loading) e conclusão (complete) */
@@ -592,6 +640,8 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             'criterioOrdenacaoGuias',
             'sentidoOrdenacaoGuias',
             'ordenarGuiasFixadas',
+            'fecharHierarquiaEmCascata',
+            'modoBarraFavoritosSuperior',
             'descarteGuiasInativasAtivo',
             'tempoInatividadeDescarteMinutos',
             'validacaoMatematicaAtiva',
@@ -606,6 +656,7 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             'corFundoMarcadorColado',
             'opacidadeFundoMarcadorColado',
             'estiloBadgeMarcadorColado',
+            'tipoContornoMarcadorColado',
             'minimoCaracteresInterface',
             'converterCabecalhoPjeAtivo',
             'atalhoF1GeminiAtivo',
@@ -615,7 +666,17 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             'promptF1Gemini',
             'tempoExibicaoAlertaMs',
             'separadorAcumulador',
-            'regrasMapeamentoElementos'
+            'regrasMapeamentoElementos',
+            'autoLimpezaCacheCookiesAtiva',
+            'autoLimpezaIdade',
+            'tempoTrabalhoCorridoAtivo',
+            'tempoTrabalhoCorridoHoras',
+            'tempoTrabalhoAtivoAtivo',
+            'tempoTrabalhoAtivoHoras',
+            'pomodoroAtivo',
+            'pomodoroProporcao',
+            'pomodoroFocoMinutos',
+            'pomodoroCiclos'
         ];
         const mudouConfiguracao = chavesConfig.some(chave => Object.prototype.hasOwnProperty.call(changes, chave));
         if (mudouConfiguracao) {
@@ -640,6 +701,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         agendarSincronizacaoNuvemDebounced(1);
         sendResponse({ ok: true, agendado: true });
         return false;
+    }
+
+    if (msg.acao === 'EXECUTAR_AUTO_LIMPEZA_AGORA') {
+        if (!instanciaModuloManutencao) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaModuloManutencao.executarAutoLimpezaCacheECookies(true, false, obterConfiguracoesGerais)
+            .then((res) => sendResponse(res))
+            .catch(() => sendResponse({ ok: false }));
+        return true;
+    }
+
+    if (msg.acao === 'PING_ATIVIDADE_TRABALHO') {
+        if (!instanciaModuloProdutividade) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaModuloProdutividade.registrarAtividadeTrabalho()
+            .then(() => sendResponse({ ok: true }))
+            .catch(() => sendResponse({ ok: false }));
+        return true;
+    }
+
+    if (msg.acao === 'OBTER_STATUS_TRABALHO') {
+        if (!instanciaModuloProdutividade) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje()
+            .then((estado) => sendResponse({ ok: true, estado }))
+            .catch(() => sendResponse({ ok: false }));
+        return true;
+    }
+
+    if (msg.acao === 'RESETAR_CONTADORES_TRABALHO') {
+        if (!instanciaModuloProdutividade) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaModuloProdutividade.resetarEstadoTrabalhoHoje()
+            .then((estado) => sendResponse({ ok: true, estado }))
+            .catch(() => sendResponse({ ok: false }));
+        return true;
     }
 
     if (msg.acao === 'garantirInjecaoSubframes') {
@@ -821,6 +926,14 @@ if (msg.acao === 'fecharGuiasDuplicadasAgora') {
             sendResponse({ ok: false, totalFechadas: 0 });
         }
     })();
+    return true;
+}
+
+if (msg.acao === 'abrirPaginaAparenciaChrome') {
+    if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+        chrome.tabs.create({ url: 'chrome://settings/appearance', active: true }).catch(() => { });
+    }
+    sendResponse({ ok: true });
     return true;
 }
 
@@ -1185,9 +1298,27 @@ async function executarSincronizacaoNuvemEfetiva() {
     } catch (_) { }
 }
 
+const NOME_ALARME_AUTO_LIMPEZA_1M = 'JUSGOV_AUTO_LIMPEZA_1M';
+const NOME_ALARME_AUTO_LIMPEZA_15M = 'JUSGOV_AUTO_LIMPEZA_15M';
+const NOME_ALARME_TRABALHO_TICK = 'JUSGOV_TICK_TRABALHO';
+
+if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated) {
+    chrome.tabs.onActivated.addListener(() => {
+        if (instanciaModuloProdutividade) instanciaModuloProdutividade.registrarAtividadeTrabalho();
+    });
+}
+if (typeof chrome !== 'undefined' && chrome.windows && chrome.windows.onFocusChanged) {
+    chrome.windows.onFocusChanged.addListener((winId) => {
+        if (winId !== chrome.windows.WINDOW_ID_NONE && instanciaModuloProdutividade) {
+            instanciaModuloProdutividade.registrarAtividadeTrabalho();
+        }
+    });
+}
+
 if (typeof chrome !== 'undefined' && chrome.alarms) {
     try {
         chrome.alarms.create(NOME_ALARME_DESCARTE_RAM, { periodInMinutes: 5 });
+        chrome.alarms.create(NOME_ALARME_TRABALHO_TICK, { periodInMinutes: 1 });
         chrome.alarms.onAlarm.addListener(async (alarme) => {
             if (!alarme || !alarme.name) return;
             if (alarme.name === NOME_ALARME_DESCARTE_RAM) {
@@ -1199,6 +1330,18 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
             } else if (alarme.name === NOME_ALARME_SYNC_NUVEM) {
                 try {
                     await executarSincronizacaoNuvemEfetiva();
+                } catch (_) { }
+            } else if (alarme.name === NOME_ALARME_AUTO_LIMPEZA_1M || alarme.name === NOME_ALARME_AUTO_LIMPEZA_15M) {
+                try {
+                    if (instanciaModuloManutencao) {
+                        await instanciaModuloManutencao.executarAutoLimpezaCacheECookies(false, false, obterConfiguracoesGerais);
+                    }
+                } catch (_) { }
+            } else if (alarme.name === NOME_ALARME_TRABALHO_TICK) {
+                try {
+                    if (instanciaModuloProdutividade) {
+                        await instanciaModuloProdutividade.processarTickTrabalho(obterConfiguracoesGerais);
+                    }
                 } catch (_) { }
             }
         });

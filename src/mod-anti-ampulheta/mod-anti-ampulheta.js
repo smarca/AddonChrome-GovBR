@@ -80,6 +80,17 @@
         'generico-anti-ampulheta.css'
     ]);
 
+    /* Matriz ordenada de prioridade dos sistemas judiciais (Seção 6.103 / FEAT-20) */
+    const MATRIZ_SISTEMAS_JUDICIAIS = Object.freeze([
+        Object.freeze({ id: 'pje', nome: 'PJe', css: 'pje-anti-ampulheta.css', padrao: /\bpje\b|pje\.|\.jus\.br\/pje/i }),
+        Object.freeze({ id: 'eproc', nome: 'Eproc', css: 'eproc-anti-ampulheta.css', padrao: /\beproc\b|eproc\./i }),
+        Object.freeze({ id: 'pdpj', nome: 'PDPJ', css: 'pdpj-stf-stj-anti-ampulheta.css', padrao: /\bpdpj\b|\bprevjud\b|stf\.jus\.br|stj\.jus\.br/i }),
+        Object.freeze({ id: 'projudi', nome: 'Projudi', css: 'seeu-projudi-anti-ampulheta.css', padrao: /\bprojudi\b|projudi\./i }),
+        Object.freeze({ id: 'saj', nome: 'SAJ', css: 'saj-anti-ampulheta.css', padrao: /\besaj\b|\bsaj\b|esaj\.|tjsp\.jus\.br\/esaj/i }),
+        Object.freeze({ id: 'creta', nome: 'Creta', css: 'creta-anti-ampulheta.css', padrao: /\bcreta\b|creta\./i }),
+        Object.freeze({ id: 'seeu', nome: 'SEEU', css: 'seeu-projudi-anti-ampulheta.css', padrao: /\bseeu\b|seeu\./i })
+    ]);
+
     /* =====================================================================
      * FOLHA DE ESTILO CONSOLIDADA ANTI-AMPULHETAS (DESACOPLADA EM SEÇÃO 6.102 / ARQ-03)
      * ===================================================================== */
@@ -544,13 +555,17 @@
                 }
             } catch (_) { }
 
-            let ehPJeOuTribunal = (dominio.includes('pje') && dominio.includes('.jus.br')) ||
+            let sistemaIdentificado = null;
+            const textoAlvo = `${dominio} ${urlCompleta}`;
+            for (const sis of MATRIZ_SISTEMAS_JUDICIAIS) {
+                if (sis.padrao.test(textoAlvo)) {
+                    sistemaIdentificado = sis;
+                    break;
+                }
+            }
+
+            let ehPJeOuTribunal = Boolean(sistemaIdentificado) ||
                 dominio.includes('.jus.br') ||
-                urlCompleta.includes('pje') ||
-                dominio.includes('eproc') ||
-                dominio.includes('projudi') ||
-                dominio.includes('prevjud') ||
-                urlCompleta.includes('prevjud') ||
                 (typeof window !== 'undefined' && window.__JUSGOV_TESTE_BLINDAR_CSS__ === true);
 
             if (!ehPJeOuTribunal && typeof window !== 'undefined' && window.self !== window.top && this.#ativo) {
@@ -559,8 +574,16 @@
 
             if (!ehPJeOuTribunal) return false;
 
+            /* Injeção estrita de folha única por aba (remove duplicatas residuais) */
+            const tagsExtras = documento.querySelectorAll('style#pje-turbo-lock');
+            for (let i = 1; i < tagsExtras.length; i++) {
+                try { tagsExtras[i].remove(); } catch (_) { }
+            }
+
             const style = tagExistente || documento.createElement('style');
             style.id = 'pje-turbo-lock';
+            style.setAttribute('data-sistema-judicial', sistemaIdentificado ? sistemaIdentificado.nome : 'Judicial');
+            style.setAttribute('data-css-alvo', sistemaIdentificado ? sistemaIdentificado.css : 'generico-anti-ampulheta.css');
             style.textContent = TURBO_CSS;
 
             const alvo = documento.head || documento.documentElement;

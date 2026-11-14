@@ -192,10 +192,10 @@
                 const tiposTexto = ['text', 'search', 'url', 'tel', 'email', 'password', 'number'];
                 return tiposTexto.includes(tipo) && !el.disabled && !el.readOnly;
             }
-            if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+            if (el.isContentEditable || el.getAttribute('contenteditable') === 'true' || el.getAttribute('contenteditable') === '') {
                 return true;
             }
-            return Boolean(el.closest && el.closest('[contenteditable="true"], .cke_editable, .tox-edit-area'));
+            return Boolean(el.closest && el.closest('[contenteditable="true"], [contenteditable=""], .cke_editable, .ck-editor__editable, .ck-content, .tox-edit-area'));
         }
 
         /**

@@ -6,7 +6,7 @@
  * @MAPA-IA:
  * - Arquivo: src/mod-copia/copia-selecionar.js
  * - Objeto Exportado: window.JusGovMotorSelecaoTeste / window.JusGovCopiaSelecionar / window.JusGovMotorTestes (API pública determinística congelada via Object.freeze)
- * - Fachadas Orquestradas: ModuloCopia (window.JusGovModuloCopia) e ModuloInput (window.JusGovModuloInput)
+ * - Fachadas Orquestradas: ModuloCopia (window.JusGovModuloCopia), ModuloInput (window.JusGovModuloInput / window.JusGovInstanciaInput) e DialogoMapeamentoRegra (window.JusGovDialogoMapeamentoRegra)
  * - Ciclo de Vida: registrarListenersDOM() / destruirCicloVidaFrame() com AbortController + WeakMap de subframes (BUG-01)
  * - Fluxo Principal: tratarMouseDownGlobal -> tratarMouseUpGlobal -> executarSelecaoInteligentePorClique -> aplicarSelecaoDOM -> executarCopiaDeSelecao -> salvarClipboardInternoComBackup (2 slots: __JUSGOV_ULTIMO_CLIPBOARD__ e __JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__)
  * - Regras / Seções: 6 Estágios, Filtros 0..4, Seções 6.1..6.64, BUG-01..BUG-07
@@ -323,6 +323,7 @@
     let corFundoMarcadorColado = '#ccfbf1';
     let opacidadeFundoMarcadorColado = 0.24;
     let estiloBadgeMarcadorColado = 'sobrescrito';
+    let tipoContornoMarcadorColado = 'solido';
     let minimoCaracteresInterface = 5;
     let modoRetirarSelecao = 'total_exceto_arrasto'; // 'total_exceto_arrasto' (padrao), 'total', 'interface', 'nenhuma'
     let timerFlashBorder = null;
@@ -419,8 +420,135 @@
     let rangeAncoraArrastoElastico = null;
     let pontoAncoraArrastoAlt = null;
     let ancoraCursorShift = null;
+    let cliqueDentroDaSelecaoAtiva = false;
+    let ultimoBlocoCompostoAtivo = null;
+    let estadoCicloSelecao = {
+        direcao: 1,
+        textoAtual: ''
+    };
     let ignorarProximoClick = false;
     let controladorCicloVida = null;
+
+    function ehTextoBlocoMultiSegmento(texto) {
+        if (!texto) return false;
+        const t = texto.trim();
+        if (!t || t.length > 128 || /\s/.test(t)) return false;
+        return /[\p{L}\p{N}]+[^\p{L}\p{N}\s]+[\p{L}\p{N}]+/u.test(t);
+    }
+
+    function resolverLimitesBlocoAtivoNaJanela(mapa, idxCursor, blocoAtivo, textoCicloAtual) {
+        if (!mapa || typeof mapa.texto !== 'string' || typeof idxCursor !== 'number') return null;
+        const texto = mapa.texto;
+        const alvo = (blocoAtivo && blocoAtivo.texto) ? blocoAtivo.texto.trim() : '';
+        if (alvo) {
+            let pos = texto.indexOf(alvo);
+            while (pos !== -1) {
+                const fim = pos + alvo.length;
+                if (idxCursor >= pos && idxCursor <= fim) {
+                    return { inicio: pos, fim, texto: alvo };
+                }
+                pos = texto.indexOf(alvo, pos + 1);
+            }
+        }
+        const resPadrao = tentarExpandirPadraoComposto(texto, idxCursor, false, false)
+            || tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+        if (resPadrao) {
+            const trecho = texto.slice(resPadrao.inicio, resPadrao.fim).trim();
+            if (trecho && (
+                (alvo && alvo === trecho) ||
+                (textoCicloAtual && (textoCicloAtual === trecho || trecho.includes(textoCicloAtual)))
+            )) {
+                return { inicio: resPadrao.inicio, fim: resPadrao.fim, texto: trecho };
+            }
+        }
+        return null;
+    }
+
+    function resolverSubSegmentoNoBlocoComposto(texto, idxCursor, blocoInicio, blocoFim) {
+        if (!texto || typeof idxCursor !== 'number' || blocoInicio >= blocoFim) return null;
+        let idx = Math.max(blocoInicio, Math.min(blocoFim - 1, idxCursor));
+        if (!/[\p{L}\p{N}]/u.test(texto[idx] || '')) {
+            return { ehSubSegmento: false, inicio: blocoInicio, fim: blocoFim };
+        }
+        let ini = idx;
+        let fim = idx + 1;
+        while (ini > blocoInicio && /[\p{L}\p{N}]/u.test(texto[ini - 1] || '')) ini--;
+        while (fim < blocoFim && /[\p{L}\p{N}]/u.test(texto[fim] || '')) fim++;
+        return {
+            ehSubSegmento: (ini > blocoInicio || fim < blocoFim),
+            inicio: ini,
+            fim: fim
+        };
+    }
+
+    function isPontoDentroDoRange(ponto, range) {
+        if (!ponto || !ponto.no || !range) return false;
+        try {
+            const rPonto = document.createRange();
+            rPonto.setStart(ponto.no, ponto.offset);
+            rPonto.setEnd(ponto.no, ponto.offset);
+            return (
+                range.compareBoundaryPoints(Range.START_TO_START, rPonto) <= 0 &&
+                range.compareBoundaryPoints(Range.END_TO_END, rPonto) >= 0
+            );
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function construirDegrausCicloSelecao(mapa, idxCursor, elAlvoEfetivo) {
+        if (!mapa || typeof mapa.texto !== 'string') return [];
+        const { texto } = mapa;
+        const degraus = [];
+        const adicionarDegrau = (rangeCandidato) => {
+            if (!rangeCandidato) return;
+            const txt = (extrairTextoPuroSanitizado(rangeCandidato) || rangeCandidato.toString()).trim();
+            if (!txt) return;
+            if (degraus.some(d => d.texto === txt)) return;
+            degraus.push({ range: rangeCandidato, texto: txt });
+        };
+
+        /* Degrau 1: Unidade Atômica Mínima */
+        const resAtomico = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
+        if (resAtomico) {
+            adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resAtomico.inicio, resAtomico.fim));
+        }
+
+        /* Degrau 2: Composto / Destaque / Delimitadores Simétricos */
+        const resComposto = tentarExpandirPadraoComposto(texto, idxCursor, true, true)
+            || tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor)
+            || tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor)
+            || tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+        if (resComposto) {
+            adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resComposto.inicio, resComposto.fim));
+        }
+
+        /* Degrau 3: Cláusula / Frase */
+        const resFrase = expandirSentencaCompletaAtePonto(texto, idxCursor)
+            || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+        if (resFrase) {
+            adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resFrase.inicio, resFrase.fim));
+        }
+
+        /* Degrau 4: Parágrafo Localizado */
+        const resParagrafo = resolverSelecaoTriploClique(mapa, idxCursor);
+        if (resParagrafo) {
+            adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resParagrafo.inicio, resParagrafo.fim));
+        }
+
+        /* Degrau 5: Bloco Ancestral Contextual */
+        const blocoAncestral = obterBlocoAncestralContextual(elAlvoEfetivo);
+        if (blocoAncestral && blocoAncestral !== document.body && blocoAncestral !== document.documentElement) {
+            try {
+                const rBloco = document.createRange();
+                rBloco.selectNodeContents(blocoAncestral);
+                adicionarDegrau(rBloco);
+            } catch (_) { }
+        }
+
+        degraus.sort((a, b) => a.texto.length - b.texto.length);
+        return degraus;
+    }
     const teclasPressionadasAtivas = new Set();
 
     /* Regras de Mapeamento Manual Avançado de Elementos (XPath / CSS) Padrões de Fábrica (Seção 6.20 e Seção 6.85) - Vazio de início como padrão */
@@ -436,7 +564,7 @@
                     .then((resp) => resp && resp.ok ? resp.json() : [])
                     .then((dados) => {
                         if (Array.isArray(dados)) {
-                            regrasInternasInterface = dados;
+                            regrasInternasInterface = dados.filter(r => r && r.origem !== 'usuario');
                         }
                     })
                     .catch(() => { });
@@ -450,6 +578,9 @@
         } else {
             regrasMapeamentoElementos = [];
         }
+        cacheClassificacaoCustomEl = null;
+        cacheClassificacaoCustomTs = 0;
+        cacheClassificacaoCustomRes = null;
     }
 
     function obterRegrasMapeamentoElementos() {
@@ -504,13 +635,42 @@
             const sel = seletorCss.trim();
             if (typeof base.matches === 'function' && base.matches(sel)) return true;
             if (herdarFilhos && typeof base.closest === 'function' && base.closest(sel)) return true;
+            /* Seção 6.134: Suporte CSS cross-frame para iframes pais (ex.: iframe#frameBinario / downloadBinario.seam) */
+            if (herdarFilhos) {
+                let winAtual = base.ownerDocument && base.ownerDocument.defaultView;
+                while (winAtual && winAtual.frameElement) {
+                    const frameEl = winAtual.frameElement;
+                    if (typeof frameEl.matches === 'function' && frameEl.matches(sel)) return true;
+                    if (typeof frameEl.closest === 'function' && frameEl.closest(sel)) return true;
+                    winAtual = frameEl.ownerDocument && frameEl.ownerDocument.defaultView;
+                }
+            }
         } catch (_) { }
         return false;
     }
 
+    function normalizarExpressaoAtributoCss(expressao, tipoSeletor = '') {
+        if (typeof expressao !== 'string') return '';
+        let expr = expressao.trim();
+        const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
+        if (!ehXPath && !expr.startsWith('[') && /^[a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=/.test(expr)) {
+            if (/^[a-zA-Z_][\w-]*=$/.test(expr)) {
+                expr = `[${expr.slice(0, -1)}]`;
+            } else {
+                const m = expr.match(/^([a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=)(.+)$/);
+                if (m) {
+                    const val = m[2].trim();
+                    const jaAspas = (val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"));
+                    expr = `[${m[1]}${jaAspas ? val : `"${val.replace(/"/g, '\\"')}"`}]`;
+                }
+            }
+        }
+        return expr;
+    }
+
     function validarExpressaoSeletor(expressao, tipoSeletor = '') {
         if (typeof expressao !== 'string' || !expressao.trim()) return false;
-        const expr = expressao.trim();
+        const expr = normalizarExpressaoAtributoCss(expressao, tipoSeletor);
         try {
             const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
             if (ehXPath) {
@@ -528,10 +688,11 @@
         }
     }
 
-    function elementoCorrespondeRegraMapeamento(el, expressao, herdarFilhos = true) {
+    function elementoCorrespondeRegraMapeamento(el, expressao, herdarFilhos = true, tipoSeletor = '') {
         if (!el || typeof expressao !== 'string' || !expressao.trim()) return false;
         try {
-            const expr = expressao.trim();
+            const expr = normalizarExpressaoAtributoCss(expressao, tipoSeletor);
+            if (!expr) return false;
             if (expr.startsWith('/') || expr.startsWith('(')) {
                 return elementoCorrespondeXPath(el, expr, herdarFilhos);
             }
@@ -551,564 +712,402 @@
     let cacheClassificacaoCustomTs = 0;
     let cacheClassificacaoCustomRes = null;
 
-    function obterClassificacaoRegraCustomizada(el) {
+    function obterClassificacaoRegraCustomizada(el, apenasUsuario = false) {
         if (!el) return null;
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         if (!base) return null;
 
-        const agora = Date.now();
-        if (base === cacheClassificacaoCustomEl && (agora - cacheClassificacaoCustomTs) < 16) {
-            return cacheClassificacaoCustomRes;
+        if (!apenasUsuario) {
+            const agora = Date.now();
+            if (base === cacheClassificacaoCustomEl && (agora - cacheClassificacaoCustomTs) < 16) {
+                return cacheClassificacaoCustomRes;
+            }
+            const det = obterDiagnosticoRegraDetalhado(base, false);
+            const resultado = det ? det.tipo : null;
+            cacheClassificacaoCustomEl = base;
+            cacheClassificacaoCustomTs = agora;
+            cacheClassificacaoCustomRes = resultado;
+            return resultado;
         }
 
-        let resultado = null;
-        const listas = [regrasMapeamentoElementos, regrasInternasInterface];
-        for (let l = 0; l < listas.length; l++) {
-            const lista = listas[l];
+        const detUsuario = obterDiagnosticoRegraDetalhado(base, true);
+        return detUsuario ? detUsuario.tipo : null;
+    }
+
+    function descreverNoCurto(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
+        const tag = (el.tagName || '').toLowerCase();
+        const idSufixo = el.id ? `#${el.id}` : '';
+        const clsStr = (typeof el.className === 'string' && el.className.trim())
+            ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.')
+            : '';
+        return `<${tag}${idSufixo}${clsStr}>`;
+    }
+
+    function temEventosAssociadosAoObjeto(el) {
+        if (!el) return null;
+        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        let profundidade = 0;
+        const ATRIBUTOS_CLIQUE = new Set(['onclick', 'ondblclick', 'onmousedown', 'onmouseup', 'onpointerdown', 'onpointerup', '(click)', '@click', 'v-on:click', 'ng-click', 'routerlink']);
+        const TAGS_ESTRUTURAIS_WIZ = new Set(['c-wiz', 'c-data', 'main', 'section', 'article']);
+        const RX_JSACTION_CLIQUE = /(?:^|[;\s])(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|tap)\s*:/i;
+
+        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 2) {
+            profundidade++;
+            if (atual.nodeType === Node.ELEMENT_NODE) {
+                const descNo = descreverNoCurto(atual);
+                const onde = profundidade === 1 ? 'no elemento' : `no ancestral +${profundidade - 1}`;
+
+                if (atual.onclick) return `evento JS onclick em ${descNo} (${onde})`;
+                if (atual.ondblclick) return `evento JS ondblclick em ${descNo} (${onde})`;
+                if (atual.onmousedown) return `evento JS onmousedown em ${descNo} (${onde})`;
+                if (atual.onmouseup) return `evento JS onmouseup em ${descNo} (${onde})`;
+                if (atual.onpointerdown) return `evento JS onpointerdown em ${descNo} (${onde})`;
+                if (atual.onpointerup) return `evento JS onpointerup em ${descNo} (${onde})`;
+
+                if (atual.attributes && atual.attributes.length > 0) {
+                    const tagAtual = (atual.tagName || '').toLowerCase();
+                    for (let a = 0; a < atual.attributes.length; a++) {
+                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
+                        if (ATRIBUTOS_CLIQUE.has(attrNome)) {
+                            return `atributo ${attrNome} em ${descNo} (${onde})`;
+                        }
+                        /* Seção 6.144 (Google Wiz / DevConsole): jsaction em containers/ancestrais ou hooks de ciclo de vida não tornam texto corrido em interface */
+                        if (attrNome === 'jsaction' && profundidade === 1 && !TAGS_ESTRUTURAIS_WIZ.has(tagAtual)) {
+                            const valJsAction = String(atual.attributes[a].value || '');
+                            if (RX_JSACTION_CLIQUE.test(valJsAction)) {
+                                return `atributo jsaction (clique) em ${descNo} (${onde})`;
+                            }
+                        }
+                    }
+                }
+            }
+            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
+        }
+        return null;
+    }
+
+    function resolverTipoElementoPorPrioridade(el) {
+        return obterDiagnosticoElemento(el).tipo;
+    }
+
+    function obterDiagnosticoRegraDetalhado(el, apenasUsuario = false) {
+        if (!el) return null;
+        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!base) return null;
+        const grupos = apenasUsuario
+            ? [{ origem: 'Regra do Usuário', lista: regrasMapeamentoElementos }]
+            : [
+                { origem: 'Regra do Usuário', lista: regrasMapeamentoElementos },
+                { origem: 'Regra Interna', lista: regrasInternasInterface }
+            ];
+        let achado = null;
+        const historico = [];
+        for (let g = 0; g < grupos.length; g++) {
+            const { origem, lista } = grupos[g];
             if (!Array.isArray(lista) || lista.length === 0) continue;
+            let deveParar = false;
             for (let i = 0; i < lista.length; i++) {
                 const regra = lista[i];
                 if (!regra || regra.ativo === false || !regra.expressao) continue;
                 const herdar = regra.herdarFilhos !== false;
-                if (elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar)) {
-                    resultado = regra.tipo || 'semiflexivel';
-                    break;
-                }
-            }
-            if (resultado) break;
-        }
-
-        cacheClassificacaoCustomEl = base;
-        cacheClassificacaoCustomTs = agora;
-        cacheClassificacaoCustomRes = resultado;
-        return resultado;
-    }
-
-    function extrairCaminhoXPathAbsoluto(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        if (el.tagName.toLowerCase() === 'html') return '/html';
-        if (el.tagName.toLowerCase() === 'body') return '/html/body';
-
-        let caminho = '';
-        let atual = el;
-        while (atual && atual.nodeType === Node.ELEMENT_NODE && atual.tagName.toLowerCase() !== 'html') {
-            const tag = atual.tagName.toLowerCase();
-            let index = 1;
-            let irmao = atual.previousElementSibling;
-            while (irmao) {
-                if (irmao.tagName.toLowerCase() === tag) {
-                    index++;
-                }
-                irmao = irmao.previousElementSibling;
-            }
-            caminho = `/${tag}[${index}]` + caminho;
-            atual = atual.parentElement;
-        }
-        return '/html' + caminho;
-    }
-
-    function extrairCaminhoXPathRelativo(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        if (el.id && typeof el.id === 'string' && el.id.trim()) {
-            return `//*[@id="${el.id.trim()}"]`;
-        }
-        let atual = el;
-        let caminhoRel = '';
-        while (atual && atual.nodeType === Node.ELEMENT_NODE && atual !== document.body && atual !== document.documentElement) {
-            if (atual !== el && atual.id && typeof atual.id === 'string' && atual.id.trim()) {
-                return `//*[@id="${atual.id.trim()}"]` + caminhoRel;
-            }
-            const tag = atual.tagName.toLowerCase();
-            let index = 1;
-            let irmao = atual.previousElementSibling;
-            while (irmao) {
-                if (irmao.tagName.toLowerCase() === tag) {
-                    index++;
-                }
-                irmao = irmao.previousElementSibling;
-            }
-            caminhoRel = `/${tag}[${index}]` + caminhoRel;
-            atual = atual.parentElement;
-        }
-        return extrairCaminhoXPathAbsoluto(el);
-    }
-
-    function extrairSeletorCssSimplificado(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        if (el.id && typeof el.id === 'string' && el.id.trim()) {
-            try {
-                return (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
-                    ? `#${CSS.escape(el.id.trim())}`
-                    : `#${el.id.trim().replace(/(:|\.|\[|\]|,|=|@)/g, '\\$1')}`;
-            } catch (_) {
-                return `#${el.id.trim()}`;
-            }
-        }
-
-        const partes = [];
-        let atual = el;
-        let profundidade = 0;
-        while (atual && atual.nodeType === Node.ELEMENT_NODE && profundidade < 5) {
-            profundidade++;
-            const tag = atual.tagName.toLowerCase();
-            if (tag === 'body' || tag === 'html') break;
-
-            if (atual.id && typeof atual.id === 'string' && atual.id.trim()) {
-                let idEscapado = atual.id.trim();
-                try {
-                    idEscapado = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
-                        ? CSS.escape(idEscapado)
-                        : idEscapado.replace(/(:|\.|\[|\]|,|=|@)/g, '\\$1');
-                } catch (_) { }
-                partes.unshift(`#${idEscapado}`);
-                break;
-            }
-
-            let descritor = tag;
-            if (typeof atual.className === 'string' && atual.className.trim()) {
-                const classesValidas = atual.className.trim().split(/\s+/)
-                    .filter(c => c && !c.includes(':') && !c.startsWith('jusgov') && !c.startsWith('ng-') && !c.startsWith('v-'));
-                if (classesValidas.length > 0) {
-                    descritor += '.' + classesValidas.slice(0, 2).join('.');
-                }
-            }
-
-            let irmao = atual.previousElementSibling;
-            let index = 1;
-            let temIrmaosMesmaTag = false;
-            while (irmao) {
-                if (irmao.tagName.toLowerCase() === tag) {
-                    temIrmaosMesmaTag = true;
-                    index++;
-                }
-                irmao = irmao.previousElementSibling;
-            }
-            if (!temIrmaosMesmaTag) {
-                let prox = atual.nextElementSibling;
-                while (prox) {
-                    if (prox.tagName.toLowerCase() === tag) {
-                        temIrmaosMesmaTag = true;
+                if (elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar, regra.tipoSeletor || '')) {
+                    const parou = (regra.continuarProxima !== true);
+                    const item = {
+                        tipo: regra.tipo || 'semiflexivel',
+                        origem,
+                        regra: regra.expressao,
+                        tipoSeletor: regra.tipoSeletor || '',
+                        observacao: regra.observacao || '',
+                        parou
+                    };
+                    achado = item;
+                    historico.push(item);
+                    if (parou) {
+                        deveParar = true;
                         break;
                     }
-                    prox = prox.nextElementSibling;
                 }
             }
-            if (temIrmaosMesmaTag) {
-                descritor += `:nth-of-type(${index})`;
-            }
-
-            partes.unshift(descritor);
-            atual = atual.parentElement;
+            if (deveParar || achado !== null) break;
         }
-
-        return partes.join(' > ') || el.tagName.toLowerCase();
+        if (achado) {
+            achado.historico = historico;
+        }
+        return achado;
     }
 
-    let modalMapeamentoAberto = null;
-
-    function fecharModalSalvarRegraMapeamento() {
-        if (modalMapeamentoAberto) {
-            try {
-                modalMapeamentoAberto.remove();
-            } catch (_) { }
-            modalMapeamentoAberto = null;
-        }
-        if (typeof document !== 'undefined') {
-            const antigo = document.getElementById('jusgov-modal-mapeamento-regra');
-            if (antigo) {
-                try { antigo.remove(); } catch (_) { }
-            }
-        }
-    }
-
-    function isRegraMuitoCurta(expressao) {
-        if (!expressao || typeof expressao !== 'string') return true;
-        const limpa = expressao.trim().toLowerCase();
-        return limpa === '/html' || limpa === '/html/body' || limpa === 'html' || limpa === 'body';
-    }
-
-    function extrairSeletorCssSimples(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        if (el.id && !/^\d/.test(el.id) && !el.id.includes(':')) {
-            return `#${el.id}`;
-        }
-        const classes = Array.from(el.classList || []).filter(c => c && !c.startsWith('jusgov-'));
-        if (classes.length > 0) {
-            return '.' + classes.slice(0, 3).join('.');
-        }
-        return (el.tagName || '').toLowerCase();
-    }
-
-    function extrairSeletorCss2(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        const partes = [];
-        let atual = el;
-        while (atual && atual.nodeType === Node.ELEMENT_NODE && atual.tagName) {
-            const tag = atual.tagName.toLowerCase();
-            if (tag === 'html') {
-                partes.unshift('html');
-                break;
-            }
-            let indice = 1;
-            let irmao = atual.previousElementSibling;
-            while (irmao) {
-                indice++;
-                irmao = irmao.previousElementSibling;
-            }
-            partes.unshift(`${tag}:nth-child(${indice})`);
-            atual = atual.parentElement;
-        }
-        return partes.join(' > ');
-    }
-
-    function abrirModalSalvarRegraMapeamento(baseEl, seletoresExtraidos) {
-        if (!baseEl || typeof document === 'undefined' || !document.body) return null;
-        fecharModalSalvarRegraMapeamento();
-
-        const seletores = seletoresExtraidos || {
-            cssSimples: extrairSeletorCssSimples(baseEl),
-            xpathRel: extrairCaminhoXPathRelativo(baseEl),
-            xpathAbs: extrairCaminhoXPathAbsoluto(baseEl),
-            seletorCss: extrairSeletorCssSimplificado(baseEl),
-            seletorCss2: extrairSeletorCss2(baseEl)
+    function obterDiagnosticoElemento(el) {
+        const diag = {
+            tipo: 'textual',
+            origem: 'Padrão (Texto)',
+            rotuloDetalhe: 'Motivo',
+            detalhe: 'Textual',
+            observacao: '',
+            trilha: []
         };
-
-        const overlay = document.createElement('div');
-        overlay.id = 'jusgov-modal-mapeamento-regra';
-        overlay.setAttribute('data-jusgov-ignore', 'true');
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.style.cssText = 'position: fixed; inset: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px); z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
-
-        const card = document.createElement('div');
-        card.setAttribute('data-jusgov-ignore', 'true');
-        card.style.cssText = 'background: #0f172a; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6); width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; color: #f8fafc; display: flex; flex-direction: column; gap: 14px; padding: 20px; box-sizing: border-box;';
-
-        // Cabeçalho
-        const cabecalho = document.createElement('div');
-        cabecalho.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #334155; padding-bottom: 12px;';
-
-        const infoCab = document.createElement('div');
-        const titulo = document.createElement('h3');
-        titulo.style.cssText = 'margin: 0; font-size: 16px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;';
-        titulo.textContent = '⚙️ Salvar Regra de Mapeamento Manual';
-
-        const descAlvo = document.createElement('div');
-        descAlvo.style.cssText = 'font-size: 12px; color: #94a3b8; margin-top: 4px;';
-        const tagNome = (baseEl.tagName || 'ELEMENT').toLowerCase();
-        const idInfo = baseEl.id ? `#${baseEl.id}` : '';
-        descAlvo.textContent = `Elemento clicado: <${tagNome}${idInfo}>`;
-
-        infoCab.appendChild(titulo);
-        infoCab.appendChild(descAlvo);
-
-        const btnFechar = document.createElement('button');
-        btnFechar.type = 'button';
-        btnFechar.textContent = '✕';
-        btnFechar.setAttribute('aria-label', 'Fechar');
-        btnFechar.style.cssText = 'background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 4px;';
-        btnFechar.addEventListener('click', fecharModalSalvarRegraMapeamento);
-
-        cabecalho.appendChild(infoCab);
-        cabecalho.appendChild(btnFechar);
-        card.appendChild(cabecalho);
-
-        // Seção: Tipos de Pesquisa
-        const secSeletores = document.createElement('div');
-        secSeletores.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
-
-        const lblSecSeletores = document.createElement('label');
-        lblSecSeletores.style.cssText = 'font-size: 12px; font-weight: 600; color: #cbd5e1;';
-        lblSecSeletores.textContent = 'Selecione os tipos de pesquisa a cadastrar (cada opção gera uma regra individual):';
-        secSeletores.appendChild(lblSecSeletores);
-
-        const listaTipos = [
-            { tipoSeletor: 'CSS (Simples)', valor: seletores.cssSimples, padrao: true },
-            { tipoSeletor: 'CSS (Hierárquico)', valor: seletores.seletorCss, padrao: !seletores.cssSimples },
-            { tipoSeletor: 'CSS (Estrutural)', valor: seletores.seletorCss2 || seletores.seletorCss, padrao: false },
-            { tipoSeletor: 'XPath (Simplificado)', valor: seletores.xpathRel, padrao: false },
-            { tipoSeletor: 'XPath (Completo)', valor: seletores.xpathAbs, padrao: false }
-        ];
-
-        const caixasOpcoes = [];
-
-        listaTipos.forEach((item, i) => {
-            const linha = document.createElement('div');
-            linha.style.cssText = 'display: flex; align-items: flex-start; gap: 8px; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155;';
-
-            const chk = document.createElement('input');
-            chk.type = 'checkbox';
-            chk.id = `chk_tipo_seletor_${i}`;
-            chk.style.cssText = 'margin-top: 3px; cursor: pointer;';
-            chk.checked = Boolean(item.padrao && item.valor);
-            chk.disabled = !item.valor;
-
-            const rotuloCorpo = document.createElement('div');
-            rotuloCorpo.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;';
-
-            const topoLinha = document.createElement('div');
-            topoLinha.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 6px;';
-
-            const badge = document.createElement('span');
-            badge.style.cssText = 'font-size: 11px; font-weight: 700; color: #38bdf8;';
-            badge.textContent = item.tipoSeletor;
-
-            topoLinha.appendChild(badge);
-
-            if (isRegraMuitoCurta(item.valor)) {
-                const avisoCurta = document.createElement('span');
-                avisoCurta.style.cssText = 'font-size: 10px; color: #f59e0b; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1px 4px; border-radius: 3px;';
-                avisoCurta.textContent = '⚠️ Seletor curto (escopo global)';
-                topoLinha.appendChild(avisoCurta);
-            }
-
-            const codeBox = document.createElement('code');
-            codeBox.style.cssText = 'font-family: monospace; font-size: 11px; color: #e2e8f0; background: #0f172a; padding: 4px 6px; border-radius: 4px; border: 1px solid #475569; word-break: break-all; white-space: pre-wrap;';
-            codeBox.textContent = item.valor || '(Não disponível)';
-
-            rotuloCorpo.appendChild(topoLinha);
-            rotuloCorpo.appendChild(codeBox);
-
-            linha.appendChild(chk);
-            linha.appendChild(rotuloCorpo);
-            secSeletores.appendChild(linha);
-
-            caixasOpcoes.push({ chk, item });
-        });
-
-        card.appendChild(secSeletores);
-
-        // Aviso dinâmico de regra muito curta
-        const painelAlertaCurto = document.createElement('div');
-        painelAlertaCurto.style.cssText = 'font-size: 11px; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 8px 10px; border-radius: 6px; display: none; line-height: 1.4;';
-        painelAlertaCurto.textContent = '⚠️ Alerta: Regras genéricas como /html ou /html/body afetam a página inteira. Salve somente se intencional.';
-        card.appendChild(painelAlertaCurto);
-
-        function atualizarVisibilidadeAvisoCurto() {
-            const temCurtaSelecionada = caixasOpcoes.some(c => c.chk.checked && isRegraMuitoCurta(c.item.valor));
-            painelAlertaCurto.style.display = temCurtaSelecionada ? 'block' : 'none';
+        if (!el) {
+            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
+            return diag;
         }
-        caixasOpcoes.forEach(c => c.chk.addEventListener('change', atualizarVisibilidadeAvisoCurto));
-        atualizarVisibilidadeAvisoCurto();
-
-        // Seção: Modo Comportamental (1º Interface, 2º Semiflexível, 3º Textual)
-        const secModo = document.createElement('div');
-        secModo.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
-
-        const lblModo = document.createElement('label');
-        lblModo.style.cssText = 'font-size: 12px; font-weight: 600; color: #cbd5e1;';
-        lblModo.textContent = 'Modo Comportamental do Elemento:';
-
-        const selectModo = document.createElement('select');
-        selectModo.style.cssText = 'padding: 6px 10px; font-size: 12px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 6px; cursor: pointer;';
-
-        const optInterface = document.createElement('option');
-        optInterface.value = 'interface';
-        optInterface.textContent = 'Interface (Desseleciona sem Alt; bloqueia cópia de texto simples)';
-
-        const optSemiflexivel = document.createElement('option');
-        optSemiflexivel.value = 'semiflexivel';
-        optSemiflexivel.textContent = 'Semiflexível (Cópia rápida com 1 clique restrita a máscaras forenses)';
-
-        const optTextual = document.createElement('option');
-        optTextual.value = 'textual';
-        optTextual.textContent = 'Textual (Modo leitura documental com seleção mantida no DOM)';
-
-        // Ordem estrita: Interface, Semiflexível, Textual
-        selectModo.appendChild(optInterface);
-        selectModo.appendChild(optSemiflexivel);
-        selectModo.appendChild(optTextual);
-
-        secModo.appendChild(lblModo);
-        secModo.appendChild(selectModo);
-        card.appendChild(secModo);
-
-        // Seção: Checkbox Herdar Filhos
-        const secFilhos = document.createElement('div');
-        secFilhos.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 12px; color: #cbd5e1;';
-        const chkFilhos = document.createElement('input');
-        chkFilhos.type = 'checkbox';
-        chkFilhos.id = 'chkModalMapeamentoFilhos';
-        chkFilhos.checked = true;
-        chkFilhos.style.cssText = 'cursor: pointer;';
-        const lblFilhos = document.createElement('label');
-        lblFilhos.htmlFor = 'chkModalMapeamentoFilhos';
-        lblFilhos.style.cssText = 'cursor: pointer; user-select: none;';
-        lblFilhos.textContent = 'Aplicar regra também aos elementos filhos / descendentes';
-        secFilhos.appendChild(chkFilhos);
-        secFilhos.appendChild(lblFilhos);
-        card.appendChild(secFilhos);
-
-        // Seção: Observação (até 150 caracteres)
-        const secObs = document.createElement('div');
-        secObs.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
-
-        const topoObs = document.createElement('div');
-        topoObs.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
-
-        const lblObs = document.createElement('label');
-        lblObs.style.cssText = 'font-size: 12px; font-weight: 600; color: #cbd5e1;';
-        lblObs.textContent = 'Observação (opcional, até 150 caracteres):';
-
-        const contadorObs = document.createElement('span');
-        contadorObs.style.cssText = 'font-size: 11px; color: #64748b;';
-        contadorObs.textContent = '0/150';
-
-        topoObs.appendChild(lblObs);
-        topoObs.appendChild(contadorObs);
-
-        const inputObs = document.createElement('input');
-        inputObs.type = 'text';
-        inputObs.maxLength = 150;
-        inputObs.placeholder = 'Ex: Painel do Polo Ativo, Tabela de Audiências, etc.';
-        inputObs.style.cssText = 'padding: 6px 10px; font-size: 12px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 6px;';
-        inputObs.addEventListener('input', () => {
-            contadorObs.textContent = `${inputObs.value.length}/150`;
-        });
-
-        secObs.appendChild(topoObs);
-        secObs.appendChild(inputObs);
-        card.appendChild(secObs);
-
-        // Rodapé de Ações
-        const rodape = document.createElement('div');
-        rodape.style.cssText = 'display: flex; justify-content: flex-end; align-items: center; gap: 10px; border-top: 1px solid #334155; padding-top: 14px; margin-top: 4px;';
-
-        const btnCancelar = document.createElement('button');
-        btnCancelar.type = 'button';
-        btnCancelar.className = 'btn btn-secundario';
-        btnCancelar.style.cssText = 'padding: 6px 14px; font-size: 12px; background: #1e293b; color: #cbd5e1; border: 1px solid #475569; border-radius: 6px; cursor: pointer;';
-        btnCancelar.textContent = 'Cancelar';
-        btnCancelar.addEventListener('click', fecharModalSalvarRegraMapeamento);
-
-        const btnSalvar = document.createElement('button');
-        btnSalvar.type = 'button';
-        btnSalvar.className = 'btn btn-primario';
-        btnSalvar.style.cssText = 'padding: 6px 16px; font-size: 12px; font-weight: 600; background: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 6px; cursor: pointer;';
-        btnSalvar.textContent = 'Salvar Regra';
-
-        btnSalvar.addEventListener('click', () => {
-            const selecionados = caixasOpcoes.filter(c => c.chk.checked && c.item.valor && c.item.valor.trim());
-            if (selecionados.length === 0) {
-                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
-                    validador.projetarMiniTipGlobal('⚠️ Selecione ao menos um tipo de pesquisa com expressão válida.', '#f59e0b');
-                }
-                return;
-            }
-
-            const invalido = selecionados.find(s => !validarExpressaoSeletor(s.item.valor, s.item.tipoSeletor));
-            if (invalido) {
-                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
-                    validador.projetarMiniTipGlobal(`⚠️ Expressão inválida em "${invalido.item.tipoSeletor}".`, '#ef4444');
-                }
-                return;
-            }
-
-            const novasRegras = selecionados.map(s => ({
-                id: 'regra_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                tipoSeletor: s.item.tipoSeletor,
-                expressao: s.item.valor.trim(),
-                tipo: selectModo.value,
-                observacao: (inputObs.value || '').trim().substring(0, 150),
-                herdarFilhos: chkFilhos.checked,
-                ativo: true
-            }));
-
-            // Adiciona localmente
-            regrasMapeamentoElementos.push(...novasRegras);
-
-            // Persiste no chrome.storage.sync e notifica listeners em tempo real
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                chrome.storage.sync.get(['regrasMapeamentoElementos'], (res) => {
-                    const atuais = Array.isArray(res && res.regrasMapeamentoElementos) ? res.regrasMapeamentoElementos : [];
-                    const atualizadas = [...atuais, ...novasRegras];
-                    chrome.storage.sync.set({ regrasMapeamentoElementos: atualizadas }, () => {
-                        if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
-                            chrome.runtime.sendMessage({
-                                acao: 'regrasMapeamentoAtualizadas',
-                                regrasMapeamentoElementos: atualizadas
-                            }).catch(() => { });
-                        }
-                    });
-                });
-            }
-
-            // Copia o primeiro seletor selecionado para a área de transferência
-            const seletorPrincipal = selecionados[0].item.valor;
-            gravarNaAreaDeTransferencia(seletorPrincipal, null);
-
-            fecharModalSalvarRegraMapeamento();
-
-            if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
-                const msg = novasRegras.length === 1
-                    ? `✓ Regra salva: ${novasRegras[0].tipoSeletor} (${selectModo.value})`
-                    : `✓ ${novasRegras.length} regras salvas (${selectModo.value})`;
-                validador.projetarMiniTipGlobal(msg, '#10b981');
-            }
-        });
-
-        rodape.appendChild(btnCancelar);
-        rodape.appendChild(btnSalvar);
-        card.appendChild(rodape);
-
-        overlay.appendChild(card);
-
-        // Fechar ao clicar fora ou Esc
-        overlay.addEventListener('click', (ev) => {
-            if (ev.target === overlay) fecharModalSalvarRegraMapeamento();
-        });
-
-        const ouvinteEsc = (ev) => {
-            if (ev.key === 'Escape') {
-                fecharModalSalvarRegraMapeamento();
-                document.removeEventListener('keydown', ouvinteEsc);
-            }
-        };
-        document.addEventListener('keydown', ouvinteEsc);
-
-        document.body.appendChild(overlay);
-        modalMapeamentoAberto = overlay;
-        return overlay;
-    }
-
-    function executarInspecaoECapturaSeletorUnico(el) {
-        if (!el) return null;
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!base) return null;
+        if (!base) {
+            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
+            return diag;
+        }
 
-        const cssSimples = extrairSeletorCssSimples(base);
-        const xpathRel = extrairCaminhoXPathRelativo(base);
-        const xpathAbs = extrairCaminhoXPathAbsoluto(base);
-        const seletorCss = extrairSeletorCssSimplificado(base);
-        const seletorCss2 = extrairSeletorCss2(base);
+        const registrarEtapa = (passo, descricao, tipo, parou = false, observacao = '') => {
+            diag.trilha.forEach((t) => { t.decisivo = false; });
+            diag.trilha.push({ passo, descricao, tipo, parou, observacao, decisivo: true });
+        };
 
-        const seletorPreferencial = (xpathRel && xpathRel.startsWith('//*[@id='))
-            ? xpathRel
-            : (seletorCss || xpathRel || xpathAbs);
+        /* Passo 1: Cursor do mouse */
+        if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+            try {
+                const cur = window.getComputedStyle(base).cursor;
+                if (cur === 'text' || cur === 'vertical-text' || cur === 'cell') {
+                    diag.tipo = 'textual';
+                    diag.origem = 'Cursor do Mouse';
+                    diag.rotuloDetalhe = 'Cursor CSS';
+                    diag.detalhe = `cursor: ${cur}`;
+                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'textual', false);
+                } else if (cur === 'default' || cur === 'arrow' || cur === 'context-menu' || cur === 'help') {
+                    diag.tipo = 'semiflexivel';
+                    diag.origem = 'Cursor do Mouse';
+                    diag.rotuloDetalhe = 'Cursor CSS';
+                    diag.detalhe = `cursor: ${cur}`;
+                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'semiflexivel', false);
+                } else if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grabbing' || cur === 'grab' || cur === 'progress') {
+                    diag.tipo = 'interface';
+                    diag.origem = 'Cursor do Mouse';
+                    diag.rotuloDetalhe = 'Cursor CSS';
+                    diag.detalhe = `cursor: ${cur}`;
+                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'interface', false);
+                }
+            } catch (_) { }
+        }
 
-        try {
-            const rng = document.createRange();
-            rng.selectNode(base);
-            dispararFlashBorderVisual(rng, 800, '#0284c7');
-        } catch (_) { }
+        /* Passo 2: Existência de eventos associados */
+        const motivoEvento = temEventosAssociadosAoObjeto(base);
+        if (motivoEvento) {
+            diag.tipo = 'interface';
+            diag.origem = 'Eventos / Controle';
+            diag.rotuloDetalhe = 'Gatilho';
+            diag.detalhe = motivoEvento;
+            registrarEtapa('2. Evento JS', motivoEvento, 'interface', false);
+        }
 
-        abrirModalSalvarRegraMapeamento(base, {
-            cssSimples,
-            xpathRel,
-            xpathAbs,
-            seletorCss,
-            seletorCss2,
-            preferencial: seletorPreferencial
-        });
+        /* Passo 3: Heurísticas extras de Browser (se ainda não for interface) */
+        if (diag.tipo !== 'interface') {
+            try {
+                const stExtra = (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
+                    ? window.getComputedStyle(base)
+                    : null;
+                const us = stExtra ? (stExtra.userSelect || stExtra.webkitUserSelect) : '';
+                const tabIdx = base.getAttribute ? base.getAttribute('tabindex') : null;
+                if (us === 'none') {
+                    diag.tipo = 'interface';
+                    diag.origem = 'Heurística Browser';
+                    diag.rotuloDetalhe = 'Heurística';
+                    diag.detalhe = 'user-select: none';
+                    registrarEtapa('3. Heurística', 'user-select: none', 'interface', false);
+                } else if (tabIdx === '0') {
+                    diag.tipo = 'interface';
+                    diag.origem = 'Heurística Browser';
+                    diag.rotuloDetalhe = 'Heurística';
+                    diag.detalhe = 'tabindex="0"';
+                    registrarEtapa('3. Heurística', 'tabindex="0"', 'interface', false);
+                } else {
+                    const tagB = (base.tagName || '').toUpperCase();
+                    const ehParagrafo = tagB === 'P' || tagB === 'ARTICLE' || tagB === 'BLOCKQUOTE';
+                    const txt = (base.textContent || '').trim();
+                    if (!ehParagrafo && txt.length > 0 && txt.length <= 80 && !txt.includes('\n')) {
+                        const temMascara = /\b(\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}(?::\d{2})?|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b/.test(txt);
+                        if (temMascara) {
+                            diag.tipo = 'semiflexivel';
+                            diag.origem = 'Heurística Browser';
+                            diag.rotuloDetalhe = 'Heurística';
+                            diag.detalhe = 'Texto curto com máscara forense';
+                            registrarEtapa('3. Heurística', 'máscara forense curta', 'semiflexivel', false);
+                        }
+                    } else if (txt.length > 100) {
+                        diag.tipo = 'textual';
+                        diag.origem = 'Heurística Browser';
+                        diag.rotuloDetalhe = 'Heurística';
+                        diag.detalhe = `Bloco de texto longo (${txt.length} chars)`;
+                        registrarEtapa('3. Heurística', `texto longo (${txt.length} chars)`, 'textual', false);
+                    }
+                }
+            } catch (_) { }
+        }
 
+        /* Passo 4: Regras XPath/CSS definidas (Usuário -> Internas) */
+        const regraDetalhe = obterDiagnosticoRegraDetalhado(base);
+        if (regraDetalhe) {
+            diag.tipo = regraDetalhe.tipo;
+            diag.origem = regraDetalhe.origem;
+            diag.rotuloDetalhe = 'Regra';
+            diag.detalhe = `${regraDetalhe.tipoSeletor ? '[' + regraDetalhe.tipoSeletor + '] ' : ''}${regraDetalhe.regra}`;
+            diag.observacao = regraDetalhe.observacao || '';
+            const listaHist = Array.isArray(regraDetalhe.historico) && regraDetalhe.historico.length > 0
+                ? regraDetalhe.historico
+                : [regraDetalhe];
+            for (let h = 0; h < listaHist.length; h++) {
+                const itemH = listaHist[h];
+                const prefixoSel = itemH.tipoSeletor ? `[${itemH.tipoSeletor}] ` : '';
+                registrarEtapa(`4. ${itemH.origem}`, `${prefixoSel}${itemH.regra}`, itemH.tipo, Boolean(itemH.parou), itemH.observacao || '');
+            }
+        }
+
+        if (diag.trilha.length === 0) {
+            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
+        }
+
+        return diag;
+    }
+
+    let painelInspetorTempoRealEl = null;
+
+    function ocultarInspetorTempoReal() {
+        if (painelInspetorTempoRealEl && painelInspetorTempoRealEl.parentNode) {
+            painelInspetorTempoRealEl.parentNode.removeChild(painelInspetorTempoRealEl);
+        }
+        painelInspetorTempoRealEl = null;
+    }
+
+    function atualizarInspetorTempoReal(x, y, alvo) {
+        if (typeof document === 'undefined' || !document.body) return;
+        const base = (alvo && alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
+        if (!base || (base.closest && base.closest('[data-jusgov-ignore="true"]'))) return;
+
+        if (!painelInspetorTempoRealEl) {
+            painelInspetorTempoRealEl = document.createElement('div');
+            painelInspetorTempoRealEl.id = 'jusgov-inspetor-tempo-real';
+            painelInspetorTempoRealEl.setAttribute('data-jusgov-ignore', 'true');
+            painelInspetorTempoRealEl.style.cssText = 'position: fixed; z-index: 2147483647; pointer-events: none; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border: 1px solid #38bdf8; border-radius: 8px; padding: 8px 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; line-height: 1.45; box-shadow: 0 10px 25px rgba(0,0,0,0.55); max-width: 420px; word-break: break-word;';
+            document.body.appendChild(painelInspetorTempoRealEl);
+        }
+
+        const ehCampoEditavel = isElementoEmCampoEditavel(base) && !isElementoInterfaceDeEditorRico(base);
+        const diag = obterDiagnosticoElemento(base);
+        const coresTipo = {
+            interface: { nome: 'Interface', cor: '#fbbf24' },
+            semiflexivel: { nome: 'SemiFlexível', cor: '#38bdf8' },
+            textual: { nome: 'Textual', cor: '#34d399' },
+            editavel: { nome: 'Editável', cor: '#c084fc' }
+        };
+        const infoTipo = coresTipo[diag.tipo] || coresTipo.textual;
+        const tag = (base.tagName || '').toLowerCase();
+        const idStr = base.id ? ` id="${base.id}"` : '';
+        const nameAttr = base.getAttribute ? base.getAttribute('name') : '';
+        const nameStr = nameAttr ? ` name="${nameAttr}"` : '';
+        const roleAttr = base.getAttribute ? base.getAttribute('role') : '';
+        const roleStr = roleAttr ? ` role="${roleAttr}"` : '';
+        const typeAttr = base.getAttribute ? base.getAttribute('type') : '';
+        const typeStr = typeAttr ? ` type="${typeAttr}"` : '';
+        const clsStr = (typeof base.className === 'string' && base.className.trim()) ? ` class="${base.className.trim().split(/\s+/).slice(0, 4).join(' ')}"` : '';
+
+        painelInspetorTempoRealEl.innerHTML = '';
+        const l1 = document.createElement('div');
+        l1.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 4px;';
+        const badgeTipo = document.createElement('span');
+        badgeTipo.style.cssText = `font-weight: 700; color: ${ehCampoEditavel ? '#c084fc' : infoTipo.cor};`;
+        badgeTipo.textContent = ehCampoEditavel ? '● Campo Editável (Regra de Ouro)' : `● ${infoTipo.nome}`;
+        const badgeOrigem = document.createElement('span');
+        badgeOrigem.style.cssText = 'font-size: 10px; color: #94a3b8; background: #1e293b; padding: 1px 6px; border-radius: 4px;';
+        badgeOrigem.textContent = ehCampoEditavel ? 'Edição Nativa' : diag.origem;
+        l1.appendChild(badgeTipo);
+        l1.appendChild(badgeOrigem);
+
+        const l2 = document.createElement('div');
+        l2.style.cssText = 'font-family: monospace; font-size: 10px; color: #cbd5e1; margin-bottom: 3px;';
+        l2.textContent = `Elemento: <${tag}${idStr}${nameStr}${typeStr}${roleStr}${clsStr}>`;
+
+        painelInspetorTempoRealEl.appendChild(l1);
+        painelInspetorTempoRealEl.appendChild(l2);
+
+        if (ehCampoEditavel) {
+            const l3 = document.createElement('div');
+            l3.style.cssText = 'font-family: monospace; font-size: 10px; font-weight: 700; color: #c084fc;';
+            l3.textContent = 'Comportamento: Edição livre (nunca intercepta clique/seleção)';
+            painelInspetorTempoRealEl.appendChild(l3);
+        }
+
+        if (Array.isArray(diag.trilha) && diag.trilha.length > 0) {
+            const boxTrilha = document.createElement('div');
+            boxTrilha.style.cssText = 'font-family: monospace; font-size: 9.5px; margin-top: 5px; border-top: 1px dashed #334155; padding-top: 4px; display: flex; flex-direction: column; gap: 2px;';
+            diag.trilha.forEach((etapa) => {
+                const linhaT = document.createElement('div');
+                const corEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].cor : '#94a3b8';
+                const nomeEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].nome : etapa.tipo;
+                const tagParada = etapa.parou ? ' [PAROU]' : (etapa.passo.startsWith('4.') ? ' [continua]' : '');
+                const textoEtapa = etapa.descricao
+                    ? `${etapa.passo}: ${etapa.descricao} → ${nomeEtapa}${tagParada}`
+                    : `${etapa.passo}: ${nomeEtapa}${tagParada}`;
+                if (etapa.decisivo && !ehCampoEditavel) {
+                    linhaT.style.cssText = `color: #f8fafc; background: rgba(56, 189, 248, 0.14); border-left: 2px solid ${corEtapa}; padding: 1px 5px; border-radius: 3px; font-weight: 700;`;
+                    linhaT.textContent = `★ ${textoEtapa}`;
+                } else {
+                    linhaT.style.cssText = 'color: #94a3b8; padding-left: 7px;';
+                    linhaT.textContent = `• ${textoEtapa}`;
+                }
+                boxTrilha.appendChild(linhaT);
+
+                if (etapa.observacao) {
+                    const linhaObs = document.createElement('div');
+                    linhaObs.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; color: #fbbf24; font-style: italic; padding-left: 14px; margin-bottom: 2px;';
+                    linhaObs.textContent = `Obs: ${etapa.observacao}`;
+                    boxTrilha.appendChild(linhaObs);
+                }
+            });
+            painelInspetorTempoRealEl.appendChild(boxTrilha);
+        }
+
+        const left = Math.min(x + 16, window.innerWidth - 435);
+        const top = Math.min(y + 16, window.innerHeight - 210);
+        painelInspetorTempoRealEl.style.left = `${Math.max(8, left)}px`;
+        painelInspetorTempoRealEl.style.top = `${Math.max(8, top)}px`;
+    }
+
+    const dialogoMapeamento = (typeof window !== 'undefined' && window.JusGovDialogoMapeamentoRegra) ? new window.JusGovDialogoMapeamentoRegra() : null;
+    function fecharModalSalvarRegraMapeamento() { return dialogoMapeamento ? dialogoMapeamento.fecharModal() : null; }
+    function obterDepsDialogoMapeamento() {
         return {
-            xpathRelativo: xpathRel,
-            xpathAbsoluto: xpathAbs,
-            seletorCss: seletorCss,
-            seletorCss2: seletorCss2,
-            preferencial: seletorPreferencial
+            validarExpressaoSeletor,
+            normalizarExpressaoAtributoCss,
+            obterDiagnosticoElemento,
+            aoSalvarRegras: (novasRegras) => {
+                regrasMapeamentoElementos.push(...novasRegras);
+                cacheClassificacaoCustomEl = null;
+                cacheClassificacaoCustomTs = 0;
+                cacheClassificacaoCustomRes = null;
+                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                    chrome.storage.sync.get(['regrasMapeamentoElementos'], (res) => {
+                        const atuais = Array.isArray(res && res.regrasMapeamentoElementos) ? res.regrasMapeamentoElementos : [];
+                        const atualizadas = [...atuais, ...novasRegras];
+                        chrome.storage.sync.set({ regrasMapeamentoElementos: atualizadas }, () => {
+                            if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
+                                chrome.runtime.sendMessage({ acao: 'regrasMapeamentoAtualizadas', regrasMapeamentoElementos: atualizadas }).catch(() => { });
+                            }
+                        });
+                    });
+                }
+            },
+            copiarTexto: (txt) => gravarNaAreaDeTransferencia(txt, null),
+            projetarMiniTip: (msg, cor) => { if (validador && typeof validador.projetarMiniTipGlobal === 'function') validador.projetarMiniTipGlobal(msg, cor); },
+            dispararFlashBorderVisual
         };
     }
+    function abrirModalSalvarRegraMapeamento(baseEl, seletoresExtraidos) {
+        return dialogoMapeamento ? dialogoMapeamento.abrirModal(baseEl, seletoresExtraidos, obterDepsDialogoMapeamento()) : null;
+    }
+    function executarInspecaoECapturaSeletorUnico(el) {
+        return dialogoMapeamento ? dialogoMapeamento.executarInspecaoECapturaSeletorUnico(el, obterDepsDialogoMapeamento()) : null;
+    }
+    function extrairCaminhoXPathAbsoluto(el) { return dialogoMapeamento ? dialogoMapeamento.extrairCaminhoXPathAbsoluto(el) : ''; }
+    function extrairCaminhoXPathRelativo(el) { return dialogoMapeamento ? dialogoMapeamento.extrairCaminhoXPathRelativo(el) : ''; }
+    function extrairSeletorCssSimplificado(el) { return dialogoMapeamento ? dialogoMapeamento.extrairSeletorCssSimplificado(el) : ''; }
+    function isRegraMuitoCurta(expressao) { return dialogoMapeamento ? dialogoMapeamento.isRegraMuitoCurta(expressao) : false; }
 
     function obterElementoAlvoEfetivo(e) {
         if (!e) return null;
@@ -1200,468 +1199,72 @@
      */
     function isElementoControlePdf(el) {
         if (!el) return false;
-        return obterClassificacaoRegraCustomizada(el) === 'interface';
+        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
     }
 
     /*
      * FUNCAO: isCelulaTabelaDadosLeitura
-     * DIRETRIZ ROOT 6.39: Identifica celulas de tabelas de dados (TD, TH, .rich-table-cell,
-     * [role="cell"], [role="gridcell"]) em sistemas como PJe, eproc e plataformas JSF/RichFaces/PrimeFaces.
-     * Celulas de dados que contem texto direto (processos CNJ, datas, horarios, nomes, valores)
-     * pertencem a LEITURA_COMUM, neutralizando eventos onmouseover/onmouseout/onclick cosmeticos
-     * injetados na tag <tr> ou <table> que erroneamente as rotulavam como controles de interface.
-     * EXCECAO: Se o alvo clicado for um controle interativo explicito (<a>, <button>, <input>, etc.)
-     * contido dentro da celula, o controle prevalece.
+     * DIRETRIZ ROOT 6.39: Identifica celulas de tabelas de dados que permanecem em leitura textual
+     * conforme a base unificada (classificarContextoElementoAlvo).
      */
     function isCelulaTabelaDadosLeitura(el) {
         if (!el) return false;
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         if (!base) return false;
-
-        const tagBase = (base.tagName || '').toUpperCase();
-        if (
-            tagBase === 'BUTTON' || tagBase === 'A' || tagBase === 'INPUT' ||
-            tagBase === 'SELECT' || tagBase === 'TEXTAREA' || tagBase === 'LABEL'
-        ) {
-            return false;
-        }
-        if (base.getAttribute && (base.getAttribute('role') === 'button' || base.getAttribute('role') === 'link')) {
-            return false;
-        }
-
         const celula = (typeof base.closest === 'function')
             ? base.closest('td, th, [role="cell"], [role="gridcell"], .rich-table-cell')
             : null;
         if (!celula) return false;
-
-        if (obterClassificacaoRegraCustomizada(celula) === 'interface') {
-            return false;
-        }
-
-        let curr = base;
-        while (curr && curr !== celula) {
-            if (curr.nodeType === Node.ELEMENT_NODE) {
-                const t = (curr.tagName || '').toUpperCase();
-                if (t === 'BUTTON' || t === 'A' || t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA' || t === 'LABEL') {
-                    return false;
-                }
-                const r = (curr.getAttribute && curr.getAttribute('role')) || '';
-                if (r === 'button' || r === 'link') {
-                    return false;
-                }
-            }
-            curr = curr.parentElement;
-        }
-
-        return true;
+        return classificarContextoElementoAlvo(base) === 'LEITURA_COMUM';
     }
 
     /*
      * FUNCAO: isAreaLeituraOuPdfConteudo
-     * DIRETRIZ ROOT 6.16 e 6.32: Identifica se o elemento alvo pertence ao conteudo textual de um
-     * visualizador de PDF no Chrome (PDF.js / .textLayer / .pdfViewer / .page / <pdf-viewer> /
-     * div#scroller / div#content / embed[type*="pdf"] / embed#plugin) ou area de leitura documental
-     * e celulas de tabelas de dados (Diretriz 6.39), excluindo expressamente barras de ferramentas e controles do PDF.
+     * DIRETRIZ ROOT 6.16 e 6.32: Delega integralmente a classificacao de leitura documental/PDF
+     * para classificarContextoElementoAlvo (incluindo regras do Mapeamento Manual Avancado e interface.json).
      */
     function isAreaLeituraOuPdfConteudo(el) {
         if (!el) return false;
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         if (!base) return false;
-
-        /* Seção 6.20: Regras de Mapeamento Manual Avançado */
-        const regraCustom = obterClassificacaoRegraCustomizada(base);
-        if (regraCustom === 'textual') return true;
-        if (regraCustom === 'interface' || regraCustom === 'semiflexivel') return false;
-
-        /* BUG-29: Controles interativos, botões, links, campos e labels NUNCA são área de leitura */
-        const tagBase = (base.tagName || '').toUpperCase();
-        if (
-            tagBase === 'LABEL' || tagBase === 'BUTTON' || tagBase === 'A' ||
-            tagBase === 'INPUT' || tagBase === 'SELECT' || tagBase === 'TEXTAREA' ||
-            (typeof base.closest === 'function' && base.closest('label, button, a, input, select, textarea'))
-        ) {
-            return false;
-        }
-
-        if (isCelulaTabelaDadosLeitura(base)) {
-            return true;
-        }
-
-        if (isElementoControlePdf(base) || isComponenteSelecaoOuDropdown(base)) {
-            return false;
-        }
-
-        let atual = base;
-        let profundidade = 0;
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 20) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tag = (atual.tagName || '').toLowerCase();
-                const idElem = (atual.id || '').toLowerCase();
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-                const tipoAttr = (atual.getAttribute('type') || '').toLowerCase();
-
-                if (
-                    tag === 'pdf-viewer' ||
-                    (tag === 'embed' && (tipoAttr.includes('pdf') || tipoAttr === 'application/x-google-chrome-pdf')) ||
-                    (tag === 'object' && tipoAttr.includes('pdf')) ||
-                    idElem === 'viewercontainer' ||
-                    tipoAttr.includes('pdf') ||
-                    tipoAttr === 'application/x-google-chrome-pdf' ||
-                    ((idElem === 'viewer' || idElem === 'scroller' || idElem === 'content' || idElem === 'plugin') &&
-                        Boolean(atual.closest && atual.closest('pdf-viewer, embed[type*="pdf"], object[type*="pdf"], .pdfViewer, #viewerContainer')))
-                ) {
-                    return true;
-                }
-
-                if (cls && (
-                    cls.includes('textlayer') ||
-                    cls.includes('pdfviewer') ||
-                    cls.includes('pdf-container') ||
-                    (cls.includes('page') && atual.hasAttribute('data-page-number'))
-                )) {
-                    return true;
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-
+        const ctx = classificarContextoElementoAlvo(base);
         if (typeof document !== 'undefined' && document.contentType === 'application/pdf') {
-            return true;
+            return ctx !== 'LINK_CLICAVEL' && ctx !== 'IGNORAR';
         }
-        return false;
+        return ctx === 'LEITURA_COMUM';
     }
 
     function isElementoInterativoOuUi(el) {
         if (!el) return false;
-
-        /* Seção 6.20: Regras de Mapeamento Manual Avançado */
-        const regraCustom = obterClassificacaoRegraCustomizada(el);
-        if (regraCustom === 'textual') return false;
-        if (regraCustom === 'interface' || regraCustom === 'semiflexivel') return true;
-
-        /* DIRETRIZ PDF E DOCUMENTOS: Visualizadores de PDF (PDF.js, PJe, eproc, textLayer)
-         * e camadas de texto de paginas de documentos pertencem estritamente a LEITURA_COMUM,
-         * NUNCA a controles de sistema ou menus de interface (exceto se o proprio alvo for link ou botao). */
-        if (isAreaLeituraOuPdfConteudo(el)) {
-            return false;
-        }
-
-        const TAGS_INTERATIVAS = new Set([
-            'BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
-            'SUMMARY', 'DETAILS', 'LABEL', 'AUDIO', 'VIDEO', 'CANVAS', 'DIALOG',
-            'EMBED', 'OBJECT', 'SVG', 'PATH', 'G', 'CIRCLE', 'RECT', 'POLYGON',
-            'LINE', 'USE', 'SYMBOL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU', 'DATALIST',
-            'NAV', 'HEADER', 'FOOTER', 'ASIDE'
-        ]);
-
-        const ROLES_INTERATIVOS = new Set([
-            'button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
-            'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option',
-            'checkbox', 'radio', 'radiogroup', 'slider', 'spinbutton', 'scrollbar',
-            'toolbar', 'tree', 'treeitem', 'searchbox', 'dialog', 'alertdialog',
-            'navigation', 'banner', 'complementary'
-        ]);
-
-        const ATRIBUTOS_ESTADO_INTERATIVO = [
-            'aria-haspopup', 'aria-expanded', 'aria-controls', 'aria-pressed',
-            'aria-checked', 'aria-selected', 'jsaction', 'jsname', 'jscontroller',
-            'data-action', 'data-toggle', 'data-bs-toggle', 'data-trigger',
-            'ng-click', 'v-on:click', 'routerlink'
-        ];
-
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                if (atual.hasAttribute('data-jusgov-ignore')) return true;
-
-                /* Heurística Root (Seção 6.121): Cursor do mouse e eventos vinculados */
-                if (profundidade <= 6) {
-                    try {
-                        const st = window.getComputedStyle(atual);
-                        if (st) {
-                            const cur = st.cursor;
-                            if (cur === 'text' || cur === 'vertical-text' || cur === 'cell') {
-                                return false;
-                            }
-                            if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grab' || cur === 'grabbing' || cur === 'progress' || cur === 'help' || cur === 'context-menu') {
-                                return true;
-                            }
-                            const us = st.userSelect || st.webkitUserSelect;
-                            if (us === 'none') {
-                                return true;
-                            }
-                        }
-                    } catch (_) { }
-                }
-
-                const tagUpper = (atual.tagName || '').toUpperCase();
-                if (TAGS_INTERATIVAS.has(tagUpper)) {
-                    return true;
-                }
-
-                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') {
-                    return true;
-                }
-
-                const role = atual.getAttribute('role');
-                if (role && ROLES_INTERATIVOS.has(role.toLowerCase())) {
-                    return true;
-                }
-
-                for (let i = 0; i < ATRIBUTOS_ESTADO_INTERATIVO.length; i++) {
-                    if (atual.hasAttribute(ATRIBUTOS_ESTADO_INTERATIVO[i])) {
-                        return true;
-                    }
-                }
-
-                /* Inspecao de propriedades e atributos de eventos de mouse e clique (onclick, onmouse*, etc.) */
-                if (
-                    atual.onclick ||
-                    atual.onmousedown ||
-                    atual.onmouseup ||
-                    atual.onmouseover ||
-                    atual.onmouseenter ||
-                    atual.onmouseleave ||
-                    atual.onpointerdown ||
-                    atual.onpointerup ||
-                    atual.ondblclick
-                ) {
-                    return true;
-                }
-
-                if (atual.attributes && atual.attributes.length > 0) {
-                    for (let a = 0; a < atual.attributes.length; a++) {
-                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
-                        if (
-                            attrNome.startsWith('on') ||
-                            attrNome === '(click)' ||
-                            attrNome === '@click' ||
-                            attrNome.startsWith('v-on:') ||
-                            attrNome.startsWith('ng-')
-                        ) {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            /* Subida na arvore atravessando Shadow DOM para o Host do componente */
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-
-        return false;
+        const ctx = classificarContextoElementoAlvo(el);
+        return ctx === 'LINK_CLICAVEL' || ctx === 'SEMIFLEXIVEL';
     }
 
     /*
      * FUNCAO: isElementoInterativoClicavelDireto
-     * DIRETRIZ ROOT 2.17: Identifica elementos clicaveis diretos (links <a href>, botoes,
-     * controles de formulario, icones "maozinha" cursor:pointer ou "help" cursor:help,
-     * ou elementos com eventos onclick/onmouse*) nos quais um clique simples SEM teclas
-     * modificadoras JAMAIS deve selecionar ou copiar (nem mesmo se contiver datas ou numeros).
+     * DIRETRIZ ROOT 2.17: Delega para classificarContextoElementoAlvo.
      */
     function isElementoInterativoClicavelDireto(el) {
         if (!el) return false;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!atual) return false;
-        if (isAreaLeituraOuPdfConteudo(atual) || isCelulaTabelaDadosLeitura(atual)) {
-            return false;
-        }
-        let profundidade = 0;
-
-        const TAGS_CLICAVEIS = new Set([
-            'A', 'BUTTON', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA',
-            'SUMMARY', 'DETAILS', 'LABEL', 'MAT-ICON', 'G-ICON', 'MD-ICON', 'MENU'
-        ]);
-        const ROLES_CLICAVEIS = new Set([
-            'button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
-            'tab', 'switch', 'combobox', 'listbox', 'option', 'checkbox', 'radio', 'treeitem'
-        ]);
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tagUpper = (atual.tagName || '').toUpperCase();
-                if (TAGS_CLICAVEIS.has(tagUpper)) return true;
-
-                const role = (atual.getAttribute('role') || '').toLowerCase();
-                if (role && ROLES_CLICAVEIS.has(role)) return true;
-
-                if (
-                    atual.onclick ||
-                    atual.onmousedown ||
-                    atual.onmouseup ||
-                    atual.onmouseover ||
-                    atual.onmouseenter ||
-                    atual.onmouseleave ||
-                    atual.onpointerdown ||
-                    atual.onpointerup ||
-                    atual.ondblclick
-                ) {
-                    return true;
-                }
-
-                if (atual.attributes && atual.attributes.length > 0) {
-                    for (let a = 0; a < atual.attributes.length; a++) {
-                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
-                        if (
-                            attrNome.startsWith('on') ||
-                            attrNome === '(click)' ||
-                            attrNome === '@click' ||
-                            attrNome.startsWith('v-on:') ||
-                            attrNome === 'ng-click' ||
-                            attrNome === 'jsaction' ||
-                            attrNome === 'routerlink'
-                        ) {
-                            return true;
-                        }
-                    }
-                }
-
-                if (profundidade <= 6) {
-                    try {
-                        const st = window.getComputedStyle(atual);
-                        if (st) {
-                            const cur = st.cursor;
-                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
-                                return true;
-                            }
-                        }
-                    } catch (_) { }
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return false;
+        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
     }
 
     /*
      * FUNCAO: isComponenteSelecaoOuDropdown
-     * BUG-16 (Seção 6.70): Identifica se um elemento ou qualquer de seus ancestrais pertence
-     * a um componente de seleção, combobox, listbox ou dropdown (Select2 do PJe, PrimeNG, PrimeFaces,
-     * Angular Material, Bootstrap, <select>, etc.).
-     * Cliques sem Alt sobre esses controles NÃO devem selecionar nem copiar dados automaticamente,
-     * preservando a abertura e seleção nativas. A cópia de placeholders ou itens selecionados
-     * é restrita à tecla Alt (Alt + Clique).
+     * BUG-16 (Seção 6.70): Delega para classificarContextoElementoAlvo.
      */
     function isComponenteSelecaoOuDropdown(el) {
         if (!el) return false;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-        const TAGS_SELECT = new Set(['SELECT', 'OPTION', 'OPTGROUP']);
-        const ROLES_SELECT = new Set(['combobox', 'listbox', 'option']);
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 18) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tag = (atual.tagName || '').toUpperCase();
-                if (TAGS_SELECT.has(tag)) return true;
-
-                const role = (atual.getAttribute('role') || '').toLowerCase();
-                if (role && ROLES_SELECT.has(role)) return true;
-
-                const ariaHasPopup = (atual.getAttribute('aria-haspopup') || '').toLowerCase();
-                if (ariaHasPopup === 'listbox' || ariaHasPopup === 'true') {
-                    if (atual.hasAttribute('aria-expanded')) return true;
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return false;
+        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
     }
 
     /*
      * FUNCAO: isComponenteBotaoOuFormularioEstrito
-     * DIRETRIZ ROOT 2.17 e 6.20: Identifica estritamente componentes de acao interativa
-     * que funcionam por clique de comando ou entrada de dados (botoes <button>, [role="button"],
-     * icones de acao, controles de formulario <input>, <select>, <textarea>, <option>, <label>,
-     * gatilhos de dropdown [aria-haspopup], switches, checkboxes, radios e toolbars).
-     * Permite distinguir botoes/forms estritos de containers/textos de interface (como <div>,
-     * <span>, <small>, <td>, <h3> ou links informativos no PJe) onde mascaras forenses
-     * (datas, horas, data+hora, CPF, CNPJ, processos CNJ, IDs) podem ser auto-copiadas no clique simples.
+     * DIRETRIZ ROOT 2.17 e 6.20: Delega para classificarContextoElementoAlvo.
      */
     function isComponenteBotaoOuFormularioEstrito(el) {
         if (!el) return false;
-        if (isComponenteSelecaoOuDropdown(el)) return true;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-
-        const TAGS_BOTAO_OU_FORM = new Set([
-            'BUTTON', 'INPUT', 'SELECT', 'OPTION', 'OPTGROUP', 'TEXTAREA',
-            'LABEL', 'SUMMARY', 'DETAILS', 'MAT-ICON', 'G-ICON', 'MD-ICON',
-            'SVG', 'PATH', 'CANVAS', 'AUDIO', 'VIDEO', 'MENU', 'DIALOG'
-        ]);
-        const ROLES_BOTAO_OU_FORM = new Set([
-            'button', 'switch', 'checkbox', 'radio', 'combobox', 'listbox',
-            'option', 'slider', 'spinbutton', 'scrollbar', 'toolbar', 'tab',
-            'menuitem', 'menuitemcheckbox', 'menuitemradio', 'searchbox', 'textbox'
-        ]);
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 15) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tagUpper = (atual.tagName || '').toUpperCase();
-                if (TAGS_BOTAO_OU_FORM.has(tagUpper)) return true;
-
-                const role = (atual.getAttribute('role') || '').toLowerCase();
-                if (role && ROLES_BOTAO_OU_FORM.has(role)) return true;
-
-                if (
-                    atual.hasAttribute('aria-haspopup') ||
-                    atual.hasAttribute('aria-expanded') ||
-                    atual.hasAttribute('aria-pressed') ||
-                    atual.hasAttribute('aria-checked')
-                ) {
-                    return true;
-                }
-
-                if (tagUpper.indexOf('-') !== -1) {
-                    const tagLower = tagUpper.toLowerCase();
-                    if (
-                        tagLower.indexOf('-button') !== -1 ||
-                        tagLower.indexOf('-btn') !== -1 ||
-                        tagLower.indexOf('-picker') !== -1 ||
-                        tagLower.indexOf('-switcher') !== -1 ||
-                        tagLower.indexOf('-selector') !== -1 ||
-                        tagLower.indexOf('-dropdown') !== -1 ||
-                        tagLower.indexOf('-toggle') !== -1 ||
-                        tagLower.indexOf('-icon') !== -1 ||
-                        tagLower.indexOf('-toolbar') !== -1 ||
-                        tagLower.indexOf('-menu') !== -1
-                    ) {
-                        return true;
-                    }
-                }
-
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-                if (cls && (
-                    /\bbtn\b/.test(cls) ||
-                    /\bbutton\b/.test(cls) ||
-                    cls.includes('btn-') ||
-                    cls.includes('mat-button') ||
-                    cls.includes('mat-icon-button') ||
-                    cls.includes('mat-raised-button') ||
-                    cls.includes('mat-flat-button') ||
-                    cls.includes('mat-stroked-button') ||
-                    cls.includes('p-button') ||
-                    cls.includes('ui-button') ||
-                    cls.includes('ui-selectonemenu') ||
-                    cls.includes('select2') ||
-                    cls.includes('dropdown-toggle') ||
-                    cls.includes('toolbarbutton') ||
-                    cls.includes('fa-') ||
-                    cls.includes('glyphicon') ||
-                    cls.includes('material-icons')
-                )) {
-                    return true;
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return false;
+        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
     }
 
     /*
@@ -2184,93 +1787,19 @@
      */
     function isContextoDeSistemaOuUi(el) {
         if (!el) return false;
-        const regraCustom = obterClassificacaoRegraCustomizada(el);
-        if (regraCustom === 'textual') return false;
-        if (regraCustom === 'interface' || regraCustom === 'semiflexivel') return true;
-        return isElementoInterativoOuUi(el);
+        const ctx = classificarContextoElementoAlvo(el);
+        return ctx === 'LINK_CLICAVEL' || ctx === 'SEMIFLEXIVEL';
     }
 
     function isElementoClaramenteDeInterface(el) {
         if (!el) return false;
-        if (isAreaLeituraOuPdfConteudo(el)) return false;
-        return isContextoDeSistemaOuUi(el) || isTelaSistemaEstritaParaDesselecao(el) || isElementoInterativoClicavelDireto(el);
+        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
     }
 
     function isTelaSistemaEstritaParaDesselecao(el) {
         if (!el) return false;
-        if (isAreaLeituraOuPdfConteudo(el)) return false;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-        const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU', 'NAV', 'HEADER', 'FOOTER', 'ASIDE']);
-        const ROLES_ESTRITOS = new Set(['button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option', 'dialog', 'alertdialog', 'toolbar', 'tree', 'treeitem']);
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tagUpper = (atual.tagName || '').toUpperCase();
-                if (TAGS_ESTRITAS.has(tagUpper)) return true;
-                if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') return true;
-                const role = (atual.getAttribute('role') || '').toLowerCase();
-                if (role && ROLES_ESTRITOS.has(role)) return true;
-                const idElem = (typeof atual.id === 'string') ? atual.id.toLowerCase() : '';
-                if (idElem && (
-                    idElem.includes('polo') ||
-                    idElem.includes('detalhe') ||
-                    idElem.includes('navbar') ||
-                    idElem.includes('toolbar') ||
-                    idElem.includes('sidebar') ||
-                    idElem.includes('topbar') ||
-                    idElem.includes('menu') ||
-                    idElem.includes('header')
-                )) {
-                    return true;
-                }
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-                if (cls && (
-                    cls.includes('modal') ||
-                    cls.includes('dialog') ||
-                    cls.includes('dropdown') ||
-                    cls.includes('popover') ||
-                    cls.includes('ui-selectonemenu') ||
-                    cls.includes('select2') ||
-                    cls.includes('context-menu') ||
-                    cls.includes('mat-dialog') ||
-                    cls.includes('p-dialog') ||
-                    cls.includes('pje-modal') ||
-                    cls.includes('pje-etiquetas') ||
-                    cls.includes('label-etiqueta') ||
-                    cls.includes('label-info') ||
-                    cls.includes('badge') ||
-                    cls.includes('chip') ||
-                    cls.includes('tag') ||
-                    cls.includes('toolbar') ||
-                    cls.includes('navbar') ||
-                    cls.includes('nav-topo') ||
-                    cls.includes('drop-menu') ||
-                    cls.includes('mais-detalhes') ||
-                    cls.includes('tree') ||
-                    cls.includes('sidebar') ||
-                    cls.includes('topbar') ||
-                    cls.includes('card-header') ||
-                    cls.includes('panel-heading') ||
-                    cls.includes('breadcrumb') ||
-                    cls.includes('btn') ||
-                    cls.includes('action-bar') ||
-                    cls.includes('ui-datalist') ||
-                    cls.includes('datalist-content') ||
-                    cls.includes('timeline') ||
-                    cls.includes('item-timeline') ||
-                    cls.includes('tarefa-card') ||
-                    cls.includes('card-processo') ||
-                    cls.includes('painel-tarefas') ||
-                    cls.includes('pje-cabecalho')
-                )) {
-                    return true;
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return false;
+        const ctx = classificarContextoElementoAlvo(el);
+        return ctx === 'LINK_CLICAVEL' || ctx === 'SEMIFLEXIVEL';
     }
 
     function normalizarModoRetirarSelecao(val) {
@@ -2281,32 +1810,25 @@
 
     /*
      * FUNCAO: deveManterSelecaoAtivaNoDom
-     * DIRETRIZ ROOT 6.16 e 6.27: Regra de Retencao / Remocao da Selecao do Sistema:
-     * - Se modoRetirarSelecao === 'nenhuma': MANTEM a selecao ativa sempre (nao retira de nada).
-     * - Se modoRetirarSelecao === 'total': REMOVE a selecao sempre (tanto interface web quanto texto de leitura).
-     * - Se modoRetirarSelecao === 'total_exceto_arrasto':
-     *   - Se for arrasto de mouse (eraArrasto === true): MANTEM a selecao ativa.
-     *   - Se for clique simples, duplo, triplo, Alt, Shift, etc.: REMOVE a selecao.
-     * - Se modoRetirarSelecao === 'interface' (padrao):
-     *   - Se pertencer a area de leitura/texto judicial ou documento PDF aberto no Chrome
-     *     (excluindo barras de ferramentas e controles do PDF): MANTEM a selecao ativa no sistema.
-     *   - Se for elemento de interface grafica/controle/modal estrito: REMOVE imediatamente a selecao do sistema.
+     * DIRETRIZ ROOT 6.16 e 6.27: Regra de Retencao / Remocao da Selecao do Sistema,
+     * delegando integralmente a classificacao para a base unica (classificarContextoElementoAlvo).
      */
     function deveManterSelecaoAtivaNoDom(noOuElemento, eraArrasto = false) {
         if (modoRetirarSelecao === 'nenhuma') return true;
         if (modoRetirarSelecao === 'total') return false;
         if (!noOuElemento) return true;
-        /* Seção 6.20: Regras de Mapeamento Manual Avançado */
         const regraCustom = obterClassificacaoRegraCustomizada(noOuElemento);
-        if (regraCustom === 'textual') return true;
-        if (regraCustom === 'interface' || regraCustom === 'semiflexivel') return false;
+        if (regraCustom) {
+            const ctxRegra = mapearTipoParaContextoAlvo(regraCustom, noOuElemento);
+            if (ctxRegra) {
+                return (ctxRegra !== 'LINK_CLICAVEL' && ctxRegra !== 'SEMIFLEXIVEL' && ctxRegra !== 'IGNORAR');
+            }
+        }
         if (modoRetirarSelecao === 'total_exceto_arrasto') {
             return (eraArrasto === true);
         }
-        if (isElementoControlePdf(noOuElemento)) return false;
-        if (isAreaLeituraOuPdfConteudo(noOuElemento)) return true;
-        if (isTelaSistemaEstritaParaDesselecao(noOuElemento)) return false;
-        return true;
+        const ctx = classificarContextoElementoAlvo(noOuElemento);
+        return (ctx !== 'LINK_CLICAVEL' && ctx !== 'SEMIFLEXIVEL' && ctx !== 'IGNORAR');
     }
 
     /*
@@ -2331,65 +1853,16 @@
 
     /*
      * FUNCAO: isElementoInterfaceDeEditorRico
-     * DIRETRIZ ROOT 6.31: Identifica se o elemento clicado (ou qualquer ancestral na cadeia pai/avo)
-     * pertence a INTERFACE DE CONTROLE / BARRA DE FERRAMENTAS de um editor rico (ex.: CKEditor cke_*,
-     * cke_*editor, cke_top, cke_toolbox, cke_toolbar, cke_combo, cke_button, TinyMCE mce-toolbar/tox-toolbar,
-     * Quill ql-toolbar, toolbar do editor demo) e NAO ao corpo editavel do documento (cke_editable /
-     * contenteditable="true").
+     * DIRETRIZ ROOT 6.31: Delega para interface.json (interna_editores_toolbars / interna_leitura_editores_pdf),
+     * excluindo nos diretamente contenteditable="true".
      */
     function isElementoInterfaceDeEditorRico(target) {
         if (!target) return false;
-        let atual = (target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
-        if (!atual || atual.nodeType !== Node.ELEMENT_NODE) return false;
-
-        const docOwner = atual.ownerDocument || document;
-        let profundidade = 0;
-
-        while (atual && atual !== docOwner && profundidade < 25) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const attrCe = (atual.getAttribute('contenteditable') || '').toLowerCase();
-                if (attrCe === 'true') {
-                    return false;
-                }
-                const cls = (typeof atual.className === 'string') ? atual.className : '';
-                const id = (typeof atual.id === 'string') ? atual.id : '';
-                const clsLower = cls.toLowerCase();
-                const idLower = id.toLowerCase();
-
-                /* Se alcancou a raiz editavel do documento CKEditor/Quill/TinyMCE/ProseMirror,
-                 * significa que o elemento esta DENTRO da folha de edicao e nao na barra de interface */
-                const tagUpperInspecao = (atual.tagName || '').toUpperCase();
-                if (tagUpperInspecao === 'RICH-TEXTAREA' || tagUpperInspecao === 'TEXTAREA') {
-                    return false;
-                }
-                const roleInspecao = (atual.getAttribute && atual.getAttribute('role')) || '';
-                if (roleInspecao === 'textbox' || roleInspecao === 'searchbox') {
-                    return false;
-                }
-                if (
-                    /\b(cke_editable|mce-content-body|ql-editor|prosemirror|editor-content-area)\b/i.test(clsLower) &&
-                    attrCe !== 'false'
-                ) {
-                    return false;
-                }
-
-                /* Checa se o elemento, pai ou avo pertence a interface de ferramentas/chrome do editor (cke_*, cke_*editor, etc.) */
-                const ehClasseOuIdCkeUi = (
-                    (/\bcke_[a-z0-9_-]*/i.test(clsLower) && !/\bcke_editable\b/i.test(clsLower)) ||
-                    (/^cke_/i.test(idLower) && !/\bcke_editable\b/i.test(clsLower)) ||
-                    /cke_[a-z0-9_-]*editor/i.test(clsLower) ||
-                    /cke_[a-z0-9_-]*editor/i.test(idLower)
-                );
-                const ehOutraToolbarEditor = /\b(editor-toolbar-main|ql-toolbar|tox-toolbar|tox-editor-header|tox-menubar|tox-statusbar|mce-toolbar|mce-menubar|mce-statusbar)\b/i.test(clsLower);
-
-                if (ehClasseOuIdCkeUi || ehOutraToolbarEditor) {
-                    return true;
-                }
-            }
-            atual = atual.parentElement;
-        }
-        return false;
+        const base = (target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
+        if (!base || base.nodeType !== Node.ELEMENT_NODE) return false;
+        const attrCe = (base.getAttribute && base.getAttribute('contenteditable') || '').toLowerCase();
+        if (attrCe === 'true' || attrCe === 'plaintext-only') return false;
+        return obterClassificacaoRegraCustomizada(base) === 'interface';
     }
 
     /*
@@ -2408,6 +1881,11 @@
             /* Excecao obrigatoria: interface de ferramentas/chrome do editor (cke_*, cke_*editor, toolbars) */
             if (isElementoInterfaceDeEditorRico(el)) {
                 return false;
+            }
+
+            const regraUsuarioEditavel = obterClassificacaoRegraCustomizada(el, true);
+            if (regraUsuarioEditavel) {
+                return regraUsuarioEditavel === 'editavel';
             }
 
             const docOwner = el.ownerDocument || document;
@@ -2439,7 +1917,7 @@
                         if (atual.getAttribute('aria-readonly') !== 'true') return true;
                     }
                     const cls = (typeof atual.className === 'string') ? atual.className : '';
-                    if (cls && /\b(cke_editable|mce-content-body|ql-editor|ProseMirror|editor-content-area|monaco-editor|CodeMirror)\b/i.test(cls)) {
+                    if (cls && /\b(cke_editable|ck-editor__editable|ck-content|mce-content-body|ql-editor|ProseMirror|editor-content-area|monaco-editor|CodeMirror)\b/i.test(cls)) {
                         if (
                             atual.isContentEditable ||
                             attrCe === 'true' ||
@@ -2559,6 +2037,11 @@
                 else return false;
             }
 
+            const regraUsuarioEditavel = obterClassificacaoRegraCustomizada(el, true);
+            if (regraUsuarioEditavel) {
+                return regraUsuarioEditavel === 'editavel';
+            }
+
             const docOwner = el.ownerDocument || document;
 
             // 1. Verificacao de tag direta
@@ -2580,6 +2063,13 @@
             const ehEditorDireto = el.isContentEditable || attrCeProprio === 'true' || attrCeProprio === 'plaintext-only' || (attrCeProprio === '' && el.hasAttribute && el.hasAttribute('contenteditable'));
             if (!ehEditorDireto && isElementoInterfaceDeEditorRico(el)) {
                 return false;
+            }
+
+            // Regras internas (interface.json) ou regras manuais marcadas explicitamente como 'editavel'
+            if (attrCeProprio !== 'false' && (!el.getAttribute || el.getAttribute('aria-readonly') !== 'true') && !el.readOnly && !el.disabled) {
+                if (obterClassificacaoRegraCustomizada(el) === 'editavel') {
+                    return true;
+                }
             }
 
             // 2. Seletor de correspondencia direta ou ancestral (closest)
@@ -2625,6 +2115,8 @@
                         atual.classList.contains('ql-editor') ||
                         atual.classList.contains('ProseMirror') ||
                         atual.classList.contains('cke_editable') ||
+                        atual.classList.contains('ck-editor__editable') ||
+                        atual.classList.contains('ck-content') ||
                         atual.classList.contains('monaco-editor') ||
                         atual.classList.contains('CodeMirror') ||
                         atual.classList.contains('mce-content-body')
@@ -2739,29 +2231,39 @@
      * - 'LINK_CLICAVEL': botoes, links, menus, dropdowns e controles de interface interativa;
      * - 'LEITURA_COMUM': texto estatico da pagina onde a copia automatica atua.
      */
+    function mapearTipoParaContextoAlvo(tipoRegra, alvoEl) {
+        if (tipoRegra === 'ignorar') return 'IGNORAR';
+        if (tipoRegra === 'interface') return 'LINK_CLICAVEL';
+        if (tipoRegra === 'semiflexivel') return 'SEMIFLEXIVEL';
+        if (tipoRegra === 'textual') return 'LEITURA_COMUM';
+        if (tipoRegra === 'editavel') {
+            const tag = (alvoEl && alvoEl.tagName) ? alvoEl.tagName.toUpperCase() : '';
+            if (tag === 'INPUT') {
+                const tipoInput = (alvoEl.getAttribute('type') || alvoEl.type || 'text').toLowerCase();
+                const tiposNaoTexto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'file', 'image', 'range', 'color'];
+                if (!tiposNaoTexto.includes(tipoInput) && !alvoEl.readOnly && !alvoEl.disabled) {
+                    return 'CAMPO_SIMPLES_EDITAVEL';
+                }
+            }
+            return 'EDITOR_MULTILINHA_EDITAVEL';
+        }
+        return null;
+    }
+
     function classificarContextoElementoAlvo(el) {
         if (!el) return 'IGNORAR';
 
-        /* Seção 6.20: Regras de Mapeamento Manual Avançado de Elementos (XPath / CSS / JS Path) */
-        const regraCustomizada = obterClassificacaoRegraCustomizada(el);
-        if (regraCustomizada === 'textual') {
-            return 'LEITURA_COMUM';
-        }
-        if (regraCustomizada === 'interface') {
-            return 'LINK_CLICAVEL';
-        }
-        if (regraCustomizada === 'semiflexivel') {
-            return 'SEMIFLEXIVEL';
+        /* Passo 2.3: Verifica se pertence ao proprio addon (IGNORAR) */
+        const atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (atual && typeof atual.closest === 'function' && atual.closest('[data-jusgov-ignore]')) {
+            return 'IGNORAR';
         }
 
-        /* Passo 2.3: Inspecao de interface de controle de editores ricos (cke_*, cke_*editor, toolbars)
-         * e controles de visualizadores de PDF (<viewer-toolbar>, div#toolbar, etc.):
-         * Excecao estrita (Diretrizes 6.31 e 6.32): Barras de ferramentas de editores e do PDF
-         * NUNCA sao classificados como conteudo editavel nem como leitura comum, mas como LINK_CLICAVEL. */
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (atual && isElementoInterfaceDeEditorRico(atual)) {
-            if (atual.hasAttribute && atual.hasAttribute('data-jusgov-ignore')) return 'IGNORAR';
-            return 'LINK_CLICAVEL';
+        /* Passo 2.4: Prioridade soberana das regras salvas no Mapeamento Manual Avancado (XPath / CSS) */
+        const regraUsuario = atual ? obterClassificacaoRegraCustomizada(atual, true) : null;
+        if (regraUsuario) {
+            const ctxUsuario = mapearTipoParaContextoAlvo(regraUsuario, atual);
+            if (ctxUsuario) return ctxUsuario;
         }
 
         /* Seletor de pagina do PDF (<viewer-page-selector> / input#pageSelector): CAMPO_SIMPLES_EDITAVEL */
@@ -2776,108 +2278,17 @@
             }
         }
 
-        /* Demais controles do PDF embutido pertencem a interface LINK_CLICAVEL */
-        if (atual && isElementoControlePdf(atual)) {
-            return 'LINK_CLICAVEL';
-        }
-
-        /* Se pertencer a area documental/camada de leitura do PDF, e LEITURA_COMUM */
-        if (atual && isAreaLeituraOuPdfConteudo(atual)) {
-            return 'LEITURA_COMUM';
-        }
-
-        /* BUG-29: Rótulos e labels de formulário/interface pertencem estritamente a LINK_CLICAVEL */
-        if (atual && typeof atual.closest === 'function' && atual.closest('label')) {
+        /* Barras de ferramentas de editores ricos nunca sao editaveis (delegado a interface.json) */
+        if (atual && isElementoInterfaceDeEditorRico(atual)) {
             return 'LINK_CLICAVEL';
         }
 
         /* Verificacao Universal de Campos Editaveis via isElementoEmCampoEditavel */
         if (atual && isElementoEmCampoEditavel(atual)) {
-            const tag = (atual.tagName || '').toUpperCase();
-            if (tag === 'INPUT') {
-                const tipoInput = (atual.getAttribute('type') || atual.type || 'text').toLowerCase();
-                const tiposNaoTexto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'file', 'image', 'range', 'color'];
-                if (!tiposNaoTexto.includes(tipoInput) && !atual.readOnly && !atual.disabled) {
-                    return 'CAMPO_SIMPLES_EDITAVEL';
-                }
-            }
-            return 'EDITOR_MULTILINHA_EDITAVEL';
+            return mapearTipoParaContextoAlvo('editavel', atual);
         }
 
         const docOwner = (atual && atual.ownerDocument) ? atual.ownerDocument : document;
-
-        /* Passo 2.4: Inspecao de campos editaveis (Inputs de texto, Textareas e hierarquia pai/avo contenteditable) */
-        while (atual && atual !== docOwner) {
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                if (atual.hasAttribute('data-jusgov-ignore')) return 'IGNORAR';
-
-                const tag = atual.tagName;
-                if (tag === 'TEXTAREA') {
-                    return (!atual.readOnly && !atual.disabled) ? 'EDITOR_MULTILINHA_EDITAVEL' : 'LEITURA_COMUM';
-                }
-
-                if (tag === 'INPUT') {
-                    const tipoInput = (atual.getAttribute('type') || atual.type || 'text').toLowerCase();
-                    const tiposNaoTexto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'file', 'image', 'range', 'color'];
-                    if (!tiposNaoTexto.includes(tipoInput) && !atual.readOnly && !atual.disabled) {
-                        return 'CAMPO_SIMPLES_EDITAVEL';
-                    }
-                    return 'LINK_CLICAVEL';
-                }
-
-                const attrCe = (atual.getAttribute('contenteditable') || '').toLowerCase();
-                if (
-                    atual.isContentEditable ||
-                    atual.contentEditable === 'true' ||
-                    attrCe === 'true' ||
-                    attrCe === 'plaintext-only'
-                ) {
-                    return 'EDITOR_MULTILINHA_EDITAVEL';
-                }
-
-                /* Se o elemento ou qualquer ancestral imediato tem contenteditable explicitamente "false",
-                 * e o proprio elemento alvo nao e editavel, encerra a busca de editores (mas ainda verifica isElementoInterativoOuUi abaixo!) */
-                if (attrCe === 'false' && !el.isContentEditable) {
-                    break;
-                }
-
-                if (atual.classList && (
-                    atual.classList.contains('cke_editable') ||
-                    atual.classList.contains('mce-content-body') ||
-                    atual.classList.contains('ql-editor') ||
-                    atual.classList.contains('ProseMirror') ||
-                    atual.classList.contains('CodeMirror') ||
-                    atual.classList.contains('monaco-editor')
-                )) {
-                    /* So e classificado como editor se for de fato editavel pelo usuario (no proprio elemento, pai/avo ou body).
-                     * Documentos ou visualizadores com classes do CKEditor/Quill/ProseMirror
-                     * mas somente-leitura nao sao editores ativos! */
-                    if (
-                        atual.isContentEditable ||
-                        attrCe === 'true' ||
-                        (docOwner.body && (docOwner.body.isContentEditable || (docOwner.body.getAttribute && docOwner.body.getAttribute('contenteditable') === 'true'))) ||
-                        docOwner.designMode === 'on'
-                    ) {
-                        return 'EDITOR_MULTILINHA_EDITAVEL';
-                    }
-                    break;
-                }
-
-                const role = atual.getAttribute('role');
-                if (role === 'textbox' || role === 'searchbox') {
-                    if (atual.getAttribute('aria-readonly') === 'true' || attrCe === 'false') {
-                        break;
-                    }
-                    if (atual.isContentEditable || attrCe === 'true' || tag === 'TEXTAREA' || tag === 'INPUT') {
-                        const ehMulti = atual.getAttribute('aria-multiline') === 'true' || tag === 'TEXTAREA';
-                        return ehMulti ? 'EDITOR_MULTILINHA_EDITAVEL' : 'CAMPO_SIMPLES_EDITAVEL';
-                    }
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-
-        /* Inspecao de Editores HTML onde document.body e contenteditable (ex: iframe ativo do CKEditor/PJe) */
         if (docOwner && docOwner.body && (
             docOwner.body.isContentEditable ||
             docOwner.body.contentEditable === 'true' ||
@@ -2887,12 +2298,9 @@
             return 'EDITOR_MULTILINHA_EDITAVEL';
         }
 
-        /* Inspecao de Interface Interativa (Botoes, Dropdowns, Menus, Abas, Controles) */
-        if (isElementoInterativoOuUi(el)) {
-            return 'LINK_CLICAVEL';
-        }
-
-        return 'LEITURA_COMUM';
+        /* Classificacao unificada pela cascata central: 0 Texto -> 1 Mouse -> 2 Eventos JS -> 3 Heuristicas -> 4 Regras */
+        const tipoCascata = resolverTipoElementoPorPrioridade(el);
+        return mapearTipoParaContextoAlvo(tipoCascata, atual) || 'LEITURA_COMUM';
     }
 
     /* ==========================================================================
@@ -3426,7 +2834,8 @@
             /* BUG-17 (Seção 6.73) & USAB-11/19 (Seções 6.110/6.120): Se o novo payload for textualmente idêntico ao que já reside no Slot 1 (atual),
              * a operação é idempotente em relação à pilha de histórico: NÃO desloca nem sobrescreve o Slot 2 (ANTERIOR__),
              * preservando a penúltima seleção intacta para ser colada com Ctrl + Botão do Meio. */
-            if (!ehConteudoIdenticoAoAtual) {
+            const preservarHistorico = Boolean(novoPayload.preservarHistorico);
+            if (!ehConteudoIdenticoAoAtual && !preservarHistorico) {
                 if (atual && (atual.texto || atual.html)) {
                     window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = {
                         texto: atual.texto || '',
@@ -3443,6 +2852,13 @@
                 if (window.__JUSGOV_HISTORICO_CLIPBOARD__.length > 2) {
                     window.__JUSGOV_HISTORICO_CLIPBOARD__.length = 2;
                 }
+            } else if (preservarHistorico && Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
+                window.__JUSGOV_HISTORICO_CLIPBOARD__[0] = {
+                    texto: txtSeguro,
+                    html: htmlSeguro,
+                    formatado: Boolean(novoPayload.formatado),
+                    timestamp: Date.now()
+                };
             }
 
             window.__JUSGOV_ULTIMO_CLIPBOARD__ = {
@@ -3463,11 +2879,12 @@
         }
     }
 
-    async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null) {
+    async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null, opcoesGravacao = {}) {
         /* Passo 5.3: Gravacao com suporte a formatos basicos, avancados ou sem filtro.
          * BLIND-01 (Seção 6.104): PRIMEIRO copia interno; somente se der certo internamente copia para o sistema operacional.
          * Se falhar internamente por estouro ou erro, NÃO copia para o sistema. */
         if (!textoFinal || typeof textoFinal !== 'string') return false;
+        const preservarHistorico = Boolean(opcoesGravacao && opcoesGravacao.preservarHistorico);
 
         let deveManterFormatacao = Boolean(manterFormatacaoBasica && rangeDOMOpcional);
         const nivelNorm = normalizarNivelFiltro(nivelFiltroFormatacao);
@@ -3483,7 +2900,7 @@
          * preserva a integridade do clipboard real do usuario no Windows e previne violacoes de
          * Permissions Policy do Chromium (crbug.com/414348233) decorrentes de disparos sinteticos sem ativacao. */
         if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) {
-            const okInterno = salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false });
+            const okInterno = salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false, preservarHistorico });
             return Boolean(okInterno);
         }
 
@@ -3496,7 +2913,7 @@
                 const textoPlanoMultilinha = extrairTextoPuroSanitizado(codigoHTML) || textoFinal;
 
                 /* BLIND-01 (Seção 6.104): Gravação interna PRIMEIRO */
-                const salvouInterno = salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: htmlParaClipboard, formatado: true });
+                const salvouInterno = salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: htmlParaClipboard, formatado: true, preservarHistorico });
                 if (!salvouInterno) {
                     return false;
                 }
@@ -3552,7 +2969,7 @@
         textoPuroFinal = (textoPuroFinal || '').replace(/[ ]{2,}/g, ' ').trim();
 
         /* BLIND-01 (Seção 6.104): Gravação interna PRIMEIRO. Se falhar, não copia para o sistema */
-        const salvouInternoTexto = salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false });
+        const salvouInternoTexto = salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false, preservarHistorico });
         if (!salvouInternoTexto) {
             return false;
         }
@@ -3962,6 +3379,12 @@
         }
         if (!textoLimpo || textoLimpo.length === 0) return false;
 
+        /* Seção 6.140 / BUG-57: Padronizar separador de datas numéricas copiadas para '/' (ex: 11-12-1992 -> 11/12/1992) */
+        const matchDataSep = textoLimpo.match(/^(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})((?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)$/);
+        if (matchDataSep) {
+            textoLimpo = `${matchDataSep[1]}/${matchDataSep[2]}/${matchDataSep[3]}${matchDataSep[4] || ''}`;
+        }
+
         if (modoAcumulador && acumulador) {
             if (acumulador.obterQuantidade() === 0 && ultimoTextoSelecionadoLimpo && ultimoTextoSelecionadoLimpo !== textoLimpo) {
                 acumulador.absorverSelecaoPreviaSeVazio(ultimoTextoSelecionadoLimpo, ultimoRangeSelecionadoSimples);
@@ -4019,7 +3442,8 @@
         }
 
         const rangeParaGravacao = (opcoesCopia && opcoesCopia.forcarUmaLinha) ? null : rangeAlvo;
-        await gravarNaAreaDeTransferencia(textoLimpo, rangeParaGravacao);
+        const ehAlteracaoContorno = Boolean(opcoesCopia && opcoesCopia.preservarHistorico);
+        await gravarNaAreaDeTransferencia(textoLimpo, rangeParaGravacao, { preservarHistorico: ehAlteracaoContorno });
 
         /* BUG-45 / USAB-13 (Seção 6.114): Notifica nova cópia global em storage.local para que outras abas
          * removam seu Contorno Visual Rápido (Flash Temporizado) ativo no modo "Até Interação". */
@@ -4071,7 +3495,8 @@
     async function aplicarSelecaoECopiar(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesSelecao = {}) {
         /* REGRA FUNDAMENTAL: NUNCA copiar de campos editaveis (inputs, textareas, rich-textarea, contenteditable, role="textbox")
          * O usuario pode estar selecionando justamente para sobrescrever/digitar por cima sem destruir o clipboard */
-        if (isSelecaoOuElementoEmCampoEditavel(rangeAlvo)) {
+        const temModificador = Boolean(opcoesSelecao && opcoesSelecao.temModificador);
+        if (!temModificador && isSelecaoOuElementoEmCampoEditavel(rangeAlvo)) {
             return false;
         }
 
@@ -4088,9 +3513,10 @@
 
         /* Protecao em Elementos de Interface do Browser sem Modificadores de Teclado */
         const elAlvoVerif = rangeAlvo.commonAncestorContainer || null;
-        const temModificador = Boolean(opcoesSelecao && opcoesSelecao.temModificador);
         /* SEÇÃO 6.80: Em seleções por arraste sem Alt, o limiar mínimo exigido é de 2 caracteres úteis */
-        const minCustomizado = (opcoesSelecao && opcoesSelecao.eraArrasto) ? (temModificador ? 1 : 2) : null;
+        const minCustomizado = (opcoesSelecao && typeof opcoesSelecao.minimoCaracteres === 'number')
+            ? opcoesSelecao.minimoCaracteres
+            : ((opcoesSelecao && opcoesSelecao.eraArrasto) ? (temModificador ? 1 : 2) : null);
         if (!verificarProtecaoTamanhoMinimoInterface(textoPreview, elAlvoVerif, temModificador, minCustomizado)) {
             try {
                 const sel = window.getSelection();
@@ -4193,7 +3619,10 @@
     }
 
     function tratarCliqueEmEditorMultilinhaSemCopia(e) {
-        return placeholders ? placeholders.tratarCliqueEmEditorMultilinhaSemCopia(e, { geometria }) : false;
+        return placeholders ? placeholders.tratarCliqueEmEditorMultilinhaSemCopia(e, {
+            geometria,
+            estagios: { estagio1, estagio2, estagio3, estagio4, estagio5 }
+        }) : false;
     }
 
     /* ==========================================================================
@@ -4252,6 +3681,93 @@
         return estagio3 ? estagio3.expandirSentencaCompletaAtePonto(texto, idx) : null;
     }
 
+    function resolverIndicesExpansaoBase(mapa, idxCursor, numCliques = 1, opcoes = {}) {
+        if (!mapa || typeof mapa.texto !== 'string' || typeof idxCursor !== 'number') return null;
+        const texto = mapa.texto;
+        const apenasBlocoOuAtomica = Boolean(opcoes && opcoes.apenasBlocoOuAtomica);
+
+        if (numCliques >= 3 && !apenasBlocoOuAtomica) {
+            const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
+            return {
+                resultadoIndices: resTriplo,
+                ehBlocoCompostoSelecionado: false
+            };
+        }
+
+        const charNoCursor = texto[idxCursor] || '';
+        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
+        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
+            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
+        const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
+            eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
+
+        const expandirComoDuplo = !apenasBlocoOuAtomica && (
+            numCliques === 2 ||
+            (Boolean(opcoes && opcoes.ehAlt) && numCliques === 1 && (clicouEmEspaco || clicouEmDelimitadorOuAspas))
+        );
+
+        let resultadoIndices = null;
+        let ehBlocoCompostoSelecionado = false;
+
+        if (expandirComoDuplo) {
+            const blocoCompostoPrevio = opcoes ? opcoes.blocoCompostoPrevio : null;
+            if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+            }
+            if (!resultadoIndices && !blocoCompostoPrevio) {
+                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = expandirSentencaCompletaAtePonto(texto, idxCursor) || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+            }
+        } else if (!apenasBlocoOuAtomica && clicouEmDelimitadorOuAspas) {
+            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+            if (resultadoIndices) ehBlocoCompostoSelecionado = true;
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+            }
+        } else if (!apenasBlocoOuAtomica && clicouEmEspaco) {
+            /* Regra de bloco: espaco logo apos ":" liga o rotulo ao que vem depois -> sentenca inteira */
+            resultadoIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+                if (resultadoIndices) ehBlocoCompostoSelecionado = true;
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
+            }
+            if (!resultadoIndices) {
+                resultadoIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+            }
+        } else {
+            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
+            if (resultadoIndices) ehBlocoCompostoSelecionado = true;
+            if (!resultadoIndices) {
+                resultadoIndices = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
+            }
+        }
+
+        return {
+            resultadoIndices,
+            ehBlocoCompostoSelecionado
+        };
+    }
+
     /* ==========================================================================
      * SECAO 8: SELECAO EM TABELAS E ORQUESTRADOR ELASTICO (CTRL OU ALT: CLIQUE E ARRASTO)
      * ========================================================================== */
@@ -4262,10 +3778,8 @@
         const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
         if (!mapa) return null;
 
-        let resultadoIndices = tentarExpandirPadraoComposto(mapa.texto, mapa.idxCursor, false, false);
-        if (!resultadoIndices) {
-            resultadoIndices = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
-        }
+        const base = resolverIndicesExpansaoBase(mapa, mapa.idxCursor, 1, { apenasBlocoOuAtomica: true });
+        const resultadoIndices = base ? base.resultadoIndices : null;
         if (!resultadoIndices) return null;
 
         const range = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
@@ -4409,7 +3923,7 @@
                 }
             }
 
-            await aplicarSelecaoECopiar(newRange, false);
+            await aplicarSelecaoECopiar(newRange, false, null, { preservarHistorico: true });
             return true;
         } catch (_) {
             return false;
@@ -4523,126 +4037,32 @@
      * exatamente uma vez por clique fisico, mesmo em abas recem-abertas.
      */
     function tratarNavegacaoAbasPorBotoesMouse(e) {
-        if (!capturaBotoesMouse4e5Ativa) return;
-
-        // SEÇÃO 6.13: Desacoplamento físico - delega ao módulo especializado mod-input se ativo
-        const modInput = (typeof window !== 'undefined' && window.JusGovModuloInputInstancia) ? window.JusGovModuloInputInstancia : null;
+        if (!capturaBotoesMouse4e5Ativa) return false;
+        const modInput = fachadaModuloInput || (typeof window !== 'undefined' && (window.JusGovInstanciaInput || window.JusGovModuloInputInstancia)) || null;
         if (modInput && modInput.botoesLaterais && typeof modInput.botoesLaterais.processarEventoMouse === 'function') {
+            modInput.botoesLaterais.ativo = true;
             return modInput.botoesLaterais.processarEventoMouse(e);
         }
         const bLaterais = (typeof window !== 'undefined' && window.JusGovBotoesLateraisMouseInstancia) ? window.JusGovBotoesLateraisMouseInstancia : null;
         if (bLaterais && typeof bLaterais.processarEventoMouse === 'function') {
+            bLaterais.ativo = true;
             return bLaterais.processarEventoMouse(e);
         }
-
-        let ehBotao4 = false;
-        let ehBotao5 = false;
-
-        if (e.type === 'keydown' || e.type === 'keyup') {
-            if (e.key === 'BrowserBack' || e.keyCode === 166) {
-                ehBotao4 = true;
-            } else if (e.key === 'BrowserForward' || e.keyCode === 167) {
-                ehBotao5 = true;
-            }
-        } else {
-            const btn = e.button;
-            const bts = typeof e.buttons === 'number' ? e.buttons : 0;
-            const which = e.which;
-
-            // Botao 4 (Voltar / Control+Shift+Tab): no DOM padrao e.button === 3, ou which === 4, ou bitmask buttons & 8
-            if (btn === 3 || which === 4 || ((bts & 8) !== 0 && (btn === 3 || btn === -1 || btn === undefined))) {
-                ehBotao4 = true;
-            }
-            // Botao 5 (Avancar / Control+Tab): no DOM padrao e.button === 4, ou which === 5, ou bitmask buttons & 16
-            else if (btn === 4 || which === 5 || ((bts & 16) !== 0 && (btn === 4 || btn === -1 || btn === undefined))) {
-                ehBotao5 = true;
-            }
-        }
-
-        if (!ehBotao4 && !ehBotao5) return;
-
-        // Neutralizacao categorica e imediata do comportamento de historico nativo do navegador
-        try {
-            e.preventDefault();
-            e.stopPropagation();
-            if (typeof e.stopImmediatePropagation === 'function') {
-                e.stopImmediatePropagation();
-            }
-        } catch (_) { }
-
-        // Em eventos de soltura (up) ou auxclick, resetamos o estado do botao para o proximo clique
-        if (e.type === 'mouseup' || e.type === 'pointerup' || e.type === 'keyup' || e.type === 'auxclick') {
-            botaoLateralEmProcessamento = 0;
-            return;
-        }
-
-        // Em eventos de pressao (down), dispara a navegacao de abas com protecao contra eventos em cascata
-        const agora = Date.now();
-        const numBotao = ehBotao4 ? 4 : 5;
-
-        // Evita duplicacao de disparo entre pointerdown e mousedown do mesmo clique fisico
-        if (botaoLateralEmProcessamento === numBotao && (agora - ultimoTimestampNavegacaoAbas < DEBOUNCE_NAVEGACAO_ABAS_MS)) {
-            return;
-        }
-
-        botaoLateralEmProcessamento = numBotao;
-        ultimoTimestampNavegacaoAbas = agora;
-
-        const temCtrl = Boolean(e && e.ctrlKey);
-        try {
-            if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) return;
-            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                if (temCtrl) {
-                    chrome.runtime.sendMessage({ acao: 'navegarAba', modo: 'ultima_ativa' });
-                } else {
-                    const direcao = ehBotao4 ? 'anterior' : 'proxima';
-                    chrome.runtime.sendMessage({ acao: 'navegarAba', direcao });
-                }
-            }
-        } catch (_) { }
+        return false;
     }
 
     /**
      * Modulo TECLADO/MOUSE: Navegacao entre campos de entrada simples via setas (ArrowDown / ArrowUp).
-     * Permite avancar (seta para baixo) ou retroceder (seta para cima) continuamente entre inputs,
-     * mesmo estando alinhados horizontalmente na mesma linha.
-     * Preserva as regras de alternancia e pre-selecao inicial de campo.
+     * Delega ao submodulo especializado NavegacaoTecladoCampos (mod-input).
      */
     function navegarEntreCamposEntrada(inputAtual, direcao) {
         if (!inputAtual) return false;
-
-        // SEÇÃO 6.13: Desacoplamento modular de interface - delega ao mod-input se ativo
-        const modInput = (typeof window !== 'undefined' && window.JusGovModuloInputInstancia) ? window.JusGovModuloInputInstancia : null;
+        const modInput = fachadaModuloInput || (typeof window !== 'undefined' && (window.JusGovInstanciaInput || window.JusGovModuloInputInstancia)) || null;
         if (modInput && modInput.tecladoCampos && typeof modInput.tecladoCampos.navegarParaCampo === 'function') {
+            modInput.tecladoCampos.ativo = Boolean(navegacaoTecladoCamposAtiva);
             return modInput.tecladoCampos.navegarParaCampo(inputAtual, direcao);
         }
-
-        let raiz = inputAtual.form;
-        if (!raiz) {
-            raiz = inputAtual.closest('#containerLinhasEntradaDemo, form, .cartao, body') || document;
-        }
-        const seletores = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([disabled]):not([readonly])';
-        const todos = Array.from(raiz.querySelectorAll(seletores));
-        const visiveis = todos.filter(inp => {
-            try {
-                return inp.offsetParent !== null || inp.getClientRects().length > 0;
-            } catch (_) {
-                return true;
-            }
-        });
-        if (visiveis.length <= 1) return false;
-        const indiceAtual = visiveis.indexOf(inputAtual);
-        if (indiceAtual === -1) return false;
-        const proximoIndice = direcao > 0
-            ? (indiceAtual + 1) % visiveis.length
-            : (indiceAtual - 1 + visiveis.length) % visiveis.length;
-        const proximoInput = visiveis[proximoIndice];
-        if (!proximoInput) return false;
-
-        try {
-            proximoInput.focus();
-        } catch (_) { }
-        return true;
+        return false;
     }
 
     /*
@@ -4686,6 +4106,33 @@
                 validador.temporizadorAlerta
             )
         );
+        cliqueDentroDaSelecaoAtiva = false;
+        if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+            try {
+                const pDown = obterPontoDoClique(e.clientX, e.clientY);
+                const selPrevia = window.getSelection();
+                const flashAtivoNoDom = Boolean(flashExclusivoSemSelecao || aguardandoDesselecaoFlash || timerFlashBorder || tempoFlashBorderMs === -1);
+                const rPrevia = (selPrevia && !selPrevia.isCollapsed && selPrevia.rangeCount > 0)
+                    ? selPrevia.getRangeAt(0)
+                    : (flashAtivoNoDom ? ultimoRangeSelecionadoSimples : null);
+                const dentroSelecao = Boolean(rPrevia && isPontoDentroDoRange(pDown, rPrevia));
+                const dentroBlocoComposto = Boolean(
+                    ultimoBlocoCompostoAtivo &&
+                    ultimoBlocoCompostoAtivo.range &&
+                    isPontoDentroDoRange(pDown, ultimoBlocoCompostoAtivo.range)
+                );
+                if (dentroSelecao || dentroBlocoComposto) {
+                    cliqueDentroDaSelecaoAtiva = true;
+                } else {
+                    ultimoBlocoCompostoAtivo = null;
+                }
+            } catch (_) {
+                ultimoBlocoCompostoAtivo = null;
+            }
+        } else if (e.button === 0) {
+            ultimoBlocoCompostoAtivo = null;
+        }
+
         if (!dentroDaCarenciaInicial && (aguardandoDesselecaoFlash || timerFlashBorder || temAvisoAtivoNoValidador)) {
             const clicouEmModalCritico = Boolean(
                 elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function' &&
@@ -4694,7 +4141,7 @@
             if (clicouEmModalCritico) {
                 limparFlashBorderImediatamente();
                 limparAvisosAuditoriaEWikiImediatamente();
-            } else if (!e || typeof e.button !== 'number' || e.button === 0 || e.button === 1 || e.button === 2) {
+            } else if (!cliqueDentroDaSelecaoAtiva && !e.shiftKey && (!e || typeof e.button !== 'number' || e.button === 0 || e.button === 1 || e.button === 2)) {
                 /* No modo Até Interação (Padrão / -1), o Flash é preservado mesmo com cliques, sumindo apenas em nova seleção/cópia */
                 if (CONFIGURACAO_MOTOR.tempoFlashBorderMs !== -1) {
                     limparFlashBorderImediatamente();
@@ -4705,8 +4152,8 @@
 
         if (!verificarUrlPermitida()) return;
 
-        /* Seção 6.20, 6.85 e 6.126: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique ou Ctrl + Alt + Botão Direito) no mousedown */
-        if ((e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) || (e.button === 2 && e.ctrlKey && e.altKey)) {
+        /* Seção 6.20, 6.85 e 6.126: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique ou Ctrl + Alt + Botão Direito sem acumulador) no mousedown */
+        if ((e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) || (e.button === 2 && e.ctrlKey && e.altKey && (!acumulador || acumulador.obterQuantidade() === 0))) {
             e.preventDefault();
             e.stopPropagation();
             if (typeof e.stopImmediatePropagation === 'function') {
@@ -4828,7 +4275,7 @@
 
         /* Passo 9.1: Campo Simples Editável (<input>):
          * Armazena estado de seleção prévia para alternância no mouseup (1º clique seleciona tudo; 2º clique posiciona cursor) */
-        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL') {
+        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL' && !(e.altKey && !e.ctrlKey && !e.shiftKey)) {
             inputAlvoMouseDown = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
                 ? (elAlvoEfetivo.closest('input') || elAlvoEfetivo)
                 : elAlvoEfetivo;
@@ -4848,7 +4295,7 @@
         }
 
         /* REGRA FUNDAMENTAL: NUNCA copiar ou auto-selecionar de editores multilinhas / ricos (Gemini rich-textarea, textarea, contenteditable) */
-        if (tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL' || isSelecaoOuElementoEmCampoEditavel(elAlvoEfetivo)) {
+        if ((tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL' || isSelecaoOuElementoEmCampoEditavel(elAlvoEfetivo)) && !(e.altKey && !e.ctrlKey && !e.shiftKey)) {
             isMousePressionado = false;
             houveArrastoMouse = false;
             selecaoElasticaAtivaNoClique = false;
@@ -4922,6 +4369,7 @@
             }
             pontoAncoraArrastoAlt = obterPontoDoClique(e.clientX, e.clientY);
             ignorarProximoClick = true;
+            e.preventDefault();
             e.stopPropagation();
         }
 
@@ -4941,7 +4389,7 @@
          *   e do navegador funcione sem nenhuma interferencia ou delay (coordsMouseDown continua ativo para checar arrasto).
          * - Se houver Alt mantido: cancela o evento padrao (preventDefault) para evitar cliques ou acoes indesejadas,
          *   mas NUNCA forca selecao visual antecipada, permitindo que arrasto parcial ou clique unico copie limpo em mouseup! */
-        const ehSistemaOuUiMousedown = (tipoContexto === 'LINK_CLICAVEL') || isContextoDeSistemaOuUi(elAlvoEfetivo);
+        const ehSistemaOuUiMousedown = (tipoContexto === 'LINK_CLICAVEL' || tipoContexto === 'SEMIFLEXIVEL');
         if (ehSistemaOuUiMousedown) {
             if (!temModificadorTeclado) {
                 ignorarProximoClick = false;
@@ -4954,16 +4402,29 @@
         }
 
         /* Passo 9.2: Tecla Shift mantida: NUNCA desseleciona a selecao existente,
-         * preservando a ancora ativa para permitir continuar ou estender a selecao atual */
-        if (e.shiftKey && !e.ctrlKey && !e.altKey && !ancoraCursorShift) {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
-                const r = sel.getRangeAt(0);
-                ancoraCursorShift = {
-                    no: sel.anchorNode || r.startContainer,
-                    offset: typeof sel.anchorOffset === 'number' ? sel.anchorOffset : r.startOffset
-                };
+         * preservando a ancora ativa para permitir continuar ou estender a selecao atual (inclusive páginas depois) */
+        if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+            if (!ancoraCursorShift || (ancoraCursorShift.no && !ancoraCursorShift.no.isConnected)) {
+                ancoraCursorShift = null;
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                    const r = sel.getRangeAt(0);
+                    ancoraCursorShift = {
+                        no: sel.anchorNode || r.startContainer,
+                        offset: typeof sel.anchorOffset === 'number' ? sel.anchorOffset : r.startOffset
+                    };
+                } else if (ultimoRangeSelecionadoSimples && ultimoRangeSelecionadoSimples.startContainer && ultimoRangeSelecionadoSimples.startContainer.isConnected) {
+                    ancoraCursorShift = {
+                        no: ultimoRangeSelecionadoSimples.startContainer,
+                        offset: ultimoRangeSelecionadoSimples.startOffset
+                    };
+                }
             }
+            if (ancoraCursorShift) {
+                e.preventDefault();
+            }
+        } else if (!e.shiftKey && !cliqueDentroDaSelecaoAtiva) {
+            ancoraCursorShift = null;
         }
 
         if (!e.ctrlKey && !e.shiftKey && e.detail >= 2) {
@@ -5009,6 +4470,11 @@
         if (fachadaModuloInput && fachadaModuloInput.caixaRapida && typeof fachadaModuloInput.caixaRapida.registrarPosicaoMouse === 'function') {
             fachadaModuloInput.caixaRapida.registrarPosicaoMouse(e);
         }
+        if (e.ctrlKey && e.altKey && e.shiftKey) {
+            atualizarInspetorTempoReal(e.clientX, e.clientY, e.target);
+        } else if (painelInspetorTempoRealEl) {
+            ocultarInspetorTempoReal();
+        }
         if ((e.buttons & 1) !== 1) return;
 
         const dx = Math.abs(e.clientX - coordsMouseDown.x);
@@ -5033,6 +4499,18 @@
     async function aoSoltarBotaoMouse(e) {
         if (capturaBotoesMouse4e5Ativa && (e.button === 3 || e.button === 4 || e.which === 4 || e.which === 5)) {
             tratarNavegacaoAbasPorBotoesMouse(e);
+            return;
+        }
+        if (e.button === 2 && e.ctrlKey && e.altKey && (!acumulador || acumulador.obterQuantidade() === 0) && verificarUrlPermitida()) {
+            const alvoDir = obterElementoAlvoEfetivo(e) || e.target;
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            executarInspecaoECapturaSeletorUnico(alvoDir);
+            ignorarProximoClick = true;
+            houveArrastoMouse = false;
             return;
         }
         if (e.button !== 0) return;
@@ -5114,10 +4592,13 @@
         }
         if (tipoContexto === 'IGNORAR') return;
 
+        const ehAltIsoladoSoltar = Boolean(e.altKey && !e.ctrlKey && !e.shiftKey);
+
         /* Passo 9.3: Regra de Ouro dos Campos Simples Editáveis (<input>):
          * Alternância de clique (1º clique seleciona tudo; 2º clique desseleciona e posiciona o cursor;
-         * máscara ex: ___/___/_____ sempre seleciona; duplo clique seleciona tudo) e NUNCA copia para clipboard */
-        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL') {
+         * máscara ex: ___/___/_____ sempre seleciona; duplo clique seleciona tudo) e NUNCA copia para clipboard
+         * (Exceto quando Alt está pressionado: Alt deve ser capaz de selecionar/copiar qualquer coisa na tela). */
+        if (tipoContexto === 'CAMPO_SIMPLES_EDITAVEL' && !ehAltIsoladoSoltar) {
             const inputAlvo = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
                 ? (elAlvoEfetivo.closest('input') || elAlvoEfetivo)
                 : elAlvoEfetivo;
@@ -5169,8 +4650,9 @@
             return;
         }
 
-        /* REGRA FUNDAMENTAL: NUNCA copiar ou auto-selecionar de editores multilinhas / ricos (Gemini, textarea, contenteditable) */
-        if (tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL' || isSelecaoOuElementoEmCampoEditavel(elAlvoEfetivo)) {
+        /* REGRA FUNDAMENTAL: NUNCA copiar ou auto-selecionar de editores multilinhas / ricos (Gemini, textarea, contenteditable)
+         * sem tecla Alt — com Alt pressionado, libera seleção e cópia de qualquer trecho inclusive em editores. */
+        if ((tipoContexto === 'EDITOR_MULTILINHA_EDITAVEL' || isSelecaoOuElementoEmCampoEditavel(elAlvoEfetivo)) && !ehAltIsoladoSoltar) {
             const ehTextarea = Boolean(elAlvoEfetivo && elAlvoEfetivo.tagName === 'TEXTAREA');
             if (ehTextarea) {
                 if (selecaoEditavelAtiva && !houveArrastoMouse && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -5180,8 +4662,15 @@
                 return;
             }
 
-            /* Editores HTML Online estritos (contenteditable, Quill, ProseMirror, CKEditor, rich-textarea) */
-            const ehEditorHtmlAtivo = isElementoOuAncestralContentEditable(elAlvoEfetivo);
+            /* Editores HTML Online estritos (contenteditable, Quill, ProseMirror, CKEditor 4/5, rich-textarea)
+             * e LibreOffice / Collabora Online (.clipboard-container textarea sob canvas) */
+            const docAtual = (elAlvoEfetivo && elAlvoEfetivo.ownerDocument) || document;
+            const ehCollaboraCanvas = Boolean(
+                elAlvoEfetivo &&
+                (elAlvoEfetivo.tagName === 'CANVAS' || (elAlvoEfetivo.closest && elAlvoEfetivo.closest('.leaflet-pane, #document-container'))) &&
+                docAtual.querySelector('.clipboard-container textarea')
+            );
+            const ehEditorHtmlAtivo = isElementoOuAncestralContentEditable(elAlvoEfetivo) || ehCollaboraCanvas;
             if (ehEditorHtmlAtivo) {
                 const permiteCliqueCtrl = (modoPlaceholdersMinutasHtml === 'ctrl_avancado' || modoPlaceholdersMinutasHtml === 'avancado') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
                 const permiteCliqueNormal = !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
@@ -5316,6 +4805,10 @@
             const mapaCtx = construirMapaTextoBlocoComJanela(pontoClique.no, pontoClique.offset);
             if (!mapaCtx) return;
 
+            if (ancoraCursorShift && ancoraCursorShift.no && !ancoraCursorShift.no.isConnected) {
+                ancoraCursorShift = null;
+            }
+
             const selAtual = window.getSelection();
             const temSelecaoAtiva = Boolean(selAtual && !selAtual.isCollapsed && selAtual.rangeCount > 0);
 
@@ -5325,6 +4818,11 @@
                 ancoraCursorShift = {
                     no: selAtual.anchorNode || rAtual.startContainer,
                     offset: typeof selAtual.anchorOffset === 'number' ? selAtual.anchorOffset : rAtual.startOffset
+                };
+            } else if (!temSelecaoAtiva && !ancoraCursorShift && ultimoRangeSelecionadoSimples && ultimoRangeSelecionadoSimples.startContainer && ultimoRangeSelecionadoSimples.startContainer.isConnected) {
+                ancoraCursorShift = {
+                    no: ultimoRangeSelecionadoSimples.startContainer,
+                    offset: ultimoRangeSelecionadoSimples.startOffset
                 };
             }
 
@@ -5410,379 +4908,52 @@
             return;
         }
 
-        /* Passo 9.7.1: Alt + Clique sobre links, botoes, menus, abas, etiquetas ou controles de interface:
-         * DIRETRIZ ROOT 6.28: Ordem de prioridade estrita:
-         * 1) TRES CLIQUES COM ALT EM LINK (e.detail >= 3):
-         *    Seleciona OBRIGATORIAMENTE TODO O TEXTO DO LINK (mesmo que tenha duas ou mais linhas, <br>,
-         *    multiplos spans/divs ou > 120 caracteres), fazendo com que o texto copiado fique TUDO EM UMA
-         *    LINHA SO, devidamente separado por espacos simples!
-         * 2) DOIS CLIQUES COM ALT (e.detail >= 2):
-         *    Seleciona "TODO" OBRIGATORIAMENTE, nao apenas o bloco interno (ex.: todo o texto do link,
-         *    todo o botao, toda a etiqueta/span), ignorando blocos pontuais ou mascaras parciais!
-         * 3) CLIQUE UNICO COM ALT (e.detail === 1):
-         *    a) Primeiro: "o campo" ou registro estruturado sob o cursor (CPF, CNPJ, Data, Hora, NB, CNJ, Moeda, etc.)
-         *    b) Segundo: se nao for campo, seleciona o texto completo do objeto da interface (botao, etiqueta, link)
-         *    c) Terceiro: se nao for interface nem campo, seleciona a unidade "palavra" (minimo possivel). */
+        /* Passo 9.7.1: Alt + Clique sozinho = autorizacao universal para copiar qualquer elemento + interceptacao de eventos,
+         * reutilizando integralmente o motor base de selecao, encolhimento e expansao (com fallback para controles sem no de texto). */
         if (e.altKey && !e.ctrlKey && !e.shiftKey) {
-            let textoParaCopiar = '';
-            let rangeParaFlash = null;
-            let forcarUmaLinhaAltLink = false;
-            const ehTresCliquesAlt = (e.detail >= 3);
-            const ehDoisCliquesAlt = (e.detail >= 2);
+            ignorarProximoClick = true;
+            e.preventDefault();
+            e.stopPropagation();
+
             const elLinkDireto = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
                 ? elAlvoEfetivo.closest('a[href], a, [role="link"]')
                 : null;
-            let elInterativo = obterObjetoInterativoParaSelecaoCompleta(elAlvoEfetivo);
-            if (!elInterativo && elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function') {
-                const candidato = elAlvoEfetivo.closest('button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], summary, [class*="label-etiqueta"], [class*="badge"], [class*="chip"]');
-                if (candidato && !isContainerComposto(candidato)) {
-                    elInterativo = candidato;
-                }
-            }
-
-            /* REGRAS DETERMINÍSTICAS DE EXPANSÃO PROGRESSIVA EM LINKS COM ALT (Diretriz 6.28 / BUG-20):
-             * Nível A: Bloco estruturado forense sob o cursor (processo CNJ, CPF, data, etc.)
-             * Nível B: Linha do link onde ocorreu o clique (div/span interno ou segmento <br>)
-             * Nível C: Link inteiro em uma linha só (sem quebras)
-             *
-             * Regras de Cliques:
-             * - 1 Clique: Bloco estruturado se houver; se não for bloco, a linha do link onde clicou.
-             * - 2 Cliques: Se clicou em bloco e a linha é mais ampla que o bloco, copia a linha do link;
-             *              se não há bloco ou se a linha já seria o mesmo de 1 clique, amplia imediatamente para o link inteiro!
-             * - 3 Cliques: Sempre o link inteiro em uma única linha! */
-            if (elLinkDireto) {
-                const ehMultilinha = isLinkMultilinha(elLinkDireto);
+            if (e.detail >= 3 && elLinkDireto) {
                 const textoLinkInteiro = extrairTextoLinkUmaLinha(elLinkDireto);
                 const rangeLinkInteiro = document.createRange();
                 rangeLinkInteiro.selectNodeContents(elLinkDireto);
-
-                // 1. Identificar bloco estruturado sob o cursor (CNJ, CPF, etc.), se houver
-                const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
-                let rangeBloco = null;
-                let textoBloco = '';
-                if (pontoAlt) {
-                    const mapaAlt = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
-                    if (mapaAlt) {
-                        const resBlocoAlt = tentarExpandirPadraoComposto(mapaAlt.texto, mapaAlt.idxCursor, false, false);
-                        if (resBlocoAlt) {
-                            const rB = criarRangeDOMAPartirDeIndices(mapaAlt, resBlocoAlt.inicio, resBlocoAlt.fim);
-                            if (rB && elLinkDireto.contains(rB.startContainer) && elLinkDireto.contains(rB.endContainer)) {
-                                rangeBloco = rB;
-                                textoBloco = (extrairTextoPuroSanitizado(rB) || rB.toString()).trim();
-                            }
-                        }
-                    }
+                if (textoLinkInteiro && textoLinkInteiro.length > 0) {
+                    await aplicarSelecaoECopiar(rangeLinkInteiro, false, textoLinkInteiro, {
+                        forcarUmaLinha: true,
+                        temModificador: true,
+                        eraArrasto: false
+                    });
+                    return;
                 }
+            }
 
-                // 2. Identificar a linha onde ocorreu o clique dentro do link
-                let rangeLinha = null;
-                let textoLinha = '';
-                if (ehMultilinha) {
-                    const resLinha = extrairLinhaClicadaDeLink(elLinkDireto, e.clientX, e.clientY, elAlvoEfetivo);
-                    if (resLinha && resLinha.texto && resLinha.range &&
-                        elLinkDireto.contains(resLinha.range.startContainer) &&
-                        elLinkDireto.contains(resLinha.range.endContainer)) {
-                        rangeLinha = resLinha.range;
-                        textoLinha = resLinha.texto.trim();
-                    }
-                }
-
-                // 3. Aplicação do Princípio da Expansão Progressiva Estrita:
-                const textoAnterior = (ultimoTextoSelecionadoLimpo || '').trim();
-
-                if (!ehMultilinha) {
-                    // Link de Linha Única:
-                    if (e.detail === 1 && textoBloco && rangeBloco) {
-                        textoParaCopiar = textoBloco;
-                        rangeParaFlash = rangeBloco;
-                    } else if (e.detail === 2) {
-                        if (textoBloco && textoAnterior === textoBloco && textoLinkInteiro !== textoBloco) {
-                            textoParaCopiar = textoLinkInteiro;
-                            rangeParaFlash = rangeLinkInteiro;
-                            forcarUmaLinhaAltLink = true;
-                        } else if (textoAnterior === textoLinkInteiro) {
-                            const blocoCard = obterBlocoAncestralContextual(elLinkDireto);
-                            if (blocoCard && blocoCard !== document.body) {
-                                rangeParaFlash = document.createRange();
-                                rangeParaFlash.selectNodeContents(blocoCard);
-                                textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                forcarUmaLinhaAltLink = false;
-                            } else {
-                                textoParaCopiar = textoLinkInteiro;
-                                rangeParaFlash = rangeLinkInteiro;
-                                forcarUmaLinhaAltLink = true;
-                            }
-                        } else {
-                            textoParaCopiar = textoLinkInteiro;
-                            rangeParaFlash = rangeLinkInteiro;
-                            forcarUmaLinhaAltLink = true;
-                        }
-                    } else if (e.detail >= 3) {
-                        if (textoAnterior === textoLinkInteiro) {
-                            const blocoCard = obterBlocoAncestralContextual(elLinkDireto);
-                            if (blocoCard && blocoCard !== document.body) {
-                                rangeParaFlash = document.createRange();
-                                rangeParaFlash.selectNodeContents(blocoCard);
-                                textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                forcarUmaLinhaAltLink = false;
-                            } else {
-                                textoParaCopiar = textoLinkInteiro;
-                                rangeParaFlash = rangeLinkInteiro;
-                                forcarUmaLinhaAltLink = true;
-                            }
-                        } else {
-                            textoParaCopiar = textoLinkInteiro;
-                            rangeParaFlash = rangeLinkInteiro;
-                            forcarUmaLinhaAltLink = true;
-                        }
-                    } else {
-                        textoParaCopiar = textoLinkInteiro;
-                        rangeParaFlash = rangeLinkInteiro;
-                        forcarUmaLinhaAltLink = true;
-                    }
+            const campoAlvo = (elAlvoEfetivo && typeof elAlvoEfetivo.closest === 'function')
+                ? elAlvoEfetivo.closest('input, textarea, select, option')
+                : null;
+            if (campoAlvo) {
+                let textoCampo = '';
+                if (campoAlvo.tagName === 'SELECT') {
+                    const optSel = (campoAlvo.selectedIndex >= 0 && campoAlvo.options) ? campoAlvo.options[campoAlvo.selectedIndex] : null;
+                    textoCampo = ((optSel && (optSel.text || optSel.textContent)) || campoAlvo.value || '').trim();
+                } else if (campoAlvo.tagName === 'OPTION') {
+                    textoCampo = (campoAlvo.text || campoAlvo.innerText || campoAlvo.textContent || '').trim();
                 } else {
-                    // Link Multilinha
-                    if (e.detail >= 3) {
-                        // 3 cliques:
-                        if (textoAnterior === textoLinkInteiro) {
-                            // Se já é o mesmo que o link inteiro: seleciona tudo (card/container ancestral)!
-                            const blocoCard = obterBlocoAncestralContextual(elLinkDireto);
-                            if (blocoCard && blocoCard !== document.body) {
-                                rangeParaFlash = document.createRange();
-                                rangeParaFlash.selectNodeContents(blocoCard);
-                                textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                forcarUmaLinhaAltLink = false;
-                            } else {
-                                textoParaCopiar = textoLinkInteiro;
-                                rangeParaFlash = rangeLinkInteiro;
-                                forcarUmaLinhaAltLink = true;
-                            }
-                        } else {
-                            textoParaCopiar = textoLinkInteiro;
-                            rangeParaFlash = rangeLinkInteiro;
-                            forcarUmaLinhaAltLink = true;
-                        }
-                    } else if (e.detail === 2) {
-                        // 2 cliques:
-                        // Se o clique incidiu em um bloco estruturado e a linha é mais ampla que o bloco:
-                        // Se textoAnterior já era a linha, ou se já era o mesmo texto: amplia para o link inteiro!
-                        const temBlocoMenorQueLinha = Boolean(textoBloco && textoLinha && textoLinha !== textoBloco);
-                        const jaEstavaNaLinha = Boolean(textoAnterior && textoLinha && textoAnterior === textoLinha);
-
-                        if (temBlocoMenorQueLinha && !jaEstavaNaLinha && rangeLinha) {
-                            textoParaCopiar = textoLinha;
-                            rangeParaFlash = rangeLinha;
-                            forcarUmaLinhaAltLink = true;
-                        } else {
-                            if (textoAnterior === textoLinkInteiro) {
-                                const blocoCard = obterBlocoAncestralContextual(elLinkDireto);
-                                if (blocoCard && blocoCard !== document.body) {
-                                    rangeParaFlash = document.createRange();
-                                    rangeParaFlash.selectNodeContents(blocoCard);
-                                    textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                    forcarUmaLinhaAltLink = false;
-                                } else {
-                                    textoParaCopiar = textoLinkInteiro;
-                                    rangeParaFlash = rangeLinkInteiro;
-                                    forcarUmaLinhaAltLink = true;
-                                }
-                            } else {
-                                textoParaCopiar = textoLinkInteiro;
-                                rangeParaFlash = rangeLinkInteiro;
-                                forcarUmaLinhaAltLink = true;
-                            }
-                        }
-                    } else {
-                        // 1 clique:
-                        // Se incidiu em bloco estruturado: seleciona estritamente o bloco!
-                        // Se não for bloco: seleciona a linha inteira onde ocorreu o clique dentro do link!
-                        if (textoBloco && rangeBloco) {
-                            textoParaCopiar = textoBloco;
-                            rangeParaFlash = rangeBloco;
-                        } else if (textoLinha && rangeLinha) {
-                            textoParaCopiar = textoLinha;
-                            rangeParaFlash = rangeLinha;
-                            forcarUmaLinhaAltLink = true;
-                        } else {
-                            textoParaCopiar = textoLinkInteiro;
-                            rangeParaFlash = rangeLinkInteiro;
-                            forcarUmaLinhaAltLink = true;
-                        }
-                    }
+                    textoCampo = (campoAlvo.value || campoAlvo.placeholder || campoAlvo.getAttribute('value') || '').trim();
                 }
-            }
-
-            /* REGRA DOS DOIS CLIQUES COM ALT:
-             * Ao dar 2 cliques com Alt no objeto de interface, seleciona OBRIGATORIAMENTE o texto TODO do objeto
-             * (ex.: todo o link, todo o botao, toda a etiqueta), descartando restricoes de bloco ou campos internos! */
-            if (!textoParaCopiar && ehDoisCliquesAlt && elInterativo) {
-                if (elInterativo.tagName === 'INPUT') {
-                    textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNode(elInterativo);
-                } else if (elInterativo.tagName === 'OPTION') {
-                    textoParaCopiar = (elInterativo.text || elInterativo.innerText || elInterativo.textContent || '').trim();
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNode(elInterativo);
-                } else {
-                    textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNodeContents(elInterativo);
+                if (textoCampo) {
+                    const rangeCampo = document.createRange();
+                    rangeCampo.selectNode(campoAlvo);
+                    await aplicarSelecaoECopiar(rangeCampo, false, textoCampo, {
+                        temModificador: true,
+                        eraArrasto: false
+                    });
+                    return;
                 }
-            }
-
-            /* DIRETRIZ ROOT UNIVERSAL 6.37: REGRA DE ALT + CLIQUE EM ESPACO EM BRANCO
-             * 1 clique sobre espaco em branco faz exatamente o que 2 cliques fazem na palavra:
-             * expande para o bloco completo / expressao conectada pelo espaco (em link, botao ou texto). */
-            if (!textoParaCopiar && !ehTresCliquesAlt && !ehDoisCliquesAlt) {
-                const pontoAltEspaco = obterPontoDoClique(e.clientX, e.clientY);
-                if (pontoAltEspaco) {
-                    const mapaAltEspaco = construirMapaTextoBlocoComJanela(pontoAltEspaco.no, pontoAltEspaco.offset);
-                    if (mapaAltEspaco && mapaAltEspaco.texto) {
-                        const { texto: txtEspaco, idxCursor: idxEspaco } = mapaAltEspaco;
-                        const chNoCursor = txtEspaco[idxEspaco] || '';
-                        const chAnterior = idxEspaco > 0 ? txtEspaco[idxEspaco - 1] : '';
-                        const clicouEmEspacoAlt = eEspacoBranco(chNoCursor) ||
-                            (eEspacoBranco(chAnterior) && !eAlfanumericoUnicode(chNoCursor));
-                        const clicouEmDelimAlt = eDelimitadorPar(chNoCursor) || eDelimitadorPar(chAnterior) ||
-                            eCaractereAspas(chNoCursor) || eCaractereAspas(chAnterior);
-
-                        if (clicouEmEspacoAlt || clicouEmDelimAlt) {
-                            let resExpAlt = null;
-                            if (clicouEmDelimAlt || clicouEmEspacoAlt) {
-                                resExpAlt = tentarExpandirDelimitadoresSimetricos(txtEspaco, idxEspaco, true);
-                            }
-                            if (!resExpAlt) {
-                                resExpAlt = tentarExpandirPadraoComposto(txtEspaco, idxEspaco, true, true);
-                            }
-                            if (!resExpAlt) {
-                                resExpAlt = tentarExpandirBlocoMaiusculasComQuebraSuave(txtEspaco, idxEspaco);
-                            }
-                            if (!resExpAlt) {
-                                resExpAlt = tentarExpandirBlocoFormatadoDestaque(mapaAltEspaco, idxEspaco);
-                            }
-                            if (!resExpAlt) {
-                                resExpAlt = tentarExpandirDelimitadoresSimetricos(txtEspaco, idxEspaco, true);
-                            }
-                            if (!resExpAlt) {
-                                resExpAlt = expandirFraseAtePontuacaoEstagio3(txtEspaco, idxEspaco);
-                            }
-
-                            if (resExpAlt) {
-                                const rExpAlt = criarRangeDOMAPartirDeIndices(mapaAltEspaco, resExpAlt.inicio, resExpAlt.fim);
-                                if (rExpAlt) {
-                                    const tExpAlt = extrairTextoPuroSanitizado(rExpAlt) || rExpAlt.toString().trim();
-                                    if (tExpAlt && tExpAlt.length > 0) {
-                                        rangeParaFlash = rExpAlt;
-                                        textoParaCopiar = tExpAlt;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            /* Caso NAO seja 2/3 cliques em interface (ex.: clique unico com Alt):
-             * 1. Prioridade 1: Verifica se o clique com Alt incidiu diretamente sobre mascara/campo estruturado forense */
-            if (!textoParaCopiar) {
-                const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
-                if (pontoAlt) {
-                    const mapaAlt = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
-                    if (mapaAlt) {
-                        const resBlocoAlt = tentarExpandirPadraoComposto(mapaAlt.texto, mapaAlt.idxCursor, false, false);
-                        if (resBlocoAlt) {
-                            const rBlocoAlt = criarRangeDOMAPartirDeIndices(mapaAlt, resBlocoAlt.inicio, resBlocoAlt.fim);
-                            if (rBlocoAlt) {
-                                const txtBlocoAlt = extrairTextoPuroSanitizado(rBlocoAlt) || rBlocoAlt.toString().trim();
-                                if (txtBlocoAlt && txtBlocoAlt.length > 0) {
-                                    rangeParaFlash = rBlocoAlt;
-                                    textoParaCopiar = txtBlocoAlt;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-
-            /* SEÇÃO 6.6 (Nível 2) & SEÇÃO 6.7 (Passo 3): Objeto Real de Interface / Link de Linha Única
-             * Se for controle real de interface (botão, link de linha única, aba, switch, menu, ou etiqueta/badge/chip):
-             * Em etiquetas/badges com botão irmão de exclusão, seleciona e copia EXCLUSIVAMENTE o rótulo da etiqueta,
-             * ignorando o ícone "X" irmão e jamais capturando o contêiner externo. */
-            if (!textoParaCopiar && elInterativo) {
-                if (elInterativo.tagName === 'INPUT') {
-                    textoParaCopiar = (elInterativo.value || elInterativo.getAttribute('value') || '').trim();
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNode(elInterativo);
-                } else if (elInterativo.tagName === 'OPTION') {
-                    textoParaCopiar = (elInterativo.text || elInterativo.innerText || elInterativo.textContent || '').trim();
-                    rangeParaFlash = document.createRange();
-                    rangeParaFlash.selectNode(elInterativo);
-                } else {
-                    textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elInterativo);
-                    rangeParaFlash = criarRangeTextoParaEtiquetaOuObjeto(elInterativo);
-                }
-            }
-
-            /* 3. Prioridade 3: Se nao for campo nem interface:
-             * Se for 2 cliques com Alt: seleciona todo o elemento de texto ancestral ou sentenca!
-             * Se for 1 clique com Alt: seleciona a unidade "palavra" pontual sob o cursor (minimo possivel) */
-            if (!textoParaCopiar) {
-                const pontoAlt = obterPontoDoClique(e.clientX, e.clientY);
-                if (pontoAlt) {
-                    const mapa = construirMapaTextoBlocoComJanela(pontoAlt.no, pontoAlt.offset);
-                    if (mapa) {
-                        if (ehTresCliquesAlt) {
-                            const blocoContainer = obterBlocoAncestralContextual(elAlvoEfetivo);
-                            if (blocoContainer && blocoContainer !== document.body) {
-                                textoParaCopiar = extrairTextoVisivelLimpoDeElemento(blocoContainer);
-                                rangeParaFlash = document.createRange();
-                                rangeParaFlash.selectNodeContents(blocoContainer);
-                            }
-                        } else if (ehDoisCliquesAlt) {
-                            const elTextoPai = (pontoAlt.no && pontoAlt.no.parentElement) ? pontoAlt.no.parentElement : null;
-                            if (elTextoPai && elTextoPai !== document.body && (elTextoPai.innerText || elTextoPai.textContent || '').trim().length <= 150) {
-                                textoParaCopiar = extrairTextoVisivelLimpoDeElemento(elTextoPai);
-                                rangeParaFlash = document.createRange();
-                                rangeParaFlash.selectNodeContents(elTextoPai);
-                            } else {
-                                const resSentenca = expandirSentencaCompletaAtePonto(mapa.texto, mapa.idxCursor) || expandirFraseAtePontuacaoEstagio3(mapa.texto, mapa.idxCursor);
-                                if (resSentenca) {
-                                    rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resSentenca.inicio, resSentenca.fim);
-                                    if (rangeParaFlash) {
-                                        textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                    }
-                                }
-                            }
-                        } else {
-                            const resAtomica = expandirUnidadeAtomicaEstagio1(mapa.texto, mapa.idxCursor);
-                            if (resAtomica) {
-                                rangeParaFlash = criarRangeDOMAPartirDeIndices(mapa, resAtomica.inicio, resAtomica.fim);
-                                if (rangeParaFlash) {
-                                    textoParaCopiar = extrairTextoPuroSanitizado(rangeParaFlash) || rangeParaFlash.toString().trim();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (textoParaCopiar && textoParaCopiar.length > 0 && rangeParaFlash) {
-                ignorarProximoClick = true;
-                e.preventDefault();
-                e.stopPropagation();
-
-                const rangeEstritoLink = elLinkDireto && rangeParaFlash &&
-                    elLinkDireto.contains(rangeParaFlash.startContainer) &&
-                    elLinkDireto.contains(rangeParaFlash.endContainer);
-
-                await aplicarSelecaoECopiar(rangeParaFlash, false, textoParaCopiar, {
-                    forcarUmaLinha: forcarUmaLinhaAltLink && Boolean(rangeEstritoLink),
-                    temModificador: true,
-                    eraArrasto: false
-                });
-                return;
             }
         }
 
@@ -5816,7 +4987,7 @@
          *   IDs numericos, moedas): COPIA para a Area de Transferencia e exibe Flash Verde temporizado,
          *   SEM manter selecao na tela.
          * - Se for palavra avulsa ou rotulo comum de interface: NAO faz nada (preserva a navegacao e acoes nativas). */
-        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || (tipoContexto === 'SEMIFLEXIVEL') || isContextoDeSistemaOuUi(elAlvoEfetivo) || isElementoInterativoClicavelDireto(elAlvoEfetivo) || isElementoClaramenteDeInterface(elAlvoEfetivo);
+        const ehSistemaOuUi = (tipoContexto === 'LINK_CLICAVEL') || (tipoContexto === 'SEMIFLEXIVEL');
         if (ehSistemaOuUi && !temModificadorTeclado) {
             if ((e.detail === 1 || e.detail === 2) && !isComponenteBotaoOuFormularioEstrito(elAlvoEfetivo)) {
                 const ponto = obterPontoDoClique(e.clientX, e.clientY);
@@ -5885,8 +5056,43 @@
             return;
         }
 
+        async function tentarFallbackAltElementoSemTexto(alvo) {
+            if (!e.altKey || !alvo) return false;
+            const elInterativo = obterObjetoInterativoParaSelecaoCompleta(alvo);
+            if (elInterativo) {
+                const txtInterativo = extrairTextoVisivelLimpoDeElemento(elInterativo);
+                const rInterativo = criarRangeTextoParaEtiquetaOuObjeto(elInterativo);
+                if (txtInterativo && rInterativo) {
+                    await aplicarSelecaoECopiar(rInterativo, modoAcumulador, txtInterativo, { temModificador: true, minimoCaracteres: 1 });
+                    return true;
+                }
+            }
+            let candidatoAlt = (alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
+            let passosAlt = 0;
+            while (candidatoAlt && candidatoAlt !== document.body && candidatoAlt !== document.documentElement && passosAlt < 3) {
+                const txtCand = extrairTextoVisivelLimpoDeElemento(candidatoAlt);
+                if (txtCand && txtCand.length > 0 && txtCand.length <= 400) {
+                    const rCand = criarRangeTextoParaEtiquetaOuObjeto(candidatoAlt);
+                    if (rCand) {
+                        await aplicarSelecaoECopiar(rCand, modoAcumulador, txtCand, { temModificador: true, minimoCaracteres: 1 });
+                        return true;
+                    }
+                }
+                candidatoAlt = candidatoAlt.parentElement;
+                passosAlt++;
+            }
+            return false;
+        }
+
         const ponto = obterPontoDoClique(e.clientX, e.clientY);
-        if (!ponto) return;
+        if (!ponto) {
+            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
+            return;
+        }
+
+        if (!e.shiftKey) {
+            ancoraCursorShift = { no: ponto.no, offset: ponto.offset };
+        }
 
         const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
         if (!mapa) {
@@ -5895,9 +5101,11 @@
                 if (bloco && bloco !== document.body) {
                     const rangeBloco = document.createRange();
                     rangeBloco.selectNodeContents(bloco);
-                    await aplicarSelecaoECopiar(rangeBloco, modoAcumulador);
+                    await aplicarSelecaoECopiar(rangeBloco, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                    return;
                 }
             }
+            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
             return;
         }
 
@@ -5932,65 +5140,103 @@
         }
 
         const ehDuploClique = (e.detail === 2);
-        const charNoCursor = texto[idxCursor] || '';
-        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
-        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
-            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
-        const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
-            eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
 
-        let resultadoIndices = null;
+        /* DIRETRIZ ROOT 2.5: Em blocos/campos compostos já selecionados, 1 clique dentro encolhe para o sub-segmento numérico/alfanumérico
+         * (ex.: dia/mês/ano de uma data, segmento de processo/boleto) e clicar em separador/não-número re-seleciona o bloco inteiro;
+         * em texto comum, executa o ciclo circular 1->5->1. */
+        if (e.detail === 1 && !e.ctrlKey && !e.shiftKey && !e.metaKey && cliqueDentroDaSelecaoAtiva && (estadoCicloSelecao.textoAtual || ultimoBlocoCompostoAtivo)) {
+            const limitesBloco = resolverLimitesBlocoAtivoNaJanela(mapa, idxCursor, ultimoBlocoCompostoAtivo, estadoCicloSelecao.textoAtual);
+            if (limitesBloco) {
+                const rBlocoComp = criarRangeDOMAPartirDeIndices(mapa, limitesBloco.inicio, limitesBloco.fim);
+                const txtBlocoComp = rBlocoComp ? (extrairTextoPuroSanitizado(rBlocoComp) || rBlocoComp.toString()).trim() : '';
+                if (rBlocoComp && txtBlocoComp) {
+                    const subSeg = resolverSubSegmentoNoBlocoComposto(texto, idxCursor, limitesBloco.inicio, limitesBloco.fim);
+                    if (subSeg && subSeg.ehSubSegmento) {
+                        const rSub = criarRangeDOMAPartirDeIndices(mapa, subSeg.inicio, subSeg.fim);
+                        if (rSub) {
+                            const txtSub = (extrairTextoPuroSanitizado(rSub) || rSub.toString()).trim();
+                            ultimoBlocoCompostoAtivo = { range: rBlocoComp.cloneRange(), texto: txtBlocoComp };
+                            estadoCicloSelecao = { direcao: 1, textoAtual: txtSub };
+                            await aplicarSelecaoECopiar(rSub, modoAcumulador, null, { temModificador: temModificadorTeclado, minimoCaracteres: 1 });
+                            return;
+                        }
+                    } else {
+                        ultimoBlocoCompostoAtivo = { range: rBlocoComp.cloneRange(), texto: txtBlocoComp };
+                        estadoCicloSelecao = { direcao: 1, textoAtual: txtBlocoComp };
+                        await aplicarSelecaoECopiar(rBlocoComp, modoAcumulador, null, { temModificador: temModificadorTeclado, minimoCaracteres: 1 });
+                        return;
+                    }
+                }
+            }
 
-        if (ehDuploClique) {
-            if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = expandirSentencaCompletaAtePonto(texto, idxCursor) || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
-            }
-        } else if (clicouEmDelimitadorOuAspas) {
-            resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
-        } else if (clicouEmEspaco) {
-            /* Regra de bloco: espaco logo apos ":" liga o rotulo ao que vem depois -> sentenca inteira */
-            resultadoIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
-            }
-        } else {
-            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
-            if (!resultadoIndices) {
-                resultadoIndices = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
+            if (estadoCicloSelecao.textoAtual) {
+                const degraus = construirDegrausCicloSelecao(mapa, idxCursor, elAlvoEfetivo);
+                if (degraus.length > 1) {
+                let idxAtual = degraus.findIndex(d => d.texto === estadoCicloSelecao.textoAtual);
+                if (idxAtual === -1) {
+                    idxAtual = degraus.findIndex(d => d.texto.includes(estadoCicloSelecao.textoAtual) || estadoCicloSelecao.textoAtual.includes(d.texto));
+                }
+                if (idxAtual === -1) idxAtual = 0;
+
+                if (idxAtual >= degraus.length - 1) {
+                    estadoCicloSelecao.direcao = -1;
+                } else if (idxAtual <= 0) {
+                    estadoCicloSelecao.direcao = 1;
+                }
+
+                const proxIdx = Math.max(0, Math.min(degraus.length - 1, idxAtual + estadoCicloSelecao.direcao));
+                if (proxIdx >= degraus.length - 1) {
+                    estadoCicloSelecao.direcao = -1;
+                } else if (proxIdx <= 0) {
+                    estadoCicloSelecao.direcao = 1;
+                }
+
+                const degrauAlvo = degraus[proxIdx];
+                if (degrauAlvo && degrauAlvo.range) {
+                    estadoCicloSelecao.textoAtual = degrauAlvo.texto;
+                    await aplicarSelecaoECopiar(degrauAlvo.range, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                    return;
+                }
+                }
             }
         }
 
-        if (!resultadoIndices) return;
+        const blocoCompostoPrevio = ehDuploClique
+            ? (ultimoBlocoCompostoAtivo || (() => {
+                const rb = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
+                return rb ? { texto: texto.slice(rb.inicio, rb.fim).trim() } : null;
+            })())
+            : null;
+
+        const resExpansao = resolverIndicesExpansaoBase(mapa, idxCursor, e.detail, { blocoCompostoPrevio, ehAlt: Boolean(e.altKey) });
+        const resultadoIndices = resExpansao ? resExpansao.resultadoIndices : null;
+        const ehBlocoCompostoSelecionado = Boolean(resExpansao && resExpansao.ehBlocoCompostoSelecionado);
+
+        if (ehDuploClique && blocoCompostoPrevio && (!resultadoIndices || texto.slice(resultadoIndices.inicio, resultadoIndices.fim).trim().length <= blocoCompostoPrevio.texto.length)) {
+            const blocoFora = obterBlocoAncestralContextual(elAlvoEfetivo);
+            if (blocoFora && blocoFora !== document.body) {
+                const rangeFora = document.createRange();
+                rangeFora.selectNodeContents(blocoFora);
+                ultimoBlocoCompostoAtivo = null;
+                estadoCicloSelecao = {
+                    direcao: 1,
+                    textoAtual: (extrairTextoPuroSanitizado(rangeFora) || rangeFora.toString()).trim()
+                };
+                await aplicarSelecaoECopiar(rangeFora, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                return;
+            }
+        }
+
+        if (!resultadoIndices) {
+            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
+            return;
+        }
 
         let rangeFinal = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
-        if (!rangeFinal) return;
+        if (!rangeFinal) {
+            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
+            return;
+        }
 
         let textoCandidato = (mapa && typeof mapa.texto === 'string')
             ? mapa.texto.slice(resultadoIndices.inicio, resultadoIndices.fim)
@@ -6024,6 +5270,13 @@
             }
         }
 
+        if (rangeFinal && !e.shiftKey) {
+            ancoraCursorShift = {
+                no: rangeFinal.startContainer,
+                offset: rangeFinal.startOffset
+            };
+        }
+
         // BUG-15: Duplo clique ou bloco opera com mínimo de 1 caractere útil
         const minLeitura = (ehDuploClique) ? 1 : null;
         if (!temModificadorTeclado && !verificarProtecaoTamanhoMinimoInterface(textoCandidato, elAlvoEfetivo, false, minLeitura)) {
@@ -6032,7 +5285,7 @@
 
         /* BUG-42 / USAB-10 (Seção 6.109): Trava de Proximidade Geométrica para Clique Único.
          * Rejeita seleção automática caso o clique único tenha ocorrido em espaço vazio longe do Range resolvido. */
-        if (!ehDuploClique && e.detail === 1 && !verificarProximidadeGeometricaDoClique(rangeFinal, e.clientX, e.clientY, e.detail)) {
+        if (!ehDuploClique && e.detail === 1 && !temModificadorTeclado && !verificarProximidadeGeometricaDoClique(rangeFinal, e.clientX, e.clientY, e.detail)) {
             return;
         }
 
@@ -6040,6 +5293,14 @@
             if (modoAcumulador || e.altKey) {
                 ignorarProximoClick = true;
             }
+            const txtFinalCiclo = (extrairTextoPuroSanitizado(rangeFinal) || rangeFinal.toString() || textoCandidato).trim();
+            estadoCicloSelecao = {
+                direcao: 1,
+                textoAtual: txtFinalCiclo
+            };
+            ultimoBlocoCompostoAtivo = (ehBlocoCompostoSelecionado || (!ehDuploClique && ehTextoBlocoMultiSegmento(txtFinalCiclo)))
+                ? { range: rangeFinal.cloneRange(), texto: txtFinalCiclo }
+                : null;
             await aplicarSelecaoECopiar(rangeFinal, modoAcumulador, null, { temModificador: temModificadorTeclado });
         }
     }
@@ -6273,7 +5534,7 @@
 
             const ehEditorRico = Boolean(alvo.isContentEditable ||
                 (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
-                (alvo.closest && alvo.closest('[contenteditable="true"]')) ||
+                (alvo.closest && alvo.closest('[contenteditable="true"], [contenteditable=""], .ck-editor__editable, .ck-content')) ||
                 document.designMode === 'on');
             const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
 
@@ -6343,14 +5604,25 @@
                 return;
             }
 
-            /* Colagem normal com o botao do meio */
+            /* Colagem normal ou Alt+Meio (250ms de espera para scripts de foco/selecionar-tudo) */
             if (colarBotaoMeioAtivo) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
-                    try {
-                        executarColagemBotaoDireito(alvo, 'normal', false);
-                    } catch (_) { }
+                    const executarColagemMeio = () => {
+                        try {
+                            executarColagemBotaoDireito(alvo, 'normal', Boolean(e.ctrlKey));
+                        } catch (_) { }
+                    };
+                    if (e.altKey) {
+                        try {
+                            if (typeof alvo.focus === 'function') alvo.focus();
+                            if (typeof alvo.click === 'function') alvo.click();
+                        } catch (_) { }
+                        setTimeout(executarColagemMeio, 250);
+                    } else {
+                        executarColagemMeio();
+                    }
                 }
                 /* Se der qualquer erro ou elemento nao for editavel: 'fazer nada' silenciosamente */
                 return;
@@ -6555,6 +5827,14 @@
             teclasPressionadasAtivas.add(String(e.key).toLowerCase());
         }
 
+        /* Secao 6.72: Delegacao unificada da Caixa de Entrada Rapida (Ins + Ins / Ctrl + Ins + Ins) */
+        if (caixaEntradaRapidaAtiva && fachadaModuloInput && fachadaModuloInput.caixaRapida && typeof fachadaModuloInput.caixaRapida.tratarEventoTeclado === 'function') {
+            fachadaModuloInput.caixaRapida.ativo = true;
+            if (fachadaModuloInput.caixaRapida.tratarEventoTeclado(e)) {
+                return;
+            }
+        }
+
         /* BUG-02, Seção 6.30 e BUG-45 / USAB-13 (Seção 6.114):
          * - Ao pressionar Escape: destrói imediatamente o contorno Flash e os avisos.
          * - Ao pressionar Enter: destrói os avisos e, se o Flash NÃO estiver em modo "Até Interação" (-1),
@@ -6753,6 +6033,9 @@
             ancoraCursorShift = null;
         }
         window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
+        if (!window.__JUSGOV_MODO_BARALHO__) {
+            ocultarInspetorTempoReal();
+        }
     }
 
     /*
@@ -6846,8 +6129,8 @@
             const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
             if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
 
-            // Em botoes, labels ou controles de formulario estritos, nunca seleciona nem copia via selectionchange sem teclas modificadoras
-            if (isComponenteBotaoOuFormularioEstrito(range.commonAncestorContainer) || (range.commonAncestorContainer && typeof range.commonAncestorContainer.closest === 'function' && range.commonAncestorContainer.closest('label'))) {
+            // Em controles estritos de interface ('interface'), nunca seleciona nem copia via selectionchange sem teclas modificadoras
+            if (isComponenteBotaoOuFormularioEstrito(range.commonAncestorContainer)) {
                 return;
             }
             // BUG-16: Em caixas de seleção / dropdowns / select2, zero cópia automática via selectionchange sem Alt
@@ -7431,6 +6714,7 @@
             }
         }, { capture: true, signal });
         window.addEventListener('keyup', aoSoltarTecla, { capture: true, passive: true, signal });
+        window.addEventListener('blur', ocultarInspetorTempoReal, { signal });
 
         /* Captura passiva e silenciosa de cópias manuais na página (Ctrl+C nativo do SO) para a Memória Interna de 2 Níveis */
         document.addEventListener('copy', () => {
@@ -7539,9 +6823,22 @@
                 validador.atualizarPosicaoAlertaSobRolagem();
             }
         }, { capture: true, passive: true, signal });
+        let ultimoPingAtividadeTrabalhoTs = 0;
+        const notificarAtividadeTrabalhoThrottled = () => {
+            const agora = Date.now();
+            if ((agora - ultimoPingAtividadeTrabalhoTs) < 30000) return;
+            ultimoPingAtividadeTrabalhoTs = agora;
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ acao: 'PING_ATIVIDADE_TRABALHO' }).catch(() => {});
+                }
+            } catch (_) { }
+        };
         window.addEventListener('keydown', (e) => {
             window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
+            notificarAtividadeTrabalhoThrottled();
         }, { capture: true, passive: true, signal });
+        window.addEventListener('mousedown', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
     }
 
     function sincronizarConfiguracaoMarcadorVisual() {
@@ -7553,7 +6850,8 @@
                     corContorno: corContornoMarcadorColado,
                     corFundo: corFundoMarcadorColado,
                     opacidadeFundo: opacidadeFundoMarcadorColado,
-                    estiloBadge: estiloBadgeMarcadorColado
+                    estiloBadge: estiloBadgeMarcadorColado,
+                    tipoContorno: tipoContornoMarcadorColado
                 });
             } catch (_) { }
         }
@@ -7590,6 +6888,7 @@
                     'corFundoMarcadorColado',
                     'opacidadeFundoMarcadorColado',
                     'estiloBadgeMarcadorColado',
+                    'tipoContornoMarcadorColado',
                     'modoRetirarSelecao',
                     'minimoCaracteresInterface',
                     'separadorAcumulador',
@@ -7683,8 +6982,11 @@
                         if (typeof cfg.opacidadeFundoMarcadorColado === 'number' && Number.isFinite(cfg.opacidadeFundoMarcadorColado)) {
                             opacidadeFundoMarcadorColado = Math.max(0.05, Math.min(0.85, cfg.opacidadeFundoMarcadorColado));
                         }
-                        if (typeof cfg.estiloBadgeMarcadorColado === 'string' && ['sobrescrito', 'circular', 'chip'].includes(cfg.estiloBadgeMarcadorColado)) {
+                        if (typeof cfg.estiloBadgeMarcadorColado === 'string' && ['sobrescrito', 'circular', 'chip', 'sem_etiqueta', 'translucido', 'bolinha', 'pilula'].includes(cfg.estiloBadgeMarcadorColado)) {
                             estiloBadgeMarcadorColado = cfg.estiloBadgeMarcadorColado;
+                        }
+                        if (typeof cfg.tipoContornoMarcadorColado === 'string' && ['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(cfg.tipoContornoMarcadorColado)) {
+                            tipoContornoMarcadorColado = cfg.tipoContornoMarcadorColado;
                         }
                         sincronizarConfiguracaoMarcadorVisual();
                         if (cfg.modoRetirarSelecao !== undefined) {
@@ -7833,6 +7135,10 @@
                         }
                         if (changes.estiloBadgeMarcadorColado !== undefined && typeof changes.estiloBadgeMarcadorColado.newValue === 'string') {
                             estiloBadgeMarcadorColado = changes.estiloBadgeMarcadorColado.newValue;
+                            sincronizarConfiguracaoMarcadorVisual();
+                        }
+                        if (changes.tipoContornoMarcadorColado !== undefined && typeof changes.tipoContornoMarcadorColado.newValue === 'string') {
+                            tipoContornoMarcadorColado = changes.tipoContornoMarcadorColado.newValue;
                             sincronizarConfiguracaoMarcadorVisual();
                         }
                         if (changes.modoRetirarSelecao !== undefined) {
@@ -8015,8 +7321,11 @@
                         if (typeof msg.opacidadeFundoMarcadorColado === 'number' && Number.isFinite(msg.opacidadeFundoMarcadorColado)) {
                             opacidadeFundoMarcadorColado = Math.max(0.05, Math.min(0.85, msg.opacidadeFundoMarcadorColado));
                         }
-                        if (typeof msg.estiloBadgeMarcadorColado === 'string' && ['sobrescrito', 'circular', 'chip'].includes(msg.estiloBadgeMarcadorColado)) {
+                        if (typeof msg.estiloBadgeMarcadorColado === 'string' && ['sobrescrito', 'circular', 'chip', 'sem_etiqueta', 'translucido', 'bolinha', 'pilula'].includes(msg.estiloBadgeMarcadorColado)) {
                             estiloBadgeMarcadorColado = msg.estiloBadgeMarcadorColado;
+                        }
+                        if (typeof msg.tipoContornoMarcadorColado === 'string' && ['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(msg.tipoContornoMarcadorColado)) {
+                            tipoContornoMarcadorColado = msg.tipoContornoMarcadorColado;
                         }
                         sincronizarConfiguracaoMarcadorVisual();
                         if (msg.modoRetirarSelecao !== undefined) {
@@ -8129,9 +7438,11 @@
         },
         definirCapturaBotoesMouse4e5Ativa(valor) {
             capturaBotoesMouse4e5Ativa = Boolean(valor);
+            sincronizarFachadasModulares();
         },
         definirColarBotaoMeioAtivo(valor) {
             colarBotaoMeioAtivo = Boolean(valor);
+            sincronizarFachadasModulares();
         },
         obterColarBotaoMeioAtivo() {
             return colarBotaoMeioAtivo;
@@ -8146,6 +7457,7 @@
         emularTeclasWinV,
         definirNavegacaoTecladoCamposAtiva(valor) {
             navegacaoTecladoCamposAtiva = Boolean(valor);
+            sincronizarFachadasModulares();
         },
         definirCaixaEntradaRapidaAtiva(valor) {
             caixaEntradaRapidaAtiva = Boolean(valor);
@@ -8187,6 +7499,7 @@
         delimitarParagrafoLocalizado,
         resolverSelecaoTriploClique,
         construirMapaTextoBlocoComJanela,
+        resolverIndicesExpansaoBase,
         simularCliqueEmTexto(texto, idxZeroBased, numCliques = 1, ehAlt = false) {
             if (typeof texto !== 'string' || texto.length === 0) return '';
             if (idxZeroBased < 0 || idxZeroBased >= texto.length) return '';
@@ -8200,42 +7513,8 @@
                 tamanhoTotalBloco: texto.length
             };
 
-            if (numCliques >= 3) {
-                const res3 = resolverSelecaoTriploClique(mapaSimulado, idxZeroBased);
-                return res3 ? higienizarTextoParaCopia(texto.substring(res3.inicio, res3.fim)) : '';
-            }
-
-            const charNoCursor = texto[idxZeroBased] || '';
-            const charAnterior = idxZeroBased > 0 ? texto[idxZeroBased - 1] : '';
-            const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
-                (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
-            const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
-                eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
-
-            let res = null;
-            if (numCliques === 2 || (ehAlt && numCliques === 1 && (clicouEmEspaco || clicouEmDelimitadorOuAspas))) {
-                if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
-                    res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
-                }
-                if (!res) res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, true);
-                if (!res) res = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
-                if (!res) res = tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
-                if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, true);
-                if (!res) res = expandirSentencaCompletaAtePonto(texto, idxZeroBased) || expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
-            } else if (clicouEmDelimitadorOuAspas) {
-                res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
-            } else if (clicouEmEspaco) {
-                res = tentarExpandirSentencaPorDoisPontos(texto, idxZeroBased);
-                if (!res) res = tentarExpandirPadraoComposto(texto, idxZeroBased, true, false);
-                if (!res) res = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxZeroBased);
-                if (!res) res = tentarExpandirBlocoFormatadoDestaque(mapaSimulado, idxZeroBased);
-                if (!res) res = tentarExpandirDelimitadoresSimetricos(texto, idxZeroBased, false);
-                if (!res) res = expandirFraseAtePontuacaoEstagio3(texto, idxZeroBased);
-            } else {
-                res = tentarExpandirPadraoComposto(texto, idxZeroBased, false, false);
-                if (!res) res = expandirUnidadeAtomicaEstagio1(texto, idxZeroBased);
-            }
-
+            const base = resolverIndicesExpansaoBase(mapaSimulado, idxZeroBased, numCliques, { ehAlt: Boolean(ehAlt) });
+            const res = base ? base.resultadoIndices : null;
             return res ? higienizarTextoParaCopia(texto.substring(res.inicio, res.fim)) : '';
         },
         simularAlternanciaCliqueInput(inputElem, posCliqueDesejada = null, numCliques = 1) {
@@ -8351,7 +7630,16 @@
         isElementoClaramenteDeInterface,
         definirRegrasMapeamentoElementos,
         obterRegrasMapeamentoElementos,
+        definirRegrasInternasInterface: (regras) => {
+            regrasInternasInterface = Array.isArray(regras) ? [...regras] : [];
+            cacheClassificacaoCustomEl = null;
+            cacheClassificacaoCustomTs = 0;
+            cacheClassificacaoCustomRes = null;
+        },
         obterClassificacaoRegraCustomizada,
+        obterDiagnosticoElemento,
+        validarExpressaoSeletor,
+        normalizarExpressaoAtributoCss,
         elementoCorrespondeXPath,
         elementoCorrespondeCss,
         elementoCorrespondeRegraMapeamento,
@@ -8470,6 +7758,7 @@
             if (typeof opcoes.corFundo === 'string') corFundoMarcadorColado = opcoes.corFundo;
             if (typeof opcoes.opacidadeFundo === 'number') opacidadeFundoMarcadorColado = opcoes.opacidadeFundo;
             if (typeof opcoes.estiloBadge === 'string') estiloBadgeMarcadorColado = opcoes.estiloBadge;
+            if (typeof opcoes.tipoContorno === 'string') tipoContornoMarcadorColado = opcoes.tipoContorno;
             sincronizarConfiguracaoMarcadorVisual();
         },
         salvarClipboardInternoComBackup,

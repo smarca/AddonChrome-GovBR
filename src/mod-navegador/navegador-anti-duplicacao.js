@@ -92,6 +92,18 @@
         get acaoConteudo() { return this.#acaoConteudo; }
         set acaoConteudo(v) { this.#acaoConteudo = String(v); }
 
+        #obterProtegerModificadasEfetivo(config = {}) {
+            const acao = (typeof config.reutilizarAbasAcaoConteudo === 'string' && config.reutilizarAbasAcaoConteudo)
+                ? config.reutilizarAbasAcaoConteudo
+                : this.#acaoConteudo;
+            if (acao === 'recarregar_se_modificada' || acao === 'recarregar_se_nao_modificada') {
+                return false;
+            }
+            return (config.protegerGuiasModificadas !== undefined)
+                ? (config.protegerGuiasModificadas !== false)
+                : this.#protegerGuiasModificadas;
+        }
+
         get mapaAbasUrls() { return this.#mapaAbasUrls; }
 
         obterMapaAbasUrls() {
@@ -254,7 +266,7 @@
                     const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
                     const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
                     const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                    const protegerModificadas = (config.protegerGuiasModificadas !== undefined) ? (config.protegerGuiasModificadas !== false) : this.#protegerGuiasModificadas;
+                    const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
 
                     const regNova = this.#mapaAbasUrls.get(tab.id);
                     const abaDuplicada = abasJanela.find((t) => {
@@ -309,9 +321,9 @@
                         return { duplicada: true, abaExistente: abaDuplicada };
                     }
                 }
-                return { duplicada: false };
+                return { duplicada: false, duplicacaoManualPermitida };
             } catch (_) {
-                return { duplicada: false };
+                return { duplicada: false, duplicacaoManualPermitida };
             }
         }
 
@@ -362,7 +374,7 @@
                         const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
                         const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
                         const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                        const protegerModificadas = (config.protegerGuiasModificadas !== undefined) ? (config.protegerGuiasModificadas !== false) : this.#protegerGuiasModificadas;
+                        const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
 
                         const abaExistente = abasJanela.find((t) => {
                             if (t.id === tabId) return false;
@@ -457,9 +469,9 @@
                         this.#mapaAbasUrls.set(tabId, regAtual);
                     }
                 }
-                return { duplicada: false };
+                return { duplicada: false, duplicacaoManualPermitida };
             } catch (_) {
-                return { duplicada: false };
+                return { duplicada: false, duplicacaoManualPermitida };
             }
         }
 
@@ -507,7 +519,7 @@
 
                 const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
                 const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                const protegerModificadas = (config.protegerGuiasModificadas !== undefined) ? (config.protegerGuiasModificadas !== false) : this.#protegerGuiasModificadas;
+                const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
 
                 const mapaGrupos = new Map();
                 for (const t of abas) {

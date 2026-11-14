@@ -129,20 +129,24 @@
             const alvo = e.target;
             if (!alvo) return false;
 
-            const ehTextarea = (alvo.tagName === 'TEXTAREA');
-            if (ehTextarea) {
+            const docAlvoPre = (alvo && alvo.ownerDocument) ? alvo.ownerDocument : document;
+            const textareaCollabora = (alvo.tagName !== 'TEXTAREA' && (alvo.tagName === 'CANVAS' || (alvo.closest && alvo.closest('.leaflet-pane, #document-container'))))
+                ? docAlvoPre.querySelector('.clipboard-container textarea')
+                : null;
+            const alvoTextarea = (alvo.tagName === 'TEXTAREA') ? alvo : textareaCollabora;
+            if (alvoTextarea) {
                 if (!this.#ativo || (e && e.detail && e.detail > 1)) return false;
                 setTimeout(() => {
                     try {
-                        if (alvo.selectionStart !== alvo.selectionEnd) return;
-                        const idx = alvo.selectionStart;
-                        const valor = alvo.value || '';
+                        if (alvoTextarea.selectionStart !== alvoTextarea.selectionEnd) return;
+                        const idx = alvoTextarea.selectionStart;
+                        const valor = alvoTextarea.value || '';
                         const spanSimbolo = this.localizarCampoSimbolosSobCursor(valor, idx);
                         if (spanSimbolo) {
-                            alvo.setSelectionRange(spanSimbolo.inicio, spanSimbolo.fim);
+                            alvoTextarea.setSelectionRange(spanSimbolo.inicio, spanSimbolo.fim);
                         }
                     } catch (_) { }
-                }, 10);
+                }, textareaCollabora ? 35 : 10);
                 return true;
             }
 
@@ -174,7 +178,10 @@
                                 ponto = { no: rNat.startContainer, offset: rNat.startOffset };
                             } else if (rNat.startContainer.nodeType === Node.ELEMENT_NODE && rNat.startContainer.childNodes.length > 0) {
                                 const idxFilho = Math.min(rNat.startOffset, rNat.startContainer.childNodes.length - 1);
-                                const f = rNat.startContainer.childNodes[idxFilho];
+                                let f = rNat.startContainer.childNodes[idxFilho];
+                                while (f && f.nodeType === Node.ELEMENT_NODE && f.firstChild) {
+                                    f = f.firstChild;
+                                }
                                 if (f && f.nodeType === Node.TEXT_NODE) {
                                     ponto = { no: f, offset: 0 };
                                 }

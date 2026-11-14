@@ -89,10 +89,10 @@
         #obterCamposCandidatos(inputOrigem) {
             /* Passo 1.2: Coleta de todos os inputs visíveis, habilitados e editáveis do mesmo formulário ou container */
             const doc = (inputOrigem && inputOrigem.ownerDocument) || (typeof document !== 'undefined' ? document : null);
-            const container = (inputOrigem && inputOrigem.form) || (inputOrigem && typeof inputOrigem.closest === 'function' && inputOrigem.closest('table, form, .container, main, body')) || (doc && doc.body);
+            const container = (inputOrigem && inputOrigem.form) || (inputOrigem && typeof inputOrigem.closest === 'function' && inputOrigem.closest('#containerLinhasEntradaDemo, table, form, .cartao, .container, main, body')) || (doc && doc.body);
             if (!container || typeof container.querySelectorAll !== 'function') return [];
             const todos = Array.from(container.querySelectorAll('input:not([type="hidden"]):not([disabled]):not([readonly])'));
-            return todos.filter(el => this.#ehInputNavegavel(el) && el.offsetParent !== null);
+            return todos.filter(el => this.#ehInputNavegavel(el) && (el.offsetParent !== null || (typeof el.getClientRects === 'function' && el.getClientRects().length > 0)));
         }
 
         /**

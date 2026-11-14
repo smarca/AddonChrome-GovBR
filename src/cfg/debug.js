@@ -9074,6 +9074,37 @@
             const modalOverlay = motorTeste.abrirModalSalvarRegraMapeamento(elementoAlvo);
             const modalAbriuOk = Boolean(modalOverlay && document.getElementById('jusgov-modal-mapeamento-regra'));
 
+            // 3.1 Botão Testar: fica translúcido até clique ou tecla comum (ignora Control, Alt, Shift)
+            let btnTestarModalOk = false;
+            if (modalOverlay) {
+                const cardModal = modalOverlay.firstElementChild;
+                const btnTestar = Array.from(modalOverlay.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Testar'));
+                if (cardModal && btnTestar) {
+                    btnTestar.click();
+                    const ficouTranslucido1 = cardModal.style.opacity === '0.12';
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', bubbles: true }));
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }));
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
+                    const manteveComModificadoras = cardModal.style.opacity === '0.12';
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+                    const restaurouComTeclaComum = cardModal.style.opacity === '1' && Boolean(document.getElementById('jusgov-modal-mapeamento-regra'));
+
+                    btnTestar.click();
+                    const ficouTranslucido2 = cardModal.style.opacity === '0.12';
+                    modalOverlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    modalOverlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    const restaurouComCliqueSemFechar = cardModal.style.opacity === '1' && Boolean(document.getElementById('jusgov-modal-mapeamento-regra'));
+
+                    btnTestarModalOk = Boolean(
+                        ficouTranslucido1 &&
+                        manteveComModificadoras &&
+                        restaurouComTeclaComum &&
+                        ficouTranslucido2 &&
+                        restaurouComCliqueSemFechar
+                    );
+                }
+            }
+
             // Fecha modal
             motorTeste.fecharModalSalvarRegraMapeamento();
             const modalFechouOk = !document.getElementById('jusgov-modal-mapeamento-regra');
@@ -9107,6 +9138,7 @@
                 detectaCurta2 &&
                 detectaLonga &&
                 modalAbriuOk &&
+                btnTestarModalOk &&
                 modalFechouOk &&
                 ehInterface &&
                 mantemInterface &&

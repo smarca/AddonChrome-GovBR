@@ -117,7 +117,7 @@
          * @param {Object} chromeApi - Objeto chrome com APIs windows e tabs
          * @returns {Promise<boolean>} True se a janela foi convertida
          */
-        async processarNovaJanela(novaJanela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+        async processarNovaJanela(novaJanela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}) {
             /* Passo 1.1: Guarda de ativação e validação de APIs */
             if (!this.#bloquearNovasJanelas || !novaJanela || !chromeApi || !chromeApi.windows || !chromeApi.tabs) {
                 return false;
@@ -152,10 +152,15 @@
                     return false;
                 }
 
+                const emPrimeiroPlano = (config.abaEmPrimeiroPlano !== undefined)
+                    ? Boolean(config.abaEmPrimeiroPlano)
+                    : (config.abaEmSegundoPlano !== undefined ? (config.abaEmSegundoPlano === false) : true);
                 /* Passo 1.4: Move as abas para a janela principal */
                 for (const aba of abasNovaJanela) {
                     await chromeApi.tabs.move(aba.id, { windowId: janelaPrincipal.id, index: -1 });
-                    await chromeApi.tabs.update(aba.id, { active: true });
+                    if (emPrimeiroPlano) {
+                        await chromeApi.tabs.update(aba.id, { active: true });
+                    }
                 }
 
                 /* Fecha a janela avulsa esvaziada */

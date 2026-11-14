@@ -48,7 +48,7 @@
         verde_forense: Object.freeze({ corContorno: '#0d9488', corFundo: '#ccfbf1', opacidadeFundo: 0.28, estiloBadge: 'sobrescrito' }),
         marca_texto: Object.freeze({ corContorno: '#eab308', corFundo: '#fef08a', opacidadeFundo: 0.36, estiloBadge: 'sobrescrito' }),
         azul_indigo: Object.freeze({ corContorno: '#4f46e5', corFundo: '#e0e7ff', opacidadeFundo: 0.28, estiloBadge: 'circular' }),
-        ambar_suave: Object.freeze({ corContorno: '#d97706', corFundo: '#fde68a', opacidadeFundo: 0.30, estiloBadge: 'chip' }),
+        ambar_suave: Object.freeze({ corContorno: '#d97706', corFundo: '#fde68a', opacidadeFundo: 0.30, estiloBadge: 'translucido' }),
         alto_contraste: Object.freeze({ corContorno: '#1e293b', corFundo: '#facc15', opacidadeFundo: 0.42, estiloBadge: 'circular' })
     });
 
@@ -89,7 +89,8 @@
                 corContorno: '#0d9488',
                 corFundo: '#ccfbf1',
                 opacidadeFundo: 0.28,
-                estiloBadge: 'sobrescrito'
+                estiloBadge: 'sobrescrito',
+                tipoContorno: 'solido'
             };
             this.#ouvinteScrollMarcadoresAtivo = false;
             this.#limparOuvinteScrollMarcadores = null;
@@ -140,8 +141,14 @@
                 this.#configMarcadorColado.opacidadeFundo = Math.max(0.05, Math.min(0.85, Number(opacidade)));
             }
             const estiloBadge = opcoes.estiloBadge || opcoes.estiloBadgeMarcadorColado;
-            if (estiloBadge === 'sobrescrito' || estiloBadge === 'circular' || estiloBadge === 'chip') {
+            if (['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(estiloBadge)) {
                 this.#configMarcadorColado.estiloBadge = estiloBadge;
+            } else if (['chip', 'bolinha', 'pilula'].includes(estiloBadge)) {
+                this.#configMarcadorColado.estiloBadge = 'sobrescrito';
+            }
+            const tipoContorno = opcoes.tipoContorno || opcoes.tipoContornoMarcadorColado;
+            if (['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(tipoContorno)) {
+                this.#configMarcadorColado.tipoContorno = tipoContorno;
             }
             if (!this.#configMarcadorColado.ativo) {
                 this.limparMarcadoresPermanentes();
@@ -307,6 +314,10 @@
                 }
             }
 
+            const ehPdf = (typeof document !== 'undefined' && document.contentType === 'application/pdf') ||
+                Boolean(rangeAlvo.commonAncestorContainer && rangeAlvo.commonAncestorContainer.parentElement && rangeAlvo.commonAncestorContainer.parentElement.closest && rangeAlvo.commonAncestorContainer.parentElement.closest('.textLayer, .pdfViewer'));
+            const limiteGapHorizontal = ehPdf ? 48 : 16;
+
             const segmentos = [];
             for (let i = 0; i < linhas.length; i++) {
                 const l = linhas[i];
@@ -314,7 +325,7 @@
                 let atual = null;
                 for (let k = 0; k < l.frags.length; k++) {
                     const f = l.frags[k];
-                    if (atual && (f.left - atual.right) <= 12) {
+                    if (atual && (f.left - atual.right) <= limiteGapHorizontal) {
                         atual.right = Math.max(atual.right, f.right);
                     } else {
                         if (atual) segmentos.push(atual);
@@ -504,6 +515,15 @@
                     }
                 };
 
+                const pontoEstaDentroDoFlashAtual = (cx, cy) => {
+                    if (typeof cx !== 'number' || typeof cy !== 'number' || !Array.isArray(this.#segmentosAtuaisFlash)) {
+                        return false;
+                    }
+                    return this.#segmentosAtuaisFlash.some((s) =>
+                        cx >= (s.left - 4) && cx <= (s.right + 4) && cy >= (s.top - 4) && cy <= (s.bottom + 4)
+                    );
+                };
+
                 const tratarMouseDownGlobalFlash = (e) => {
                     if (!e) return;
                     const alvo = e.target;
@@ -513,10 +533,24 @@
                     );
                     if (clicouEmModalCritico) {
                         this.limparFlashBorderImediatamente();
+                        return;
+                    }
+                    /* Seção 6.136 / BUG-54: Clique dentro do contorno NÃO o retira (permite expandir/diminuir);
+                     * clique fora do contorno limpa imediatamente no modo temporizado/interação. */
+                    if (!pontoEstaDentroDoFlashAtual(e.clientX, e.clientY) && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                        this.limparFlashBorderImediatamente();
                     }
                 };
 
-                const tratarCopiaOuSelecaoGlobalFlash = () => {
+                const tratarCopiaOuSelecaoGlobalFlash = (e) => {
+                    if (e && e.type === 'selectstart' && e.target && this.#segmentosAtuaisFlash.length > 0) {
+                        try {
+                            const r = typeof e.target.getBoundingClientRect === 'function' ? e.target.getBoundingClientRect() : null;
+                            if (r && pontoEstaDentroDoFlashAtual((r.left + r.right) / 2, (r.top + r.bottom) / 2)) {
+                                return;
+                            }
+                        } catch (_) { }
+                    }
                     this.limparFlashBorderImediatamente();
                 };
 
@@ -661,63 +695,178 @@
                 return null;
             }
 
-            /* Verifica se já existe um marcador permanente que se sobrepõe ou expande este mesmo Range */
-            let marcadorAlvo = null;
-            for (let i = 0; i < this.#marcadoresPermanentes.length; i++) {
-                const m = this.#marcadoresPermanentes[i];
-                if (this.#rangesSeSobrepoem(m.range, candidata.range)) {
-                    m.range = this.#fundirRangesSobrepostos(m.range, candidata.range);
-                    m.texto = m.range.toString().trim() || candidata.texto;
-                    marcadorAlvo = m;
-                    break;
+            /* Seção 6.138 / FEAT-30: Se existirem marcadores no intervalo, apaga-os e substitui por um novo com novo número */
+            for (let j = this.#marcadoresPermanentes.length - 1; j >= 0; j--) {
+                const existente = this.#marcadoresPermanentes[j];
+                if (existente && existente.range && this.#rangesSeSobrepoem(existente.range, candidata.range)) {
+                    this.#marcadoresPermanentes.splice(j, 1);
                 }
             }
 
-            /* Se fundiu com um marcador existente, funde também quaisquer outros marcadores que agora fiquem englobados pelo range expandido */
-            if (marcadorAlvo) {
-                for (let j = this.#marcadoresPermanentes.length - 1; j >= 0; j--) {
-                    const outro = this.#marcadoresPermanentes[j];
-                    if (outro !== marcadorAlvo && this.#rangesSeSobrepoem(marcadorAlvo.range, outro.range)) {
-                        marcadorAlvo.range = this.#fundirRangesSobrepostos(marcadorAlvo.range, outro.range);
-                        this.#marcadoresPermanentes.splice(j, 1);
-                    }
-                }
-            }
+            let textoRangeOriginal = '';
+            try {
+                textoRangeOriginal = String(candidata.range.toString() || '').replace(/\s+/g, ' ').trim();
+            } catch (_) { }
 
-            if (!marcadorAlvo) {
-                this.#contadorMarcadoresGuia += 1;
-                marcadorAlvo = {
-                    id: `jusgov-marcador-colado-${this.#contadorMarcadoresGuia}`,
-                    numeroOrdinal: this.#contadorMarcadoresGuia,
-                    range: candidata.range.cloneRange(),
-                    texto: candidata.texto,
-                    timestamp: Date.now()
-                };
-                this.#marcadoresPermanentes.push(marcadorAlvo);
-            }
+            this.#contadorMarcadoresGuia += 1;
+            const marcadorAlvo = {
+                id: `jusgov-marcador-colado-${this.#contadorMarcadoresGuia}`,
+                numeroOrdinal: this.#contadorMarcadoresGuia,
+                range: candidata.range.cloneRange(),
+                texto: candidata.texto,
+                textoRangeOriginal,
+                timestamp: Date.now()
+            };
+            this.#marcadoresPermanentes.push(marcadorAlvo);
 
             this.#garantirOuvintesScrollMarcadoresPermanentes();
             this.#renderizarTodosMarcadoresPermanentesNoDom();
             return marcadorAlvo;
         }
 
+        #agendarAtualizacaoMarcadores() {
+            if (this.#marcadoresPermanentes.length === 0) return;
+            if (typeof requestAnimationFrame === 'function') {
+                if (this.#rafScrollMarcadores) return;
+                this.#rafScrollMarcadores = requestAnimationFrame(() => {
+                    this.#rafScrollMarcadores = 0;
+                    if (this.#marcadoresPermanentes.length > 0) {
+                        this.#renderizarTodosMarcadoresPermanentesNoDom();
+                    }
+                });
+            } else {
+                this.#renderizarTodosMarcadoresPermanentesNoDom();
+            }
+        }
+
         #garantirOuvintesScrollMarcadoresPermanentes() {
             if (this.#ouvinteScrollMarcadoresAtivo) return;
-            const atualizar = () => {
+            const atualizarImediato = () => {
                 if (this.#marcadoresPermanentes.length === 0) return;
                 this.#renderizarTodosMarcadoresPermanentesNoDom();
             };
+            const agendar = () => this.#agendarAtualizacaoMarcadores();
             const opts = { capture: true, passive: true };
-            window.addEventListener('scroll', atualizar, opts);
-            document.addEventListener('scroll', atualizar, opts);
-            window.addEventListener('resize', atualizar, opts);
+            window.addEventListener('scroll', atualizarImediato, opts);
+            document.addEventListener('scroll', atualizarImediato, opts);
+            window.addEventListener('resize', atualizarImediato, opts);
+            window.addEventListener('hashchange', agendar, opts);
+            window.addEventListener('popstate', agendar, opts);
+            document.addEventListener('transitionend', agendar, opts);
+            document.addEventListener('visibilitychange', agendar, opts);
+
+            let observerDom = null;
+            if (typeof MutationObserver === 'function' && (document.body || document.documentElement)) {
+                observerDom = new MutationObserver((muts) => {
+                    if (this.#marcadoresPermanentes.length === 0) return;
+                    const relevante = muts.some((m) => {
+                        const t = m.target;
+                        const el = (t && t.nodeType === Node.TEXT_NODE) ? t.parentElement : t;
+                        return !(el && el.closest && el.closest('[data-jusgov-ignore="true"]'));
+                    });
+                    if (relevante) agendar();
+                });
+                try {
+                    observerDom.observe(document.body || document.documentElement, {
+                        childList: true,
+                        subtree: true,
+                        characterData: true,
+                        attributes: true,
+                        attributeFilter: ['style', 'class', 'hidden', 'aria-hidden', 'aria-selected', 'aria-expanded', 'disabled']
+                    });
+                } catch (_) {
+                    observerDom = null;
+                }
+            }
+
             this.#ouvinteScrollMarcadoresAtivo = true;
             this.#limparOuvinteScrollMarcadores = () => {
-                window.removeEventListener('scroll', atualizar, opts);
-                document.removeEventListener('scroll', atualizar, opts);
-                window.removeEventListener('resize', atualizar, opts);
+                window.removeEventListener('scroll', atualizarImediato, opts);
+                document.removeEventListener('scroll', atualizarImediato, opts);
+                window.removeEventListener('resize', atualizarImediato, opts);
+                window.removeEventListener('hashchange', agendar, opts);
+                window.removeEventListener('popstate', agendar, opts);
+                document.removeEventListener('transitionend', agendar, opts);
+                document.removeEventListener('visibilitychange', agendar, opts);
+                if (observerDom) {
+                    try { observerDom.disconnect(); } catch (_) { }
+                    observerDom = null;
+                }
+                if (this.#rafScrollMarcadores && typeof cancelAnimationFrame === 'function') {
+                    cancelAnimationFrame(this.#rafScrollMarcadores);
+                    this.#rafScrollMarcadores = 0;
+                }
                 this.#ouvinteScrollMarcadoresAtivo = false;
             };
+        }
+
+        /**
+         * Verifica se o elemento-âncora do marcador está realmente visível (não oculto por troca de guia/tab, display:none, visibility:hidden ou opacity:0).
+         */
+        #isElementoAlvoVisivel(el) {
+            if (!el || !el.isConnected) return false;
+            let cur = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+            while (cur && cur.nodeType === Node.ELEMENT_NODE && cur !== document.documentElement) {
+                if (cur.hasAttribute && cur.hasAttribute('hidden')) return false;
+                if (cur.getAttribute && cur.getAttribute('aria-hidden') === 'true') return false;
+                if (typeof window.getComputedStyle === 'function') {
+                    const st = window.getComputedStyle(cur);
+                    if (st.display === 'none' || st.visibility === 'hidden' || st.visibility === 'collapse') return false;
+                    if (parseFloat(st.opacity) <= 0.02) return false;
+                }
+                cur = cur.parentElement;
+            }
+            return true;
+        }
+
+        /**
+         * Calcula o retângulo visível do elemento recortado pela viewport e por todos os contêineres ancestrais com rolagem/overflow.
+         */
+        #obterCaixaVisivelRecortada(el) {
+            const vw = window.innerWidth || document.documentElement.clientWidth || 2000;
+            const vh = window.innerHeight || document.documentElement.clientHeight || 2000;
+            let clip = { top: 0, left: 0, right: vw, bottom: vh };
+            let cur = (el && el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+            while (cur && cur.nodeType === Node.ELEMENT_NODE && cur !== document.documentElement) {
+                if (typeof window.getComputedStyle === 'function' && typeof cur.getBoundingClientRect === 'function') {
+                    const st = window.getComputedStyle(cur);
+                    const recortaX = ['auto', 'scroll', 'hidden', 'clip'].includes(st.overflowX);
+                    const recortaY = ['auto', 'scroll', 'hidden', 'clip'].includes(st.overflowY);
+                    if (recortaX || recortaY) {
+                        const r = cur.getBoundingClientRect();
+                        if (recortaX) {
+                            clip.left = Math.max(clip.left, r.left);
+                            clip.right = Math.min(clip.right, r.right);
+                        }
+                        if (recortaY) {
+                            clip.top = Math.max(clip.top, r.top);
+                            clip.bottom = Math.min(clip.bottom, r.bottom);
+                        }
+                        if (clip.right <= clip.left + 1 || clip.bottom <= clip.top + 1) {
+                            return null;
+                        }
+                    }
+                }
+                cur = cur.parentElement;
+            }
+            return clip;
+        }
+
+        /**
+         * Verifica se o centro de um segmento está realmente exposto na tela (não encoberto por outro painel, modal ou cabeçalho fixo).
+         */
+        #pontoEstaVisivelNoAlvo(x, y, baseEl) {
+            if (typeof document.elementsFromPoint !== 'function' || !baseEl) return true;
+            try {
+                const pilha = document.elementsFromPoint(x, y);
+                if (!Array.isArray(pilha) || pilha.length === 0) return true;
+                for (let i = 0; i < pilha.length; i++) {
+                    const elTopo = pilha[i];
+                    if (!elTopo || (elTopo.closest && elTopo.closest('[data-jusgov-ignore="true"]'))) continue;
+                    return (elTopo === baseEl || baseEl.contains(elTopo) || elTopo.contains(baseEl));
+                }
+            } catch (_) { }
+            return true;
         }
 
         /**
@@ -727,8 +876,32 @@
         #renderizarTodosMarcadoresPermanentesNoDom() {
             const idRoot = 'jusgov-pasted-markers-container';
             let container = document.getElementById(idRoot);
+
+            /* Remove definitivamente marcadores cujo nó DOM foi destruído ou teve o texto alterado */
+            for (let k = this.#marcadoresPermanentes.length - 1; k >= 0; k--) {
+                const m = this.#marcadoresPermanentes[k];
+                let valido = Boolean(m && m.range && m.range.startContainer && m.range.endContainer && m.range.startContainer.isConnected && m.range.endContainer.isConnected);
+                if (valido && m.textoRangeOriginal) {
+                    try {
+                        const txtAtual = String(m.range.toString() || '').replace(/\s+/g, ' ').trim();
+                        if (!txtAtual || txtAtual !== m.textoRangeOriginal) {
+                            valido = false;
+                        }
+                    } catch (_) {
+                        valido = false;
+                    }
+                }
+                if (!valido) {
+                    this.#marcadoresPermanentes.splice(k, 1);
+                }
+            }
+
             if (!this.#configMarcadorColado.ativo || this.#marcadoresPermanentes.length === 0) {
                 if (container && container.parentNode) container.parentNode.removeChild(container);
+                if (this.#marcadoresPermanentes.length === 0 && typeof this.#limparOuvinteScrollMarcadores === 'function') {
+                    this.#limparOuvinteScrollMarcadores();
+                    this.#limparOuvinteScrollMarcadores = null;
+                }
                 return;
             }
             if (!container) {
@@ -747,12 +920,37 @@
             const corContorno = cfg.corContorno || '#0d9488';
             const corFundoRgba = this.converterHexParaRgbaFlash(cfg.corFundo || '#ccfbf1', cfg.opacidadeFundo || 0.28).rgba;
             const estiloBadge = cfg.estiloBadge || 'sobrescrito';
+            const tipoContorno = cfg.tipoContorno || 'solido';
 
             for (let mIdx = 0; mIdx < this.#marcadoresPermanentes.length; mIdx++) {
                 const marcador = this.#marcadoresPermanentes[mIdx];
                 if (!marcador || !marcador.range) continue;
-                const segmentos = this.calcularLinhasDoRange(marcador.range);
+                const noBase = marcador.range.startContainer;
+                const elBase = (noBase.nodeType === Node.TEXT_NODE) ? noBase.parentElement : noBase;
+                if (!this.#isElementoAlvoVisivel(elBase)) continue;
+                const caixaClip = this.#obterCaixaVisivelRecortada(elBase);
+                if (!caixaClip) continue;
+
+                const segmentosBrutos = this.calcularLinhasDoRange(marcador.range);
+                if (segmentosBrutos.length === 0) continue;
+
+                const segmentos = [];
+                for (let sIdx = 0; sIdx < segmentosBrutos.length; sIdx++) {
+                    const seg = segmentosBrutos[sIdx];
+                    const l = Math.max(seg.left, caixaClip.left);
+                    const r = Math.min(seg.right, caixaClip.right);
+                    const t = Math.max(seg.top, caixaClip.top);
+                    const b = Math.min(seg.bottom, caixaClip.bottom);
+                    if ((r - l) > 1.5 && (b - t) > 1.5) {
+                        segmentos.push({ left: l, right: r, top: t, bottom: b });
+                    }
+                }
                 if (segmentos.length === 0) continue;
+
+                const segRef = segmentos[0];
+                if (!this.#pontoEstaVisivelNoAlvo((segRef.left + segRef.right) / 2, (segRef.top + segRef.bottom) / 2, elBase)) {
+                    continue;
+                }
 
                 const wrapper = document.createElement('div');
                 wrapper.className = 'jusgov-marcador-colado-item';
@@ -760,85 +958,193 @@
                 wrapper.setAttribute('data-jusgov-ordinal', String(marcador.numeroOrdinal));
                 wrapper.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;pointer-events:none !important;overflow:visible;';
 
-                for (let s = 0; s < segmentos.length; s++) {
-                    const r = segmentos[s];
-                    const box = document.createElement('div');
-                    box.className = 'jusgov-marcador-colado-box';
-                    box.setAttribute('data-jusgov-ignore', 'true');
-                    box.style.cssText = [
-                        'position:fixed',
-                        `top:${Math.round(r.top - 1)}px`,
-                        `left:${Math.round(r.left - 2)}px`,
-                        `width:${Math.max(1, Math.round(r.right - r.left + 4))}px`,
-                        `height:${Math.max(1, Math.round(r.bottom - r.top + 2))}px`,
-                        `border:1.5px solid ${corContorno}`,
-                        'border-radius:3px',
-                        `background-color:${corFundoRgba}`,
-                        'pointer-events:none !important',
-                        'box-sizing:border-box',
-                        'margin:0',
-                        'padding:0'
-                    ].join(';') + ';';
-                    wrapper.appendChild(box);
-                }
-
-                /* Badge ordinal sobrescrito no canto superior direito do primeiro segmento */
-                const segTopo = segmentos[0];
-                const badge = document.createElement('sup');
-                badge.className = 'jusgov-marcador-colado-badge';
-                badge.setAttribute('data-jusgov-ignore', 'true');
-                badge.textContent = String(marcador.numeroOrdinal);
-
-                const baseBadgeCss = [
-                    'position:fixed',
-                    `top:${Math.round(segTopo.top - 8)}px`,
-                    `left:${Math.round(segTopo.right - 2)}px`,
-                    'font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif',
-                    'font-weight:800',
-                    'line-height:1',
-                    'pointer-events:none !important',
-                    'user-select:none',
-                    'z-index:2147483646'
-                ];
-
-                if (estiloBadge === 'circular') {
-                    baseBadgeCss.push(
-                        'font-size:9.5px',
-                        `background-color:${corContorno}`,
-                        'color:#ffffff',
-                        'border-radius:999px',
-                        'padding:2px 4.5px',
-                        'min-width:14px',
-                        'text-align:center',
-                        'box-shadow:0 1px 3px rgba(0,0,0,0.25)'
-                    );
-                } else if (estiloBadge === 'chip') {
-                    baseBadgeCss.push(
-                        'font-size:9px',
-                        'background-color:#ffffff',
-                        `color:${corContorno}`,
-                        `border:1px solid ${corContorno}`,
-                        'border-radius:4px',
-                        'padding:1px 3.5px',
-                        'box-shadow:0 1px 2px rgba(0,0,0,0.18)'
-                    );
+                /* Renderização contínua em polígono SVG para quebras de linha quando contorno sólido/tracejado/sem_borda */
+                const blocos = this.agruparLinhasEmBlocos(segmentos);
+                if ((tipoContorno === 'solido' || tipoContorno === 'tracejado' || tipoContorno === 'sem_borda') && blocos.some(b => b.length > 1)) {
+                    for (let b = 0; b < blocos.length; b++) {
+                        const linhas = blocos[b];
+                        if (linhas.length === 1) {
+                            const r = linhas[0];
+                            const box = document.createElement('div');
+                            box.className = 'jusgov-marcador-colado-box';
+                            box.setAttribute('data-jusgov-ignore', 'true');
+                            const estiloBorda = tipoContorno === 'sem_borda'
+                                ? 'border:none'
+                                : `border:1.5px ${tipoContorno === 'tracejado' ? 'dashed' : 'solid'} ${corContorno}`;
+                            box.style.cssText = [
+                                'position:fixed',
+                                `top:${Math.round(r.top - 1)}px`,
+                                `left:${Math.round(r.left - 2)}px`,
+                                `width:${Math.max(1, Math.round(r.right - r.left + 4))}px`,
+                                `height:${Math.max(1, Math.round(r.bottom - r.top + 2))}px`,
+                                estiloBorda,
+                                'border-radius:3px',
+                                `background-color:${corFundoRgba}`,
+                                'pointer-events:none !important',
+                                'box-sizing:border-box',
+                                'margin:0',
+                                'padding:0'
+                            ].join(';') + ';';
+                            wrapper.appendChild(box);
+                            continue;
+                        }
+                        const n = linhas.length;
+                        const L = linhas.map(l => l.left - 2);
+                        const R = linhas.map(l => l.right + 2);
+                        const Y = [];
+                        for (let i = 0; i < n - 1; i++) Y.push((linhas[i].bottom + linhas[i + 1].top) / 2);
+                        const topo = linhas[0].top - 1;
+                        const base = linhas[n - 1].bottom + 1;
+                        const pts = [[L[0], topo], [R[0], topo]];
+                        for (let i = 0; i < n - 1; i++) { pts.push([R[i], Y[i]]); pts.push([R[i + 1], Y[i]]); }
+                        pts.push([R[n - 1], base]); pts.push([L[n - 1], base]);
+                        for (let i = n - 2; i >= 0; i--) { pts.push([L[i + 1], Y[i]]); pts.push([L[i], Y[i]]); }
+                        const d = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ') + ' Z';
+                        const svgNS = 'http://www.w3.org/2000/svg';
+                        const svg = document.createElementNS(svgNS, 'svg');
+                        svg.setAttribute('data-jusgov-ignore', 'true');
+                        svg.style.cssText = `position:fixed;top:0;left:0;width:${window.innerWidth}px;height:${window.innerHeight}px;pointer-events:none !important;overflow:visible;margin:0;padding:0;`;
+                        const path = document.createElementNS(svgNS, 'path');
+                        path.setAttribute('d', d);
+                        path.setAttribute('fill', corFundoRgba);
+                        path.setAttribute('stroke', tipoContorno === 'sem_borda' ? 'none' : corContorno);
+                        path.setAttribute('stroke-width', tipoContorno === 'sem_borda' ? '0' : '1.5');
+                        if (tipoContorno === 'tracejado') path.setAttribute('stroke-dasharray', '4 3');
+                        path.setAttribute('stroke-linejoin', 'round');
+                        svg.appendChild(path);
+                        wrapper.appendChild(svg);
+                    }
                 } else {
-                    /* Padrão: sobrescrito elevado minimalista */
-                    baseBadgeCss.push(
-                        'font-size:10px',
-                        `color:${corContorno}`,
-                        'background-color:rgba(255,255,255,0.92)',
-                        `border:1px solid ${corContorno}`,
-                        'border-radius:3px',
-                        'padding:0.5px 3px',
-                        'box-shadow:0 1px 2px rgba(0,0,0,0.14)'
-                    );
+                    for (let s = 0; s < segmentos.length; s++) {
+                        const r = segmentos[s];
+                        const box = document.createElement('div');
+                        box.className = 'jusgov-marcador-colado-box';
+                        box.setAttribute('data-jusgov-ignore', 'true');
+                        let cssContorno = `border:1.5px solid ${corContorno};background-color:${corFundoRgba};`;
+                        if (tipoContorno === 'tracejado') {
+                            cssContorno = `border:1.5px dashed ${corContorno};background-color:${corFundoRgba};`;
+                        } else if (tipoContorno === 'sem_borda') {
+                            cssContorno = `border:none;background-color:${corFundoRgba};`;
+                        } else if (tipoContorno === 'ondulado') {
+                            cssContorno = `border:none;border-bottom:2px wavy ${corContorno};background-color:${corFundoRgba};`;
+                        } else if (tipoContorno === 'taxado') {
+                            cssContorno = `border:none;background-color:${corFundoRgba};`;
+                            const riscado = document.createElement('div');
+                            riscado.style.cssText = `position:absolute;left:0;right:0;top:50%;height:1.5px;background:${corContorno};pointer-events:none !important;`;
+                            box.appendChild(riscado);
+                        }
+                        box.style.cssText = [
+                            'position:fixed',
+                            `top:${Math.round(r.top - 1)}px`,
+                            `left:${Math.round(r.left - 2)}px`,
+                            `width:${Math.max(1, Math.round(r.right - r.left + 4))}px`,
+                            `height:${Math.max(1, Math.round(r.bottom - r.top + 2))}px`,
+                            cssContorno,
+                            'border-radius:3px',
+                            'pointer-events:none !important',
+                            'box-sizing:border-box',
+                            'margin:0',
+                            'padding:0'
+                        ].join(';') + ';';
+                        wrapper.appendChild(box);
+                    }
                 }
 
-                badge.style.cssText = baseBadgeCss.join(';') + ';';
-                wrapper.appendChild(badge);
+                /* Badge ordinal sobrescrito clicável para fechar o marcador (mantendo contador) */
+                if (estiloBadge !== 'sem_etiqueta') {
+                    const segTopo = segmentos[0];
+                    const badge = document.createElement('sup');
+                    badge.className = 'jusgov-marcador-colado-badge';
+                    badge.setAttribute('data-jusgov-ignore', 'true');
+                    badge.title = 'Clique para remover este marcador';
+                    badge.textContent = String(marcador.numeroOrdinal);
+
+                    const baseBadgeCss = [
+                        'position:fixed',
+                        `top:${Math.round(segTopo.top - 8)}px`,
+                        `left:${Math.round(segTopo.right - 2)}px`,
+                        'font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif',
+                        'font-weight:800',
+                        'line-height:1',
+                        'pointer-events:auto !important',
+                        'cursor:pointer',
+                        'user-select:none',
+                        'z-index:2147483646'
+                    ];
+
+                    const raioBadge = (estiloBadge.startsWith('retangular_') || estiloBadge === 'sobrescrito_retangular') ? '3px' : '999px';
+                    if (estiloBadge === 'circular' || estiloBadge === 'retangular_compacto') {
+                        baseBadgeCss.push(
+                            'display:inline-flex',
+                            'align-items:center',
+                            'justify-content:center',
+                            'font-size:9px',
+                            `background-color:${corContorno}`,
+                            'color:#ffffff',
+                            `border-radius:${raioBadge}`,
+                            'min-width:15px',
+                            'height:15px',
+                            'padding:0 3.5px',
+                            'box-sizing:border-box',
+                            'box-shadow:0 1px 3px rgba(0,0,0,0.22)'
+                        );
+                    } else if (estiloBadge === 'translucido' || estiloBadge === 'retangular_translucido') {
+                        const fundoTranslucido = this.converterHexParaRgbaFlash(corContorno, 0.16).rgba;
+                        const bordaTranslucida = this.converterHexParaRgbaFlash(corContorno, 0.45).rgba;
+                        baseBadgeCss.push(
+                            'display:inline-flex',
+                            'align-items:center',
+                            'justify-content:center',
+                            'font-size:9px',
+                            `color:${corContorno}`,
+                            `background-color:${fundoTranslucido}`,
+                            `border:1px solid ${bordaTranslucida}`,
+                            `border-radius:${raioBadge}`,
+                            'min-width:15px',
+                            'height:15px',
+                            'padding:0 3.5px',
+                            'box-sizing:border-box',
+                            'opacity:0.82'
+                        );
+                    } else {
+                        baseBadgeCss.push(
+                            'display:inline-flex',
+                            'align-items:center',
+                            'justify-content:center',
+                            'font-size:9px',
+                            `color:${corContorno}`,
+                            'background-color:rgba(255,255,255,0.88)',
+                            `border:1px solid ${corContorno}`,
+                            `border-radius:${raioBadge}`,
+                            'min-width:14px',
+                            'height:14px',
+                            'padding:0 3px',
+                            'box-sizing:border-box',
+                            'box-shadow:0 1px 2px rgba(0,0,0,0.12)'
+                        );
+                    }
+
+                    badge.style.cssText = baseBadgeCss.join(';') + ';';
+                    badge.addEventListener('click', (ev) => {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        this.removerMarcadorPermanentePorId(marcador.id);
+                    });
+                    wrapper.appendChild(badge);
+                }
                 container.appendChild(wrapper);
             }
+        }
+
+        /**
+         * Remove um marcador permanente específico pelo ID sem zerar a contagem sequencial (Seção 6.138).
+         */
+        removerMarcadorPermanentePorId(idMarcador) {
+            const idx = this.#marcadoresPermanentes.findIndex((m) => m && m.id === idMarcador);
+            if (idx === -1) return false;
+            this.#marcadoresPermanentes.splice(idx, 1);
+            this.#renderizarTodosMarcadoresPermanentesNoDom();
+            return true;
         }
 
         /**

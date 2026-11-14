@@ -102,9 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblDescNivelFiltroPopup = document.getElementById('lblDescNivelFiltroPopup');
     const checkAmpuletas = document.getElementById('checkAmpuletas') || document.getElementById('chkAmpuletas');
     const containerAmpuletas = document.getElementById('containerAmpuletas');
+    const tituloAmpuletas = document.getElementById('tituloAmpuletas');
+    const subtituloAmpuletas = document.getElementById('subtituloAmpuletas');
     const selectComportamentoIconePopup = document.getElementById('selectComportamentoIconePopup');
     const descComportamentoIcone = document.getElementById('descComportamentoIcone');
     const btnAbrirOpcoes = document.getElementById('btnAbrirOpcoes') || document.getElementById('btnOptions');
+    const btnBugsOnline = document.getElementById('btnBugsOnline');
 
     /* Mapear elementos do icone SVG para alterar cor dinamicamente */
     const iconeBg = document.getElementById('iconeBg');
@@ -299,10 +302,23 @@ document.addEventListener('DOMContentLoaded', () => {
             barraDominioAtual.style.display = (modoOperacionalAtual === 'url') ? 'flex' : 'none';
         }
 
-        /* Passo 2.5: Logica de Ocultacao do PJe Turbo (Aparece apenas em sites .jus.br ou com "pje") */
+        /* Passo 2.5: Deteccao multi-sistema judicial (PJe, Eproc, PDPJ, Projudi, SAJ, Creta, SEEU ou *.jus.br) */
         if (containerAmpuletas) {
             const strHost = hostnameAbaAtual.toLowerCase();
-            if (strHost.includes('pje') || strHost.includes('.jus.br')) {
+            const matrizSistemas = [
+                { nome: 'PJe', padrao: /\bpje\b|pje\./i },
+                { nome: 'Eproc', padrao: /\beproc\b|eproc\./i },
+                { nome: 'PDPJ', padrao: /\bpdpj\b|\bprevjud\b|stf\.jus\.br|stj\.jus\.br/i },
+                { nome: 'Projudi', padrao: /\bprojudi\b|projudi\./i },
+                { nome: 'SAJ', padrao: /\besaj\b|\bsaj\b|esaj\./i },
+                { nome: 'Creta', padrao: /\bcreta\b|creta\./i },
+                { nome: 'SEEU', padrao: /\bseeu\b|seeu\./i }
+            ];
+            const sisMatch = matrizSistemas.find((s) => s.padrao.test(strHost));
+            if (sisMatch || strHost.includes('.jus.br')) {
+                const nomeExibicao = sisMatch ? sisMatch.nome : 'Sistema Judicial';
+                if (tituloAmpuletas) tituloAmpuletas.textContent = `${nomeExibicao} Turbo (Anti-Ampulhetas)`;
+                if (subtituloAmpuletas) subtituloAmpuletas.textContent = `Neutraliza cortinas de bloqueio ("Aguarde...") e libera cliques imediatos no ${nomeExibicao}.`;
                 containerAmpuletas.style.display = 'flex';
             } else {
                 containerAmpuletas.style.display = 'none';
@@ -473,6 +489,19 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (chrome.runtime.getURL) {
                 window.open(chrome.runtime.getURL('src/cfg/options.html'));
             }
+        }
+        window.close();
+    });
+
+    /* Passo 4.5.1: Botao Help / Bugs Online (Joaninha - Secao 6.135 / FEAT-28) */
+    adicionarOuvinteSeguro(btnBugsOnline, 'click', () => {
+        const urlRepo = 'https://github.com/smarca/AddonChrome-GovBR';
+        if (typeof chrome !== 'undefined' && chrome.windows && typeof chrome.windows.create === 'function') {
+            chrome.windows.create({ url: urlRepo, focused: true }).catch(() => {
+                window.open(urlRepo, '_blank', 'noopener,noreferrer');
+            });
+        } else {
+            window.open(urlRepo, '_blank', 'noopener,noreferrer');
         }
         window.close();
     });

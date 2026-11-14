@@ -1,6 +1,17 @@
-# ⚖️ JusGovBR — Seleção/Cópia Inteligente
+# ⚖️ JusGovBR — Seleção/Cópia Inteligente & PJe Turbo
 
-**JusGovBR — Seleção/Cópia Inteligente** é uma extensão de alta performance para navegadores baseados em Chromium (Google Chrome, Microsoft Edge, Brave — versão 116+ / Manifest V3), projetada especificamente para acelerar a rotina de **magistrados, assessores, servidores públicos, advogados e operadores do Direito** que atuam diariamente em sistemas judiciais e governamentais brasileiros (como **PJe**, **SEI!**, **e-Proc**, **Projudi** e portais `.jus.br` / `.gov.br`), além de funcionar em qualquer página web ou visualizador de PDF.
+> [!NOTE]
+> ### 🧭 AUTO-DESCRIÇÃO E DIRETRIZ DE REÚSO PARA NOVOS PROJETOS
+> - **Identificação do Arquivo:** `docs/README.md`
+> - **Finalidade Primária:** Apresentação executiva, manual de instalação rápida e guia público para usuários e desenvolvedores externos.
+> - **Papel na Governança e Inteligência da IA:** Define a identidade pública do software como fonte canônica primária em `docs/README.md`, replicando-se unidirecionalmente para o `README.md` da raiz através do pipeline de sincronização (protegendo a integridade documental caso arquivos fora de `docs/` sejam apagados acidentalmente).
+> - **Reaproveitamento em Novos Projetos:**
+>   - *Comando de Ativação:* Ao iniciar outro projeto, declare: `"vou iniciar um novo projeto do zero..."`.
+>   - *Núcleo Perpétuo Reutilizável (DNA do Autor):* Estrutura de tópicos profissionais, seções de compatibilidade, instalação em modo desenvolvedor e replicação a partir de `docs/` para a raiz.
+>   - *Seções Específicas de Domínio (A Adaptar):* Descrição do produto, atalhos e funcionalidades do novo sistema.
+
+
+**JusGovBR (Seleção, Validação e Cópia de Textos Aprimorada)** é uma extensão de alta performance para navegadores baseados em Chromium (Google Chrome, Microsoft Edge, Brave — versão 116+ / Manifest V3), projetada especificamente para acelerar a rotina de **magistrados, assessores, servidores públicos, advogados e operadores do Direito** que atuam diariamente em sistemas judiciais e governamentais brasileiros (como **PJe**, **SEI!**, **e-Proc**, **Projudi** e portais `.jus.br` / `.gov.br`), além de funcionar em qualquer página web ou visualizador de PDF.
 
 ---
 
@@ -62,8 +73,8 @@ Sempre que um documento ou data é selecionado, o aplicativo audita sua validade
 
 ---
 
-### 5. ⚡ Módulo Anti-Ampulhetas & Gerenciamento de Navegador
-* **Anti-Ampulhetas (Sistemas Judiciais):** Neutraliza as cortinas cinzas de bloqueio visual (*"Aguarde..."*) e destrava o cursor do mouse nas páginas dos sistemas judiciais (`*pje*.jus.br`, etc.), permitindo continuar lendo e selecionando textos imediatamente.
+### 5. ⚡ Módulo PJe Turbo & Gerenciamento de Navegador
+* **PJe Anti-Ampulhetas:** Neutraliza as cortinas cinzas de bloqueio visual (*"Aguarde..."*) e destrava o cursor do mouse nas páginas do Processo Judicial Eletrônico (`*pje*.jus.br`), permitindo continuar lendo e selecionando textos imediatamente.
 * **Conversão Automática de Cabeçalhos PJe:** Transforma automaticamente referências brutas copiadas do PJe (como `Num. 2297820154 - Pág. 1`) no formato forense limpo (`id 2297820154, pg. 1`).
 * **Gerenciamento Inteligente de Janelas e Guias:** Opções para impedir que sistemas judiciais abram dezenas de janelas pop-up soltas (**Modo Janela Única / Single Window**), evitar abas duplicadas com a mesma URL e ordenar guias abertas automaticamente.
 

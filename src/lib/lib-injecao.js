@@ -7,8 +7,8 @@
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-injecao.js
  * - Classe Exportada: JusGovInjecaoScripts (self.JusGovInjecaoScripts / window.JusGovInjecaoScripts)
- * - Métodos Públicos: enfileirarRegistro, injetarRetroativamenteNasAbasAbertas, agendarInjecaoSeguraNaAba,
- *   obterArquivosNucleoCopia, obterArquivosModuloInput, obterArquivosConteudoIntegrado, obterArquivosCssPje
+ * - Métodos Públicos: filtrarArquivosExistentes, enfileirarRegistro, injetarRetroativamenteNasAbasAbertas, agendarInjecaoSeguraNaAba,
+ *   obterArquivosNucleoCopia, obterArquivosModuloInput, obterArquivosConteudoIntegrado, obterArquivosCssPje, limparDebounceAba
  * - Padrão Arquitetural: UMD (Universal Module Definition) para compatibilidade cruzada
  *   com Service Worker (Background MV3), Content Scripts, Popups/Options e ambiente Node/Jest.
  * - Regras / Seções: Diretrizes 1/4/11/16, Seção 3 (BP-06 / ARQ-01)
@@ -42,6 +42,7 @@
         'src/lib/lib-verificadores.js',
         'src/mod-copia/copia-constantes.js',
         'src/mod-copia/copia-aviso-flutuante.js',
+        'src/mod-copia/copia-dialogo-mapeamento.js',
         'src/mod-copia/copia-acumulador.js',
         'src/mod-copia/copia-geometria.js',
         'src/mod-copia/copia-filtros.js',
@@ -91,6 +92,37 @@
             this.urls = dependencias.urls || null;
             this.promiseFila = Promise.resolve();
             this.mapaDebounceInjecaoTab = new Map();
+            this.mapaExistenciaArquivos = new Map();
+        }
+
+        /**
+         * Filtra apenas os caminhos de script/CSS que existem fisicamente no pacote da extensão.
+         * Garante que a remoção de um diretório inteiro de módulo (src/mod-*) não quebre a injeção
+         * nem impeça o funcionamento dos demais módulos (Diretriz Root 5.30).
+         */
+        async filtrarArquivosExistentes(listaCaminhos, chromeApi = null) {
+            if (!Array.isArray(listaCaminhos) || listaCaminhos.length === 0) return [];
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.runtime || typeof apiChrome.runtime.getURL !== 'function' || typeof fetch !== 'function') {
+                return [...listaCaminhos];
+            }
+            const verif = await Promise.all(listaCaminhos.map(async (caminho) => {
+                if (!caminho) return null;
+                if (this.mapaExistenciaArquivos.has(caminho)) {
+                    return this.mapaExistenciaArquivos.get(caminho) ? caminho : null;
+                }
+                try {
+                    const urlExt = apiChrome.runtime.getURL(caminho);
+                    const resp = await fetch(urlExt);
+                    const existe = Boolean(resp && (resp.ok || resp.status === 200));
+                    this.mapaExistenciaArquivos.set(caminho, existe);
+                    return existe ? caminho : null;
+                } catch (_) {
+                    this.mapaExistenciaArquivos.set(caminho, false);
+                    return null;
+                }
+            }));
+            return verif.filter(Boolean);
         }
 
         obterArquivosNucleoCopia() {
@@ -137,16 +169,19 @@
                             ? urlsUtil.sanitizarParaMatches(urlsAmpuletas)
                             : [];
                         if (matchesPje.length > 0) {
-                            try {
-                                await apiChrome.scripting.registerContentScripts([{
-                                    id: 'modulo-anti-ampulheta',
-                                    matches: matchesPje,
-                                    css: [...ARQUIVOS_MODULO_CSS_PJE],
-                                    runAt: 'document_start',
-                                    allFrames: true
-                                }]);
-                            } catch (errCss) {
-                                console.warn('[JusGovBR] Aviso ao registrar CSS Anti-Ampulhetas:', errCss);
+                            const cssExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_CSS_PJE, apiChrome);
+                            if (cssExistentes.length > 0) {
+                                try {
+                                    await apiChrome.scripting.registerContentScripts([{
+                                        id: 'modulo-anti-ampulheta',
+                                        matches: matchesPje,
+                                        css: cssExistentes,
+                                        runAt: 'document_start',
+                                        allFrames: true
+                                    }]);
+                                } catch (errCss) {
+                                    console.warn('[JusGovBR] Aviso ao registrar CSS Anti-Ampulhetas:', errCss);
+                                }
                             }
                         }
                     }
@@ -162,17 +197,20 @@
                                 : [];
                             if (sanitizadas.length > 0) matchesTurbo = sanitizadas;
                         }
-                        try {
-                            await apiChrome.scripting.registerContentScripts([{
-                                id: 'jusgovbr-conteudo-integrado',
-                                matches: matchesTurbo,
-                                js: [...ARQUIVOS_CONTEUDO_INTEGRADO],
-                                runAt: 'document_start',
-                                allFrames: true,
-                                matchAboutBlank: true
-                            }]);
-                        } catch (errJs) {
-                            console.warn('[JusGovBR] Aviso ao registrar scripts nativos de conteúdo:', errJs);
+                        const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                        if (jsExistentes.length > 0) {
+                            try {
+                                await apiChrome.scripting.registerContentScripts([{
+                                    id: 'jusgovbr-conteudo-integrado',
+                                    matches: matchesTurbo,
+                                    js: jsExistentes,
+                                    runAt: 'document_start',
+                                    allFrames: true,
+                                    matchAboutBlank: true
+                                }]);
+                            } catch (errJs) {
+                                console.warn('[JusGovBR] Aviso ao registrar scripts nativos de conteúdo:', errJs);
+                            }
                         }
                     }
                 } catch (err) {
@@ -242,10 +280,13 @@
 
                     /* Passo 3.8: Se o modulo de copia e navegacao estiver ativo, garantir injecao dos scripts na aba */
                     if (config.modoTurbo !== 'desligado') {
-                        apiChrome.scripting.executeScript({
-                            target: { tabId: tab.id, allFrames: true },
-                            files: [...ARQUIVOS_CONTEUDO_INTEGRADO]
-                        }).catch(() => { });
+                        const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                        if (jsExistentes.length > 0) {
+                            apiChrome.scripting.executeScript({
+                                target: { tabId: tab.id, allFrames: true },
+                                files: jsExistentes
+                            }).catch(() => { });
+                        }
                     }
 
                     /* Passo 3.9: Se o PJe Anti-Ampulhetas estiver ativo para esta URL, garantir que o CSS esteja injetado; caso desativado, remover dinamicamente sem reload */
@@ -253,16 +294,21 @@
                         ? urlsUtil.urlCorrespondeAosPadroes(tab.url, config.urlsAmpuletas || [])
                         : false;
 
-                    if (config.ativoAmpuletas !== false && correspondePje) {
-                        apiChrome.scripting.insertCSS({
-                            target: { tabId: tab.id, allFrames: true },
-                            files: [...ARQUIVOS_MODULO_CSS_PJE]
-                        }).catch(() => { });
-                    } else if (config.ativoAmpuletas === false && correspondePje) {
-                        apiChrome.scripting.removeCSS({
-                            target: { tabId: tab.id, allFrames: true },
-                            files: [...ARQUIVOS_MODULO_CSS_PJE]
-                        }).catch(() => { });
+                    if (correspondePje) {
+                        const cssExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_CSS_PJE, apiChrome);
+                        if (cssExistentes.length > 0) {
+                            if (config.ativoAmpuletas !== false) {
+                                apiChrome.scripting.insertCSS({
+                                    target: { tabId: tab.id, allFrames: true },
+                                    files: cssExistentes
+                                }).catch(() => { });
+                            } else if (config.ativoAmpuletas === false) {
+                                apiChrome.scripting.removeCSS({
+                                    target: { tabId: tab.id, allFrames: true },
+                                    files: cssExistentes
+                                }).catch(() => { });
+                            }
+                        }
                     }
                 }
             } catch (_) { }
@@ -288,11 +334,15 @@
                 ? { tabId, frameIds: frameIdsOpcional }
                 : { tabId, allFrames: true };
 
-            apiChrome.scripting.executeScript({
-                target,
-                files: [...ARQUIVOS_CONTEUDO_INTEGRADO],
-                injectImmediately: true
-            }).catch(() => { });
+            (async () => {
+                const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                if (jsExistentes.length === 0) return;
+                await apiChrome.scripting.executeScript({
+                    target,
+                    files: jsExistentes,
+                    injectImmediately: true
+                });
+            })().catch(() => { });
         }
 
         limparDebounceAba(tabId) {

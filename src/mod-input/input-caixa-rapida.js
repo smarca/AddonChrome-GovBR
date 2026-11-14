@@ -40,7 +40,7 @@
     class CaixaEntradaRapida {
         #ativo = true;
         #ultimoInsertTimestamp = 0;
-        #janelaTempoMs = 400;
+        #janelaTempoMs = 550;
         #elementoDialogo = null;
         #ultimoTextoDigitado = '';
         #posicaoMouse = { x: 0, y: 0 };
@@ -102,7 +102,12 @@
             if (!this.#ativo || !e) return false;
             if (e.repeat === true) return false;
 
-            const ehInsert = (e.key === 'Insert' || e.code === 'Insert' || e.keyCode === 45);
+            const ehInsert = (
+                e.key === 'Insert' ||
+                e.code === 'Insert' ||
+                e.keyCode === 45 ||
+                (e.code === 'Numpad0' && (e.key === 'Insert' || e.key === 'Unidentified' || e.keyCode === 45))
+            );
             if (!ehInsert) return false;
 
             /* Guarda de evento único (BUG-32): se o mesmo objeto KeyboardEvent passar por dois listeners
@@ -164,17 +169,11 @@
                 } catch (_) { }
             }
 
-            if (todosExistentes.length > 1) {
-                for (let i = 1; i < todosExistentes.length; i++) {
-                    try { todosExistentes[i].remove(); } catch (_) { }
+            if (!this.isAberta && todosExistentes.length > 0) {
+                for (const elOrfao of todosExistentes) {
+                    try { elOrfao.remove(); } catch (_) { }
                 }
-            }
-
-            const elExistenteNoDom = todosExistentes[0] || null;
-            if (this.isAberta || elExistenteNoDom) {
-                if (elExistenteNoDom) {
-                    this.#elementoDialogo = elExistenteNoDom;
-                }
+            } else if (this.isAberta) {
                 if (this.#elementoDialogo) {
                     const inpExistente = this.#elementoDialogo.querySelector('input');
                     if (inpExistente) {
@@ -289,6 +288,67 @@
                 inputTexto.style.backgroundColor = '#f8fafc';
             };
             body.appendChild(inputTexto);
+
+            // 3.1 Painel de Checagem e Validação Matemática Online (Seção 6.143 / FEAT-33)
+            const painelValidacaoOnline = doc.createElement('div');
+            painelValidacaoOnline.className = 'jusgov-input-rapido-validacao';
+            painelValidacaoOnline.style.cssText = [
+                'display: none',
+                'font-size: 11.5px',
+                'line-height: 1.4',
+                'padding: 7px 10px',
+                'border-radius: 6px',
+                'border: 1px solid #e2e8f0',
+                'background: #f8fafc',
+                'color: #334155',
+                'word-break: break-word'
+            ].join('; ');
+            body.appendChild(painelValidacaoOnline);
+
+            const atualizarValidacaoOnline = () => {
+                const txt = (inputTexto.value || '').trim();
+                if (!txt) {
+                    painelValidacaoOnline.style.display = 'none';
+                    painelValidacaoOnline.textContent = '';
+                    return;
+                }
+                const ValidadorCtor = (typeof window !== 'undefined' && window.JusGovAvisoFlutuante) ? window.JusGovAvisoFlutuante : null;
+                if (!ValidadorCtor) {
+                    painelValidacaoOnline.style.display = 'none';
+                    return;
+                }
+                if (typeof window !== 'undefined' && !window.__jusgovValidadorCaixaRapida) {
+                    try { window.__jusgovValidadorCaixaRapida = new ValidadorCtor(); } catch (_) { }
+                }
+                const instVal = (typeof window !== 'undefined') ? window.__jusgovValidadorCaixaRapida : null;
+                if (!instVal || typeof instVal.auditarEAlerta !== 'function') {
+                    painelValidacaoOnline.style.display = 'none';
+                    return;
+                }
+                const res = instVal.auditarEAlerta(txt, null);
+                if (!res || (!res.msg && !res.ehWiki && res.valido)) {
+                    painelValidacaoOnline.style.display = 'block';
+                    painelValidacaoOnline.style.background = '#f8fafc';
+                    painelValidacaoOnline.style.borderColor = '#e2e8f0';
+                    painelValidacaoOnline.style.color = '#475569';
+                    painelValidacaoOnline.textContent = `Texto livre (${txt.length} caractere${txt.length === 1 ? '' : 's'})`;
+                    return;
+                }
+                painelValidacaoOnline.style.display = 'block';
+                if (!res.valido) {
+                    painelValidacaoOnline.style.background = '#fef2f2';
+                    painelValidacaoOnline.style.borderColor = '#fecaca';
+                    painelValidacaoOnline.style.color = '#991b1b';
+                } else {
+                    painelValidacaoOnline.style.background = '#f0fdf4';
+                    painelValidacaoOnline.style.borderColor = '#bbf7d0';
+                    painelValidacaoOnline.style.color = '#166534';
+                }
+                const textoLimpo = String(res.msg || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                painelValidacaoOnline.textContent = textoLimpo || (res.valido ? 'Bloco estruturado válido' : 'Estrutura inválida');
+            };
+            inputTexto.addEventListener('input', atualizarValidacaoOnline);
+            atualizarValidacaoOnline();
 
             // 4. Rodapé com Botões de Ação
             const footer = doc.createElement('div');
