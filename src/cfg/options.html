@@ -1888,6 +1888,10 @@
                             <div class="setting-help" style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
                                 Permite cadastrar regras locais explícitas para forçar o comportamento de elementos específicos como <strong>Interface</strong> (bloqueia cópia sem Alt e desseleciona imediatamente com flash), <strong>Semiflexível</strong> (restrito à cópia rápida de máscaras forenses com 1 clique) ou <strong>Textual</strong> (leitura documental com seleção mantida no DOM). Pressione <code>Ctrl + Alt + Shift + Clique</code> sobre qualquer elemento em páginas web para abrir o assistente e salvar a regra diretamente.
                             </div>
+                            <div style="display: flex; gap: 6px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+                                <button type="button" id="tabRegrasUsuario" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; border-color: #38bdf8; color: #38bdf8;">Regras do Usuário</button>
+                                <button type="button" id="tabRegrasInternas" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; opacity: 0.7;">Regras Internas (interface.json)</button>
+                            </div>
                             <div id="containerListaRegrasMapeamento" style="display: flex; flex-direction: column; gap: 10px;">
                                 <!-- As regras cadastradas sao renderizadas dinamicamente aqui -->
                             </div>

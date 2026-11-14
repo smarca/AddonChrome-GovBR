@@ -730,7 +730,7 @@
             { tipoSeletor: 'XPath Simplificado', valor: seletores.xpathRel, padrao: true },
             { tipoSeletor: 'XPath Completo', valor: seletores.xpathAbs, padrao: false },
             { tipoSeletor: 'Seletor CSS', valor: seletores.seletorCss, padrao: !seletores.xpathRel },
-            { tipoSeletor: 'Caminho JS', valor: seletores.jsPath, padrao: false }
+            { tipoSeletor: 'Seletor CSS-2', valor: seletores.seletorCss2 || seletores.seletorCss, padrao: false }
         ];
 
         const caixasOpcoes = [];

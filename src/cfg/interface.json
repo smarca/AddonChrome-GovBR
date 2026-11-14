@@ -1,0 +1,9 @@
+[
+    {
+        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs",
+        "tipo": "interface",
+        "herdarFilhos": true,
+        "tipoSeletor": "Seletor CSS",
+        "origem": "interna"
+    }
+]

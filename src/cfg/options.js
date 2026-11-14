@@ -279,7 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const expr = (regra && regra.expressao) ? String(regra.expressao).trim() : '';
         if (expr.startsWith('//') || expr.startsWith('(')) return 'XPath Simplificado';
         if (expr.startsWith('/')) return 'XPath Completo';
-        if (/^document\.querySelector/i.test(expr)) return 'Caminho JS';
         return 'Seletor CSS';
     }
 
@@ -301,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.className = 'item-regra-mapeamento';
             item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; flex-wrap: wrap;';
 
-            // Badge com Tipo de Seletor (XPath Simplificado, XPath Completo, Seletor CSS ou Caminho JS)
+            // Badge com Tipo de Seletor (XPath Simplificado, XPath Completo, Seletor CSS ou Seletor CSS-2)
             const badgeTipo = document.createElement('span');
             badgeTipo.className = 'badge-tipo-seletor';
             badgeTipo.style.cssText = 'font-size: 10px; font-weight: 700; color: #38bdf8; background: #0f172a; border: 1px solid #0284c7; padding: 2px 6px; border-radius: 4px; white-space: nowrap;';
@@ -2256,6 +2255,57 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.runtime.onMessage.addListener((msg) => {
             if (msg && msg.acao === 'regrasMapeamentoAtualizadas' && Array.isArray(msg.regrasMapeamentoElementos)) {
                 renderizarListaRegrasMapeamento(msg.regrasMapeamentoElementos);
+            }
+        });
+    }
+
+    const tabRegrasUsuario = document.getElementById('tabRegrasUsuario');
+    const tabRegrasInternas = document.getElementById('tabRegrasInternas');
+
+    if (tabRegrasUsuario && tabRegrasInternas) {
+        adicionarOuvinteSeguro(tabRegrasUsuario, 'click', () => {
+            tabRegrasUsuario.style.borderColor = '#38bdf8';
+            tabRegrasUsuario.style.color = '#38bdf8';
+            tabRegrasUsuario.style.opacity = '1';
+            tabRegrasInternas.style.borderColor = '';
+            tabRegrasInternas.style.color = '';
+            tabRegrasInternas.style.opacity = '0.7';
+            if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'inline-flex';
+            renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
+        });
+
+        adicionarOuvinteSeguro(tabRegrasInternas, 'click', async () => {
+            tabRegrasInternas.style.borderColor = '#38bdf8';
+            tabRegrasInternas.style.color = '#38bdf8';
+            tabRegrasInternas.style.opacity = '1';
+            tabRegrasUsuario.style.borderColor = '';
+            tabRegrasUsuario.style.color = '';
+            tabRegrasUsuario.style.opacity = '0.7';
+            if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'none';
+            try {
+                const url = chrome.runtime.getURL('src/cfg/interface.json');
+                const resp = await fetch(url);
+                const internas = await resp.json();
+                if (containerListaRegrasMapeamento) {
+                    containerListaRegrasMapeamento.innerHTML = '';
+                    (Array.isArray(internas) ? internas : []).forEach((regra) => {
+                        const item = document.createElement('div');
+                        item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; opacity: 0.85; flex-wrap: wrap;';
+                        const badge = document.createElement('span');
+                        badge.style.cssText = 'font-size: 10px; font-weight: 700; color: #94a3b8; background: #0f172a; border: 1px solid #475569; padding: 2px 6px; border-radius: 4px;';
+                        badge.textContent = normalizarTipoSeletorRotulo(regra);
+                        const expr = document.createElement('code');
+                        expr.style.cssText = 'flex: 1; font-size: 11px; color: #e2e8f0; word-break: break-all;';
+                        expr.textContent = regra.expressao || '';
+                        item.appendChild(badge);
+                        item.appendChild(expr);
+                        containerListaRegrasMapeamento.appendChild(item);
+                    });
+                }
+            } catch (_) {
+                if (containerListaRegrasMapeamento) {
+                    containerListaRegrasMapeamento.innerHTML = '<div style="color: #94a3b8; font-size: 12px;">Não foi possível carregar interface.json.</div>';
+                }
             }
         });
     }
