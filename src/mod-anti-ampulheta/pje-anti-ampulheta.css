@@ -1,0 +1,148 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         PJe - Anti-Ampulheta
+@namespace    pje.jus.br
+@version      2.2.0
+@description  Elimina bloqueios em cliques simples e preserva travas em lote.
+@match        *://*.jus.br/pje*
+@match        *://*.jus.br/*/Processo/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO PJE 1.X E 2.X (JSF/RICHFACES E ANGULAR)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/pje-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta PJe 1.x e 2.x (CNJ / TRFs / TJs / TRTs)
+ * - Regras CSS: Neutralizacao de bloqueios RichFaces/JSF/Angular ([id="_viewRoot:status"], #modalStatus, .ajax-loader, .rich-mpnl-mask, mat-progress-spinner, #cke-overlay-frame-editorTexto); Preservacao estrita de lotes e assinaturas (#mpProgresso, [id*="Confirmacao" i], [id*="lote" i], [id*="assina" i], [id*="certidao" i])
+ * - Compatibilidade: JSF 1.2/2.x, RichFaces 3/4, PrimeFaces, CKEditor e Angular PJe
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DE AMPULHETAS E BLOQUEIOS TRANSIENTES
+ * POR QUE: Em cada clique num dropdown, o RichFaces injeta um ModalPanel de
+ * status. Isso impede o usuario de interagir com o resto da tela ate que
+ * o callback seja processado.
+ * COMO: Enviamos para o fundo da tela (z-index negativo), invisivel 
+ * (opacity: 0.01) e permeavel ao mouse (pointer-events: none).
+ * -------------------------------------------------------------------------- */
+[id="_viewRoot:status"],
+[id="_viewRoot:status.start"],
+[id="_viewRoot:status.stop"],
+[id$=":status.start"],
+#modalStatus,
+#modalStatusContainer,
+#modalStatusDiv,
+#modalStatusCursorDiv,
+[id*="status_movimentar" i],
+.ajax-loader:not([id*="mpProgresso" i]):not(:has([id*="mpProgresso" i])),
+[class*="rich-mpnl-mask" i]:not([id*="mpProgresso" i]):not([id*="Confirmacao" i]):not([id*="modal" i]):not([id*="lote" i]),
+#cke-overlay-frame-editorTexto,
+mat-progress-spinner,
+mat-spinner,
+.mat-progress-spinner,
+.mat-spinner,
+.mat-mdc-progress-spinner,
+p-progressspinner,
+p-progressSpinner,
+.p-progress-spinner,
+.spinner-border:not([role="progressbar"]),
+.spinner-grow,
+[class*="progress-spinner" i],
+[class*="loading-spinner" i],
+.loading-overlay:not([id*="lote" i]),
+.loader-overlay:not([id*="lote" i]),
+.pje-loading:not([id*="lote" i]),
+pdpj-spinner,
+pje-spinner,
+app-loading,
+ngx-loading,
+.ngx-loading-backdrop,
+.block-ui-wrapper:not(:has([role="progressbar"], .progress-bar, mat-progress-bar)),
+.p-blockui:not(:has([role="progressbar"], .progress-bar, mat-progress-bar)) {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PROTECAO DE INTEGRIDADE EM OPERACOES DE LOTE (#mpProgresso)
+ * POR QUE: No PJe 1.x, as atividades em lote executam loops de persistencia.
+ * Se o usuario clicar em botoes adjacentes durante o salvamento, ocorrem 
+ * colisoes (StaleObjectStateException) e geracao de minutas fantasma.
+ * COMO: Restauramos (auto/1/visible) o container #mpProgresso e todas as 
+ * caixas de confirmacao. Mantemos a tela escura para avisar o usuario.
+ * -------------------------------------------------------------------------- */
+#mpProgresso,
+#mpProgressoContainer,
+#mpProgressoCDiv,
+[id*="mpProgresso" i]:not(.rich-mpnl-mask-div) {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10500 !important;
+}
+
+#mpProgressoDiv,
+#mpProgressoCursorDiv,
+[id*="mpProgresso" i][class*="rich-mpnl-mask" i] {
+    pointer-events: auto !important;
+    cursor: wait !important;
+    opacity: 0.55 !important;
+    background-color: #000000 !important;
+    z-index: 10490 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 3: PROTECAO DOS DIALOGOS DECISORIOS
+ * POR QUE: Mensagens pedindo confirmacao ("Deseja sobreescrever a minuta?")
+ * nao podem ficar ocultas ou invisiveis aos cliques, senao a operacao trava 
+ * num limbo.
+ * -------------------------------------------------------------------------- */
+[id*="mdMensagemConfirmacao" i],
+[id*="mdMensagemLancamento" i],
+[id*="mdMensagemMovimentoNaoLancado" i],
+[id*="modalConfirmaLimpar" i],
+[id*="modalDescricaoNaoPreenchida" i],
+[id*="modalTipoLote" i],
+[id*="modalErros" i],
+.modal-anexos,
+.modal.fade.in,
+mat-progress-bar,
+p-progressbar,
+.rich-progress-bar,
+.progress-bar,
+[role="progressbar"],
+.rich-modalpanel:has(.rich-progress-bar, [id*="mpProgresso" i], [role="progressbar"]) {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 4: ANULACAO DE ATRAZOS ARTIFICIAIS DE UI
+ * POR QUE: O framework aplica atrasos de meio segundo para fade-in/fade-out.
+ * Zeramos essas variaveis para tornar as telas instantaneas.
+ * -------------------------------------------------------------------------- */
+*, *::before, *::after { 
+    animation-delay: 0s !important; 
+    transition: none !important; 
+    transition-delay: 0s !important; 
+    transition-duration: 0s !important; 
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 5: DESTRAVAMENTO DO CURSOR
+ * POR QUE: Callbacks perdidos costumam deixar "cursor: wait" perpetuo no <body>.
+ * Limpamos essa regra, preservando o cursor de relogio apenas se a mascara 
+ * do lote (#mpProgresso) estiver renderizada na tela.
+ * -------------------------------------------------------------------------- */
+html[style*="wait" i]:not(:has(#mpProgressoContainer:not([style*="display: none"]))),
+body[style*="wait" i]:not(:has(#mpProgressoContainer:not([style*="display: none"]))),
+*[style*="cursor: wait" i]:not([id*="mpProgresso" i]),
+*[style*="cursor:wait" i]:not([id*="mpProgresso" i]),
+.wait-cursor:not([id*="mpProgresso" i]) { 
+    cursor: auto !important; 
+}

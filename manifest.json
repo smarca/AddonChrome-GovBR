@@ -1,0 +1,99 @@
+/* ==========================================================================
+ * Nome do arquivo: manifest.json
+ * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * DIRETIVAS DE GERAÇÃO E MANUTENÇÃO IA [DEV - ENGENHARIA DE CÓDIGO]:
+ * 1) DELIBERAÇÃO PRÉVIA OBRIGATÓRIA: Jamais gerar código sem comando expresso;
+ *    sugerir preliminarmente e na ordem exata: (a) Eventuais Correções,
+ *    (b) Mudanças de Boas Práticas e (c) Novas Features.
+ * 2) PRESERVAÇÃO DOCUMENTAL ABSOLUTA: É terminantemente proibido apagar,
+ *    resumir, ocultar ou encurtar comentários no código-fonte. Todo comentário
+ *    deve explicar exaustivamente o *porquê* (regras de negócio, permissões
+ *    Manifest V3 e interoperabilidade com o PJe) e não apenas o *o que*.
+ * 3) INTRA-COMENTÁRIOS DE RECONSTRUÇÃO (PSEUDOCÓDIGO INTERCALADO / BLUEPRINT):
+ *    O propósito de cada chave de configuração está documentado neste cabeçalho
+ *    para reconstrução integral do manifesto a qualquer tempo.
+ * 4) CODIFICAÇÃO UTF-8 NATIVA DIRETA (ACENTOS E CEDILHAS REAIS): O código-fonte,
+ *    o manifesto e os arquivos de interface utilizam a codificação padrão UTF-8
+ *    sem BOM com suporte nativo a acentos e cedilhas (ç, ã, é, etc.) diretamente no texto.
+ *    É terminantemente PROIBIDO o uso de entidades HTML (como &ccedil;, &otilde;, &eacute;)
+ *    ou caracteres corrompidos.
+ * 5) INTEGRIDADE FUNCIONAL E CÓPIA SILENCIOSA: Proibido simplificar a base de 6
+ *    estágios, remover suporte a Ctrl/Alt/Shift, exibir popups de "Copiado!" em
+ *    cópias simples ou inserir anotações de versão (ChronoSemVer) nos cabeçalhos.
+ * 6) SINCRONIZAÇÃO OBRIGATÓRIA DE BLUE PRINT E SANDBOX: Toda alteração de regra
+ *    de negócio, máscara ou validação deve manter obrigatoriamente atualizados e
+ *    sincronizados o Blue Print (especificação documental interna nos cabeçalhos
+ *    e na Central de Ajuda) e o SandBox (área de Testes interativos em
+ *    options.html e bateria automatizada em debug.js), garantindo paridade entre
+ *    exemplos válidos e inválidos para homologação imediata.
+ * 7) PADRÃO DE VERSIONAMENTO UNIFICADO (AAMMDD.VER[.FIX]):
+ *    A versão oficial do aplicativo reside única e exclusivamente no manifest.json.
+ *    Formato: AAMMDD.VER[.FIX] (ex: 261105.0.1 ou 261105.1 ou 261105.1.2)
+ *    - AAMMDD: sempre atualizado para Ano, Mês e Dia corrente (yyMMdd),
+ *      independentemente do tipo de alteração realizada.
+ *    - VER: incrementado a cada inclusão de qualquer funcionalidade (mesmo mínimas:
+ *      MAJOR + MINOR mudanças). Se nenhuma funcionalidade for alterada no dia, VER = 0.
+ *    - FIX: incrementado exclusivamente quando existirem correções (PATCH / BUGFIX).
+ *    - REGRA DE OMISSÃO: se FIX = 0, suprime-se o FIX (ex: AAMMDD.VER).
+ *      Se FIX > 0, exibe-se completo (ex: AAMMDD.VER.FIX, tal como 261105.0.1).
+ *
+ * ==========================================================================
+ * [ESPECIFICAÇÃO FUNCIONAL E REGRAS DE NEGÓCIO -- HELP BLUEPRINT PERPÉTUO]
+ * (Espelho integral da Central de Ajuda / Options para reconstrução mútua)
+ *
+ * ARQUITETURA MANIFEST V3 (CHROMIUM 116+):
+ * - "manifest_version": 3 -> Adota o padrão moderno de segurança e isolamento
+ *   do Google Chrome, substituindo Background Pages persistentes pelo Service
+ *   Worker orientado a eventos ("background.js").
+ * - "minimum_chrome_version": "116" -> Garante suporte nativo às APIs modernas
+ *   utilizadas pelo motor: CSS Custom Highlight API (CSS.highlights), Top Layer
+ *   Popover API (showPopover/hidePopover), OffscreenCanvas no Service Worker e
+ *   chrome.storage.session em memória RAM.
+ *
+ * NOTA DE PRODUÇÃO: Caso o carregador de extensões descompactadas do Chrome
+ * exija JSON estrito sem comentários no topo, salve no disco apenas o objeto
+ * delimitado entre as chaves { ... } abaixo.
+ * ========================================================================== */
+{
+  "manifest_version": 3,
+  "name": "JusGovBR — Seleção/Cópia Inteligente",
+  "short_name": "JusGovBR",
+  "version": "261111.0.3",
+  "version_name": "261111.0.3",
+  "description": "JusGovBR — Seleção/Cópia Inteligente",
+  "author": "smarca@gmail.com",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "clipboardWrite",
+    "scripting",
+    "tabs",
+    "tabGroups",
+    "contextMenus",
+    "storage",
+    "webNavigation",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/cfg/background.js"
+  },
+  "options_page": "src/cfg/options.html",
+  "options_ui": {
+    "page": "src/cfg/options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "JusGovBR — Seleção/Cópia Inteligente",
+    "default_popup": "src/cfg/popup.html"
+  },
+  "icons": {
+    "16": "src/ico/icon128.png",
+    "48": "src/ico/icon128.png",
+    "128": "src/ico/icon128.png"
+  },
+  "web_accessible_resources": []
+}

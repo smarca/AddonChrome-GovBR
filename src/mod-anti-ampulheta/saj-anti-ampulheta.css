@@ -1,0 +1,63 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         SAJ / e-SAJ - Anti-Ampulheta
+@namespace    esaj.jus.br
+@version      2.2.0
+@match        *://esaj.*.jus.br/*
+@match        *://*.jus.br/esaj/*
+@match        *://*.jus.br/saj/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO SAJ (SOFTPLAN E KENDO UI)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/saj-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta SAJ / e-SAJ (Softplan e Kendo UI / TJSP / TJSC / TJMS / TJCE / TJAL / TJAC)
+ * - Regras CSS: Neutralizacao de Kendo UI e SAJ overlays (#bloqueioTela, .bloqueioTela, .esajAguarde, .saj-loading, .k-loading-mask, .k-loading-image); Preservacao estrita de WebSigner e assinaturas em lote (.k-loading-mask:has([id*="assinar" i]), [id*="Assinatura" i], [id*="Lote" i])
+ * - Compatibilidade: e-SAJ / SAJ Softplan com Kendo UI
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DO KENDO UI E SAJ OVERLAY
+ * POR QUE: A troca de folha ou a arvore do processo geram blocos de carregamento.
+ * Ignoramos essas camadas e forcamos pointer-events none e opacidade 0.01.
+ * -------------------------------------------------------------------------- */
+#bloqueioTela:not([id*="Assinatura" i]):not([id*="Lote" i]),
+.bloqueioTela:not([class*="Assinatura" i]):not([class*="Lote" i]),
+.esajAguarde,
+.saj-loading:not([class*="lote" i]),
+.saj-overlay:not([class*="lote" i]),
+.spw-loading,
+.spw-overlay,
+.k-loading-mask,
+.k-loading-image,
+.k-loading-color,
+.loadmask,
+.loadmask-msg {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PRESERVACAO DO ASSINADOR EM LOTE
+ * POR QUE: O handshake com tokens criptograficos pode estourar timeouts caso
+ * cliques adicionais acionem funcoes que demandem o slot do driver. A tela 
+ * deve ser integralmente protegida ate o callback de sucesso.
+ * -------------------------------------------------------------------------- */
+[id*="AssinaturaLote" i],
+[class*="assinatura-lote" i],
+.saj-lote-loading,
+.progress-bar,
+.k-progressbar,
+[role="progressbar"] {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10000 !important;
+}
+
+html[style*="wait" i], body[style*="wait" i], *[style*="cursor: wait" i]:not([id*="Assinatura" i]), *[style*="cursor:wait" i]:not([id*="Assinatura" i]) { cursor: auto !important; }

@@ -1,0 +1,64 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         Projudi / SEEU - Anti-Ampulheta
+@namespace    seeu.pje.jus.br
+@version      2.2.0
+@match        *://seeu.pje.jus.br/*
+@match        *://projudi.*.jus.br/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO SEEU/PROJUDI (JAVA EE / MOTOR DWR)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/seeu-projudi-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta SEEU / Projudi (CNJ / TJPR / TJBA / TJGO / TJMG)
+ * - Regras CSS: Neutralizacao do DWR Direct Web Remoting (#disabledZone, #messageZone, #divAguarde, #mascaraAguarde); Preservacao estrita de liquidacao de penas e lotes (.progressBar, .progress, [id*="Lote" i], [id*="Execucao" i])
+ * - Compatibilidade: Java EE, DWR e Prototype.js do SEEU e Projudi
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DO DWR DISABLED ZONE
+ * POR QUE: O motor DWR usa um approach defasado de bloqueio por DIV absoluta
+ * em toda chamada do Prototype.js. Tornamos esse bloco inerte a interacoes.
+ * -------------------------------------------------------------------------- */
+#disabledZone:not(:has(.progressBar, .progress, [role="progressbar"])),
+#messageZone:not(:has(.progressBar, .progress, [role="progressbar"])),
+#divAguarde:not([id*="Lote" i]),
+#mascaraAguarde:not([id*="Lote" i]),
+#fundoAguarde:not([id*="Lote" i]),
+#overlayAguarde:not([id*="Lote" i]),
+.painelAguarde:not([class*="Lote" i]),
+.mascaraAguarde:not([class*="Lote" i]),
+#divLoading,
+#loadingMask,
+#seeuAguarde:not([id*="Lote" i]),
+.seeu-loading:not([class*="Lote" i]),
+.processando-overlay:not([class*="Lote" i]) {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PRESERVACAO DO CALCULO PENAL EM MASSA
+ * POR QUE: A liquidacao consolidada exige tempo de query e insert em massa
+ * na tabela de historico. A barra de progresso obrigatoriamente protegera 
+ * a UI contra duplos cliques.
+ * -------------------------------------------------------------------------- */
+#modalProcessandoLote,
+[id*="Lote" i][id*="Progresso" i],
+.progresso-lote,
+.progressBar,
+.progress-bar,
+progress,
+[role="progressbar"] {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10000 !important;
+}
+
+html[style*="wait" i], body[style*="wait" i], *[style*="cursor: wait" i]:not([id*="Progresso" i]), *[style*="cursor:wait" i]:not([id*="Progresso" i]) { cursor: auto !important; }

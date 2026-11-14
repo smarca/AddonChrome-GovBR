@@ -1,0 +1,70 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         eproc - Anti-Ampulheta
+@namespace    eproc.jus.br
+@version      2.2.0
+@description  Remove a cortina 'Carregando...' em consultas, mantendo bloqueio em lotes.
+@match        *://eproc.*.jus.br/*
+@match        *://*.jus.br/eproc/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO EPROC (INFRAPHP)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/eproc-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta eproc (InfraPHP / TRF4 / TRF2 / TJSC / TJRS / TJTO)
+ * - Regras CSS: Neutralizacao da mascara InfraPHP (#divInfraAviso, #divInfraAvisoFundo, .infraAviso, .blockUI); Preservacao estrita de lotes (#divInfraBarraLocalizacao, [id*="Progresso" i], [id*="Lote" i], [id*="Assinar" i])
+ * - Compatibilidade: InfraPHP e jQuery BlockUI dos sistemas eproc
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DA MASCARA INFRAPHP E JQUERY BLOCKUI
+ * POR QUE: A arvore de documentos do Eproc injeta a mascara de fundo cinza
+ * (infraAvisoFundo) mesmo quando os dados ja estao em prefetch.
+ * -------------------------------------------------------------------------- */
+#divInfraAviso:not([id*="Progresso" i]):not([id*="Lote" i]),
+#divInfraAvisoFundo:not([id*="Progresso" i]):not([id*="Lote" i]),
+.infraAviso:not([class*="Progresso" i]):not([class*="Lote" i]),
+.infraAvisoFundo:not([class*="Progresso" i]):not([class*="Lote" i]),
+.infraFundoTransparente[id*="Aviso" i]:not([id*="Progresso" i]):not([id*="Lote" i]),
+#divCarregando,
+.divCarregando,
+#divInfraCarregando,
+.blockUI.blockOverlay:not(:has(.infraBarraProgresso, .progress-bar)),
+.blockUI.blockMsg:not(:has(.infraBarraProgresso, .progress-bar)),
+.blockUI.blockPage:not(:has(.infraBarraProgresso, .progress-bar)) {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PRESERVACOES DE ASSINATURA EM BLOCO E PROGRESSO
+ * POR QUE: Assinaturas de oficios e RPVs exigem calculos de hash. O plugin
+ * de execucao precisa monopolizar a UI. Mantemos o 'infraProgresso' travado.
+ * -------------------------------------------------------------------------- */
+#divInfraProgresso,
+.infraBarraProgresso,
+[id*="infraProgresso" i],
+[class*="infraProgresso" i],
+#divInfraAviso[id*="Lote" i],
+.infraAviso[class*="Lote" i],
+.infraBarraProgressoContainer,
+.progress-bar,
+[role="progressbar"],
+#divInfraDialogo,
+.infraDialogo,
+#divInfraMensagemConfirmacao {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10000 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 3: LIMPEZA DE CURSOR DE ESPERA ORFAO
+ * -------------------------------------------------------------------------- */
+html[style*="wait" i], body[style*="wait" i], *[style*="cursor: wait" i]:not([id*="Progresso" i]), *[style*="cursor:wait" i]:not([id*="Progresso" i]) { cursor: auto !important; }

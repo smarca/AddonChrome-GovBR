@@ -1,0 +1,7 @@
+# Ignora tudo por padrao no repositorio GitHub
+*
+!.gitignore
+!README.md
+!manifest.json
+!src/
+!src/**

@@ -1,0 +1,61 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         PDPJ-Br / STF / STJ - Anti-Ampulheta
+@namespace    pdpj.jus.br
+@version      2.2.0
+@match        *://*.pdpj.jus.br/*
+@match        *://*.stf.jus.br/*
+@match        *://*.stj.jus.br/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO ANGULAR (PDPJ, STF, STJ E GOVBR-DS)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/pdpj-stf-stj-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta PDPJ-Br / STF / STJ / GovBR-DS
+ * - Regras CSS: Neutralizacao de spinners e scrims Angular CDK (pdpj-loading, pdpj-spinner, stf-loading, stj-loading, .cdk-overlay-backdrop); Preservacao estrita de modais Material e barras de fluxo (.cdk-dialog-container, mat-dialog-container, mat-progress-bar, .br-loading)
+ * - Compatibilidade: Single Page Applications (Angular 12+, Angular Material e Design System GovBR)
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DOS SPINERS E SCRIMS DO ANGULAR CDK
+ * POR QUE: O Angular insere divs absolutas de alto z-index durante resolvers
+ * e requisicoes HttpClient. Isso congela cliques e selecao textual basica.
+ * -------------------------------------------------------------------------- */
+pdpj-loading,
+pdpj-spinner,
+stf-loading,
+stj-loading,
+ngx-spinner,
+.ngx-spinner-overlay,
+.br-loading-mask,
+.br-scrim.is-loading,
+.spinner-border-overlay,
+.cdk-overlay-backdrop.loading-backdrop,
+.cdk-overlay-backdrop.cdk-overlay-dark-backdrop:empty {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PRESAVACAO DE BARRA LINEAR E DIALOGOS CONCRETOS
+ * POR QUE: Qualquer componente Material "cdk-overlay-pane" que venha munido 
+ * de um role="dialog" real e barras lineares "mat-progress-bar" sinalizam 
+ * upload de pecas processuais, exigindo bloqueio para prevencao de perda.
+ * -------------------------------------------------------------------------- */
+mat-progress-bar,
+p-progressbar,
+.br-loading:not(.is-loading),
+[role="progressbar"],
+.cdk-overlay-pane:has(mat-progress-bar, p-progressbar, [role="progressbar"]),
+.cdk-overlay-pane:has([role="dialog"]),
+.cdk-overlay-backdrop:has(+ .cdk-overlay-pane [role="dialog"]) {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10000 !important;
+}

@@ -1,0 +1,53 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         Creta JEF - Anti-Ampulheta
+@namespace    jef.trf5.jus.br
+@version      2.2.0
+@match        *://*.trf5.jus.br/creta*
+@match        *://*.trf5.jus.br/jef*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO CRETA JEF (PHP LEGADO)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/creta-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta Creta JEF TRF5
+ * - Regras CSS: Neutralizacao de divs absolutas de aguarde (#div_aguarde, #tela_bloqueio, .creta-loading, .creta-overlay); Preservacao estrita de lotes DPU/INSS ([id*="lote" i][id*="progresso" i], .creta-lote-bloqueio, progress)
+ * - Compatibilidade: PHP legados do TRF5 (Creta / JEF)
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: NEUTRALIZACAO DO BLOQUEIO DE TELA SSR
+ * POR QUE: O Creta utiliza metodos antigos de bloqueio que inserem divs
+ * absolutas opacas. A opacidade em 0.01 remove a obstrucao visual.
+ * -------------------------------------------------------------------------- */
+#div_aguarde:not([id*="lote" i]),
+#tela_bloqueio:not([id*="lote" i]),
+#carregando_dados:not([id*="lote" i]),
+.creta-loading:not([class*="lote" i]),
+.creta-overlay:not([class*="lote" i]) {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: PRESERVAÇÃO DE ATOS DA REDE DPU/INSS EM LOTE
+ * POR QUE: Geracao de requisicoes financeiras consolidadas devem ser unicas
+ * no servidor PHP e nao toleram POSTs repetidos em intervalo sub-segundo.
+ * -------------------------------------------------------------------------- */
+[id*="lote" i][id*="progresso" i],
+[id*="aguarde" i][id*="lote" i],
+.creta-lote-bloqueio,
+progress,
+.progress-bar {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 10000 !important;
+}
+
+html[style*="wait" i], body[style*="wait" i], *[style*="cursor: wait" i]:not([id*="lote" i]), *[style*="cursor:wait" i]:not([id*="lote" i]) { cursor: auto !important; }

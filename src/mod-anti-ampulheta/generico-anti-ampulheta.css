@@ -1,0 +1,67 @@
+@charset "UTF-8";
+/* ==UserStyle==
+@name         Web Generica - Anti-Ampulheta
+@namespace    global
+@version      1.1.0
+@description  Remove bloqueios genericos (BlockUI, SweetAlert2, modais Bootstrap vazios).
+@match        *://*/*
+==/UserStyle== */
+
+/* ==========================================================================
+ * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]
+ * NOME: MODULO GENERICO WEB ABERTA
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/generico-anti-ampulheta.css
+ * - Modulo: Anti-Ampulheta Web Generica
+ * - Regras CSS: Neutralizacao de jQuery BlockUI (.blockUI.blockOverlay, .blockUI.blockMsg), SweetAlert2 (.swal2-container.swal2-backdrop-show), modais Bootstrap/Tailwind (.modal-backdrop:not(.show)); Preservacao de progress bar e uploads (.progress, .progress-bar, [role="progressbar"], .dz-preview)
+ * - Compatibilidade: Web Aberta e Portais Corporativos Gov.br
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * REGRA 1: JQUERY BLOCK UI E OVERLAYS
+ * POR QUE: Extrema utilizacao em sistemas de gestao na web brasileira, travam
+ * o mouse enquanto um datatable busca uma unica linha nova de dados.
+ * -------------------------------------------------------------------------- */
+.blockUI.blockOverlay:not(:has(.progress, .progress-bar, [role="progressbar"])),
+.blockUI.blockMsg:not(:has(.progress, .progress-bar, [role="progressbar"])),
+
+/* --------------------------------------------------------------------------
+ * REGRA 2: SWEET ALERT 2 MODAL DE STATUS
+ * POR QUE: Usado frequentemente para exibir "loading...". Destravamos os 
+ * fundos para manter cliques nos botões adjacentes.
+ * -------------------------------------------------------------------------- */
+.swal2-container.swal2-backdrop-show:has(.swal2-loading),
+
+/* --------------------------------------------------------------------------
+ * REGRA 3: LOADINGS GENERICOS VUE/REACT/KENDO
+ * POR QUE: Diversos frameworks isolam modulos usando variacoes de .loading-mask.
+ * Isolamos todos aqueles que nao possuam barras de progresso (indicativo de lote).
+ * -------------------------------------------------------------------------- */
+.k-loading-mask,
+.loading-mask:not(:has(.progress-bar)),
+.loader-mask:not(:has(.progress-bar)),
+.loading-overlay:not(:has(.progress-bar)),
+.loader-overlay:not(:has(.progress-bar)),
+.loading-backdrop:not(:has(.progress-bar)),
+
+/* --------------------------------------------------------------------------
+ * REGRA 4: MODAL BACKDROP DO BOOTSTRAP ORFAO
+ * POR QUE: Muito comum o HTML renderizar .modal-backdrop sem o .modal aberto
+ * travando a tela com z-index de 1040. Aniquilamos apenas os que estao vazios.
+ * -------------------------------------------------------------------------- */
+.modal-backdrop.show:empty,
+.modal-backdrop.fade.in:empty {
+    pointer-events: none !important;
+    cursor: auto !important;
+    opacity: 0.01 !important;
+    z-index: -99999 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 5: CURSOR WAIT GLOBAL
+ * -------------------------------------------------------------------------- */
+html[style*="wait" i]:not(:has(.progress, .progress-bar, [role="progressbar"])),
+body[style*="wait" i]:not(:has(.progress, .progress-bar, [role="progressbar"])) {
+    cursor: auto !important;
+}
