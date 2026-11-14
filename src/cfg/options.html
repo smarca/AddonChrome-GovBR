@@ -357,7 +357,7 @@
         }
 
         details.secao-avancada summary::after {
-            content: '+ Expandir Opções Avançadas';
+            content: '+';
             font-size: 12px;
             font-weight: 600;
             color: var(--azul-jusgov);
@@ -367,7 +367,7 @@
         }
 
         details.secao-avancada[open] summary::after {
-            content: '- Recolher Opções Avançadas';
+            content: '-';
         }
 
         .conteudo-avancado {
@@ -1890,14 +1890,17 @@
                             </div>
                             <div style="display: flex; gap: 6px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
                                 <button type="button" id="tabRegrasUsuario" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; border-color: #38bdf8; color: #38bdf8;">Regras do Usuário</button>
-                                <button type="button" id="tabRegrasInternas" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; opacity: 0.7;">Regras Internas (interface.json)</button>
+                                <button type="button" id="tabRegrasInternas" class="btn btn-secundario" style="font-size: 11px; padding: 4px 10px; opacity: 0.7;">Regras Internas</button>
                             </div>
                             <div id="containerListaRegrasMapeamento" style="display: flex; flex-direction: column; gap: 10px;">
                                 <!-- As regras cadastradas sao renderizadas dinamicamente aqui -->
                             </div>
                             <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
-                                <button type="button" id="btnAdicionarRegraMapeamento" class="btn btn-secundario" title="Adicionar Regra Manualmente" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; margin-right: auto;">
+                                <button type="button" id="btnAdicionarRegraMapeamento" class="btn btn-secundario" title="Adicionar Regra Manualmente" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
                                     <span>➕</span> Adicionar Regra
+                                </button>
+                                <button type="button" id="btnSalvarRegrasMapeamento" class="btn btn-primario" title="Salvar Regras de Mapeamento" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; margin-right: auto;">
+                                    <span>💾</span> Salvar
                                 </button>
                                 <button type="button" id="btnExportarMapeamentoJson" class="btn btn-secundario" title="Exportar Regras para JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
                                     <span>📤</span> Exportar JSON

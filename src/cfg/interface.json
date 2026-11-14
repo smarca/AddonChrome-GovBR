@@ -1,9 +1,101 @@
 [
     {
-        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs",
+        "id": "interna_nav_toolbars",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs, .nav-topo, .action-bar, .toolbar, .sidebar, .topbar, .breadcrumb",
         "tipo": "interface",
+        "observacao": "Barras de navegação, menus e cabeçalhos de sistema",
         "herdarFilhos": true,
-        "tipoSeletor": "Seletor CSS",
-        "origem": "interna"
+        "ativo": true
+    },
+    {
+        "id": "interna_modais_menus",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".modal, .dialog, .dropdown, .popover, .context-menu, .mat-dialog, .p-dialog, .pje-modal, .drop-menu, .dropdown-menu, .dropdown-item, [aria-modal=\"true\"]",
+        "tipo": "interface",
+        "observacao": "Modais, diálogos, popovers e menus suspensos",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_dropdowns_select",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".ui-selectonemenu, .select2, .p-dropdown, .mat-select, .ng-select, .ant-select, .form-select, .custom-select",
+        "tipo": "interface",
+        "observacao": "Componentes de seleção e caixas dropdown",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_badges_etiquetas",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".pje-etiquetas, .label-etiqueta, .label-info, .badge, .chip, .tag, .mais-detalhes, .tree, .card-header, .panel-heading, .btn",
+        "tipo": "interface",
+        "observacao": "Etiquetas PJe, badges, chips, árvores e botões",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_pje_cards_timeline",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".ui-datalist, .datalist-content, .timeline, .item-timeline, .tarefa-card, .card-processo, .painel-tarefas, .pje-cabecalho, processo-datalist-card, ui-datalist",
+        "tipo": "interface",
+        "observacao": "Cards de processos, timeline e painéis de tarefas PJe",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_editores_toolbars",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[class*=\"cke_\"]:not(.cke_editable), [id^=\"cke_\"]:not(.cke_editable), .editor-toolbar-main, .ql-toolbar, .tox-toolbar, .tox-editor-header, .mce-toolbar",
+        "tipo": "interface",
+        "observacao": "Barras de ferramentas de editores ricos (CKEditor, TinyMCE, Quill)",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_ids_estruturais",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "[id*=\"polo\" i], [id*=\"detalhe\" i], [id*=\"navbar\" i], [id*=\"toolbar\" i], [id*=\"sidebar\" i], [id*=\"topbar\" i], [id*=\"menu\" i], [id*=\"header\" i]",
+        "tipo": "interface",
+        "observacao": "Contêineres estruturais por ID (polo, detalhe, menu, header)",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_webcomponents_ui",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "mat-icon, g-icon, md-icon, [class*=\"-button\"], [class*=\"-btn\"], [class*=\"-picker\"], [class*=\"-switcher\"], [class*=\"-selector\"], [class*=\"-dropdown\"], [class*=\"-toggle\"], [class*=\"-toolbar\"], [class*=\"-menu\"]",
+        "tipo": "interface",
+        "observacao": "Ícones e Web Components de interface",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_leitura_editores_pdf",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".cke_editable, .pdfViewer, .textLayer, .pdf-container, pdf-viewer",
+        "tipo": "textual",
+        "observacao": "Áreas de leitura documental, PDFs e editores editáveis",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_controles_pdf",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": "viewer-toolbar, viewer-page-selector, viewer-pdf-sidenav, cr-icon-button, #toolbarviewer, #toolbarcontainer, #secondarytoolbar, #sidenav-container, #sidebarcontainer, #zoom-controls, #sidenavtoggle, #pageselector, .toolbarbutton, .doorhanger, .treeview",
+        "tipo": "interface",
+        "observacao": "Controles internos do visualizador de PDF e árvores de navegação",
+        "herdarFilhos": true,
+        "ativo": true
+    },
+    {
+        "id": "interna_tabelas_semiflexivel",
+        "tipoSeletor": "CSS (Simples)",
+        "expressao": ".cabecalho-processo, .ui-widget-header",
+        "tipo": "semiflexivel",
+        "observacao": "Cabeçalhos de processo e widgets semiflexíveis",
+        "herdarFilhos": true,
+        "ativo": true
     }
 ]

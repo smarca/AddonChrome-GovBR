@@ -427,6 +427,22 @@
     const PADROES_FABRICA_REGRAS_MAPEAMENTO = Object.freeze([]);
 
     let regrasMapeamentoElementos = [];
+    let regrasInternasInterface = [];
+
+    (function carregarRegrasInternasInterface() {
+        try {
+            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
+                fetch(chrome.runtime.getURL('src/cfg/interface.json'))
+                    .then((resp) => resp && resp.ok ? resp.json() : [])
+                    .then((dados) => {
+                        if (Array.isArray(dados)) {
+                            regrasInternasInterface = dados;
+                        }
+                    })
+                    .catch(() => { });
+            }
+        } catch (_) { }
+    })();
 
     function definirRegrasMapeamentoElementos(novasRegras) {
         if (Array.isArray(novasRegras)) {
@@ -492,35 +508,80 @@
         return false;
     }
 
-    function elementoCorrespondeRegraMapeamento(el, expressao, herdarFilhos = true) {
-        if (!el || typeof expressao !== 'string' || !expressao.trim()) return false;
+    function validarExpressaoSeletor(expressao, tipoSeletor = '') {
+        if (typeof expressao !== 'string' || !expressao.trim()) return false;
         const expr = expressao.trim();
-        if (expr.startsWith('/') || expr.startsWith('(')) {
-            return elementoCorrespondeXPath(el, expr, herdarFilhos);
-        }
-        if (/^document\.querySelector/i.test(expr)) {
-            const m = expr.match(/^document\.querySelector(?:All)?\(\s*['"`](.*?)['"`]\s*\)/i);
-            if (m && m[1]) {
-                return elementoCorrespondeCss(el, m[1], herdarFilhos);
+        try {
+            const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
+            if (ehXPath) {
+                if (typeof document !== 'undefined' && typeof document.evaluate === 'function') {
+                    document.evaluate(expr, document, null, XPathResult.ANY_TYPE, null);
+                }
+                return true;
             }
+            if (typeof document !== 'undefined' && typeof document.createDocumentFragment === 'function') {
+                document.createDocumentFragment().querySelector(expr);
+            }
+            return true;
+        } catch (_) {
+            return false;
         }
-        return elementoCorrespondeCss(el, expr, herdarFilhos);
     }
 
+    function elementoCorrespondeRegraMapeamento(el, expressao, herdarFilhos = true) {
+        if (!el || typeof expressao !== 'string' || !expressao.trim()) return false;
+        try {
+            const expr = expressao.trim();
+            if (expr.startsWith('/') || expr.startsWith('(')) {
+                return elementoCorrespondeXPath(el, expr, herdarFilhos);
+            }
+            if (/^document\.querySelector/i.test(expr)) {
+                const m = expr.match(/^document\.querySelector(?:All)?\(\s*['"`](.*?)['"`]\s*\)/i);
+                if (m && m[1]) {
+                    return elementoCorrespondeCss(el, m[1], herdarFilhos);
+                }
+            }
+            return elementoCorrespondeCss(el, expr, herdarFilhos);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    let cacheClassificacaoCustomEl = null;
+    let cacheClassificacaoCustomTs = 0;
+    let cacheClassificacaoCustomRes = null;
+
     function obterClassificacaoRegraCustomizada(el) {
-        if (!el || !Array.isArray(regrasMapeamentoElementos) || regrasMapeamentoElementos.length === 0) return null;
+        if (!el) return null;
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         if (!base) return null;
 
-        for (let i = 0; i < regrasMapeamentoElementos.length; i++) {
-            const regra = regrasMapeamentoElementos[i];
-            if (!regra || regra.ativo === false || !regra.expressao) continue;
-            const herdar = regra.herdarFilhos !== false;
-            if (elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar)) {
-                return regra.tipo || 'semiflexivel';
-            }
+        const agora = Date.now();
+        if (base === cacheClassificacaoCustomEl && (agora - cacheClassificacaoCustomTs) < 16) {
+            return cacheClassificacaoCustomRes;
         }
-        return null;
+
+        let resultado = null;
+        const listas = [regrasMapeamentoElementos, regrasInternasInterface];
+        for (let l = 0; l < listas.length; l++) {
+            const lista = listas[l];
+            if (!Array.isArray(lista) || lista.length === 0) continue;
+            for (let i = 0; i < lista.length; i++) {
+                const regra = lista[i];
+                if (!regra || regra.ativo === false || !regra.expressao) continue;
+                const herdar = regra.herdarFilhos !== false;
+                if (elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar)) {
+                    resultado = regra.tipo || 'semiflexivel';
+                    break;
+                }
+            }
+            if (resultado) break;
+        }
+
+        cacheClassificacaoCustomEl = base;
+        cacheClassificacaoCustomTs = agora;
+        cacheClassificacaoCustomRes = resultado;
+        return resultado;
     }
 
     function extrairCaminhoXPathAbsoluto(el) {
@@ -666,15 +727,50 @@
         return limpa === '/html' || limpa === '/html/body' || limpa === 'html' || limpa === 'body';
     }
 
+    function extrairSeletorCssSimples(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
+        if (el.id && !/^\d/.test(el.id) && !el.id.includes(':')) {
+            return `#${el.id}`;
+        }
+        const classes = Array.from(el.classList || []).filter(c => c && !c.startsWith('jusgov-'));
+        if (classes.length > 0) {
+            return '.' + classes.slice(0, 3).join('.');
+        }
+        return (el.tagName || '').toLowerCase();
+    }
+
+    function extrairSeletorCss2(el) {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
+        const partes = [];
+        let atual = el;
+        while (atual && atual.nodeType === Node.ELEMENT_NODE && atual.tagName) {
+            const tag = atual.tagName.toLowerCase();
+            if (tag === 'html') {
+                partes.unshift('html');
+                break;
+            }
+            let indice = 1;
+            let irmao = atual.previousElementSibling;
+            while (irmao) {
+                indice++;
+                irmao = irmao.previousElementSibling;
+            }
+            partes.unshift(`${tag}:nth-child(${indice})`);
+            atual = atual.parentElement;
+        }
+        return partes.join(' > ');
+    }
+
     function abrirModalSalvarRegraMapeamento(baseEl, seletoresExtraidos) {
         if (!baseEl || typeof document === 'undefined' || !document.body) return null;
         fecharModalSalvarRegraMapeamento();
 
         const seletores = seletoresExtraidos || {
+            cssSimples: extrairSeletorCssSimples(baseEl),
             xpathRel: extrairCaminhoXPathRelativo(baseEl),
             xpathAbs: extrairCaminhoXPathAbsoluto(baseEl),
             seletorCss: extrairSeletorCssSimplificado(baseEl),
-            jsPath: `document.querySelector("${extrairSeletorCssSimplificado(baseEl)}")`
+            seletorCss2: extrairSeletorCss2(baseEl)
         };
 
         const overlay = document.createElement('div');
@@ -727,10 +823,11 @@
         secSeletores.appendChild(lblSecSeletores);
 
         const listaTipos = [
-            { tipoSeletor: 'XPath Simplificado', valor: seletores.xpathRel, padrao: true },
-            { tipoSeletor: 'XPath Completo', valor: seletores.xpathAbs, padrao: false },
-            { tipoSeletor: 'Seletor CSS', valor: seletores.seletorCss, padrao: !seletores.xpathRel },
-            { tipoSeletor: 'Seletor CSS-2', valor: seletores.seletorCss2 || seletores.seletorCss, padrao: false }
+            { tipoSeletor: 'CSS (Simples)', valor: seletores.cssSimples, padrao: true },
+            { tipoSeletor: 'CSS (Hierárquico)', valor: seletores.seletorCss, padrao: !seletores.cssSimples },
+            { tipoSeletor: 'CSS (Estrutural)', valor: seletores.seletorCss2 || seletores.seletorCss, padrao: false },
+            { tipoSeletor: 'XPath (Simplificado)', valor: seletores.xpathRel, padrao: false },
+            { tipoSeletor: 'XPath (Completo)', valor: seletores.xpathAbs, padrao: false }
         ];
 
         const caixasOpcoes = [];
@@ -899,6 +996,14 @@
                 return;
             }
 
+            const invalido = selecionados.find(s => !validarExpressaoSeletor(s.item.valor, s.item.tipoSeletor));
+            if (invalido) {
+                if (validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                    validador.projetarMiniTipGlobal(`⚠️ Expressão inválida em "${invalido.item.tipoSeletor}".`, '#ef4444');
+                }
+                return;
+            }
+
             const novasRegras = selecionados.map(s => ({
                 id: 'regra_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                 tipoSeletor: s.item.tipoSeletor,
@@ -971,10 +1076,11 @@
         const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         if (!base) return null;
 
+        const cssSimples = extrairSeletorCssSimples(base);
         const xpathRel = extrairCaminhoXPathRelativo(base);
         const xpathAbs = extrairCaminhoXPathAbsoluto(base);
         const seletorCss = extrairSeletorCssSimplificado(base);
-        const jsPath = `document.querySelector("${seletorCss}")`;
+        const seletorCss2 = extrairSeletorCss2(base);
 
         const seletorPreferencial = (xpathRel && xpathRel.startsWith('//*[@id='))
             ? xpathRel
@@ -987,10 +1093,11 @@
         } catch (_) { }
 
         abrirModalSalvarRegraMapeamento(base, {
+            cssSimples,
             xpathRel,
             xpathAbs,
             seletorCss,
-            jsPath,
+            seletorCss2,
             preferencial: seletorPreferencial
         });
 
@@ -998,7 +1105,7 @@
             xpathRelativo: xpathRel,
             xpathAbsoluto: xpathAbs,
             seletorCss: seletorCss,
-            jsPath: jsPath,
+            seletorCss2: seletorCss2,
             preferencial: seletorPreferencial
         };
     }
@@ -1093,44 +1200,7 @@
      */
     function isElementoControlePdf(el) {
         if (!el) return false;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 20) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const tag = (atual.tagName || '').toLowerCase();
-                const idElem = (atual.id || '').toLowerCase();
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-
-                if (
-                    tag === 'viewer-toolbar' ||
-                    tag === 'viewer-page-selector' ||
-                    tag === 'viewer-pdf-sidenav' ||
-                    tag === 'cr-icon-button' ||
-                    idElem === 'toolbar' ||
-                    idElem === 'toolbarviewer' ||
-                    idElem === 'toolbarcontainer' ||
-                    idElem === 'secondarytoolbar' ||
-                    idElem === 'sidenav-container' ||
-                    idElem === 'sidebarcontainer' ||
-                    idElem === 'zoom-controls' ||
-                    idElem === 'sidenavtoggle' ||
-                    idElem === 'pageselector'
-                ) {
-                    return true;
-                }
-
-                if (cls && (
-                    cls.includes('toolbar') ||
-                    cls.includes('toolbarbutton') ||
-                    cls.includes('doorhanger')
-                )) {
-                    return true;
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return false;
+        return obterClassificacaoRegraCustomizada(el) === 'interface';
     }
 
     /*
@@ -1164,19 +1234,7 @@
             : null;
         if (!celula) return false;
 
-        /* DIRETRIZ REFORÇO INTERFACE: Se a célula ou tabela estiver contida em componentes de interface
-         * (como dropdowns PJe #poloAtivo/#poloPassivo/#maisDetalhes, barras de navegação .navbar, modais,
-         * painéis de tarefas, cards ou sidebars), a célula NÃO é área de leitura documental! */
-        if (typeof celula.closest === 'function' && celula.closest(
-            '.navbar, .nav-topo, #navbar, .navbar-default, .navbar-fixed-top, .nav, ' +
-            '.dropdown, .drop-menu, .dropdown-menu, .mais-detalhes, ' +
-            '#poloAtivo, #poloPassivo, #outrosInteressados, #maisDetalhes, ' +
-            '[id*="polo"], [id*="Polo"], [id*="detalhe"], [id*="Detalhe"], ' +
-            '.modal, .dialog, .popover, .toolbar, .sidebar, .topbar, .card-header, .panel-heading, ' +
-            '.painel-tarefas, .pje-cabecalho, .cabecalho-processo, ' +
-            '.tree, .treeview, processo-datalist-card, .ui-datalist, .datalist-content, ' +
-            '.timeline, .item-timeline, .tarefa-card, .card-processo, .ui-widget-header'
-        )) {
+        if (obterClassificacaoRegraCustomizada(celula) === 'interface') {
             return false;
         }
 
@@ -1320,106 +1378,33 @@
             if (atual.nodeType === Node.ELEMENT_NODE) {
                 if (atual.hasAttribute('data-jusgov-ignore')) return true;
 
-                const tagUpper = (atual.tagName || '').toUpperCase();
+                /* Heurística Root (Seção 6.121): Cursor do mouse e eventos vinculados */
+                if (profundidade <= 6) {
+                    try {
+                        const st = window.getComputedStyle(atual);
+                        if (st) {
+                            const cur = st.cursor;
+                            if (cur === 'text' || cur === 'vertical-text' || cur === 'cell') {
+                                return false;
+                            }
+                            if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grab' || cur === 'grabbing' || cur === 'progress' || cur === 'help' || cur === 'context-menu') {
+                                return true;
+                            }
+                            const us = st.userSelect || st.webkitUserSelect;
+                            if (us === 'none') {
+                                return true;
+                            }
+                        }
+                    } catch (_) { }
+                }
 
+                const tagUpper = (atual.tagName || '').toUpperCase();
                 if (TAGS_INTERATIVAS.has(tagUpper)) {
                     return true;
                 }
 
-                /* Inspecao de Modais, Dialogos, Popovers, Etiquetas PJe, Interface de Editores (cke_*, cke_*editor) e Menus Suspensos WAI-ARIA */
                 if (atual.hasAttribute('aria-modal') && atual.getAttribute('aria-modal') !== 'false') {
                     return true;
-                }
-
-                const idElemLower = (typeof atual.id === 'string') ? atual.id.toLowerCase() : '';
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-                if (
-                    ((/\bcke_[a-z0-9_-]*/i.test(cls) || /^cke_/i.test(idElemLower) || /cke_[a-z0-9_-]*editor/i.test(cls) || /cke_[a-z0-9_-]*editor/i.test(idElemLower)) && !/\bcke_editable\b/i.test(cls)) ||
-                    /\b(editor-toolbar-main|ql-toolbar|tox-toolbar|tox-editor-header|mce-toolbar)\b/i.test(cls)
-                ) {
-                    return true;
-                }
-                if (idElemLower && (
-                    idElemLower.includes('polo') ||
-                    idElemLower.includes('detalhe') ||
-                    idElemLower.includes('navbar') ||
-                    idElemLower.includes('toolbar') ||
-                    idElemLower.includes('sidebar') ||
-                    idElemLower.includes('topbar') ||
-                    idElemLower.includes('menu') ||
-                    idElemLower.includes('header')
-                )) {
-                    return true;
-                }
-                if (cls && (
-                    cls.includes('modal') ||
-                    cls.includes('dialog') ||
-                    cls.includes('dropdown') ||
-                    cls.includes('popover') ||
-                    cls.includes('ui-selectonemenu') ||
-                    cls.includes('select2') ||
-                    cls.includes('context-menu') ||
-                    cls.includes('mat-dialog') ||
-                    cls.includes('p-dialog') ||
-                    cls.includes('pje-modal') ||
-                    cls.includes('pje-etiquetas') ||
-                    cls.includes('label-etiqueta') ||
-                    cls.includes('label-info') ||
-                    cls.includes('badge') ||
-                    cls.includes('chip') ||
-                    cls.includes('tag') ||
-                    cls.includes('toolbar') ||
-                    cls.includes('navbar') ||
-                    cls.includes('nav-topo') ||
-                    cls.includes('drop-menu') ||
-                    cls.includes('mais-detalhes') ||
-                    cls.includes('tree') ||
-                    cls.includes('sidebar') ||
-                    cls.includes('topbar') ||
-                    cls.includes('card-header') ||
-                    cls.includes('panel-heading') ||
-                    cls.includes('breadcrumb') ||
-                    cls.includes('btn') ||
-                    cls.includes('action-bar') ||
-                    cls.includes('ui-datalist') ||
-                    cls.includes('datalist-content') ||
-                    cls.includes('timeline') ||
-                    cls.includes('item-timeline') ||
-                    cls.includes('tarefa-card') ||
-                    cls.includes('card-processo') ||
-                    cls.includes('painel-tarefas') ||
-                    cls.includes('pje-cabecalho')
-                )) {
-                    return true;
-                }
-
-                if (tagUpper === 'PROCESSO-DATALIST-CARD' || tagUpper === 'UI-DATALIST') {
-                    return true;
-                }
-
-                /* Custom Elements de UI (tags contendo hifen, ex: bard-mode-switcher, mat-icon-button) */
-                if (tagUpper.indexOf('-') !== -1) {
-                    const tagLower = tagUpper.toLowerCase();
-                    if (
-                        tagLower.indexOf('-button') !== -1 ||
-                        tagLower.indexOf('-btn') !== -1 ||
-                        tagLower.indexOf('-picker') !== -1 ||
-                        tagLower.indexOf('-switcher') !== -1 ||
-                        tagLower.indexOf('-selector') !== -1 ||
-                        tagLower.indexOf('-dropdown') !== -1 ||
-                        tagLower.indexOf('-toggle') !== -1 ||
-                        tagLower.indexOf('-item') !== -1 ||
-                        tagLower.indexOf('-icon') !== -1 ||
-                        tagLower.indexOf('-toolbar') !== -1 ||
-                        tagLower.indexOf('-menu') !== -1 ||
-                        tagLower.indexOf('-tab') !== -1 ||
-                        tagLower.startsWith('bard-') ||
-                        tagLower.startsWith('mat-') ||
-                        tagLower.startsWith('mdc-') ||
-                        tagLower.startsWith('gws-')
-                    ) {
-                        return true;
-                    }
                 }
 
                 const role = atual.getAttribute('role');
@@ -1461,24 +1446,6 @@
                             return true;
                         }
                     }
-                }
-
-                /* Inspecao de Estilos Computados (limitada aos 6 ancestrais mais proximos para evitar Layout Thrashing):
-                 * cursor pointer ("maozinha"), help ("ajuda"), grab e user-select none */
-                if (profundidade <= 6) {
-                    try {
-                        const st = window.getComputedStyle(atual);
-                        if (st) {
-                            const cur = st.cursor;
-                            if (cur === 'pointer' || cur === 'help' || cur === 'grab' || cur === 'grabbing' || cur === 'context-menu') {
-                                return true;
-                            }
-                            const us = st.userSelect || st.webkitUserSelect;
-                            if (us === 'none') {
-                                return true;
-                            }
-                        }
-                    } catch (_) { }
                 }
             }
 
@@ -1599,22 +1566,6 @@
                 const ariaHasPopup = (atual.getAttribute('aria-haspopup') || '').toLowerCase();
                 if (ariaHasPopup === 'listbox' || ariaHasPopup === 'true') {
                     if (atual.hasAttribute('aria-expanded')) return true;
-                }
-
-                const cls = (typeof atual.className === 'string') ? atual.className.toLowerCase() : '';
-                if (cls && (
-                    cls.includes('select2') ||
-                    cls.includes('ui-selectonemenu') ||
-                    cls.includes('p-dropdown') ||
-                    cls.includes('mat-select') ||
-                    cls.includes('ng-select') ||
-                    cls.includes('ant-select') ||
-                    cls.includes('form-select') ||
-                    cls.includes('custom-select') ||
-                    cls.includes('dropdown-menu') ||
-                    cls.includes('dropdown-item')
-                )) {
-                    return true;
                 }
             }
             atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
@@ -2250,7 +2201,7 @@
         if (isAreaLeituraOuPdfConteudo(el)) return false;
         let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
         let profundidade = 0;
-        const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU', 'NAV', 'HEADER', 'FOOTER', 'ASIDE', 'PROCESSO-DATALIST-CARD', 'UI-DATALIST']);
+        const TAGS_ESTRITAS = new Set(['BUTTON', 'A', 'SELECT', 'OPTION', 'OPTGROUP', 'INPUT', 'TEXTAREA', 'SUMMARY', 'DETAILS', 'DIALOG', 'MENU', 'NAV', 'HEADER', 'FOOTER', 'ASIDE']);
         const ROLES_ESTRITOS = new Set(['button', 'link', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'menubar', 'tab', 'tablist', 'switch', 'combobox', 'listbox', 'option', 'dialog', 'alertdialog', 'toolbar', 'tree', 'treeitem']);
 
         while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 25) {

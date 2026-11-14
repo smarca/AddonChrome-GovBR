@@ -266,45 +266,119 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Mapeamento Manual Avançado de Elementos (XPath / CSS) (Seção 6.20 e Seção 6.85) */
     const detalhesMapeamentoXPath = document.getElementById('detalhesMapeamentoXPath');
     const btnAdicionarRegraMapeamento = document.getElementById('btnAdicionarRegraMapeamento');
+    const btnSalvarRegrasMapeamento = document.getElementById('btnSalvarRegrasMapeamento');
     const btnExportarMapeamentoJson = document.getElementById('btnExportarMapeamentoJson');
     const btnImportarMapeamentoJson = document.getElementById('btnImportarMapeamentoJson');
     const inputImportarMapeamentoArquivo = document.getElementById('inputImportarMapeamentoArquivo');
     const containerListaRegrasMapeamento = document.getElementById('containerListaRegrasMapeamento');
     let regrasMapeamentoAtuais = [];
 
-    function normalizarTipoSeletorRotulo(regra) {
-        if (regra && regra.tipoSeletor && typeof regra.tipoSeletor === 'string') {
-            return regra.tipoSeletor;
+    function validarExpressaoSeletorOptions(expressao, tipoSeletor = '') {
+        if (typeof expressao !== 'string' || !expressao.trim()) return true; // vazio ainda em edição
+        const expr = expressao.trim();
+        try {
+            const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
+            if (ehXPath) {
+                document.evaluate(expr, document, null, XPathResult.ANY_TYPE, null);
+                return true;
+            }
+            document.createDocumentFragment().querySelector(expr);
+            return true;
+        } catch (_) {
+            return false;
         }
-        const expr = (regra && regra.expressao) ? String(regra.expressao).trim() : '';
-        if (expr.startsWith('//') || expr.startsWith('(')) return 'XPath Simplificado';
-        if (expr.startsWith('/')) return 'XPath Completo';
-        return 'Seletor CSS';
     }
 
-    function renderizarListaRegrasMapeamento(regras) {
+    function normalizarTipoSeletorRotulo(regra) {
+        const mapaLegado = {
+            'Seletor CSS': 'CSS (Hierárquico)',
+            'Seletor CSS-2': 'CSS (Estrutural)',
+            'XPath Simplificado': 'XPath (Simplificado)',
+            'XPath Completo': 'XPath (Completo)'
+        };
+        if (regra && regra.tipoSeletor && typeof regra.tipoSeletor === 'string') {
+            return mapaLegado[regra.tipoSeletor] || regra.tipoSeletor;
+        }
+        const expr = (regra && regra.expressao) ? String(regra.expressao).trim() : '';
+        if (expr.startsWith('//') || expr.startsWith('(')) return 'XPath (Simplificado)';
+        if (expr.startsWith('/')) return 'XPath (Completo)';
+        if (expr.includes(':nth-child(')) return 'CSS (Estrutural)';
+        if (expr.includes('>') || expr.includes(':nth-of-type(')) return 'CSS (Hierárquico)';
+        return 'CSS (Simples)';
+    }
+
+    function renderizarListaRegrasMapeamento(regras, somenteLeitura = false) {
         if (!containerListaRegrasMapeamento) return;
-        regrasMapeamentoAtuais = Array.isArray(regras) ? [...regras] : [...PADROES_FABRICA_REGRAS_MAPEAMENTO];
+        const listaRenderizar = Array.isArray(regras) ? [...regras] : [...PADROES_FABRICA_REGRAS_MAPEAMENTO];
+        if (!somenteLeitura) {
+            regrasMapeamentoAtuais = listaRenderizar;
+        }
         containerListaRegrasMapeamento.innerHTML = '';
 
-        if (regrasMapeamentoAtuais.length === 0) {
+        if (listaRenderizar.length === 0) {
             const vazio = document.createElement('div');
             vazio.style.cssText = 'color: #94a3b8; font-size: 12px; font-style: italic; padding: 10px 0; line-height: 1.5;';
-            vazio.textContent = 'Nenhuma regra customizada cadastrada. Utilize Ctrl + Alt + Shift + Clique sobre qualquer elemento em páginas web para abrir o assistente e cadastrar novas regras.';
+            vazio.textContent = somenteLeitura
+                ? 'Nenhuma regra interna encontrada.'
+                : 'Nenhuma regra customizada cadastrada. Utilize Ctrl + Alt + Shift + Clique sobre qualquer elemento em páginas web para abrir o assistente e cadastrar novas regras.';
             containerListaRegrasMapeamento.appendChild(vazio);
             return;
         }
 
-        regrasMapeamentoAtuais.forEach((regra, idx) => {
+        let idxArrastando = null;
+
+        listaRenderizar.forEach((regra, idx) => {
             const item = document.createElement('div');
             item.className = 'item-regra-mapeamento';
             item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; flex-wrap: wrap;';
 
-            // Badge com Tipo de Seletor (XPath Simplificado, XPath Completo, Seletor CSS ou Seletor CSS-2)
-            const badgeTipo = document.createElement('span');
-            badgeTipo.className = 'badge-tipo-seletor';
-            badgeTipo.style.cssText = 'font-size: 10px; font-weight: 700; color: #38bdf8; background: #0f172a; border: 1px solid #0284c7; padding: 2px 6px; border-radius: 4px; white-space: nowrap;';
-            badgeTipo.textContent = normalizarTipoSeletorRotulo(regra);
+            if (!somenteLeitura) {
+                item.draggable = true;
+                item.addEventListener('dragstart', (ev) => {
+                    idxArrastando = idx;
+                    item.style.opacity = '0.5';
+                    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+                });
+                item.addEventListener('dragend', () => {
+                    item.style.opacity = '1';
+                    idxArrastando = null;
+                });
+                item.addEventListener('dragover', (ev) => {
+                    ev.preventDefault();
+                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                });
+                item.addEventListener('drop', (ev) => {
+                    ev.preventDefault();
+                    if (idxArrastando === null || idxArrastando === idx) return;
+                    const [movida] = regrasMapeamentoAtuais.splice(idxArrastando, 1);
+                    regrasMapeamentoAtuais.splice(idx, 0, movida);
+                    renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
+                    salvarRegrasMapeamento();
+                });
+
+                const alca = document.createElement('span');
+                alca.textContent = '⋮⋮';
+                alca.title = 'Arrastar para reordenar prioridade';
+                alca.style.cssText = 'cursor: grab; color: #64748b; font-size: 14px; font-weight: 700; user-select: none; padding: 0 2px;';
+                item.appendChild(alca);
+            }
+
+            // Seletor com Tipo de Pesquisa (CSS Simples, Hierárquico, Estrutural, XPath Simplificado, XPath Completo)
+            const selectTipoSeletor = document.createElement('select');
+            selectTipoSeletor.className = 'select-customizado';
+            selectTipoSeletor.style.cssText = 'font-size: 10px; font-weight: 700; color: #38bdf8; background: #0f172a; border: 1px solid #0284c7; padding: 3px 6px; border-radius: 4px; cursor: pointer;';
+            const tipoAtualRotulo = normalizarTipoSeletorRotulo(regra);
+            ['CSS (Simples)', 'CSS (Hierárquico)', 'CSS (Estrutural)', 'XPath (Simplificado)', 'XPath (Completo)'].forEach((nomeTipo) => {
+                const opt = document.createElement('option');
+                opt.value = nomeTipo;
+                opt.textContent = nomeTipo;
+                if (tipoAtualRotulo === nomeTipo) opt.selected = true;
+                selectTipoSeletor.appendChild(opt);
+            });
+            selectTipoSeletor.addEventListener('change', () => {
+                regrasMapeamentoAtuais[idx].tipoSeletor = selectTipoSeletor.value;
+                salvarRegrasMapeamento();
+            });
 
             // Campo Expressao (XPath / CSS / JS Path)
             const inputExpr = document.createElement('input');
@@ -314,28 +388,39 @@ document.addEventListener('DOMContentLoaded', () => {
             inputExpr.value = regra.expressao || '';
             inputExpr.placeholder = 'Expressão (XPath, CSS, JS Path)';
             inputExpr.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].expressao = inputExpr.value.trim();
+                const valor = inputExpr.value.trim();
+                const tipoSel = selectTipoSeletor ? selectTipoSeletor.value : '';
+                if (!validarExpressaoSeletorOptions(valor, tipoSel)) {
+                    inputExpr.style.borderColor = '#ef4444';
+                    exibirToast(`⚠️ Expressão inválida para ${tipoSel || 'regra'}. Corrija antes de salvar.`);
+                    return;
+                }
+                inputExpr.style.borderColor = '#475569';
+                regrasMapeamentoAtuais[idx].expressao = valor;
                 salvarRegrasMapeamento();
             });
 
-            // Seletor de Modo Comportamental (Interface, Semiflexível, Textual)
+            // Seletor de Modo Comportamental (Interface, SemiFlexível, Textual)
             const selectTipo = document.createElement('select');
             selectTipo.className = 'select-customizado';
-            selectTipo.style.cssText = 'padding: 4px 8px; font-size: 11px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; cursor: pointer; flex: 1 1 140px;';
+            selectTipo.style.cssText = 'padding: 4px 8px; font-size: 11px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; cursor: pointer; flex: 0 0 auto; width: auto;';
 
             const optInterface = document.createElement('option');
             optInterface.value = 'interface';
-            optInterface.textContent = 'Interface (Desseleção / Alt)';
+            optInterface.textContent = 'Interface';
+            optInterface.title = 'Desseleção / Alt';
             if (regra.tipo === 'interface') optInterface.selected = true;
 
             const optSemiflexivel = document.createElement('option');
             optSemiflexivel.value = 'semiflexivel';
-            optSemiflexivel.textContent = 'Semiflexível (Máscaras Forenses)';
+            optSemiflexivel.textContent = 'SemiFlexível';
+            optSemiflexivel.title = 'Máscaras Forenses';
             if (regra.tipo === 'semiflexivel') optSemiflexivel.selected = true;
 
             const optTextual = document.createElement('option');
             optTextual.value = 'textual';
-            optTextual.textContent = 'Textual (Leitura / Manter)';
+            optTextual.textContent = 'Textual';
+            optTextual.title = 'Leitura / Manter';
             if (regra.tipo === 'textual') optTextual.selected = true;
 
             selectTipo.appendChild(optInterface);
@@ -400,13 +485,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 salvarRegrasMapeamento();
             });
 
-            item.appendChild(badgeTipo);
+            if (somenteLeitura) {
+                selectTipoSeletor.disabled = true;
+                inputExpr.readOnly = true;
+                selectTipo.disabled = true;
+                inputObs.readOnly = true;
+                chkHerdar.disabled = true;
+                chkAtivo.disabled = true;
+            }
+
+            item.appendChild(selectTipoSeletor);
             item.appendChild(inputExpr);
             item.appendChild(selectTipo);
             item.appendChild(inputObs);
             item.appendChild(labelHerdar);
             item.appendChild(labelAtivo);
-            item.appendChild(btnExcluir);
+            if (!somenteLeitura) {
+                item.appendChild(btnExcluir);
+            }
 
             containerListaRegrasMapeamento.appendChild(item);
         });
@@ -2271,6 +2367,9 @@ document.addEventListener('DOMContentLoaded', () => {
             tabRegrasInternas.style.color = '';
             tabRegrasInternas.style.opacity = '0.7';
             if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'inline-flex';
+            if (btnSalvarRegrasMapeamento) btnSalvarRegrasMapeamento.style.display = 'inline-flex';
+            if (btnExportarMapeamentoJson) btnExportarMapeamentoJson.style.display = 'inline-flex';
+            if (btnImportarMapeamentoJson) btnImportarMapeamentoJson.style.display = 'inline-flex';
             renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
         });
 
@@ -2282,26 +2381,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tabRegrasUsuario.style.color = '';
             tabRegrasUsuario.style.opacity = '0.7';
             if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'none';
+            if (btnSalvarRegrasMapeamento) btnSalvarRegrasMapeamento.style.display = 'none';
+            if (btnExportarMapeamentoJson) btnExportarMapeamentoJson.style.display = 'none';
+            if (btnImportarMapeamentoJson) btnImportarMapeamentoJson.style.display = 'none';
             try {
                 const url = chrome.runtime.getURL('src/cfg/interface.json');
                 const resp = await fetch(url);
                 const internas = await resp.json();
-                if (containerListaRegrasMapeamento) {
-                    containerListaRegrasMapeamento.innerHTML = '';
-                    (Array.isArray(internas) ? internas : []).forEach((regra) => {
-                        const item = document.createElement('div');
-                        item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; opacity: 0.85; flex-wrap: wrap;';
-                        const badge = document.createElement('span');
-                        badge.style.cssText = 'font-size: 10px; font-weight: 700; color: #94a3b8; background: #0f172a; border: 1px solid #475569; padding: 2px 6px; border-radius: 4px;';
-                        badge.textContent = normalizarTipoSeletorRotulo(regra);
-                        const expr = document.createElement('code');
-                        expr.style.cssText = 'flex: 1; font-size: 11px; color: #e2e8f0; word-break: break-all;';
-                        expr.textContent = regra.expressao || '';
-                        item.appendChild(badge);
-                        item.appendChild(expr);
-                        containerListaRegrasMapeamento.appendChild(item);
-                    });
-                }
+                renderizarListaRegrasMapeamento(Array.isArray(internas) ? internas : [], true);
             } catch (_) {
                 if (containerListaRegrasMapeamento) {
                     containerListaRegrasMapeamento.innerHTML = '<div style="color: #94a3b8; font-size: 12px;">Não foi possível carregar interface.json.</div>';
@@ -2313,13 +2400,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnAdicionarRegraMapeamento) {
         adicionarOuvinteSeguro(btnAdicionarRegraMapeamento, 'click', () => {
             regrasMapeamentoAtuais.push({
+                id: 'regra_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                tipoSeletor: 'CSS (Simples)',
                 expressao: '',
                 tipo: 'interface',
+                observacao: '',
                 herdarFilhos: true,
-                tipoSeletor: 'Seletor CSS'
+                ativo: true
             });
             renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
             salvarRegrasMapeamento();
+        });
+    }
+
+    if (btnSalvarRegrasMapeamento) {
+        adicionarOuvinteSeguro(btnSalvarRegrasMapeamento, 'click', () => {
+            const invalida = regrasMapeamentoAtuais.find(r => r && r.expressao && !validarExpressaoSeletorOptions(r.expressao, r.tipoSeletor));
+            if (invalida) {
+                exibirToast(`⚠️ Há regra com expressão inválida (${invalida.tipoSeletor || 'Seletor'}). Corrija antes de salvar.`);
+                return;
+            }
+            salvarRegrasMapeamento();
+            exibirToast('Regras de mapeamento salvas!');
         });
     }
 
@@ -2785,6 +2887,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (changes.colagemBotaoDireitoAtiva !== undefined && optColagemBotaoDireito) {
                     optColagemBotaoDireito.checked = Boolean(changes.colagemBotaoDireitoAtiva.newValue);
+                }
+                if (changes.regrasMapeamentoElementos && Array.isArray(changes.regrasMapeamentoElementos.newValue)) {
+                    renderizarListaRegrasMapeamento(changes.regrasMapeamentoElementos.newValue);
                 }
                 if (changes.alternarAbasRecentesCtrlTabAtiva !== undefined && optAlternarAbasRecentesCtrlTab) {
                     optAlternarAbasRecentesCtrlTab.checked = (changes.alternarAbasRecentesCtrlTabAtiva.newValue !== false);
