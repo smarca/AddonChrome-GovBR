@@ -141,10 +141,18 @@
             }
             this.#ultimoDisparoTimestamp = agora;
 
-            /* Passo 2.4 (BUG-48): Despacho de mensagem segura para o Service Worker do Chrome.
-             * Botão 4 (Voltar): Alterna entre as duas abas mais recentes (LRU ping-pong).
-             * Botão 5 (Avançar): Avança para a próxima aba aberta à direita.
-             * Desativado o modificador Ctrl conforme especificação da Seção 6.118. */
+            /* Passo 2.4 (FEAT-29 / BUG-48): Despacho de ação para Botão 4 e Botão 5.
+             * Botão 4 sem Ctrl: Alterna entre as duas abas mais recentes (LRU ping-pong).
+             * Botão 4 com Ctrl: Retorna no histórico da página atual (window.history.back()).
+             * Botão 5: Avança para a próxima aba aberta à direita. */
+            if (ehVoltar && e.ctrlKey) {
+                try {
+                    if (typeof window !== 'undefined' && window.history && typeof window.history.back === 'function') {
+                        window.history.back();
+                    }
+                } catch (_) { }
+                return true;
+            }
             const acaoAlvo = ehVoltar ? 'TROCAR_GUIA_ULTIMA_ATIVA' : 'TROCAR_GUIA_PROXIMA';
             try {
                 if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {

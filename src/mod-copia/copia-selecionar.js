@@ -462,6 +462,20 @@
                     return true;
                 }
             }
+            /* Seção 6.134: Suporte a XPath Completo com Filhos em iframes internos (ex.: downloadBinario.seam) */
+            if (herdarFilhos && doc.defaultView && doc.defaultView.frameElement) {
+                const frameEl = doc.defaultView.frameElement;
+                const parentDoc = frameEl.ownerDocument;
+                if (parentDoc && typeof parentDoc.evaluate === 'function') {
+                    const snapParent = parentDoc.evaluate(expr, parentDoc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                    for (let j = 0; j < (snapParent ? snapParent.snapshotLength : 0); j++) {
+                        const noParent = snapParent.snapshotItem(j);
+                        if (noParent && (noParent === frameEl || (typeof noParent.contains === 'function' && noParent.contains(frameEl)))) {
+                            return true;
+                        }
+                    }
+                }
+            }
         } catch (_) { }
         return false;
     }
@@ -4740,8 +4754,8 @@
 
         if (!verificarUrlPermitida()) return;
 
-        /* Seção 6.20 e Seção 6.85: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique) no mousedown */
-        if (e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) {
+        /* Seção 6.20, 6.85 e 6.126: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique ou Ctrl + Alt + Botão Direito) no mousedown */
+        if ((e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) || (e.button === 2 && e.ctrlKey && e.altKey)) {
             e.preventDefault();
             e.stopPropagation();
             if (typeof e.stopImmediatePropagation === 'function') {
@@ -5102,8 +5116,8 @@
 
         if (!verificarUrlPermitida()) return;
 
-        /* Seção 6.20 e Seção 6.85: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique) no mouseup */
-        if (e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) {
+        /* Seção 6.20, 6.85 e 6.126: Identificação Única e Assistente de Mapeamento (Ctrl + Alt + Shift + Clique ou Ctrl + Alt + Botão Direito) no mouseup */
+        if ((e.button === 0 && e.ctrlKey && e.altKey && e.shiftKey) || (e.button === 2 && e.ctrlKey && e.altKey)) {
             e.preventDefault();
             e.stopPropagation();
             if (typeof e.stopImmediatePropagation === 'function') {

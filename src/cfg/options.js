@@ -265,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Mapeamento Manual Avançado de Elementos (XPath / CSS) (Seção 6.20 e Seção 6.85) */
     const detalhesMapeamentoXPath = document.getElementById('detalhesMapeamentoXPath');
+    const btnAdicionarRegraMapeamento = document.getElementById('btnAdicionarRegraMapeamento');
     const btnExportarMapeamentoJson = document.getElementById('btnExportarMapeamentoJson');
     const btnImportarMapeamentoJson = document.getElementById('btnImportarMapeamentoJson');
     const inputImportarMapeamentoArquivo = document.getElementById('inputImportarMapeamentoArquivo');
@@ -2256,6 +2257,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (msg && msg.acao === 'regrasMapeamentoAtualizadas' && Array.isArray(msg.regrasMapeamentoElementos)) {
                 renderizarListaRegrasMapeamento(msg.regrasMapeamentoElementos);
             }
+        });
+    }
+
+    if (btnAdicionarRegraMapeamento) {
+        adicionarOuvinteSeguro(btnAdicionarRegraMapeamento, 'click', () => {
+            regrasMapeamentoAtuais.push({
+                expressao: '',
+                tipo: 'interface',
+                herdarFilhos: true,
+                tipoSeletor: 'Seletor CSS'
+            });
+            renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
+            salvarRegrasMapeamento();
         });
     }
 

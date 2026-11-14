@@ -1891,7 +1891,10 @@
                             <div id="containerListaRegrasMapeamento" style="display: flex; flex-direction: column; gap: 10px;">
                                 <!-- As regras cadastradas sao renderizadas dinamicamente aqui -->
                             </div>
-                            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px; gap: 8px;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
+                                <button type="button" id="btnAdicionarRegraMapeamento" class="btn btn-secundario" title="Adicionar Regra Manualmente" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; margin-right: auto;">
+                                    <span>➕</span> Adicionar Regra
+                                </button>
                                 <button type="button" id="btnExportarMapeamentoJson" class="btn btn-secundario" title="Exportar Regras para JSON" style="font-size: 12px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
                                     <span>📤</span> Exportar JSON
                                 </button>

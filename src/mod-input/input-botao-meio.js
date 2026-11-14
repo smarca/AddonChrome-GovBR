@@ -309,34 +309,36 @@
             }
             this.#ultimoDisparoTimestamp = agora;
 
-            /* Passo 3.4: Tratamento de Ctrl + Botão do Meio (Penúltimo Buffer / Slot 2 - Seção 6.63) */
-            if (e.ctrlKey) {
-                const textoParaColar = this.#obterTextoDoHistorico(1, bufferUltimaSelecao, bufferPenultimaSelecao);
+            const executarColagem = (slotIndex) => {
+                const textoParaColar = this.#obterTextoDoHistorico(slotIndex, bufferUltimaSelecao, bufferPenultimaSelecao);
                 /* BLIND-01 (Seção 6.104): Se nulo ou vazio, operação no-op silenciosa */
                 if (textoParaColar && typeof textoParaColar === 'string' && textoParaColar.length > 0) {
                     const colou = this.#inserirTextoNoCursor(alvo, textoParaColar);
                     if (colou && typeof window !== 'undefined' && window.JusGovMotorSelecaoTeste && typeof window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo === 'function') {
-                        try { window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo(textoParaColar, 1); } catch (_) { }
+                        try { window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo(textoParaColar, slotIndex); } catch (_) { }
                     }
                     if (typeof callbackSucesso === 'function') {
-                        callbackSucesso(textoParaColar, alvo, 1);
+                        callbackSucesso(textoParaColar, alvo, slotIndex);
                     }
                 }
+            };
+
+            const slotAlvo = e.ctrlKey ? 1 : 0;
+
+            /* Passo 3.4 (FEAT-29): Botão do Meio + Alt: ativa o elemento, aguarda 250ms e cola */
+            if (e.altKey) {
+                try {
+                    if (typeof alvo.focus === 'function') alvo.focus();
+                    if (typeof alvo.click === 'function') alvo.click();
+                } catch (_) { }
+                setTimeout(() => {
+                    executarColagem(slotAlvo);
+                }, 250);
                 return true;
             }
 
-            /* Passo 3.5: Colagem da última seleção no alvo editável sob o cursor (Slot 1) */
-            const textoParaColar = this.#obterTextoDoHistorico(0, bufferUltimaSelecao, bufferPenultimaSelecao);
-            /* BLIND-01 (Seção 6.104): Se nulo ou vazio, operação no-op silenciosa */
-            if (textoParaColar && typeof textoParaColar === 'string' && textoParaColar.length > 0) {
-                const colou = this.#inserirTextoNoCursor(alvo, textoParaColar);
-                if (colou && typeof window !== 'undefined' && window.JusGovMotorSelecaoTeste && typeof window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo === 'function') {
-                    try { window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo(textoParaColar, 0); } catch (_) { }
-                }
-                if (typeof callbackSucesso === 'function') {
-                    callbackSucesso(textoParaColar, alvo, 0);
-                }
-            }
+            /* Passo 3.5: Colagem imediata (Slot 1 sem Ctrl, Slot 2 com Ctrl) */
+            executarColagem(slotAlvo);
 
             return true;
         }
