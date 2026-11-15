@@ -107,7 +107,7 @@ const ROTULOS_TEMPO_ALERTA_HTML = Object.freeze([
     '5s (Lento)',
     '7,5s (Super lento)',
     '10s (Ultra lento)',
-    'Até Interação (Padrão)'
+    'Até Interação'
 ]);
 const ESCALA_TEMPO_CONFERENCIA_DOCUMENTOS_MS = Object.freeze([0, 1000, 2000, 3000, 4000, 5000, -1]);
 const ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML = Object.freeze([
@@ -117,7 +117,7 @@ const ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML = Object.freeze([
     '3s',
     '4s',
     '5s',
-    'Até Interação (Padrão)'
+    'Até Interação'
 ]);
 const PRESETS_MARCADOR_CONTEUDO_COLADO = Object.freeze({
     verde_forense: { corContorno: '#0d9488', corFundo: '#ccfbf1' },
@@ -537,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Checkbox Permitir Próxima Regra (padrão: parar nesta regra)
             const labelContinuar = document.createElement('label');
             labelContinuar.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; cursor: pointer; user-select: none; margin: 0;';
-            labelContinuar.title = 'Permitir processar próxima regra após esta (padrão: parar aqui)';
+            labelContinuar.title = 'Permitir processar próxima regra após esta';
             const chkContinuar = document.createElement('input');
             chkContinuar.type = 'checkbox';
             chkContinuar.checked = regra.continuarProxima === true;
@@ -1063,12 +1063,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function formatarMinutosHHMM(totalMin) {
+        const mTotal = Math.max(0, Math.floor(Number(totalMin) || 0));
+        const hh = String(Math.floor(mTotal / 60)).padStart(2, '0');
+        const mm = String(mTotal % 60).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
     function atualizarStatusProdutividadeUI() {
         if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined') return;
         const renderizarEstado = (st) => {
             if (!st) return;
             const dataStr = st.data ? ` (${st.data})` : '';
-            const baseTxt = `Hoje${dataStr}: Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pausas ${st.pausasConfirmadas || 0}`;
+            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
+            const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0));
+            const pausas = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0));
+            const partes = [`Hoje${dataStr} — Tempo: Corrido ${formatarMinutosHHMM(corridoMin)}`];
+            if (ativoMin !== corridoMin) {
+                partes.push(`Ativo ${formatarMinutosHHMM(ativoMin)}`);
+            }
+            if (pausas !== 0) {
+                partes.push(`Pausas ${pausas}`);
+            }
+            const baseTxt = partes.join(' • ');
             if (optPomodoroAtivo && optPomodoroAtivo.checked) {
                 const faseMapa = { foco: 'Foco', alivio: 'Alívio', pausa_maior: 'Pausa Maior' };
                 const faseTxt = faseMapa[st.pomodoroFase] || 'Foco';
@@ -1140,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!lblValorTempoFlash || !optTempoFlashMs) return;
         const ms = normalizarTempoFlashMs(optTempoFlashMs.value);
         if (ms === -1) {
-            lblValorTempoFlash.innerHTML = 'Até Interação (Padrão)';
+            lblValorTempoFlash.innerHTML = 'Até Interação';
         } else if (ms <= 0) {
             lblValorTempoFlash.innerHTML = '0 (Desabilitado)';
         } else if (ms < 1000) {
@@ -1538,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (optPomodoroCiclos) {
                 const cic = Number(dados.pomodoroCiclos);
-                optPomodoroCiclos.value = [2, 3, 4, 5].includes(cic) ? String(cic) : '4';
+                optPomodoroCiclos.value = (Number.isInteger(cic) && cic >= 2 && cic <= 10) ? String(cic) : '4';
             }
             atualizarCalculoPomodoroUI();
             atualizarStatusProdutividadeUI();

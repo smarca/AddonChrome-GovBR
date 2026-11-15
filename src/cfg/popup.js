@@ -507,11 +507,28 @@ document.addEventListener('DOMContentLoaded', () => {
         window.close();
     });
 
+    function formatarMinutosHHMM(totalMin) {
+        const mTotal = Math.max(0, Math.floor(Number(totalMin) || 0));
+        const hh = String(Math.floor(mTotal / 60)).padStart(2, '0');
+        const mm = String(mTotal % 60).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
     function atualizarContadoresProdutividadePopup() {
         if (!rodapeProdutividadeOnline || typeof chrome === 'undefined') return;
         const renderizar = (st) => {
             if (!st) return;
-            rodapeProdutividadeOnline.textContent = `Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pausas ${st.pausasConfirmadas || 0}`;
+            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
+            const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0));
+            const pausas = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0));
+            const partes = [`Tempo: Corrido ${formatarMinutosHHMM(corridoMin)}`];
+            if (ativoMin !== corridoMin) {
+                partes.push(`Ativo ${formatarMinutosHHMM(ativoMin)}`);
+            }
+            if (pausas !== 0) {
+                partes.push(`Pausas ${pausas}`);
+            }
+            rodapeProdutividadeOnline.textContent = partes.join(' • ');
         };
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {

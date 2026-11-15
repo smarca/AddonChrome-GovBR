@@ -310,7 +310,7 @@
                 config.pomodoroFocoMinutos = 25;
                 precisaSalvar = true;
             }
-            if (typeof config.pomodoroCiclos !== 'number' || ![2, 3, 4, 5].includes(config.pomodoroCiclos)) {
+            if (typeof config.pomodoroCiclos !== 'number' || !Number.isInteger(config.pomodoroCiclos) || config.pomodoroCiclos < 2 || config.pomodoroCiclos > 10) {
                 config.pomodoroCiclos = 4;
                 precisaSalvar = true;
             }
