@@ -901,6 +901,7 @@
             selectModo.addEventListener('change', () => {
                 if (selectModo.value) {
                     selectModo.style.borderColor = '#475569';
+                    chkContinuar.checked = (selectModo.value === 'textual');
                 }
             });
 

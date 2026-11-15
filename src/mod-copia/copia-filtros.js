@@ -424,16 +424,34 @@
         /**
          * Nível 0 da Arquitetura Progressiva de Filtros HTML: Texto Puro Sanitizado.
          */
+        #devePreservarQuebrasDoElemento(el) {
+            if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+            try {
+                if (el.closest && el.closest('pre, textarea')) return true;
+                const ws = (typeof window !== 'undefined' && window.getComputedStyle)
+                    ? window.getComputedStyle(el).whiteSpace
+                    : (el.style ? el.style.whiteSpace : '');
+                return ws === 'pre' || ws === 'pre-wrap' || ws === 'pre-line' || ws === 'break-spaces';
+            } catch (_) {
+                return false;
+            }
+        }
+
         extrairTextoPuroSanitizado(origem) {
             if (!origem) return '';
             try {
+                let preservarQuebrasNaOrigem = false;
                 const container = document.createElement('div');
                 if (typeof origem === 'string') {
                     container.innerHTML = origem;
                 } else if (origem instanceof Range) {
+                    const anc = origem.commonAncestorContainer || origem.startContainer;
+                    const ancEl = anc && anc.nodeType === Node.TEXT_NODE ? anc.parentElement : anc;
+                    preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(ancEl);
                     const frag = origem.cloneContents();
                     if (frag) container.appendChild(frag);
                 } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
+                    preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(origem);
                     container.appendChild(origem.cloneNode(true));
                 } else {
                     return this.aplicarFiltro3InformacoesELinhas(this.aplicarFiltro1DadosLixo(String(origem || '')));
@@ -450,11 +468,14 @@
                 let noTexto;
                 while ((noTexto = walker.nextNode())) {
                     const pai = noTexto.parentElement;
-                    const tagPai = pai ? pai.tagName : '';
-                    if (tagPai !== 'PRE' && tagPai !== 'TEXTAREA') {
+                    const preservarAqui = preservarQuebrasNaOrigem
+                        || (pai && pai.closest && Boolean(pai.closest('pre, textarea, [style*="white-space: pre"], [style*="white-space:pre"]')));
+                    if (!preservarAqui) {
                         if (noTexto.nodeValue) {
                             noTexto.nodeValue = noTexto.nodeValue.replace(/[\r\n\t]+/g, ' ');
                         }
+                    } else if (noTexto.nodeValue) {
+                        noTexto.nodeValue = noTexto.nodeValue.replace(/\r\n?/g, '\n');
                     }
                 }
 

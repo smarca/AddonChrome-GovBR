@@ -2941,36 +2941,39 @@
                 }
             );
 
-            /* Sub-modulo: Cascata de Validacao Matematica e Tempo de Exibicao dos Avisos */
+            /* Sub-modulo: Cascata de Validacao Matematica (FEAT-23 / Seção 6.112: Tempo de Exibição dos Avisos é independente) */
             const optValMat = document.getElementById('optValidacaoMatematicaAtiva');
             const optTempoAviso = document.getElementById('optTempoExibicaoAlerta');
             const optModoVal = document.getElementById('optModoExibicaoValidacao');
+            const optPosVal = document.getElementById('optPosicaoAvisosValidacao');
             let cascataValidacaoOk = true;
             if (optValMat && optTempoAviso) {
                 const estOrigVal = optValMat.checked;
                 optValMat.checked = false;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
-                const offTempo = (optTempoAviso.disabled === true);
+                const offTempoIndep = (optTempoAviso.disabled === false);
                 const offModo = !optModoVal || (optModoVal.disabled === true);
+                const offPos = !optPosVal || (optPosVal.disabled === true);
 
                 optValMat.checked = true;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
                 const onTempo = (optTempoAviso.disabled === false);
                 const onModo = !optModoVal || (optModoVal.disabled === false);
+                const onPos = !optPosVal || (optPosVal.disabled === false);
 
                 optValMat.checked = estOrigVal;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
 
-                cascataValidacaoOk = Boolean(offTempo && onTempo && offModo && onModo);
+                cascataValidacaoOk = Boolean(offTempoIndep && onTempo && offModo && onModo && offPos && onPos);
             }
             registrar(
                 cascataValidacaoOk,
                 'VALIDACAO_MATEMATICA_CASCATA_TEMPO_ALERTA',
-                'Cascata Validacao: desativar conferencia desativa slider de tempo de exibicao do alerta',
+                'Cascata Validacao (FEAT-23 / Seção 6.112): desativar conferencia desabilita Exibição/Posição mantendo Tempo de Avisos independente',
                 {
                     textoTestado: 'Comportamento Reativo de optValidacaoMatematicaAtiva',
                     idxCursor: 0,
-                    esperado: 'off -> disabled=true; on -> disabled=false',
+                    esperado: 'off -> modo/pos disabled=true, tempo_aviso disabled=false; on -> todos disabled=false',
                     obtido: cascataValidacaoOk ? 'ok' : 'falha'
                 }
             );
@@ -3002,7 +3005,7 @@
             let sequenciaOrdenacaoOk = true;
             if (optCritOrd) {
                 const valores = Array.from(optCritOrd.options || []).map(o => o.value);
-                const seqEsperada = ['nenhum', 'dominio', 'url', 'dominio_criacao', 'dominio_acesso', 'ordem_criacao', 'tempo_acesso', 'titulo'];
+                const seqEsperada = ['nenhum', 'hierarquia_arvore', 'dominio', 'dominio_titulo', 'url', 'dominio_criacao', 'dominio_acesso', 'ordem_criacao', 'tempo_acesso', 'titulo'];
                 const seqIgual = (valores.length === seqEsperada.length) && seqEsperada.every((v, idx) => valores[idx] === v);
                 const switchPresente = Boolean(!optSentSwitch || (optSentSwitch && lblSentSwitch && optSentSwitch.checked === true));
                 sequenciaOrdenacaoOk = Boolean(seqIgual && switchPresente);
@@ -3010,12 +3013,12 @@
             registrar(
                 sequenciaOrdenacaoOk,
                 'ORDENACAO_GUIAS_SEQUENCIA_E_SENTIDO_SWITCH',
-                'Hierarquia de criterios de ordenacao (nenhum -> dominio -> sub-dominio [url, criacao, acesso] -> grupo acesso [criacao, acesso navegacao] -> titulo) e switch sentido A-Z ativo',
+                'Hierarquia de criterios de ordenacao (nenhum -> hierarquia_arvore -> dominio -> sub-dominio [dominio_titulo, url, criacao, acesso] -> grupo acesso -> titulo) e switch sentido A-Z ativo',
                 {
                     textoTestado: 'Criterios Hierarquicos de Ordenacao de Guias e Switch Sentido A-Z',
                     idxCursor: 0,
-                    esperado: 'nenhum, dominio, url, dominio_criacao, dominio_acesso, ordem_criacao, tempo_acesso, titulo | sentido_padrao=esq_dir',
-                    obtido: sequenciaOrdenacaoOk ? 'nenhum, dominio, url, dominio_criacao, dominio_acesso, ordem_criacao, tempo_acesso, titulo | sentido_padrao=esq_dir' : 'falha'
+                    esperado: 'nenhum, hierarquia_arvore, dominio, dominio_titulo, url, dominio_criacao, dominio_acesso, ordem_criacao, tempo_acesso, titulo | sentido_padrao=esq_dir',
+                    obtido: sequenciaOrdenacaoOk ? 'nenhum, hierarquia_arvore, dominio, dominio_titulo, url, dominio_criacao, dominio_acesso, ordem_criacao, tempo_acesso, titulo | sentido_padrao=esq_dir' : 'falha'
                 }
             );
 
@@ -3092,24 +3095,27 @@
                 }
             );
 
-            /* Sub-modulo: Abertura de Novas Guias em Primeiro Plano (Inversao de Logica) */
+            /* Sub-modulo: Abertura de Novas Guias em Primeiro Plano (Padrão Primeiro Plano / Alternável) */
             const optPrimPlano = document.getElementById('optAbaEmPrimeiroPlano');
             let primeiroPlanoOk = true;
             if (optPrimPlano) {
-                const padraoDesmarcado = (optPrimPlano.checked === false);
+                const estOrigPrimPlano = optPrimPlano.checked;
+                const padraoMarcado = (estOrigPrimPlano === true);
+                optPrimPlano.checked = false;
+                const desmarcou = (optPrimPlano.checked === false);
                 optPrimPlano.checked = true;
                 const marcou = (optPrimPlano.checked === true);
-                optPrimPlano.checked = false;
-                primeiroPlanoOk = Boolean(padraoDesmarcado && marcou && !optPrimPlano.checked);
+                optPrimPlano.checked = estOrigPrimPlano;
+                primeiroPlanoOk = Boolean(padraoMarcado && desmarcou && marcou);
             }
             registrar(
                 primeiroPlanoOk,
                 'ABERTURA_GUIAS_PRIMEIRO_PLANO',
-                'Abertura de guias em primeiro plano desmarcada por padrao (segundo plano ativo por padrao) com controle alternavel',
+                'Abertura de guias em primeiro plano marcada por padrao (abaEmPrimeiroPlano=true) com controle alternavel',
                 {
                     textoTestado: 'optAbaEmPrimeiroPlano',
-                    esperado: 'padrao=false (segundo plano), controle=ok',
-                    obtido: primeiroPlanoOk ? 'padrao=false (segundo plano), controle=ok' : 'falha'
+                    esperado: 'padrao=true (primeiro plano), controle=ok',
+                    obtido: primeiroPlanoOk ? 'padrao=true (primeiro plano), controle=ok' : 'falha'
                 }
             );
 
@@ -8885,8 +8891,8 @@
                 inspecao.preferencial
             );
 
-            // 2. Padrão vazio de fábrica (Seção 6.85) e ativação de regra customizada
-            const classifPadraoVazio = motorTeste.obterClassificacaoRegraCustomizada(divFilho);
+            // 2. Padrão vazio de fábrica de regras do USUÁRIO (Seção 6.85) e ativação de regra customizada
+            const classifPadraoVazio = motorTeste.obterClassificacaoRegraCustomizada(divFilho, true);
             motorTeste.definirRegrasMapeamentoElementos([
                 { id: 'pje1', expressao: '//*[@id="detalheDocumento:j_id477"]/div', tipo: 'semiflexivel', herdarFilhos: true, ativo: true }
             ]);
@@ -9102,6 +9108,29 @@
                         ficouTranslucido2 &&
                         restaurouComCliqueSemFechar
                     );
+                }
+
+                // 3.2 Regra padrão de "Continuar" por tipo + permissão de alteração manual posterior
+                const selectModoModal = Array.from(modalOverlay.querySelectorAll('select')).find(s => Array.from(s.options).some(o => o.value === 'textual'));
+                const chkContinuarModal = document.getElementById('chkModalMapeamentoContinuar');
+                if (selectModoModal && chkContinuarModal) {
+                    selectModoModal.value = 'textual';
+                    selectModoModal.dispatchEvent(new Event('change', { bubbles: true }));
+                    const marcouTextual = chkContinuarModal.checked === true;
+
+                    selectModoModal.value = 'semiflexivel';
+                    selectModoModal.dispatchEvent(new Event('change', { bubbles: true }));
+                    const desmarcouSemi = chkContinuarModal.checked === false;
+
+                    selectModoModal.value = 'interface';
+                    selectModoModal.dispatchEvent(new Event('change', { bubbles: true }));
+                    const desmarcouInterface = chkContinuarModal.checked === false;
+
+                    chkContinuarModal.checked = true;
+                    chkContinuarModal.dispatchEvent(new Event('change', { bubbles: true }));
+                    const manteveAlteracaoManual = chkContinuarModal.checked === true;
+
+                    btnTestarModalOk = Boolean(btnTestarModalOk && marcouTextual && desmarcouSemi && desmarcouInterface && manteveAlteracaoManual);
                 }
             }
 
@@ -10010,13 +10039,18 @@
                 window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 60, clientY: 55 }));
                 flashMantemNoHover = (document.getElementById('jusgov-flash-contour-container') !== null);
 
-                // Clique comum (mousedown) NÃO fecha o Flash no modo Até Interação
-                window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 10, clientY: 10 }));
-                flashMantemNoClique = (document.getElementById('jusgov-flash-contour-container') !== null);
-
-                // Tecla comum (keydown) NÃO fecha o Flash no modo Até Interação
+                // Tecla comum (keydown 'a') NÃO fecha o Flash no modo Até Interação
                 window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
                 flashMantemNaTecla = (document.getElementById('jusgov-flash-contour-container') !== null);
+
+                // Seção 6.136 / BUG-54: Clique DENTRO do contorno mantém o Flash (permite expandir/diminuir)
+                const rectFlashDentro = spanFlash.getBoundingClientRect();
+                window.dispatchEvent(new MouseEvent('mousedown', {
+                    bubbles: true,
+                    clientX: rectFlashDentro.left + Math.max(2, rectFlashDentro.width / 2),
+                    clientY: rectFlashDentro.top + Math.max(2, rectFlashDentro.height / 2)
+                }));
+                flashMantemNoClique = (document.getElementById('jusgov-flash-contour-container') !== null);
 
                 // Cópia (evento copy / Ctrl+C) FECHA o Flash
                 document.dispatchEvent(new Event('copy', { bubbles: true }));
@@ -10847,6 +10881,648 @@
                 'FUZZ_ROBUSTEZ_EXTRACAO_LINHAS_TURBO',
                 `Estresse de Extração e Higienização de Listas Turbo (${totalTurboFuzz} iterações estocásticas)`,
                 { detalhe: `Sucessos=${totalTurboFuzz - errosTurboFuzz}/${totalTurboFuzz} | Falhas=${errosTurboFuzz}` }
+            );
+        }
+
+        /* 7) Regressão: Preservação de quebras de linha em <pre> e elementos com white-space: pre-wrap (ex: painel debug.txt) */
+        {
+            let preWrapOk = false;
+            let detalhePreWrap = '';
+            try {
+                const filtrosTeste = (typeof window.JusGovFiltrosHtml === 'function') ? new window.JusGovFiltrosHtml() : null;
+                if (filtrosTeste && typeof filtrosTeste.extrairTextoPuroSanitizado === 'function') {
+                    const boxPre = document.createElement('div');
+                    boxPre.style.cssText = 'white-space: pre-wrap; position: fixed; left: -9999px; top: 0;';
+                    const spL1 = document.createElement('span');
+                    spL1.textContent = '[OK] Linha 1 do relatório';
+                    const spL2 = document.createElement('span');
+                    spL2.textContent = '[OK] Linha 2 do relatório';
+                    const spL3 = document.createElement('span');
+                    spL3.textContent = '[OK] Linha 3 do relatório';
+                    boxPre.appendChild(spL1);
+                    boxPre.appendChild(document.createTextNode('\n'));
+                    boxPre.appendChild(spL2);
+                    boxPre.appendChild(document.createTextNode('\n'));
+                    boxPre.appendChild(spL3);
+
+                    const boxNormal = document.createElement('div');
+                    boxNormal.style.cssText = 'white-space: normal; position: fixed; left: -9999px; top: 0;';
+                    boxNormal.innerHTML = '<span>Palavra A</span>\n<span>Palavra B</span>';
+
+                    document.body.appendChild(boxPre);
+                    document.body.appendChild(boxNormal);
+
+                    const rngPre = document.createRange();
+                    rngPre.selectNodeContents(boxPre);
+                    const txtPreRange = filtrosTeste.extrairTextoPuroSanitizado(rngPre);
+                    const txtPreElem = filtrosTeste.extrairTextoPuroSanitizado(boxPre);
+
+                    const rngNorm = document.createRange();
+                    rngNorm.selectNodeContents(boxNormal);
+                    const txtNormRange = filtrosTeste.extrairTextoPuroSanitizado(rngNorm);
+
+                    boxPre.remove();
+                    boxNormal.remove();
+
+                    const linhasRange = String(txtPreRange || '').split('\n').map(l => l.trim()).filter(Boolean);
+                    const linhasElem = String(txtPreElem || '').split('\n').map(l => l.trim()).filter(Boolean);
+                    preWrapOk = Boolean(
+                        linhasRange.length === 3 &&
+                        linhasElem.length === 3 &&
+                        linhasRange[0].includes('Linha 1') &&
+                        linhasRange[2].includes('Linha 3') &&
+                        !String(txtNormRange || '').includes('\n') &&
+                        String(txtNormRange || '').includes('Palavra A') &&
+                        String(txtNormRange || '').includes('Palavra B')
+                    );
+                    if (!preWrapOk) {
+                        detalhePreWrap = `rangeLinhas=${linhasRange.length}, elemLinhas=${linhasElem.length}, norm=${JSON.stringify(txtNormRange)}`;
+                    }
+                }
+            } catch (ePre) {
+                detalhePreWrap = ePre.message || String(ePre);
+            }
+            registrar(
+                preWrapOk,
+                'PRE_WRAP_COPIA_PRESERVA_QUEBRAS_LINHA_RELATORIO',
+                'Higienização HTML preserva quebras de linha reais em contêineres pre / white-space: pre-wrap (painel debug.txt) e colapsa quebras HTML em white-space: normal.',
+                { detalhe: detalhePreWrap }
+            );
+        }
+
+        /* 8) Regressão: Reposicionamento imediato de Flash Border e Marcador Permanente após mudança dinâmica de layout */
+        {
+            let layoutShiftOk = false;
+            let detalheLayoutShift = '';
+            try {
+                const visShift = (typeof window.JusGovFeedbackVisual === 'function') ? new window.JusGovFeedbackVisual() : null;
+                if (visShift) {
+                    const wrapperShift = document.createElement('div');
+                    wrapperShift.style.cssText = 'position: relative; width: 420px; background: #fff;';
+                    const slotMock = document.createElement('div');
+                    slotMock.setAttribute('data-jusgov-ignore', 'true');
+                    slotMock.style.cssText = 'height: 20px; width: 400px;';
+                    const alvoShift = document.createElement('span');
+                    alvoShift.textContent = '099.912.349-18';
+                    alvoShift.style.cssText = 'display: inline-block; font-size: 14px; line-height: 20px;';
+                    wrapperShift.appendChild(slotMock);
+                    wrapperShift.appendChild(alvoShift);
+                    document.body.appendChild(wrapperShift);
+
+                    const rngShift = document.createRange();
+                    rngShift.selectNodeContents(alvoShift);
+                    visShift.dispararFlashBorderVisual(rngShift, -1);
+
+                    const boxAntes = document.querySelector('#jusgov-flash-contour-container .jusgov-flash-box');
+                    const topFlashAntes = boxAntes ? boxAntes.getBoundingClientRect().top : -1;
+                    const topAlvoAntes = alvoShift.getBoundingClientRect().top;
+
+                    // Simula expansão assíncrona do visor Slot 1 / Slot 2 (+70px)
+                    slotMock.style.height = '90px';
+                    if (typeof visShift.atualizarPosicaoFlashSobRolagem === 'function') {
+                        visShift.atualizarPosicaoFlashSobRolagem();
+                    }
+
+                    const boxDepois = document.querySelector('#jusgov-flash-contour-container .jusgov-flash-box');
+                    const topFlashDepois = boxDepois ? boxDepois.getBoundingClientRect().top : -1;
+                    const topAlvoDepois = alvoShift.getBoundingClientRect().top;
+
+                    // Também garante remoção do Flash ao confirmar marcador e criação limpa dentro de ancestrais ignorados
+                    visShift.registrarCopiaCandidataParaMarcador(rngShift, '099.912.349-18');
+                    const marcadorCriado = visShift.confirmarColagemEMarcarPermanente('099.912.349-18');
+                    const contagemMarc = visShift.obterContagemMarcadoresPermanentes();
+
+                    visShift.limparFlashBorderImediatamente();
+                    visShift.limparMarcadoresPermanentes();
+                    wrapperShift.remove();
+
+                    layoutShiftOk = Boolean(
+                        topFlashAntes >= 0 &&
+                        Math.abs(topFlashAntes - topAlvoAntes) <= 6 &&
+                        Math.abs(topFlashDepois - topAlvoDepois) <= 6 &&
+                        (topFlashDepois - topFlashAntes) >= 55 &&
+                        marcadorCriado &&
+                        contagemMarc === 1
+                    );
+                    if (!layoutShiftOk) {
+                        detalheLayoutShift = `antes=${topFlashAntes}/${topAlvoAntes}, depois=${topFlashDepois}/${topAlvoDepois}, marc=${contagemMarc}`;
+                    }
+                }
+            } catch (eShift) {
+                detalheLayoutShift = eShift.message || String(eShift);
+            }
+            registrar(
+                layoutShiftOk,
+                'FLASH_BORDER_REPOSICIONA_MUDANCA_LAYOUT_DINAMICO',
+                'Contorno Flash Border e Marcador Permanente acompanham exatamente novas coordenadas quando elementos acima expandem/alteram layout (Slot 1/2 / SPA).',
+                { detalhe: detalheLayoutShift }
+            );
+        }
+
+        /* 9) Regressão: Regra Root de Encolher em blocos compostos válidos/inválidos e atualização da âncora Shift em palavra curta */
+        {
+            let shrinkEShiftOk = false;
+            let detalheShrinkShift = '';
+            try {
+                if (
+                    motorTeste &&
+                    typeof motorTeste.ehTextoBlocoMultiSegmento === 'function' &&
+                    typeof motorTeste.resolverLimitesBlocoAtivoNaJanela === 'function' &&
+                    typeof motorTeste.resolverSubSegmentoNoBlocoComposto === 'function' &&
+                    typeof motorTeste.resolverIndicesExpansaoBase === 'function'
+                ) {
+                    const casosBloco = [
+                        { texto: 'Data válida 29/02/2024 ok', bloco: '29/02/2024', sub1: '29', sub2: '02', sub3: '2024', sep: '/' },
+                        { texto: 'Data inválida 29/02/2025 ok', bloco: '29/02/2025', sub1: '29', sub2: '02', sub3: '2025', sep: '/' },
+                        { texto: 'CPF válido 099.912.349-18 ok', bloco: '099.912.349-18', sub1: '099', sub2: '912', sub3: '18', sep: '-' },
+                        { texto: 'CPF inválido 099.123.459-99 ok', bloco: '099.123.459-99', sub1: '099', sub2: '123', sub3: '99', sep: '.' },
+                        { texto: 'CNPJ alfa 12.ABC.345/01DE-35 ok', bloco: '12.ABC.345/01DE-35', sub1: '12', sub2: 'ABC', sub3: '01DE', sep: '/' },
+                        { texto: 'CNPJ inválido 09.912.345/0001-99 ok', bloco: '09.912.345/0001-99', sub1: '09', sub2: '912', sub3: '0001', sep: '-' }
+                    ];
+
+                    let todosBlocosOk = true;
+                    for (const c of casosBloco) {
+                        const ehMulti = motorTeste.ehTextoBlocoMultiSegmento(c.bloco);
+                        const idxIni = c.texto.indexOf(c.bloco);
+                        const idxFim = idxIni + c.bloco.length;
+                        const mapaFake = { texto: c.texto, idxCursor: idxIni, deslocamentoJanela: 0 };
+                        const lim = motorTeste.resolverLimitesBlocoAtivoNaJanela(mapaFake, idxIni + 1, { texto: c.bloco }, c.sub1);
+                        const iSub1 = c.texto.indexOf(c.sub1, idxIni);
+                        const iSub2 = c.texto.indexOf(c.sub2, iSub1 + c.sub1.length);
+                        const iSub3 = c.texto.indexOf(c.sub3, iSub2 + c.sub2.length);
+                        const iSep = c.texto.indexOf(c.sep, idxIni);
+
+                        const r1 = motorTeste.resolverSubSegmentoNoBlocoComposto(c.texto, iSub1, idxIni, idxFim);
+                        const r2 = motorTeste.resolverSubSegmentoNoBlocoComposto(c.texto, iSub2, idxIni, idxFim);
+                        const r3 = motorTeste.resolverSubSegmentoNoBlocoComposto(c.texto, iSub3, idxIni, idxFim);
+                        const rSep = motorTeste.resolverSubSegmentoNoBlocoComposto(c.texto, iSep, idxIni, idxFim);
+                        const rExp2 = motorTeste.resolverIndicesExpansaoBase(mapaFake, iSub1, 2, { blocoCompostoPrevio: { texto: c.bloco }, ehAlt: false });
+
+                        const seg1Txt = r1 ? c.texto.slice(r1.inicio, r1.fim) : '';
+                        const seg2Txt = r2 ? c.texto.slice(r2.inicio, r2.fim) : '';
+                        const seg3Txt = r3 ? c.texto.slice(r3.inicio, r3.fim) : '';
+                        const sepTxt = rSep ? c.texto.slice(rSep.inicio, rSep.fim) : '';
+                        const exp2Txt = (rExp2 && rExp2.resultadoIndices) ? c.texto.slice(rExp2.resultadoIndices.inicio, rExp2.resultadoIndices.fim).trim() : '';
+
+                        if (
+                            !ehMulti ||
+                            !lim || lim.inicio !== idxIni || lim.fim !== idxFim ||
+                            !r1?.ehSubSegmento || seg1Txt !== c.sub1 ||
+                            !r2?.ehSubSegmento || seg2Txt !== c.sub2 ||
+                            !r3?.ehSubSegmento || seg3Txt !== c.sub3 ||
+                            !rSep || rSep.ehSubSegmento !== false || sepTxt !== c.bloco ||
+                            exp2Txt.length <= c.bloco.length
+                        ) {
+                            todosBlocosOk = false;
+                            detalheShrinkShift = `Falha caso ${c.bloco}: seg=[${seg1Txt},${seg2Txt},${seg3Txt}], sep=${sepTxt}, exp2=${exp2Txt}`;
+                            break;
+                        }
+                    }
+
+                    // Valida também que clique em palavra curta (< mínimo de caracteres) atualiza ancoraCursorShift
+                    let ancoraCurtaOk = false;
+                    const pCurta = document.createElement('p');
+                    pCurta.textContent = 'Se houver urgência comprovada nos autos';
+                    pCurta.style.cssText = 'position: fixed; left: 24px; top: 24px; font-size: 16px; line-height: 24px; margin: 0; padding: 0;';
+                    document.body.appendChild(pCurta);
+                    const minAnt = motorTeste.obterMinimoCaracteresInterface();
+                    motorTeste.definirMinimoCaracteresInterface(5);
+                    try {
+                        const rSe = document.createRange();
+                        const noSe = pCurta.firstChild;
+                        rSe.setStart(noSe, 0);
+                        rSe.setEnd(noSe, 1);
+                        const rectSe = rSe.getBoundingClientRect();
+                        const cx = rectSe.left + Math.max(1, rectSe.width / 2);
+                        const cy = rectSe.top + Math.max(2, rectSe.height / 2);
+                        pCurta.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1, clientX: cx, clientY: cy }));
+                        pCurta.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, detail: 1, clientX: cx, clientY: cy }));
+                        const ancora = (typeof motorTeste.obterAncoraCursorShift === 'function') ? motorTeste.obterAncoraCursorShift() : null;
+                        ancoraCurtaOk = Boolean(ancora && ancora.no === noSe && ancora.offset === 0);
+                        if (!ancoraCurtaOk) {
+                            detalheShrinkShift = `ancoraCurta=${ancora ? `${ancora.offset} (${ancora.no?.textContent?.slice(0, 12)})` : 'null'}`;
+                        }
+                    } finally {
+                        motorTeste.definirMinimoCaracteresInterface(minAnt);
+                        pCurta.remove();
+                    }
+
+                    shrinkEShiftOk = todosBlocosOk && ancoraCurtaOk;
+                }
+            } catch (eShrink) {
+                detalheShrinkShift = eShrink.message || String(eShrink);
+            }
+            registrar(
+                shrinkEShiftOk,
+                'REGRA_ROOT_ENCOLHER_BLOCOS_E_SHIFT_ANCORA_CURTA',
+                'Diretriz Root 2.5: Encolhimento genérico em sub-segmentos de datas/CPF/CNPJ válidos/inválidos, re-seleção em separadores, expansão no duplo clique e âncora Shift em palavra curta.',
+                { detalhe: detalheShrinkShift }
+            );
+        }
+
+        /* 10) Regressão: Ordem hierárquica "Básico: " e precedência de toolbars sobre contêineres PDF em interface.json */
+        {
+            let interfaceOrdemOk = false;
+            let detalheInterfaceOrdem = '';
+            try {
+                const regrasPre = Array.isArray(window.__JUSGOV_INTERFACE_JSON__) ? window.__JUSGOV_INTERFACE_JSON__ : null;
+                let ordemJsonOk = true;
+                if (regrasPre && regrasPre.length > 10) {
+                    const regrasBasicas = regrasPre.filter(r => typeof r.observacao === 'string' && r.observacao.startsWith('Básico: '));
+                    const todasBasicasNoInicio = regrasBasicas.length >= 9 &&
+                        regrasPre.slice(0, regrasBasicas.length).every(r => typeof r.observacao === 'string' && r.observacao.startsWith('Básico: '));
+                    const idxPdfToolbar = regrasPre.findIndex(r => r.id === 'interna_controles_pdf');
+                    const idxPdfLeitura = regrasPre.findIndex(r => r.id === 'interna_leitura_editores_pdf');
+                    const idxEdToolbar = regrasPre.findIndex(r => r.id === 'interna_editores_toolbars');
+                    ordemJsonOk = Boolean(
+                        todasBasicasNoInicio &&
+                        idxPdfToolbar !== -1 && idxPdfLeitura !== -1 && idxEdToolbar !== -1 &&
+                        idxPdfToolbar < idxPdfLeitura &&
+                        idxEdToolbar < idxPdfLeitura
+                    );
+                    if (!ordemJsonOk) {
+                        detalheInterfaceOrdem = `basicas=${regrasBasicas.length}, pdfTb=${idxPdfToolbar}, edTb=${idxEdToolbar}, pdfLeitura=${idxPdfLeitura}`;
+                    }
+                }
+
+                // Garante também classificação prática no motor mesmo dentro de .pdfViewer
+                const wrapPdf = document.createElement('div');
+                wrapPdf.className = 'pdfViewer';
+                const btnToolbarPdf = document.createElement('button');
+                btnToolbarPdf.id = 'toolbarViewer';
+                btnToolbarPdf.className = 'toolbarButton';
+                btnToolbarPdf.textContent = 'Zoom';
+                const pLeituraPdf = document.createElement('p');
+                pLeituraPdf.textContent = 'Sentença proferida nos autos.';
+                wrapPdf.appendChild(btnToolbarPdf);
+                wrapPdf.appendChild(pLeituraPdf);
+                document.body.appendChild(wrapPdf);
+
+                const ctxBtnPdf = motorTeste.classificarContextoElementoAlvo(btnToolbarPdf);
+                const ctxTextoPdf = motorTeste.classificarContextoElementoAlvo(pLeituraPdf);
+                wrapPdf.remove();
+
+                interfaceOrdemOk = Boolean(
+                    ordemJsonOk &&
+                    ctxBtnPdf === 'LINK_CLICAVEL' &&
+                    ctxTextoPdf === 'LEITURA_COMUM'
+                );
+                if (!interfaceOrdemOk && !detalheInterfaceOrdem) {
+                    detalheInterfaceOrdem = `ctxBtnPdf=${ctxBtnPdf}, ctxTextoPdf=${ctxTextoPdf}`;
+                }
+            } catch (eIntOrd) {
+                detalheInterfaceOrdem = eIntOrd.message || String(eIntOrd);
+            }
+            registrar(
+                interfaceOrdemOk,
+                'INTERFACE_JSON_ORDEM_BASICO_E_PRIORIDADES',
+                'Catálogo interface.json inicia com todas as regras "Básico: " em ordem hierárquica e prioriza toolbars de PDF/editor antes de áreas de leitura PDF.',
+                { detalhe: detalheInterfaceOrdem }
+            );
+        }
+
+        /* 11) Regressão: Inspetor Ctrl+Alt+Shift (fuga da borda inferior direita + ocultação entre frames) e card PJe semiflexível */
+        {
+            let inspetorECardOk = false;
+            let detalheInsp = '';
+            try {
+                const cardPje = document.createElement('div');
+                cardPje.className = 'tarefa-card';
+                cardPje.textContent = '1015306-38.2026.4.01.4002';
+                document.body.appendChild(cardPje);
+                const ctxCardPje = motorTeste.classificarContextoElementoAlvo(cardPje);
+
+                let bordaDireitaInferiorOk = false;
+                let ocultouEmIframeEMouseLeave = false;
+                if (typeof motorTeste.atualizarInspetorTempoReal === 'function' && typeof motorTeste.ocultarInspetorTempoReal === 'function') {
+                    const cx = Math.max(50, window.innerWidth - 18);
+                    const cy = Math.max(50, window.innerHeight - 18);
+                    motorTeste.atualizarInspetorTempoReal(cx, cy, cardPje);
+                    const painel = document.getElementById('jusgov-inspetor-tempo-real');
+                    if (painel) {
+                        const rectP = painel.getBoundingClientRect();
+                        const foraDoCursorX = cx >= rectP.right || cx < rectP.left;
+                        const foraDoCursorY = cy >= rectP.bottom || cy < rectP.top;
+                        bordaDireitaInferiorOk = Boolean(rectP.width > 0 && rectP.height > 0 && (foraDoCursorX || foraDoCursorY));
+                        if (!bordaDireitaInferiorOk) {
+                            detalheInsp = `cursor=(${cx},${cy}) dentro de rect=(${Math.round(rectP.left)},${Math.round(rectP.top)},${Math.round(rectP.right)},${Math.round(rectP.bottom)})`;
+                        }
+                    }
+
+                    const iframeMock = document.createElement('iframe');
+                    document.body.appendChild(iframeMock);
+                    motorTeste.atualizarInspetorTempoReal(100, 100, iframeMock);
+                    const sumiuNoIframe = !document.getElementById('jusgov-inspetor-tempo-real');
+                    iframeMock.remove();
+
+                    motorTeste.atualizarInspetorTempoReal(100, 100, cardPje);
+                    document.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+                    const sumiuNoMouseLeave = !document.getElementById('jusgov-inspetor-tempo-real');
+                    motorTeste.ocultarInspetorTempoReal();
+
+                    ocultouEmIframeEMouseLeave = Boolean(sumiuNoIframe && sumiuNoMouseLeave);
+                    if (!ocultouEmIframeEMouseLeave && !detalheInsp) {
+                        detalheInsp = `sumiuIframe=${sumiuNoIframe}, sumiuMouseLeave=${sumiuNoMouseLeave}`;
+                    }
+                }
+                cardPje.remove();
+
+                inspetorECardOk = Boolean(ctxCardPje === 'SEMIFLEXIVEL' && bordaDireitaInferiorOk && ocultouEmIframeEMouseLeave);
+                if (!inspetorECardOk && !detalheInsp) {
+                    detalheInsp = `ctxCardPje=${ctxCardPje}, borda=${bordaDireitaInferiorOk}, ocultou=${ocultouEmIframeEMouseLeave}`;
+                }
+            } catch (eInsp) {
+                detalheInsp = eInsp.message || String(eInsp);
+            }
+            registrar(
+                inspetorECardOk,
+                'INSPETOR_TEMPO_REAL_POSICIONAMENTO_E_CARD_PJE_SEMIFLEXIVEL',
+                'Inspetor Ctrl+Alt+Shift sai da frente do mouse na borda inferior direita e não fica preso entre frames; cards/timeline PJe classificam como SemiFlexível.',
+                { detalhe: detalheInsp }
+            );
+
+            // Teste: Alt+Clique em Interface seleciona toda a linha clicada (1 clique) ou todas as linhas (2 cliques)
+            let altInterfaceOk = false;
+            let detalheAltInterface = '';
+            try {
+                const motor = window.JusGovMotorTestes;
+                const temApiAltInt = motor && typeof motor.resolverRangeAltEmInterface === 'function';
+                if (temApiAltInt) {
+                    const boxAlt = document.createElement('div');
+                    boxAlt.style.cssText = 'position:fixed;left:20px;top:20px;z-index:1;';
+                    const btnUmaLinha = document.createElement('button');
+                    btnUmaLinha.innerHTML = '<span>Salvar</span> <span>Tudo</span>';
+                    const btnMultilinha = document.createElement('button');
+                    btnMultilinha.innerHTML = '<span>Emitir</span> <span>Certidão</span><br><span>Negativa</span>';
+                    const linkComBloco = document.createElement('a');
+                    linkComBloco.href = '#proc';
+                    linkComBloco.innerHTML = 'Processo 0001234-55.2024.4.01.4002<br>Petição Inicial';
+                    boxAlt.appendChild(btnUmaLinha);
+                    boxAlt.appendChild(btnMultilinha);
+                    boxAlt.appendChild(linkComBloco);
+                    document.body.appendChild(boxAlt);
+
+                    const spanSalvar = btnUmaLinha.querySelector('span');
+                    const r1 = motor.resolverRangeAltEmInterface(
+                        spanSalvar.firstChild,
+                        { no: spanSalvar.firstChild, offset: 2 },
+                        25,
+                        25,
+                        1
+                    );
+
+                    const spanCertidao = btnMultilinha.querySelectorAll('span')[1];
+                    const rectCert = spanCertidao.getBoundingClientRect();
+                    const rMulti1 = motor.resolverRangeAltEmInterface(
+                        spanCertidao.firstChild,
+                        { no: spanCertidao.firstChild, offset: 2 },
+                        rectCert.left + 4,
+                        rectCert.top + 4,
+                        1
+                    );
+                    const rMulti2 = motor.resolverRangeAltEmInterface(
+                        spanCertidao.firstChild,
+                        { no: spanCertidao.firstChild, offset: 2 },
+                        rectCert.left + 4,
+                        rectCert.top + 4,
+                        2
+                    );
+
+                    const noLinkTexto1 = linkComBloco.firstChild;
+                    const rectLink = linkComBloco.getBoundingClientRect();
+                    const lenLink1 = noLinkTexto1.nodeValue.length;
+                    const segsLink1 = [{ no: noLinkTexto1, inicioGlobal: 0, fimGlobal: lenLink1 }];
+                    const mapaLinkNoBloco = { texto: noLinkTexto1.nodeValue, idxCursor: 15, deslocamentoJanela: 0, tamanhoTotalBloco: lenLink1, segmentos: segsLink1 };
+                    const mapaLinkForaBloco = { texto: noLinkTexto1.nodeValue, idxCursor: 2, deslocamentoJanela: 0, tamanhoTotalBloco: lenLink1, segmentos: segsLink1 };
+
+                    const textoMsciv = 'MSCiv 1015594-83.2026.4.01.4002\nAposentadoria Rural (Art. 48/51)';
+                    const resEspacoMsciv = motor.resolverIndicesExpansaoBase({ texto: textoMsciv, idxCursor: 5 }, 5, 1, { ehAlt: true });
+                    const txtEspacoMsciv = (resEspacoMsciv && resEspacoMsciv.resultadoIndices)
+                        ? textoMsciv.slice(resEspacoMsciv.resultadoIndices.inicio, resEspacoMsciv.resultadoIndices.fim).trim()
+                        : '';
+
+                    const rLinkBloco1 = motor.resolverRangeAltEmInterface(noLinkTexto1, { no: noLinkTexto1, offset: 15 }, rectLink.left + 80, rectLink.top + 4, 1, mapaLinkNoBloco);
+                    const rLinkBloco2 = motor.resolverRangeAltEmInterface(noLinkTexto1, { no: noLinkTexto1, offset: 15 }, rectLink.left + 80, rectLink.top + 4, 2, mapaLinkNoBloco);
+                    const rLinkBloco3 = motor.resolverRangeAltEmInterface(noLinkTexto1, { no: noLinkTexto1, offset: 15 }, rectLink.left + 80, rectLink.top + 4, 3, mapaLinkNoBloco);
+                    const rLinkFora1 = motor.resolverRangeAltEmInterface(noLinkTexto1, { no: noLinkTexto1, offset: 2 }, rectLink.left + 10, rectLink.top + 4, 1, mapaLinkForaBloco);
+                    const rLinkFora2 = motor.resolverRangeAltEmInterface(noLinkTexto1, { no: noLinkTexto1, offset: 2 }, rectLink.left + 10, rectLink.top + 4, 2, mapaLinkForaBloco);
+
+                    const txt1 = r1 && r1.texto ? r1.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtM1 = rMulti1 && rMulti1.texto ? rMulti1.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtM2 = rMulti2 && rMulti2.texto ? rMulti2.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtLB1 = rLinkBloco1 && rLinkBloco1.texto ? rLinkBloco1.texto.trim() : '';
+                    const txtLB2 = rLinkBloco2 && rLinkBloco2.texto ? rLinkBloco2.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtLB3 = rLinkBloco3 && rLinkBloco3.texto ? rLinkBloco3.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtLF1 = rLinkFora1 && rLinkFora1.texto ? rLinkFora1.texto.replace(/\s+/g, ' ').trim() : '';
+                    const txtLF2 = rLinkFora2 && rLinkFora2.texto ? rLinkFora2.texto.replace(/\s+/g, ' ').trim() : '';
+
+                    altInterfaceOk = (
+                        txt1 === 'Salvar Tudo' &&
+                        txtM1 === 'Emitir Certidão' &&
+                        txtM2.includes('Emitir') &&
+                        txtM2.includes('Certidão') &&
+                        txtM2.includes('Negativa') &&
+                        txtLB1 === '0001234-55.2024.4.01.4002' &&
+                        txtLB2 === 'Processo 0001234-55.2024.4.01.4002' &&
+                        txtLB3 === 'Processo 0001234-55.2024.4.01.4002 Petição Inicial' &&
+                        txtLF1 === 'Processo 0001234-55.2024.4.01.4002' &&
+                        txtLF2 === 'Processo 0001234-55.2024.4.01.4002 Petição Inicial' &&
+                        txtEspacoMsciv === 'MSCiv 1015594-83.2026.4.01.4002'
+                    );
+                    detalheAltInterface = `btn1=[${txt1}] | multi1=[${txtM1}] | multi2=[${txtM2}] | mscivEspaco=[${txtEspacoMsciv}] | linkBloco=(${txtLB1} -> ${txtLB2} -> ${txtLB3}) | linkFora=(${txtLF1} -> ${txtLF2})`;
+                    boxAlt.remove();
+                } else {
+                    detalheAltInterface = 'API resolverRangeAltEmInterface ausente';
+                }
+            } catch (eAltInt) {
+                detalheAltInterface = eAltInt.message || String(eAltInt);
+            }
+            registrar(
+                altInterfaceOk,
+                'ALT_CLIQUE_INTERFACE_LINHA_UNICA_E_DUPLO_CLIQUE_MULTILINHA',
+                'Alt+1 clique em interface seleciona todo o texto na mesma linha; em múltiplas linhas seleciona apenas a linha clicada e 2 cliques selecionam todas as linhas.',
+                { detalhe: detalheAltInterface }
+            );
+
+            // Teste: Independência entre Retirar Seleções do Sistema (modoRetirarSelecao) e Contorno Visual Flash (tempoFlashBorderMs)
+            let flashIndepOk = false;
+            let detalheFlashIndep = '';
+            try {
+                const motor = window.JusGovMotorTestes;
+                if (
+                    motor &&
+                    typeof motor.definirTempoFlashBorderMs === 'function' &&
+                    typeof motor.definirModoRetirarSelecao === 'function' &&
+                    typeof motor.dispararFlashBorderVisual === 'function' &&
+                    typeof motor.limparFlashBorderImediatamente === 'function'
+                ) {
+                    const tempoAnt = motor.obterTempoFlashBorderMs();
+                    const modoAnt = motor.obterModoRetirarSelecao();
+
+                    const spanFlashIndep = document.createElement('span');
+                    spanFlashIndep.textContent = '099.123.459-67';
+                    spanFlashIndep.style.cssText = 'position:fixed;left:20px;top:20px;font-size:14px;';
+                    const btnIntIndep = document.createElement('button');
+                    btnIntIndep.textContent = 'Ação Interface';
+                    btnIntIndep.style.cssText = 'position:fixed;left:200px;top:200px;';
+                    document.body.appendChild(spanFlashIndep);
+                    document.body.appendChild(btnIntIndep);
+
+                    const rIndep = document.createRange();
+                    rIndep.selectNodeContents(spanFlashIndep);
+
+                    // Caso 1: modoRetirarSelecao='total' + tempoFlashBorderMs=-1 -> clique em interface fora do contorno NÃO remove o Flash
+                    motor.definirModoRetirarSelecao('total');
+                    motor.definirTempoFlashBorderMs(-1);
+                    motor.dispararFlashBorderVisual(rIndep, -1);
+                    btnIntIndep.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 220, clientY: 210 }));
+                    const manteveModoInteracao = (document.getElementById('jusgov-flash-contour-container') !== null);
+
+                    // Caso 2: tempoFlashBorderMs=2000 -> mousedown e selectstart em interface/flex NÃO cancelam o timer do Flash antes do tempo
+                    motor.definirTempoFlashBorderMs(2000);
+                    motor.dispararFlashBorderVisual(rIndep, 2000);
+                    btnIntIndep.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 220, clientY: 210 }));
+                    document.dispatchEvent(new Event('selectstart', { bubbles: true }));
+                    const manteveTemporizado = (document.getElementById('jusgov-flash-contour-container') !== null);
+
+                    // Caso 3: tempoFlashBorderMs=0 -> não exibe contorno mesmo com modoRetirarSelecao='nenhuma'
+                    motor.definirModoRetirarSelecao('nenhuma');
+                    motor.definirTempoFlashBorderMs(0);
+                    motor.dispararFlashBorderVisual(rIndep, 0);
+                    const naoExibiuComZero = (document.getElementById('jusgov-flash-contour-container') === null);
+
+                    flashIndepOk = manteveModoInteracao && manteveTemporizado && naoExibiuComZero;
+                    detalheFlashIndep = `ateInteracao=${manteveModoInteracao}, temporizado=${manteveTemporizado}, zero=${naoExibiuComZero}`;
+
+                    motor.limparFlashBorderImediatamente();
+                    spanFlashIndep.remove();
+                    btnIntIndep.remove();
+                    motor.definirTempoFlashBorderMs(tempoAnt);
+                    motor.definirModoRetirarSelecao(modoAnt);
+                } else {
+                    detalheFlashIndep = 'APIs de teste ausentes';
+                }
+            } catch (eFlashInd) {
+                detalheFlashIndep = eFlashInd.message || String(eFlashInd);
+            }
+            registrar(
+                flashIndepOk,
+                'FLASH_VISUAL_INDEPENDENTE_DE_RETIRAR_SELECAO_E_CLIQUE_INTERFACE',
+                'Contorno Visual Flash cumpre exclusivamente tempoFlashBorderMs, independente de Retirar Seleções do Sistema ou clique em interface/flex.',
+                { detalhe: detalheFlashIndep }
+            );
+
+            // Teste: Produtividade (Corrido, Ativo e Pausas) sempre ativa + regra de 5 min e contagem inteira da pausa
+            let produtOk = false;
+            let detalheProdut = '';
+            try {
+                const ModProd = window.JusGovModuloProdutividade;
+                if (typeof ModProd === 'function') {
+                    const mp = new ModProd();
+                    const t0 = 1700000000000;
+                    const cfgDesligada = {
+                        tempoTrabalhoCorridoAtivo: false,
+                        tempoTrabalhoAtivoAtivo: false,
+                        pomodoroAtivo: false
+                    };
+                    const st = {
+                        data: '2026-11-15',
+                        inicioTs: t0,
+                        ultimaAtividadeTs: t0,
+                        corridoMinutos: 0,
+                        ativoMinutos: 0,
+                        pausasMinutos: 0,
+                        pausasConfirmadas: 0,
+                        emPausa: false,
+                        minutosInativosPendentes: 0,
+                        alertaCorridoDisparado: false,
+                        alertaAtivoDisparado: false
+                    };
+                    // Minuto 1 com atividade recente (< 1 min sem atividade): corrido=1, ativo=1, pausas=0
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 30 * 1000, cfgDesligada);
+                    const passo1Ok = (st.corridoMinutos === 1 && st.ativoMinutos === 1 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0);
+
+                    // Minutos 2..5 sem nova atividade (1, 2, 3, 4 min inativos < 5 min): ainda conta provisoriamente como ativo
+                    for (let m = 1; m <= 4; m++) {
+                        mp.avancarMinutoEstadoTrabalho(st, t0 + m * 60 * 1000, cfgDesligada);
+                    }
+                    const antesConfirmarPausaOk = (st.corridoMinutos === 5 && st.ativoMinutos === 5 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0 && !st.emPausa);
+
+                    // Minuto 6 (>= 5 min inativo): confirma 1 pausa e contabiliza a pausa INTEIRA (5 min) fora do ativo!
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 5 * 60 * 1000, cfgDesligada);
+                    const aposConfirmarPausaOk = (st.corridoMinutos === 6 && st.ativoMinutos === 1 && st.pausasMinutos === 5 && st.pausasConfirmadas === 1 && st.emPausa);
+
+                    // Minuto 7 (ainda na mesma pausa): corrido=7, ativo=1, pausasMinutos=6, pausasConfirmadas segue 1
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 6 * 60 * 1000, cfgDesligada);
+                    const continuaPausaOk = (st.corridoMinutos === 7 && st.ativoMinutos === 1 && st.pausasMinutos === 6 && st.pausasConfirmadas === 1);
+
+                    produtOk = passo1Ok && antesConfirmarPausaOk && aposConfirmarPausaOk && continuaPausaOk;
+                    detalheProdut = `p1=${passo1Ok}, antes5m=${antesConfirmarPausaOk}, conf5m=${aposConfirmarPausaOk}, cont=${continuaPausaOk}`;
+                } else {
+                    detalheProdut = 'JusGovModuloProdutividade ausente';
+                }
+            } catch (eProd) {
+                detalheProdut = eProd.message || String(eProd);
+            }
+            registrar(
+                produtOk,
+                'PRODUTIVIDADE_CONTADORES_ATIVOS_E_PAUSA_INTEIRA_5MIN',
+                'Contadores Corrido/Ativo/Pausas operam mesmo com Pomodoro desativado e convertem a pausa inteira ao confirmar 5 min sem interação.',
+                { detalhe: detalheProdut }
+            );
+
+            // Teste: Dia lógico às 04:00 e continuidade de serão até descanso >= 3h
+            let seraoOk = false;
+            let detalheSerao = '';
+            try {
+                const ModProd = window.JusGovModuloProdutividade;
+                if (typeof ModProd === 'function') {
+                    const mp = new ModProd();
+                    const ts22hOntem = new Date(2026, 10, 14, 22, 0, 0).getTime();
+                    const ts02h30 = new Date(2026, 10, 15, 2, 30, 0).getTime();
+                    const ts04h05 = new Date(2026, 10, 15, 4, 5, 0).getTime();
+                    const ts07h00 = new Date(2026, 10, 15, 7, 0, 0).getTime();
+
+                    const chave22h = mp.obterDataLocalChaveHoje(ts22hOntem);
+                    const chave02h30 = mp.obterDataLocalChaveHoje(ts02h30);
+                    const chave04h05 = mp.obterDataLocalChaveHoje(ts04h05);
+                    const chavesOk = (chave22h === '2026-11-14' && chave02h30 === '2026-11-14' && chave04h05 === '2026-11-15');
+
+                    // 1. Trabalhou direto de ontem até 07:00 (última atividade às 06:58 -> hiato 2 min < 3h): mantém 2026-11-14
+                    const stSeraoDireto = {
+                        data: '2026-11-14',
+                        ultimaAtividadeTs: ts07h00 - 2 * 60 * 1000,
+                        corridoMinutos: 540,
+                        ativoMinutos: 500,
+                        pausasConfirmadas: 1
+                    };
+                    const resDireto = mp.resolverEstadoTrabalhoParaMomento(stSeraoDireto, ts07h00);
+                    const manteveSeraoOk = (!resDireto.reiniciou && resDireto.estado.data === '2026-11-14' && resDireto.estado.corridoMinutos === 540);
+
+                    // 2. Parou às 23:00 e iniciou às 04:05 (hiato 5h05 >= 3h): reinicia para 2026-11-15
+                    const stDormiu = {
+                        data: '2026-11-14',
+                        ultimaAtividadeTs: new Date(2026, 10, 14, 23, 0, 0).getTime(),
+                        corridoMinutos: 180,
+                        ativoMinutos: 170,
+                        pausasConfirmadas: 0
+                    };
+                    const resDormiu = mp.resolverEstadoTrabalhoParaMomento(stDormiu, ts04h05);
+                    const reiniciouPosSonoOk = (resDormiu.reiniciou && resDormiu.estado.data === '2026-11-15' && resDormiu.estado.corridoMinutos === 0);
+
+                    seraoOk = chavesOk && manteveSeraoOk && reiniciouPosSonoOk;
+                    detalheSerao = `chaves=${chavesOk}, serao07h=${manteveSeraoOk}, inicio04h=${reiniciouPosSonoOk}`;
+                } else {
+                    detalheSerao = 'JusGovModuloProdutividade ausente';
+                }
+            } catch (eSerao) {
+                detalheSerao = eSerao.message || String(eSerao);
+            }
+            registrar(
+                seraoOk,
+                'PRODUTIVIDADE_SERAO_MADRUGADA_E_DESCANSO_3H',
+                'Dia lógico vira às 04:00, reiniciando quem inicia após descanso >= 3h e mantendo no dia anterior quem segue em serão direto.',
+                { detalhe: detalheSerao }
             );
         }
 

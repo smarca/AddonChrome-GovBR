@@ -1477,8 +1477,8 @@
                             </div>
                         </div>
                         <div style="font-size: 11.5px; color: #94a3b8; line-height: 1.5;">
-                            <strong>Como capturar na própria página:</strong> passe o mouse segurando <code>Ctrl + Alt + Shift</code> para ver um cartão explicando como a extensão está enxergando aquele item; se quiser mudar o comportamento, faça <code>Ctrl + Alt + Shift + Clique</code> (ou <code>Ctrl + Alt + Botão Direito</code>), use <strong>👁️ Testar</strong> para ver o destaque atrás da janela e salve.<br>
-                            <strong>Ordem de decisão automática:</strong> 0) Padrão <em>Textual</em> ➔ 1) Formato do cursor (setinha, mãozinha, barra de texto) ➔ 2) Ações de clique do site ➔ 3) Aparência/conteúdo (datas, textos longos, bloqueio de seleção) ➔ 4) <em>Regras do Usuário</em> (suas regras têm prioridade!) e, se nenhuma bater, <em>Regras Internas</em> (<em>Continuar</em> passa para a próxima regra do mesmo grupo). Ao usar <em>Restaurar Padrões</em>, os exemplos iniciais voltam para <em>Regras do Usuário</em>.
+                            <strong>Como capturar na própria página:</strong> passe o mouse segurando <code>Ctrl + Alt + Shift</code> para ver um cartão explicando como a extensão está enxergando aquele item; se quiser mudar o comportamento, faça <code>Ctrl + Alt + Shift + Clique</code> (ou <code>Ctrl + Alt + Botão Direito</code>), use <strong>👁️ Testar</strong> (o diálogo fica translúcido até você clicar ou pressionar qualquer tecla comum, ignorando <code>Ctrl</code>/<code>Alt</code>/<code>Shift</code>) para conferir os elementos contornados e salve.<br>
+                            <strong>Ordem de decisão automática:</strong> 1) <em>Regras do Usuário</em> (têm prioridade soberana sobre tudo, inclusive sobre campos editáveis e heurísticas automáticas) ➔ 2) Heurísticas de contexto, <em>Regras Internas</em> (iniciando pelas regras hierárquicas <code>Básico: Nível 0..8</code> de HTML/ARIA e seguindo para seletores de toolbars PDF/editores e PJe, com suporte a <em>Continuar</em> entre regras) e padrão <em>Textual</em>. Ao usar <em>Restaurar Padrões</em>, os exemplos iniciais voltam para <em>Regras do Usuário</em>.
                         </div>
                     </div>
                     <div style="display: flex; gap: 6px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
@@ -2029,7 +2029,7 @@
                 <div class="setting-item">
                     <div>
                         <div class="setting-label">Tempo de Trabalho Corrido (Meta Diária)</div>
-                        <div class="setting-help">Conta o tempo corrido total da jornada no dia (padrão: 7h, de 1h a 12h) e exibe modal de aviso ao completar a meta.</div>
+                        <div class="setting-help">Conta o tempo corrido total da jornada no dia (padrão: 7h, de 1h a 12h) e exibe modal de aviso ao completar a meta. <strong>Regra de contagem:</strong> intervalos inferiores a 5 minutos sem interação continuam contando como Tempo Ativo (ex.: leitura/análise); ao atingir o tempo mínimo de <strong>5 minutos seguidos sem interação</strong>, confirma-se uma <strong>Pausa</strong> e todo o período desde o início da inatividade passa a ser contabilizado integralmente em <em>Pausas</em> (descontado do Tempo Ativo). <strong>Virada de dia (serão):</strong> o dia lógico vira às <strong>04:00</strong> da manhã; porém, se você estiver trabalhando direto do dia anterior (sem descanso de <strong>3 horas ou mais</strong>), a contagem continua no dia anterior; após 3h+ de descanso a partir das 04:00, reinicia para o novo dia. As estatísticas diárias são registradas continuamente, mesmo com os alertas e o Pomodoro desativados.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select id="optTempoTrabalhoCorridoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
@@ -2137,7 +2137,7 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
-                    <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje: Corrido 0 min • Ativo 0 min • Pomodoro: Foco</span>
+                    <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje: Corrido 0 min • Ativo 0 min • Pausas 0</span>
                     <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
                 </div>
             </section>
@@ -2316,6 +2316,12 @@
                                     (<code>28/10/2026 - 06:28:50</code>):</strong> 1 clique sobre a data seleciona
                                 apenas a data (<code>28/10/2026</code>); 1 clique sobre o horário seleciona
                                 apenas o horário (<code>06:28:50</code>).</li>
+                            <li><strong>Encolher no Bloco já Selecionado:</strong> Quando um bloco composto
+                                (data, CPF, CNPJ, CNJ, boleto — válidos ou inválidos) já estiver selecionado,
+                                <strong>1 clique</strong> dentro dele sobre um número/parte (ex.: dia, mês ou ano)
+                                encolhe a seleção só para aquela parte; clicar no separador (<code>/</code>,
+                                <code>.</code>, <code>-</code>) re-seleciona o bloco inteiro; <strong>2 cliques</strong>
+                                expandem para fora do bloco.</li>
                         </ul>
                     </div>
                     <div class="card-estagio">
@@ -2366,9 +2372,15 @@
                             </li>
                             <li><strong>Tabelas (Ctrl+Alt):</strong> Clique no cabeçalho da tabela (Coluna) ou na
                                 borda esquerda da linha (Linha).</li>
-                            <li><strong>Filtro Shift:</strong> <code>Shift + Clique</code> em documento copia apenas os
-                                números/letras sem pontuação (preenchendo zeros à esquerda
-                                no CNJ).</li>
+                            <li><strong>Filtro Shift e Âncora do Cursor:</strong> <code>Shift + Clique</code> em documento copia apenas os
+                                números/letras sem pontuação (preenchendo zeros à esquerda no CNJ) e permite selecionar
+                                do cursor anterior até o ponto final — mesmo que você tenha clicado antes em uma
+                                palavra curta (ex.: <code>Se</code>) abaixo do mínimo de caracteres.</li>
+                            <li><strong>Alt + Clique Universal e Contorno Flash / Seleção do Sistema:</strong> Segurar <code>Alt</code>
+                                autoriza a seleção/cópia em qualquer área da tela (botões, links, rótulos ou editores)
+                                reutilizando exatamente o mesmo motor base (inclusive encolher/expandir). Por padrão,
+                                a opção combinada <em>Retirar Seleções do Sistema = Total</em> limpa a seleção azul nativa
+                                deixando o <strong>Contorno Flash</strong> (que acompanha rolagens e mudanças dinâmicas de layout).</li>
                             <li><strong>Duplo Esc (<code>Esc + Esc</code>):</strong> 2 toques sequenciais rápidos
                                 (&lt; 500ms) alternam instantaneamente "Remover Formatações"
                                 com aviso sonoro/visual. 1 Esc simples apenas cancela seleções visuais sem
@@ -2424,10 +2436,10 @@
                                     (<code>;</code>):</strong> Atuam como separadores e jamais colam na palavra clicada
                                 (clicar em <code>Brasília,</code> seleciona apenas
                                 <code>Brasília</code>).<br>
-                                • <strong>Documentos em 1 Clique:</strong> CNPJ (clássico ou
+                                • <strong>Documentos em 1 Clique e Encolhimento Intra-Bloco:</strong> CNPJ (clássico ou
                                 alfanumérico), CPF, Processo CNJ, SEI!, PIS/PASEP/NIT, RG, OAB, CEP, Datas
                                 numéricas, Horários, Percentuais (<code>100%</code>), Telefones e E-mails
-                                são copiados inteiros com 1 clique.
+                                são copiados inteiros com 1 clique. <strong>Regra Root de Encolher/Expandir:</strong> se um bloco/campo composto já estiver selecionado (válido ou inválido), o próximo clique simples dentro dele encolhe para o sub-segmento clicado (ex.: apenas dia, mês ou ano), clicar no separador (<code>/</code>, <code>.</code>, <code>-</code>) re-seleciona o bloco inteiro e o <strong>duplo clique</strong> dentro do bloco expande para fora dele.
                             </td>
                         </tr>
                         <tr>
@@ -2540,13 +2552,12 @@
                                 <code>Num. 2297820154 - Pág. 1</code> grava automaticamente
                                 <code>id 2297820154, pg. 1</code>.<br>
                                 • <strong>Seleção Elástica com <code>Ctrl</code> vs.
-                                    Seleção de Objetos com <code>Alt</code>:</strong> <code>Ctrl</code>
+                                    <code>Alt + Clique</code> Universal (Mesmo Motor Base):</strong> <code>Ctrl</code>
                                 continua, expande ou reduz a seleção existente por palavras. Já
-                                <code>Alt + Clique</code> <strong>inicia sempre uma nova seleção</strong>:
-                                ao clicar com <code>Alt</code> sobre links, botões (ex:
-                                <code>MARCAR TODOS COMO LIDOS</code>), etiquetas/spans (ex: <code>HOMOLOGAR ACORDO</code>), menus ou itens, seleciona e copia o texto do
-                                objeto (com <strong>1 clique</strong> respeita campo/registro interno se houver; com <strong>2 cliques</strong> seleciona obrigatoriamente <strong>todo</strong> o texto do objeto/link; com <strong>3 cliques</strong> em um link seleciona <strong>todo o texto do link mesmo que tenha 2 ou mais linhas, unificando tudo em uma linha só separada por espaços</strong>; ou permite <code>Alt + Arrastar</code> para copiar apenas parte do texto do
-                                link/botão).<br>
+                                <code>Alt + Clique</code> atua como autorização universal de seleção/cópia + interceptação
+                                de eventos em <strong>qualquer área da tela</strong> (botões, links, menus, rótulos semiflexíveis,
+                                caixas de texto ou editores) reutilizando exatamente o <strong>mesmo motor base</strong> sem <code>Alt</code>
+                                (respeitando encolhimento de blocos com 1 clique, expansão com 2 cliques, linha única com 3 cliques em links e <code>Alt + Arrastar</code> parcial).<br>
                                 • <strong>Modo Acumulador (<code>Ctrl+Alt</code>) e Colunas/Linhas de
                                     Tabelas:</strong> Une vários itens separados pelo símbolo configurado
                                 (padrão <code>;</code>, personalizável até 5
@@ -2859,15 +2870,15 @@
                             <li><strong>1. Espiar o que a extensão decidiu:</strong> Segure <code>Ctrl + Alt + Shift</code> e passe o mouse por cima de qualquer parte da página. Aparecerá um quadro mostrando qual dos 4 tipos está ativo ali e por qual motivo.</li>
                             <li><strong>2. Abrir o assistente no local desejado:</strong> Clique sobre o elemento segurando <code>Ctrl + Alt + Shift + Clique</code> (ou <code>Ctrl + Alt + Botão Direito</code>).</li>
                             <li><strong>3. Ajustar o alcance (Pai / Filho):</strong> Se você clicou em uma palavrinha dentro de um quadro e quer que a regra valha para o quadro inteiro, use <strong>↑ Pai</strong> no canto direito; para voltar, use <strong>↓ Filho</strong>.</li>
-                            <li><strong>4. Conferir antes de salvar:</strong> Clique em <strong>👁️ Testar</strong> — a janelinha fica transparente por alguns instantes e contorna na página tudo o que aquela regra vai atingir. Depois basta escolher o modo desejado (<em>Interface</em>, <em>SemiFlexível</em>, <em>Textual</em> ou <em>Editável</em>) e clicar em <strong>Salvar Regra</strong>.</li>
+                            <li><strong>4. Conferir antes de salvar:</strong> Clique em <strong>👁️ Testar</strong> — o diálogo fica translúcido até que você dê qualquer clique na tela ou pressione uma tecla comum (teclas modificadoras como <code>Ctrl</code>, <code>Alt</code> e <code>Shift</code> são ignoradas), contornando tudo o que a regra atinge; ao clicar ou apertar uma tecla comum, a opacidade volta ao normal sem fechar a janela.</li>
                         </ul>
                     </div>
                     <div class="card-estagio">
                         <h3>Opções extras e prioridade das regras</h3>
                         <ul>
-                            <li><strong>Suas regras mandam primeiro:</strong> Tudo que você cria fica em <em>Regras do Usuário</em> e tem prioridade sobre as <em>Regras Internas</em> que já vêm de fábrica na extensão.</li>
+                            <li><strong>Suas regras mandam primeiro (soberania total):</strong> Tudo que você cria fica em <em>Regras do Usuário</em> e prevalece sobre todas as <em>Regras Internas</em> e heurísticas automáticas (inclusive campos editáveis). Nas <em>Regras Internas</em>, os seletores universais aparecem primeiro organizados hierarquicamente como <code>Básico: Nível 0..8</code>, seguidos de toolbars de PDF/editores e áreas do PJe.</li>
                             <li><strong>Aplicar regra aos elementos filhos:</strong> Marcada por padrão. Faz a regra valer não só para a caixa selecionada, mas também para todos os textos e botões que estiverem dentro dela.</li>
-                            <li><strong>Continuar avaliando próximas regras:</strong> Útil para casos avançados — em vez de parar na primeira regra encontrada, permite que outra regra logo abaixo na mesma lista dê a palavra final para itens mais específicos dentro daquela área.</li>
+                            <li><strong>Continuar avaliando próximas regras:</strong> Útil para casos avançados — em vez de parar na primeira regra encontrada, permite que outra regra logo abaixo na mesma lista dê a palavra final para itens mais específicos dentro daquela área. Ao escolher o tipo <em>Textual</em>, ela já vem marcada por padrão; ao escolher <em>Interface</em> ou <em>SemiFlexível</em>, vem desmarcada por padrão, podendo ser alterada manualmente a qualquer momento depois.</li>
                             <li><strong>Desfazer / Compartilhar:</strong> Na aba <em>Configurações ➔ 1. Cópia Inteligente ➔ Mapeamento Manual Avançado</em>, você pode desativar temporariamente, excluir, exportar para JSON ou importar regras prontas de colegas.</li>
                         </ul>
                     </div>

@@ -533,23 +533,22 @@
                     );
                     if (clicouEmModalCritico) {
                         this.limparFlashBorderImediatamente();
-                        return;
-                    }
-                    /* Seção 6.136 / BUG-54: Clique dentro do contorno NÃO o retira (permite expandir/diminuir);
-                     * clique fora do contorno limpa imediatamente no modo temporizado/interação. */
-                    if (!pontoEstaDentroDoFlashAtual(e.clientX, e.clientY) && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-                        this.limparFlashBorderImediatamente();
                     }
                 };
 
                 const tratarCopiaOuSelecaoGlobalFlash = (e) => {
-                    if (e && e.type === 'selectstart' && e.target && this.#segmentosAtuaisFlash.length > 0) {
-                        try {
-                            const r = typeof e.target.getBoundingClientRect === 'function' ? e.target.getBoundingClientRect() : null;
-                            if (r && pontoEstaDentroDoFlashAtual((r.left + r.right) / 2, (r.top + r.bottom) / 2)) {
-                                return;
-                            }
-                        } catch (_) { }
+                    if (e && e.type === 'selectstart') {
+                        if (this.#duracaoAtivaFlash > 0) {
+                            return;
+                        }
+                        if (e.target && this.#segmentosAtuaisFlash.length > 0) {
+                            try {
+                                const r = typeof e.target.getBoundingClientRect === 'function' ? e.target.getBoundingClientRect() : null;
+                                if (r && pontoEstaDentroDoFlashAtual((r.left + r.right) / 2, (r.top + r.bottom) / 2)) {
+                                    return;
+                                }
+                            } catch (_) { }
+                        }
                     }
                     this.limparFlashBorderImediatamente();
                 };
@@ -557,6 +556,18 @@
                 const tratarScrollOuResizeFlash = () => {
                     this.atualizarPosicaoFlashSobRolagem();
                 };
+
+                /* Seção 6.137 / BUG-55: Observa mudanças no layout da página (DOM e redimensionamento de containers/corpo)
+                 * para manter o Flash Border fisicamente ancorado caso algum painel acima altere a altura após a cópia. */
+                if (this._desconectarObsLayoutFlash) {
+                    try { this._desconectarObsLayoutFlash(); } catch (_) { }
+                    this._desconectarObsLayoutFlash = null;
+                }
+                const obsLayoutFlash = this.#iniciarObservadorLayout(
+                    () => Boolean(document.getElementById('jusgov-flash-contour-container')),
+                    tratarScrollOuResizeFlash
+                );
+                this._desconectarObsLayoutFlash = obsLayoutFlash;
 
                 const opts = { capture: true, passive: true };
                 document.addEventListener('keydown', tratarKeyDownGlobalFlash, opts);
@@ -568,6 +579,7 @@
                 window.addEventListener('scroll', tratarScrollOuResizeFlash, opts);
                 document.addEventListener('scroll', tratarScrollOuResizeFlash, opts);
                 window.addEventListener('resize', tratarScrollOuResizeFlash, opts);
+                document.addEventListener('transitionend', tratarScrollOuResizeFlash, opts);
 
                 this.#limparOuvintesInteracaoFlash = () => {
                     document.removeEventListener('keydown', tratarKeyDownGlobalFlash, opts);
@@ -579,6 +591,11 @@
                     window.removeEventListener('scroll', tratarScrollOuResizeFlash, opts);
                     document.removeEventListener('scroll', tratarScrollOuResizeFlash, opts);
                     window.removeEventListener('resize', tratarScrollOuResizeFlash, opts);
+                    document.removeEventListener('transitionend', tratarScrollOuResizeFlash, opts);
+                    if (this._desconectarObsLayoutFlash) {
+                        try { this._desconectarObsLayoutFlash(); } catch (_) { }
+                        this._desconectarObsLayoutFlash = null;
+                    }
                 };
 
                 if (duracaoMs > 0) {
@@ -739,6 +756,66 @@
             }
         }
 
+        #ehMutacaoDeOverlayVisualProprio(target) {
+            const el = (target && target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
+            if (!el || !el.closest) return false;
+            return Boolean(el.closest(
+                '#jusgov-flash-contour-container, #jusgov-pasted-markers-container, #jusgov-validacao-flutuante, [data-jusgov-flash="true"], [data-jusgov-pasted-container="true"]'
+            ));
+        }
+
+        #iniciarObservadorLayout(estaAtivoFn, aoMudarFn) {
+            const desconectarCallbacks = [];
+            let encerrado = false;
+            const desconectar = () => {
+                if (encerrado) return;
+                encerrado = true;
+                for (const fn of desconectarCallbacks) {
+                    try { fn(); } catch (_) { }
+                }
+                desconectarCallbacks.length = 0;
+            };
+            const dispararSeAtivo = () => {
+                if (encerrado) return;
+                if (!estaAtivoFn()) {
+                    desconectar();
+                    return;
+                }
+                aoMudarFn();
+            };
+
+            const alvoDom = document.body || document.documentElement;
+            if (typeof MutationObserver === 'function' && alvoDom) {
+                const mutObs = new MutationObserver((muts) => {
+                    if (encerrado) return;
+                    const relevante = muts.some((m) => !this.#ehMutacaoDeOverlayVisualProprio(m.target));
+                    if (relevante) dispararSeAtivo();
+                });
+                mutObs.observe(alvoDom, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class', 'hidden', 'open', 'aria-hidden', 'aria-selected', 'aria-expanded', 'disabled']
+                });
+                desconectarCallbacks.push(() => mutObs.disconnect());
+            }
+
+            if (typeof ResizeObserver === 'function' && alvoDom) {
+                const resObs = new ResizeObserver(() => dispararSeAtivo());
+                resObs.observe(alvoDom);
+                desconectarCallbacks.push(() => resObs.disconnect());
+            }
+
+            const onTransitionEnd = (ev) => {
+                if (!this.#ehMutacaoDeOverlayVisualProprio(ev && ev.target)) dispararSeAtivo();
+            };
+            document.addEventListener('transitionend', onTransitionEnd, { capture: true, passive: true });
+            desconectarCallbacks.push(() => document.removeEventListener('transitionend', onTransitionEnd, true));
+
+            return desconectar;
+        }
+
         #garantirOuvintesScrollMarcadoresPermanentes() {
             if (this.#ouvinteScrollMarcadoresAtivo) return;
             const atualizarImediato = () => {
@@ -752,32 +829,12 @@
             window.addEventListener('resize', atualizarImediato, opts);
             window.addEventListener('hashchange', agendar, opts);
             window.addEventListener('popstate', agendar, opts);
-            document.addEventListener('transitionend', agendar, opts);
             document.addEventListener('visibilitychange', agendar, opts);
 
-            let observerDom = null;
-            if (typeof MutationObserver === 'function' && (document.body || document.documentElement)) {
-                observerDom = new MutationObserver((muts) => {
-                    if (this.#marcadoresPermanentes.length === 0) return;
-                    const relevante = muts.some((m) => {
-                        const t = m.target;
-                        const el = (t && t.nodeType === Node.TEXT_NODE) ? t.parentElement : t;
-                        return !(el && el.closest && el.closest('[data-jusgov-ignore="true"]'));
-                    });
-                    if (relevante) agendar();
-                });
-                try {
-                    observerDom.observe(document.body || document.documentElement, {
-                        childList: true,
-                        subtree: true,
-                        characterData: true,
-                        attributes: true,
-                        attributeFilter: ['style', 'class', 'hidden', 'aria-hidden', 'aria-selected', 'aria-expanded', 'disabled']
-                    });
-                } catch (_) {
-                    observerDom = null;
-                }
-            }
+            const desconectarLayoutMarcadores = this.#iniciarObservadorLayout(
+                () => this.#marcadoresPermanentes.length > 0,
+                agendar
+            );
 
             this.#ouvinteScrollMarcadoresAtivo = true;
             this.#limparOuvinteScrollMarcadores = () => {
@@ -786,12 +843,8 @@
                 window.removeEventListener('resize', atualizarImediato, opts);
                 window.removeEventListener('hashchange', agendar, opts);
                 window.removeEventListener('popstate', agendar, opts);
-                document.removeEventListener('transitionend', agendar, opts);
                 document.removeEventListener('visibilitychange', agendar, opts);
-                if (observerDom) {
-                    try { observerDom.disconnect(); } catch (_) { }
-                    observerDom = null;
-                }
+                try { desconectarLayoutMarcadores(); } catch (_) { }
                 if (this.#rafScrollMarcadores && typeof cancelAnimationFrame === 'function') {
                     cancelAnimationFrame(this.#rafScrollMarcadores);
                     this.#rafScrollMarcadores = 0;

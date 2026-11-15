@@ -559,12 +559,18 @@
 
     (function carregarRegrasInternasInterface() {
         try {
+            if (typeof window !== 'undefined' && Array.isArray(window.__JUSGOV_INTERFACE_JSON__)) {
+                regrasInternasInterface = window.__JUSGOV_INTERFACE_JSON__.filter(r => r && r.origem !== 'usuario');
+            }
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
                 fetch(chrome.runtime.getURL('src/cfg/interface.json'))
                     .then((resp) => resp && resp.ok ? resp.json() : [])
                     .then((dados) => {
                         if (Array.isArray(dados)) {
                             regrasInternasInterface = dados.filter(r => r && r.origem !== 'usuario');
+                            cacheClassificacaoCustomEl = null;
+                            cacheClassificacaoCustomTs = 0;
+                            cacheClassificacaoCustomRes = null;
                         }
                     })
                     .catch(() => { });
@@ -772,8 +778,15 @@
                         if (ATRIBUTOS_CLIQUE.has(attrNome)) {
                             return `atributo ${attrNome} em ${descNo} (${onde})`;
                         }
-                        /* Seção 6.144 (Google Wiz / DevConsole): jsaction em containers/ancestrais ou hooks de ciclo de vida não tornam texto corrido em interface */
-                        if (attrNome === 'jsaction' && profundidade === 1 && !TAGS_ESTRUTURAIS_WIZ.has(tagAtual)) {
+                        /* Seção 6.144 (Google Wiz / DevConsole): jsaction em containers/ancestrais ou hooks de ciclo de vida não tornam texto corrido em interface;
+                         * aceita ancestral direto (+1, profundidade <= 2) apenas se for wrapper compacto de botão/controle sem blocos de leitura internos. */
+                        const jsActionEmWrapperCurto = (
+                            profundidade === 2 &&
+                            !TAGS_ESTRUTURAIS_WIZ.has(tagAtual) &&
+                            (!atual.querySelector || !atual.querySelector('p, h1, h2, h3, h4, h5, h6, article, section, main, pre, code, table')) &&
+                            String(atual.textContent || '').trim().length <= 80
+                        );
+                        if (attrNome === 'jsaction' && !TAGS_ESTRUTURAIS_WIZ.has(tagAtual) && (profundidade === 1 || jsActionEmWrapperCurto)) {
                             const valJsAction = String(atual.attributes[a].value || '');
                             if (RX_JSACTION_CLIQUE.test(valJsAction)) {
                                 return `atributo jsaction (clique) em ${descNo} (${onde})`;
@@ -871,13 +884,13 @@
                     diag.rotuloDetalhe = 'Cursor CSS';
                     diag.detalhe = `cursor: ${cur}`;
                     registrarEtapa('1. Mouse', `cursor: ${cur}`, 'textual', false);
-                } else if (cur === 'default' || cur === 'arrow' || cur === 'context-menu' || cur === 'help') {
+                } else if (cur === 'default' || cur === 'arrow' || cur === 'context-menu') {
                     diag.tipo = 'semiflexivel';
                     diag.origem = 'Cursor do Mouse';
                     diag.rotuloDetalhe = 'Cursor CSS';
                     diag.detalhe = `cursor: ${cur}`;
                     registrarEtapa('1. Mouse', `cursor: ${cur}`, 'semiflexivel', false);
-                } else if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grabbing' || cur === 'grab' || cur === 'progress') {
+                } else if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grabbing' || cur === 'grab' || cur === 'progress' || cur === 'help') {
                     diag.tipo = 'interface';
                     diag.origem = 'Cursor do Mouse';
                     diag.rotuloDetalhe = 'Cursor CSS';
@@ -967,6 +980,7 @@
     }
 
     let painelInspetorTempoRealEl = null;
+    const ID_FRAME_INSPETOR_ATUAL = 'jusgov_insp_' + Math.random().toString(36).slice(2);
 
     function ocultarInspetorTempoReal() {
         if (painelInspetorTempoRealEl && painelInspetorTempoRealEl.parentNode) {
@@ -975,10 +989,29 @@
         painelInspetorTempoRealEl = null;
     }
 
+    function notificarOutrosFramesOcultarInspetor() {
+        try {
+            const payload = { __jusgovAcao: 'OCULTAR_INSPETOR_TEMPO_REAL', origemId: ID_FRAME_INSPETOR_ATUAL };
+            if (window.top && window.top !== window) {
+                window.top.postMessage(payload, '*');
+            } else if (window.frames && window.frames.length > 0) {
+                for (let i = 0; i < window.frames.length; i++) {
+                    try { window.frames[i].postMessage(payload, '*'); } catch (_) { }
+                }
+            }
+        } catch (_) { }
+    }
+
     function atualizarInspetorTempoReal(x, y, alvo) {
         if (typeof document === 'undefined' || !document.body) return;
         const base = (alvo && alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
         if (!base || (base.closest && base.closest('[data-jusgov-ignore="true"]'))) return;
+        if (base.tagName === 'IFRAME' || base.tagName === 'FRAME') {
+            ocultarInspetorTempoReal();
+            return;
+        }
+
+        notificarOutrosFramesOcultarInspetor();
 
         if (!painelInspetorTempoRealEl) {
             painelInspetorTempoRealEl = document.createElement('div');
@@ -1063,10 +1096,26 @@
             painelInspetorTempoRealEl.appendChild(boxTrilha);
         }
 
-        const left = Math.min(x + 16, window.innerWidth - 435);
-        const top = Math.min(y + 16, window.innerHeight - 210);
-        painelInspetorTempoRealEl.style.left = `${Math.max(8, left)}px`;
-        painelInspetorTempoRealEl.style.top = `${Math.max(8, top)}px`;
+        const rectPainel = painelInspetorTempoRealEl.getBoundingClientRect();
+        const larguraPainel = rectPainel.width || 420;
+        const alturaPainel = rectPainel.height || 200;
+        const margemTela = 8;
+        const deslocamentoCursor = 16;
+
+        let left = x + deslocamentoCursor;
+        if (left + larguraPainel > window.innerWidth - margemTela) {
+            left = x - larguraPainel - deslocamentoCursor;
+        }
+        left = Math.max(margemTela, Math.min(left, window.innerWidth - larguraPainel - margemTela));
+
+        let top = y + deslocamentoCursor;
+        if (top + alturaPainel > window.innerHeight - margemTela) {
+            top = y - alturaPainel - deslocamentoCursor;
+        }
+        top = Math.max(margemTela, Math.min(top, window.innerHeight - alturaPainel - margemTela));
+
+        painelInspetorTempoRealEl.style.left = `${Math.round(left)}px`;
+        painelInspetorTempoRealEl.style.top = `${Math.round(top)}px`;
     }
 
     const dialogoMapeamento = (typeof window !== 'undefined' && window.JusGovDialogoMapeamentoRegra) ? new window.JusGovDialogoMapeamentoRegra() : null;
@@ -1264,7 +1313,13 @@
      */
     function isComponenteBotaoOuFormularioEstrito(el) {
         if (!el) return false;
-        return classificarContextoElementoAlvo(el) === 'LINK_CLICAVEL';
+        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+        if (!base || base.nodeType !== Node.ELEMENT_NODE) return false;
+        const ctx = classificarContextoElementoAlvo(base);
+        if (ctx !== 'LINK_CLICAVEL' && ctx !== 'CAMPO_SIMPLES_EDITAVEL') return false;
+        return Boolean(base.closest && base.closest(
+            'button, input, select, textarea, label, option, optgroup, summary, [role="button"], [role="combobox"], [role="switch"], [role="checkbox"], [role="radio"], [role="slider"], [role="spinbutton"], .btn, [class*="btn-"], .button, [class*="-button"], .mat-button, .mat-icon-button, .mat-raised-button, .mat-flat-button, .mat-stroked-button, .p-button, .ui-button'
+        ));
     }
 
     /*
@@ -1530,7 +1585,13 @@
             }
             if (sub && sub !== elLink && elLink.children.length > 1) {
                 const brsSub = Array.from(sub.querySelectorAll('br'));
-                if (brsSub.length === 0) {
+                const rectSubBase = sub.getBoundingClientRect ? sub.getBoundingClientRect() : null;
+                const temIrmaoNaMesmaLinha = rectSubBase && rectSubBase.height > 0 && Array.from(elLink.children).some((irmao) => {
+                    if (irmao === sub || !irmao.getBoundingClientRect) return false;
+                    const rIrmao = irmao.getBoundingClientRect();
+                    return rIrmao.height > 0 && rIrmao.width > 0 && Math.abs(rIrmao.top - rectSubBase.top) < 5;
+                });
+                if (brsSub.length === 0 && !temIrmaoNaMesmaLinha) {
                     const rectsSub = Array.from(sub.getClientRects());
                     let temQuebraVisualInterna = false;
                     if (rectsSub.length > 1) {
@@ -1713,6 +1774,78 @@
     }
 
     /*
+     * FUNCAO: resolverRangeAltEmInterface
+     * Modificador de Alt + Clique dentro do fluxo normal em elementos de interface ('LINK_CLICAVEL'):
+     * - Em bloco verificável (CPF, CNPJ, data, processo, etc.):
+     *     1 clique: apenas o bloco verificável;
+     *     2 cliques: a linha ativa inteira (se múltiplas linhas) ou a interface;
+     *     3+ cliques: todo o texto da interface (todas as linhas, com texto unificado em links).
+     * - Fora de bloco verificável:
+     *     1 clique: a linha ativa inteira (se múltiplas linhas) ou a interface;
+     *     2+ cliques: todo o texto da interface (todas as linhas, com texto unificado em links).
+     */
+    function resolverRangeAltEmInterface(alvo, ponto, clientX, clientY, numCliques = 1, mapa = null) {
+        if (!alvo) return null;
+        const elBase = (alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
+        let elInterface = obterObjetoInterativoParaSelecaoCompleta(alvo);
+        if (!elInterface && elBase && elBase !== document.body && elBase !== document.documentElement && !isContainerComposto(elBase)) {
+            elInterface = elBase;
+        }
+        if (!elInterface || elInterface === document.body || elInterface === document.documentElement) {
+            return null;
+        }
+
+        let clicouEmBlocoVerificavel = false;
+        let rangeBlocoVerificavel = null;
+        let txtBlocoVerificavel = '';
+        if (mapa && typeof mapa.texto === 'string' && typeof mapa.idxCursor === 'number') {
+            const resBloco = localizarBlocoForenseAutoSelecionavelEmInterface(mapa.texto, mapa.idxCursor, 1, false);
+            if (resBloco) {
+                const trecho = mapa.texto.slice(resBloco.inicio, resBloco.fim).trim();
+                if (trecho && isBlocoVerificavel(trecho)) {
+                    const rBloco = criarRangeDOMAPartirDeIndices(mapa, resBloco.inicio, resBloco.fim);
+                    if (rBloco) {
+                        clicouEmBlocoVerificavel = true;
+                        rangeBlocoVerificavel = rBloco;
+                        txtBlocoVerificavel = (extrairTextoPuroSanitizado(rBloco) || trecho).trim();
+                    }
+                }
+            }
+        }
+
+        if (clicouEmBlocoVerificavel && numCliques === 1 && rangeBlocoVerificavel && txtBlocoVerificavel) {
+            return { range: rangeBlocoVerificavel, texto: txtBlocoVerificavel, ehBlocoVerificavel: true };
+        }
+
+        const ehLinkAlvo = Boolean(
+            (elInterface.tagName === 'A' || (typeof elInterface.getAttribute === 'function' && elInterface.getAttribute('role') === 'link')) ||
+            (typeof elInterface.closest === 'function' && elInterface.closest('a, [role="link"]'))
+        );
+        const rangeCompleto = criarRangeTextoParaEtiquetaOuObjeto(elInterface);
+        const textoCompleto = ehLinkAlvo
+            ? (extrairTextoLinkUmaLinha(elInterface) || extrairTextoVisivelLimpoDeElemento(elInterface))
+            : (rangeCompleto
+                ? (extrairTextoPuroSanitizado(rangeCompleto) || rangeCompleto.toString() || '').trim()
+                : extrairTextoVisivelLimpoDeElemento(elInterface));
+
+        const deveSelecionarApenasLinha = (clicouEmBlocoVerificavel && numCliques === 2) || (!clicouEmBlocoVerificavel && numCliques === 1);
+        if (deveSelecionarApenasLinha && isLinkMultilinha(elInterface)) {
+            const resLinha = extrairLinhaClicadaDeLink(elInterface, clientX, clientY, ponto ? ponto.no : null);
+            if (resLinha && resLinha.range) {
+                const txtLinha = (extrairTextoPuroSanitizado(resLinha.range) || resLinha.texto || resLinha.range.toString() || '').trim();
+                if (txtLinha) {
+                    return { range: resLinha.range, texto: txtLinha, ehBlocoVerificavel: false };
+                }
+            }
+        }
+
+        if (rangeCompleto && textoCompleto) {
+            return { range: rangeCompleto, texto: textoCompleto, ehBlocoVerificavel: false, forcarUmaLinha: ehLinkAlvo };
+        }
+        return null;
+    }
+
+    /*
      * FUNCAO: extrairTextoLinkUmaLinha
      * DIRETRIZ ROOT 6.28 (Alt + 3 Cliques em Links):
      * Seleciona e extrai TODO O TEXTO VISIVEL de um link (<a> ou [role="link"]),
@@ -1817,18 +1950,22 @@
         if (modoRetirarSelecao === 'nenhuma') return true;
         if (modoRetirarSelecao === 'total') return false;
         if (!noOuElemento) return true;
-        const regraCustom = obterClassificacaoRegraCustomizada(noOuElemento);
-        if (regraCustom) {
-            const ctxRegra = mapearTipoParaContextoAlvo(regraCustom, noOuElemento);
-            if (ctxRegra) {
-                return (ctxRegra !== 'LINK_CLICAVEL' && ctxRegra !== 'SEMIFLEXIVEL' && ctxRegra !== 'IGNORAR');
+        /* Regra manual explícita do usuário (Mapeamento Manual Avançado) tem prioridade sobre total_exceto_arrasto */
+        const regraUsuario = obterClassificacaoRegraCustomizada(noOuElemento, true);
+        if (regraUsuario) {
+            const ctxUsuario = mapearTipoParaContextoAlvo(regraUsuario, noOuElemento);
+            if (ctxUsuario) {
+                return (ctxUsuario !== 'LINK_CLICAVEL' && ctxUsuario !== 'SEMIFLEXIVEL' && ctxUsuario !== 'IGNORAR');
             }
+        }
+        const ctx = classificarContextoElementoAlvo(noOuElemento);
+        if (ctx === 'LINK_CLICAVEL' || ctx === 'SEMIFLEXIVEL' || ctx === 'IGNORAR') {
+            return false;
         }
         if (modoRetirarSelecao === 'total_exceto_arrasto') {
             return (eraArrasto === true);
         }
-        const ctx = classificarContextoElementoAlvo(noOuElemento);
-        return (ctx !== 'LINK_CLICAVEL' && ctx !== 'SEMIFLEXIVEL' && ctx !== 'IGNORAR');
+        return true;
     }
 
     /*
@@ -3233,8 +3370,8 @@
 
     function dispararFlashBorderVisual(rangeAlvo, duracaoCustomMs, corCustomHex) {
         const duracaoMs = (typeof duracaoCustomMs === 'number') ? duracaoCustomMs : (tempoFlashBorderMs !== 0 ? tempoFlashBorderMs : -1);
-        if (duracaoMs === 0 || !rangeAlvo) return;
         limparFlashBorderImediatamente();
+        if (duracaoMs === 0 || !rangeAlvo) return;
         const cor = corCustomHex || corFlashBorder;
         if (visual) {
             visual.dispararFlashBorderVisual(rangeAlvo, duracaoMs, cor);
@@ -3731,6 +3868,16 @@
             }
         } else if (!apenasBlocoOuAtomica && clicouEmDelimitadorOuAspas) {
             resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
+            /* BUG-39: Se clicou exatamente no caractere delimitador/aspas (ex.: ')' ao final de citação),
+             * só mantém match composto se ele efetivamente cobrir idxCursor (ex.: '(61) 3300-1000');
+             * se o match composto terminou ANTES de idxCursor (dropou ')'), delega aos delimitadores simétricos. */
+            if (
+                resultadoIndices &&
+                (eDelimitadorPar(charNoCursor) || eCaractereAspas(charNoCursor)) &&
+                !(resultadoIndices.inicio <= idxCursor && idxCursor < resultadoIndices.fim)
+            ) {
+                resultadoIndices = null;
+            }
             if (resultadoIndices) ehBlocoCompostoSelecionado = true;
             if (!resultadoIndices) {
                 resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
@@ -4142,8 +4289,9 @@
                 limparFlashBorderImediatamente();
                 limparAvisosAuditoriaEWikiImediatamente();
             } else if (!cliqueDentroDaSelecaoAtiva && !e.shiftKey && (!e || typeof e.button !== 'number' || e.button === 0 || e.button === 1 || e.button === 2)) {
-                /* No modo Até Interação (Padrão / -1), o Flash é preservado mesmo com cliques, sumindo apenas em nova seleção/cópia */
-                if (CONFIGURACAO_MOTOR.tempoFlashBorderMs !== -1) {
+                /* Contorno Visual (Flash) obedece apenas ao seu proprio parametro (tempoFlashBorderMs):
+                 * -1 (Ate Interacao) ou > 0 (Temporizado) nao sao cancelados por um clique comum sem nova copia. */
+                if (tempoFlashBorderMs === 0) {
                     limparFlashBorderImediatamente();
                 }
                 limparAvisosAuditoriaEWikiImediatamente();
@@ -5041,8 +5189,6 @@
                                         await aplicarSelecaoECopiar(rangeComposto, false, textoLimpo, {
                                             forcarDesselecao: true
                                         });
-                                        const sel = window.getSelection();
-                                        if (sel) sel.removeAllRanges();
                                         ignorarProximoClick = false;
                                         return;
                                     }
@@ -5058,6 +5204,13 @@
 
         async function tentarFallbackAltElementoSemTexto(alvo) {
             if (!e.altKey || !alvo) return false;
+            if ((tipoContexto === 'LINK_CLICAVEL' || tipoContexto === 'SEMIFLEXIVEL') && (e.detail === 1 || e.detail === 2)) {
+                const resAltInterface = resolverRangeAltEmInterface(alvo, null, e.clientX, e.clientY, e.detail);
+                if (resAltInterface && resAltInterface.range && resAltInterface.texto) {
+                    await aplicarSelecaoECopiar(resAltInterface.range, modoAcumulador, resAltInterface.texto, { temModificador: true, minimoCaracteres: 1 });
+                    return true;
+                }
+            }
             const elInterativo = obterObjetoInterativoParaSelecaoCompleta(alvo);
             if (elInterativo) {
                 const txtInterativo = extrairTextoVisivelLimpoDeElemento(elInterativo);
@@ -5111,9 +5264,15 @@
 
         const { texto, idxCursor } = mapa;
 
+        const ehAltIsoladoEmInterface = Boolean(
+            e.altKey && !e.ctrlKey && !e.shiftKey &&
+            (tipoContexto === 'LINK_CLICAVEL' || tipoContexto === 'SEMIFLEXIVEL') &&
+            e.detail >= 1
+        );
+
         /* Passo 9.7.2: 3 Cliques (e.detail >= 3): tendencia a minorar em blocos compostos ("12.016/2009" -> "12.016" ou "2009")
          * e selecao estritamente localizada ao clicar 3 vezes no inicio de um paragrafo (sem invadir paragrafos vizinhos). */
-        if (e.detail >= 3) {
+        if (e.detail >= 3 && !ehAltIsoladoEmInterface) {
             const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
             if (resTriplo) {
                 const rangeTriplo = criarRangeDOMAPartirDeIndices(mapa, resTriplo.inicio, resTriplo.fim);
@@ -5201,6 +5360,10 @@
             }
         }
 
+        let rangeFinal = null;
+        let textoCandidato = '';
+        let ehBlocoCompostoSelecionado = false;
+
         const blocoCompostoPrevio = ehDuploClique
             ? (ultimoBlocoCompostoAtivo || (() => {
                 const rb = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
@@ -5210,61 +5373,78 @@
 
         const resExpansao = resolverIndicesExpansaoBase(mapa, idxCursor, e.detail, { blocoCompostoPrevio, ehAlt: Boolean(e.altKey) });
         const resultadoIndices = resExpansao ? resExpansao.resultadoIndices : null;
-        const ehBlocoCompostoSelecionado = Boolean(resExpansao && resExpansao.ehBlocoCompostoSelecionado);
+        ehBlocoCompostoSelecionado = Boolean(resExpansao && resExpansao.ehBlocoCompostoSelecionado);
 
-        if (ehDuploClique && blocoCompostoPrevio && (!resultadoIndices || texto.slice(resultadoIndices.inicio, resultadoIndices.fim).trim().length <= blocoCompostoPrevio.texto.length)) {
-            const blocoFora = obterBlocoAncestralContextual(elAlvoEfetivo);
-            if (blocoFora && blocoFora !== document.body) {
-                const rangeFora = document.createRange();
-                rangeFora.selectNodeContents(blocoFora);
-                ultimoBlocoCompostoAtivo = null;
-                estadoCicloSelecao = {
-                    direcao: 1,
-                    textoAtual: (extrairTextoPuroSanitizado(rangeFora) || rangeFora.toString()).trim()
-                };
-                await aplicarSelecaoECopiar(rangeFora, modoAcumulador, null, { temModificador: temModificadorTeclado });
-                return;
-            }
-        }
+        if (ehAltIsoladoEmInterface) {
+            const txtBaseAlt = resultadoIndices ? mapa.texto.slice(resultadoIndices.inicio, resultadoIndices.fim).trim() : '';
+            const ehBlocoVerificavelBase = Boolean(txtBaseAlt && (ehBlocoCompostoSelecionado || isBlocoVerificavel(txtBaseAlt)));
+            const motorJaExpandiuTrecho = Boolean(txtBaseAlt && /\s/.test(txtBaseAlt));
 
-        if (!resultadoIndices) {
-            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
-            return;
-        }
-
-        let rangeFinal = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
-        if (!rangeFinal) {
-            await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
-            return;
-        }
-
-        let textoCandidato = (mapa && typeof mapa.texto === 'string')
-            ? mapa.texto.slice(resultadoIndices.inicio, resultadoIndices.fim)
-            : '';
-
-        /* DIRETRIZ UNIVERSAL ANTI-ESTAGNAÇÃO POR CLIQUES:
-         * Se ehDuploClique e o texto candidato for igual ao já selecionado/copiado anteriormente, amplia imediatamente! */
-        if (ehDuploClique && ultimoTextoSelecionadoLimpo && textoCandidato.trim() === ultimoTextoSelecionadoLimpo.trim()) {
-            const resSentenca = expandirSentencaCompletaAtePonto(texto, idxCursor) || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
-            if (resSentenca && (resSentenca.fim - resSentenca.inicio) > (resultadoIndices.fim - resultadoIndices.inicio)) {
-                const rSent = criarRangeDOMAPartirDeIndices(mapa, resSentenca.inicio, resSentenca.fim);
-                if (rSent) {
-                    const txtSent = (extrairTextoPuroSanitizado(rSent) || rSent.toString()).trim();
-                    if (txtSent && txtSent !== ultimoTextoSelecionadoLimpo.trim()) {
-                        rangeFinal = rSent;
-                        textoCandidato = txtSent;
-                    }
+            if (e.detail >= 2 || (!ehBlocoVerificavelBase && !motorJaExpandiuTrecho)) {
+                const resAltInterface = resolverRangeAltEmInterface(elAlvoEfetivo, ponto, e.clientX, e.clientY, e.detail, mapa);
+                if (resAltInterface && resAltInterface.range) {
+                    rangeFinal = resAltInterface.range;
+                    textoCandidato = resAltInterface.texto || '';
+                    ehBlocoCompostoSelecionado = Boolean(resAltInterface.ehBlocoVerificavel);
                 }
             }
-            if (textoCandidato.trim() === ultimoTextoSelecionadoLimpo.trim()) {
-                const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
-                if (bloco && bloco !== document.body) {
-                    const rBloco = document.createRange();
-                    rBloco.selectNodeContents(bloco);
-                    const txtBloco = (extrairTextoPuroSanitizado(rBloco) || rBloco.toString()).trim();
-                    if (txtBloco && txtBloco !== ultimoTextoSelecionadoLimpo.trim()) {
-                        rangeFinal = rBloco;
-                        textoCandidato = txtBloco;
+        }
+
+        if (!rangeFinal) {
+            if (ehDuploClique && blocoCompostoPrevio && (!resultadoIndices || texto.slice(resultadoIndices.inicio, resultadoIndices.fim).trim().length <= blocoCompostoPrevio.texto.length)) {
+                const blocoFora = obterBlocoAncestralContextual(elAlvoEfetivo);
+                if (blocoFora && blocoFora !== document.body) {
+                    const rangeFora = document.createRange();
+                    rangeFora.selectNodeContents(blocoFora);
+                    ultimoBlocoCompostoAtivo = null;
+                    estadoCicloSelecao = {
+                        direcao: 1,
+                        textoAtual: (extrairTextoPuroSanitizado(rangeFora) || rangeFora.toString()).trim()
+                    };
+                    await aplicarSelecaoECopiar(rangeFora, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                    return;
+                }
+            }
+
+            if (!resultadoIndices) {
+                await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
+                return;
+            }
+
+            rangeFinal = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
+            if (!rangeFinal) {
+                await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
+                return;
+            }
+
+            textoCandidato = (mapa && typeof mapa.texto === 'string')
+                ? mapa.texto.slice(resultadoIndices.inicio, resultadoIndices.fim)
+                : '';
+
+            /* DIRETRIZ UNIVERSAL ANTI-ESTAGNAÇÃO POR CLIQUES:
+             * Se ehDuploClique e o texto candidato for igual ao já selecionado/copiado anteriormente, amplia imediatamente! */
+            if (!ehAltIsoladoEmInterface && ehDuploClique && ultimoTextoSelecionadoLimpo && textoCandidato.trim() === ultimoTextoSelecionadoLimpo.trim()) {
+                const resSentenca = expandirSentencaCompletaAtePonto(texto, idxCursor) || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
+                if (resSentenca && (resSentenca.fim - resSentenca.inicio) > (resultadoIndices.fim - resultadoIndices.inicio)) {
+                    const rSent = criarRangeDOMAPartirDeIndices(mapa, resSentenca.inicio, resSentenca.fim);
+                    if (rSent) {
+                        const txtSent = (extrairTextoPuroSanitizado(rSent) || rSent.toString()).trim();
+                        if (txtSent && txtSent !== ultimoTextoSelecionadoLimpo.trim()) {
+                            rangeFinal = rSent;
+                            textoCandidato = txtSent;
+                        }
+                    }
+                }
+                if (textoCandidato.trim() === ultimoTextoSelecionadoLimpo.trim()) {
+                    const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
+                    if (bloco && bloco !== document.body) {
+                        const rBloco = document.createRange();
+                        rBloco.selectNodeContents(bloco);
+                        const txtBloco = (extrairTextoPuroSanitizado(rBloco) || rBloco.toString()).trim();
+                        if (txtBloco && txtBloco !== ultimoTextoSelecionadoLimpo.trim()) {
+                            rangeFinal = rBloco;
+                            textoCandidato = txtBloco;
+                        }
                     }
                 }
             }
@@ -6715,6 +6895,29 @@
         }, { capture: true, signal });
         window.addEventListener('keyup', aoSoltarTecla, { capture: true, passive: true, signal });
         window.addEventListener('blur', ocultarInspetorTempoReal, { signal });
+        document.addEventListener('mouseleave', ocultarInspetorTempoReal, { signal });
+        document.addEventListener('mouseout', (evOut) => {
+            if (evOut && !evOut.relatedTarget) {
+                ocultarInspetorTempoReal();
+            }
+        }, { signal });
+        window.addEventListener('message', (evMsg) => {
+            const d = evMsg && evMsg.data;
+            if (!d || d.__jusgovAcao !== 'OCULTAR_INSPETOR_TEMPO_REAL') return;
+            if (d.origemId !== ID_FRAME_INSPETOR_ATUAL) {
+                ocultarInspetorTempoReal();
+            }
+            if (window === window.top && window.frames && window.frames.length > 0 && d.__repassado !== true) {
+                const payloadRepasse = { __jusgovAcao: d.__jusgovAcao, origemId: d.origemId, __repassado: true };
+                for (let i = 0; i < window.frames.length; i++) {
+                    try {
+                        if (window.frames[i] !== evMsg.source) {
+                            window.frames[i].postMessage(payloadRepasse, '*');
+                        }
+                    } catch (_) { }
+                }
+            }
+        }, { signal });
 
         /* Captura passiva e silenciosa de cópias manuais na página (Ctrl+C nativo do SO) para a Memória Interna de 2 Níveis */
         document.addEventListener('copy', () => {
@@ -6764,11 +6967,12 @@
                 (validador && validador.timestampCriacaoAviso) ? validador.timestampCriacaoAviso : 0
             );
             if ((agoraPerf - tsRef) < 40) return;
-            /* Seção 6.90 / BUG-37: No modo Até Interação (-1), o contorno visual só sai com interação humana real */
+            /* Retirar Seleções do Sistema (window.getSelection) e Contorno Visual (tempoFlashBorderMs) são independentes:
+             * a perda da seleção nativa do sistema não deve encerrar o contorno visual antes do parâmetro próprio. */
             if (tempoFlashBorderMs === -1) return;
             const selAtual = window.getSelection();
             if (!selAtual || selAtual.rangeCount === 0 || selAtual.isCollapsed || selAtual.toString().trim().length === 0) {
-                agendarRetiradaFlashAposDesselecao(true);
+                limparAvisosAuditoriaEWikiImediatamente(true);
             }
         }, { passive: true, signal });
         window.addEventListener('load', (e) => {
@@ -7500,6 +7704,10 @@
         resolverSelecaoTriploClique,
         construirMapaTextoBlocoComJanela,
         resolverIndicesExpansaoBase,
+        ehTextoBlocoMultiSegmento,
+        resolverLimitesBlocoAtivoNaJanela,
+        resolverSubSegmentoNoBlocoComposto,
+        obterAncoraCursorShift: () => ancoraCursorShift,
         simularCliqueEmTexto(texto, idxZeroBased, numCliques = 1, ehAlt = false) {
             if (typeof texto !== 'string' || texto.length === 0) return '';
             if (idxZeroBased < 0 || idxZeroBased >= texto.length) return '';
@@ -7588,6 +7796,7 @@
         isLinkMultilinha,
         extrairLinhaClicadaDeLink,
         criarRangeTextoParaEtiquetaOuObjeto,
+        resolverRangeAltEmInterface,
         isContainerComposto,
         obterObjetoInterativoParaSelecaoCompleta,
         dispararFlashBorderVisual,
@@ -7638,6 +7847,8 @@
         },
         obterClassificacaoRegraCustomizada,
         obterDiagnosticoElemento,
+        atualizarInspetorTempoReal,
+        ocultarInspetorTempoReal,
         validarExpressaoSeletor,
         normalizarExpressaoAtributoCss,
         elementoCorrespondeXPath,

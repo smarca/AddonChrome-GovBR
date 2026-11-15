@@ -56,11 +56,16 @@
         }
 
         /**
-         * Retorna a chave textual da data local atual no formato YYYY-MM-DD.
+         * Retorna a chave textual do dia lógico de trabalho (YYYY-MM-DD),
+         * considerando a virada de dia às 04:00 da manhã para acomodar serões.
+         * @param {number} [ts]
          * @returns {string}
          */
-        obterDataLocalChaveHoje() {
-            const d = new Date();
+        obterDataLocalChaveHoje(ts = Date.now()) {
+            const d = new Date(ts);
+            if (d.getHours() < 4) {
+                d.setDate(d.getDate() - 1);
+            }
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
@@ -68,31 +73,70 @@
         }
 
         /**
-         * Recupera o estado diário atual do storage ou cria um novo registro zerado para hoje.
-         * @returns {Promise<Object>}
+         * Cria um registro diário zerado para a chave de dia lógico informada.
+         * @param {string} dataChave
+         * @param {number} [agora]
+         * @returns {Object}
          */
-        async obterOuIniciarEstadoTrabalhoHoje() {
-            const hoje = this.obterDataLocalChaveHoje();
-            const agora = Date.now();
-            const dados = await chrome.storage.local.get(['jusgovTrabalhoEstado']);
-            const atual = dados.jusgovTrabalhoEstado;
-            if (atual && atual.data === hoje) {
-                return atual;
-            }
-            const novo = {
-                data: hoje,
+        criarEstadoTrabalhoZerado(dataChave, agora = Date.now()) {
+            return {
+                data: dataChave,
                 inicioTs: agora,
                 ultimaAtividadeTs: agora,
                 corridoMinutos: 0,
                 ativoMinutos: 0,
+                pausasMinutos: 0,
+                pausasConfirmadas: 0,
+                emPausa: false,
+                minutosInativosPendentes: 0,
                 alertaCorridoDisparado: false,
                 alertaAtivoDisparado: false,
                 pomodoroFase: 'foco',
                 pomodoroMinutosNaFase: 0,
                 pomodoroCicloAtual: 0
             };
-            await chrome.storage.local.set({ jusgovTrabalhoEstado: novo });
-            return novo;
+        }
+
+        /**
+         * Resolve se o estado salvo deve ser mantido (mesmo dia lógico ou serão contínuo
+         * atravessando as 04:00 com hiato < 3h) ou reiniciado para o novo dia lógico.
+         * @param {Object|null} atual
+         * @param {number} [agora]
+         * @returns {{ estado: Object, reiniciou: boolean }}
+         */
+        resolverEstadoTrabalhoParaMomento(atual, agora = Date.now()) {
+            const LIMITE_DESCANSO_SONO_MS = 3 * 60 * 60 * 1000;
+            const diaLogicoAtual = this.obterDataLocalChaveHoje(agora);
+
+            if (!atual || !atual.data) {
+                return { estado: this.criarEstadoTrabalhoZerado(diaLogicoAtual, agora), reiniciou: true };
+            }
+
+            if (atual.data === diaLogicoAtual) {
+                return { estado: atual, reiniciou: false };
+            }
+
+            const hiatoMs = Math.max(0, agora - Number(atual.ultimaAtividadeTs || 0));
+            if (hiatoMs < LIMITE_DESCANSO_SONO_MS) {
+                /* Continuidade de serão atravessando a madrugada/04:00 sem descanso >= 3h */
+                return { estado: atual, reiniciou: false };
+            }
+
+            return { estado: this.criarEstadoTrabalhoZerado(diaLogicoAtual, agora), reiniciou: true };
+        }
+
+        /**
+         * Recupera o estado diário atual do storage ou cria um novo registro zerado para hoje.
+         * @returns {Promise<Object>}
+         */
+        async obterOuIniciarEstadoTrabalhoHoje() {
+            const agora = Date.now();
+            const dados = await chrome.storage.local.get(['jusgovTrabalhoEstado']);
+            const { estado, reiniciou } = this.resolverEstadoTrabalhoParaMomento(dados.jusgovTrabalhoEstado, agora);
+            if (reiniciou) {
+                await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
+            }
+            return estado;
         }
 
         /**
@@ -101,18 +145,7 @@
          */
         async resetarEstadoTrabalhoHoje() {
             const agora = Date.now();
-            const novo = {
-                data: this.obterDataLocalChaveHoje(),
-                inicioTs: agora,
-                ultimaAtividadeTs: agora,
-                corridoMinutos: 0,
-                ativoMinutos: 0,
-                alertaCorridoDisparado: false,
-                alertaAtivoDisparado: false,
-                pomodoroFase: 'foco',
-                pomodoroMinutosNaFase: 0,
-                pomodoroCicloAtual: 0
-            };
+            const novo = this.criarEstadoTrabalhoZerado(this.obterDataLocalChaveHoje(agora), agora);
             await chrome.storage.local.set({ jusgovTrabalhoEstado: novo });
             return novo;
         }
@@ -125,6 +158,8 @@
             try {
                 const estado = await this.obterOuIniciarEstadoTrabalhoHoje();
                 estado.ultimaAtividadeTs = Date.now();
+                estado.emPausa = false;
+                estado.minutosInativosPendentes = 0;
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
             } catch (_) { }
         }
@@ -193,6 +228,64 @@
         }
 
         /**
+         * Avança 1 minuto no estado diário de trabalho (lógica pura e determinística).
+         * - Contabiliza sempre Corrido, Ativo e Pausas, mesmo com Pomodoro/alertas desativados.
+         * - Tempo mínimo de pausa: 5 minutos seguidos sem interação.
+         * - Ao confirmar pausa (>= 5 min), converte os minutos pendentes desde o início da
+         *   inatividade para Pausas (contagem inteira da pausa, descontando do Tempo Ativo).
+         * @param {Object} estado
+         * @param {number} [agora]
+         * @param {Object} [config]
+         * @returns {Object}
+         */
+        avancarMinutoEstadoTrabalho(estado, agora = Date.now(), config = {}) {
+            const TEMPO_MINIMO_PAUSA_MS = 5 * 60 * 1000;
+            const msDesdeAtividade = Math.max(0, agora - Number(estado.ultimaAtividadeTs || 0));
+            const usuarioAtivoNaJanela = msDesdeAtividade < TEMPO_MINIMO_PAUSA_MS;
+
+            estado.corridoMinutos = Number(estado.corridoMinutos || 0) + 1;
+
+            if (usuarioAtivoNaJanela && !estado.emPausa) {
+                if (msDesdeAtividade >= 60 * 1000) {
+                    estado.minutosInativosPendentes = Number(estado.minutosInativosPendentes || 0) + 1;
+                } else {
+                    estado.minutosInativosPendentes = 0;
+                }
+                estado.ativoMinutos = Number(estado.ativoMinutos || 0) + 1;
+            } else if (!estado.emPausa) {
+                const pendentes = Math.min(Number(estado.ativoMinutos || 0), Number(estado.minutosInativosPendentes || 0));
+                estado.ativoMinutos = Math.max(0, Number(estado.ativoMinutos || 0) - pendentes);
+                estado.pausasMinutos = Number(estado.pausasMinutos || 0) + pendentes + 1;
+                estado.pausasConfirmadas = Number(estado.pausasConfirmadas || 0) + 1;
+                estado.emPausa = true;
+                estado.minutosInativosPendentes = 0;
+            } else {
+                estado.pausasMinutos = Number(estado.pausasMinutos || 0) + 1;
+            }
+
+            const corridoAtivo = Boolean(config && config.tempoTrabalhoCorridoAtivo);
+            const ativoAtivo = Boolean(config && config.tempoTrabalhoAtivoAtivo);
+            let disparoCorrido = false;
+            let disparoAtivo = false;
+
+            if (corridoAtivo) {
+                const metaCorridoMin = Math.max(1, Number(config.tempoTrabalhoCorridoHoras || 7)) * 60;
+                if (!estado.alertaCorridoDisparado && estado.corridoMinutos >= metaCorridoMin) {
+                    estado.alertaCorridoDisparado = true;
+                    disparoCorrido = true;
+                }
+            }
+            if (ativoAtivo) {
+                const metaAtivoMin = Math.max(1, Number(config.tempoTrabalhoAtivoHoras || 6)) * 60;
+                if (!estado.alertaAtivoDisparado && estado.ativoMinutos >= metaAtivoMin) {
+                    estado.alertaAtivoDisparado = true;
+                    disparoAtivo = true;
+                }
+            }
+            return { estado, disparoCorrido, disparoAtivo };
+        }
+
+        /**
          * Processa o tick de 1 minuto para tempo corrido, tempo ativo e ciclo Pomodoro.
          * @param {Function} [obterConfigFn]
          * @returns {Promise<void>}
@@ -204,39 +297,26 @@
                     : (this._obterConfig || (typeof obterConfiguracoesGerais === 'function' ? obterConfiguracoesGerais : null));
                 const config = provedor ? await provedor() : {};
 
-                const corridoAtivo = Boolean(config.tempoTrabalhoCorridoAtivo);
-                const ativoAtivo = Boolean(config.tempoTrabalhoAtivoAtivo);
                 const pomodoroAtivo = Boolean(config.pomodoroAtivo);
-                if (!corridoAtivo && !ativoAtivo && !pomodoroAtivo) return;
 
                 const estado = await this.obterOuIniciarEstadoTrabalhoHoje();
                 const agora = Date.now();
-                const usuarioAtivo = (agora - Number(estado.ultimaAtividadeTs || 0)) <= (5 * 60 * 1000);
+                const res = this.avancarMinutoEstadoTrabalho(estado, agora, config);
 
-                if (corridoAtivo) {
-                    estado.corridoMinutos = Number(estado.corridoMinutos || 0) + 1;
-                    const metaCorridoMin = Math.max(1, Number(config.tempoTrabalhoCorridoHoras || 7)) * 60;
-                    if (!estado.alertaCorridoDisparado && estado.corridoMinutos >= metaCorridoMin) {
-                        estado.alertaCorridoDisparado = true;
-                        await this.projetarModalProdutividadeEmTodasJanelas(
-                            'Tempo de Trabalho Corrido Atingido',
-                            `Você completou ${config.tempoTrabalhoCorridoHoras || 7}h de jornada corrida hoje.`,
-                            `Tempo corrido: ${estado.corridoMinutos} min | Tempo ativo: ${estado.ativoMinutos} min`
-                        );
-                    }
+                if (res.disparoCorrido) {
+                    await this.projetarModalProdutividadeEmTodasJanelas(
+                        'Tempo de Trabalho Corrido Atingido',
+                        `Você completou ${config.tempoTrabalhoCorridoHoras || 7}h de jornada corrida hoje.`,
+                        `Tempo corrido: ${estado.corridoMinutos} min | Tempo ativo: ${estado.ativoMinutos} min | Pausas: ${estado.pausasMinutos} min`
+                    );
                 }
 
-                if (ativoAtivo && usuarioAtivo) {
-                    estado.ativoMinutos = Number(estado.ativoMinutos || 0) + 1;
-                    const metaAtivoMin = Math.max(1, Number(config.tempoTrabalhoAtivoHoras || 6)) * 60;
-                    if (!estado.alertaAtivoDisparado && estado.ativoMinutos >= metaAtivoMin) {
-                        estado.alertaAtivoDisparado = true;
-                        await this.projetarModalProdutividadeEmTodasJanelas(
-                            'Tempo Ativo de Trabalho Atingido',
-                            `Você completou ${config.tempoTrabalhoAtivoHoras || 6}h de atividade efetiva hoje (estilo Workrave).`,
-                            `Tempo ativo: ${estado.ativoMinutos} min | Tempo corrido: ${estado.corridoMinutos} min`
-                        );
-                    }
+                if (res.disparoAtivo) {
+                    await this.projetarModalProdutividadeEmTodasJanelas(
+                        'Tempo Ativo de Trabalho Atingido',
+                        `Você completou ${config.tempoTrabalhoAtivoHoras || 6}h de atividade efetiva hoje (estilo Workrave).`,
+                        `Tempo ativo: ${estado.ativoMinutos} min | Tempo corrido: ${estado.corridoMinutos} min | Pausas: ${estado.pausasMinutos} min`
+                    );
                 }
 
                 if (pomodoroAtivo) {

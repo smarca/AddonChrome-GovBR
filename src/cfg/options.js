@@ -488,6 +488,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             selectTipo.addEventListener('change', () => {
                 regrasMapeamentoAtuais[idx].tipo = selectTipo.value;
+                const continuarPadrao = (selectTipo.value === 'textual');
+                regrasMapeamentoAtuais[idx].continuarProxima = continuarPadrao;
+                chkContinuar.checked = continuarPadrao;
                 marcarAlteracoesPendentesMapeamento(true);
             });
 
@@ -1061,14 +1064,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarStatusProdutividadeUI() {
-        if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
-        chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
-            if (chrome.runtime.lastError || !resp || !resp.ok || !resp.estado) return;
-            const st = resp.estado;
-            const faseMapa = { foco: 'Foco', alivio: 'Alívio', pausa_maior: 'Pausa Maior' };
-            const faseTxt = faseMapa[st.pomodoroFase] || 'Foco';
-            lblStatusProdutividadeTrabalho.textContent = `Hoje (${st.data}): Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pomodoro: ${faseTxt} (${st.pomodoroMinutosNaFase || 0} min, ciclo ${(st.pomodoroCicloAtual || 0) + 1})`;
+        if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined') return;
+        const renderizarEstado = (st) => {
+            if (!st) return;
+            const dataStr = st.data ? ` (${st.data})` : '';
+            const baseTxt = `Hoje${dataStr}: Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pausas ${st.pausasConfirmadas || 0}`;
+            if (optPomodoroAtivo && optPomodoroAtivo.checked) {
+                const faseMapa = { foco: 'Foco', alivio: 'Alívio', pausa_maior: 'Pausa Maior' };
+                const faseTxt = faseMapa[st.pomodoroFase] || 'Foco';
+                lblStatusProdutividadeTrabalho.textContent = `${baseTxt} • Pomodoro: ${faseTxt} (${st.pomodoroMinutosNaFase || 0} min, ciclo ${(st.pomodoroCicloAtual || 0) + 1})`;
+            } else {
+                lblStatusProdutividadeTrabalho.textContent = baseTxt;
+            }
+        };
+        if (chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
+                if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
+                    renderizarEstado(resp.estado);
+                    return;
+                }
+                if (chrome.storage && chrome.storage.local) {
+                    chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+                        if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
+                            renderizarEstado(dados.jusgovTrabalhoEstado);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local' && changes.jusgovTrabalhoEstado) {
+                atualizarStatusProdutividadeUI();
+            }
         });
+    }
+    if (typeof window !== 'undefined' && lblStatusProdutividadeTrabalho) {
+        setInterval(atualizarStatusProdutividadeUI, 1000);
     }
 
     function normalizarTempoFlashMs(valorBruto) {

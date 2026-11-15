@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const descComportamentoIcone = document.getElementById('descComportamentoIcone');
     const btnAbrirOpcoes = document.getElementById('btnAbrirOpcoes') || document.getElementById('btnOptions');
     const btnBugsOnline = document.getElementById('btnBugsOnline');
+    const rodapeProdutividadeOnline = document.getElementById('rodapeProdutividadeOnline');
 
     /* Mapear elementos do icone SVG para alterar cor dinamicamente */
     const iconeBg = document.getElementById('iconeBg');
@@ -506,6 +507,35 @@ document.addEventListener('DOMContentLoaded', () => {
         window.close();
     });
 
+    function atualizarContadoresProdutividadePopup() {
+        if (!rodapeProdutividadeOnline || typeof chrome === 'undefined') return;
+        const renderizar = (st) => {
+            if (!st) return;
+            rodapeProdutividadeOnline.textContent = `Corrido ${st.corridoMinutos || 0} min • Ativo ${st.ativoMinutos || 0} min • Pausas ${st.pausasConfirmadas || 0}`;
+        };
+        if (chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
+                if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
+                    renderizar(resp.estado);
+                    return;
+                }
+                if (chrome.storage && chrome.storage.local) {
+                    chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+                        if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
+                            renderizar(dados.jusgovTrabalhoEstado);
+                        }
+                    });
+                }
+            });
+        } else if (chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+                if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
+                    renderizar(dados.jusgovTrabalhoEstado);
+                }
+            });
+        }
+    }
+
     /* Passo 4.6: Escutar alteracoes externas no storage (ex: Duplo Esc na pagina) */
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
@@ -527,9 +557,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (changes.comportamentoCliqueIcone !== undefined) {
                     atualizarInterfaceComportamentoIcone(changes.comportamentoCliqueIcone.newValue);
                 }
+            } else if (area === 'local' && changes.jusgovTrabalhoEstado) {
+                atualizarContadoresProdutividadePopup();
             }
         });
     }
 
     carregarEstadoInicial();
+    atualizarContadoresProdutividadePopup();
+    if (rodapeProdutividadeOnline) {
+        setInterval(atualizarContadoresProdutividadePopup, 1000);
+    }
 });
