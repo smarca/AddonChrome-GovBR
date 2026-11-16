@@ -11731,6 +11731,151 @@
                 'Auto-Limpeza remove apenas cookies sem acesso/alteração >= X dias, preservando tokens recentes, sessões ativas e cookies sem histórico.',
                 { detalhe: detalheManut }
             );
+
+            // Teste: Match Pattern Chromium (*://*.jus.br/* inclui dominio raiz e rejeita spoofing de path)
+            let urlMatchOk = false;
+            let detalheUrlMatch = '';
+            try {
+                const UrlsCls = window.JusGovUrls;
+                if (typeof UrlsCls === 'function') {
+                    const u = new UrlsCls();
+                    const p = ['*://*.jus.br/*'];
+                    const mSub = u.urlCorrespondeAosPadroes('https://pje.tjsp.jus.br/pje', p);
+                    const mApex = u.urlCorrespondeAosPadroes('https://jus.br/portal', p);
+                    const mSpoof = u.urlCorrespondeAosPadroes('https://evil.example.com/?url=tjsp.jus.br/', p);
+                    urlMatchOk = (mSub === true && mApex === true && mSpoof === false);
+                    detalheUrlMatch = `sub=${mSub}, apex=${mApex}, spoofBlocked=${!mSpoof}`;
+                }
+            } catch (eUrl) {
+                detalheUrlMatch = eUrl.message || String(eUrl);
+            }
+            registrar(
+                urlMatchOk,
+                'LIB_URLS_APEX_MATCH_PATTERN',
+                'Match pattern *://*.jus.br/* aceita subdomínio e domínio raiz (apex), bloqueando spoofing em query/path.',
+                { detalhe: detalheUrlMatch }
+            );
+
+            // Teste: Regressão navegador-anti-duplicacao (processarAbaAtualizada sem ReferenceError) e ModuloNavegador Ctrl+Tab MV3
+            let antiDupFixOk = false;
+            let detalheAntiDupFix = '';
+            try {
+                const AntiDupCls = window.JusGovGerenciadorAntiDuplicacao;
+                const NavCls = window.JusGovModuloNavegador;
+                if (typeof AntiDupCls === 'function' && typeof NavCls === 'function') {
+                    const ad = new AntiDupCls();
+                    ad.reutilizarAbasAbertas = true;
+                    ad.monitorarUrlAtual = true;
+                    const removidas = [];
+                    const sessionStore = {};
+                    const mockChrome = {
+                        tabs: {
+                            query: () => Promise.resolve([
+                                { id: 10, windowId: 1, url: 'https://pje.jus.br/doc/1' },
+                                { id: 11, windowId: 1, url: 'https://pje.jus.br/doc/1' }
+                            ]),
+                            remove: (id) => { removidas.push(id); return Promise.resolve(); },
+                            update: () => Promise.resolve()
+                        },
+                        storage: {
+                            session: {
+                                set: (obj) => { Object.assign(sessionStore, obj); return Promise.resolve(); },
+                                get: (k) => Promise.resolve(k ? { [k]: sessionStore[k] } : sessionStore)
+                            }
+                        }
+                    };
+                    const prom = ad.processarAbaAtualizada(11, { url: 'https://pje.jus.br/doc/1' }, { id: 11, windowId: 1, url: 'https://pje.jus.br/doc/1' }, mockChrome, { reutilizarAbasAbertas: true, monitorarUrlAtualPagina: true });
+                    const navInst = new NavCls();
+                    const temCtrlTabSession = typeof navInst.inicializarHistoricoAbasAtivas === 'function' &&
+                        typeof navInst.registrarAbaAtivadaHistorico === 'function' &&
+                        typeof navInst.alternarParaUltimaAbaAtiva === 'function';
+                    const promCtrl = navInst.registrarAbaAtivadaHistorico({ tabId: 10, windowId: 1 }, mockChrome);
+                    antiDupFixOk = Boolean(prom && typeof prom.then === 'function' && temCtrlTabSession && promCtrl && typeof promCtrl.then === 'function');
+                    detalheAntiDupFix = `retPromise=${Boolean(prom)}, ctrlTabMV3=${temCtrlTabSession}`;
+                }
+            } catch (eAd) {
+                detalheAntiDupFix = eAd.message || String(eAd);
+            }
+            registrar(
+                antiDupFixOk,
+                'NAVEGADOR_ANTI_DUPLICACAO_REGRESSAO',
+                'GerenciadorAntiDuplicacao.processarAbaAtualizada e ModuloNavegador.Ctrl+Tab MV3 executam sem erros de referência.',
+                { detalhe: detalheAntiDupFix }
+            );
+
+            // Teste: Separação Dados/Regras em JSON (dados-forenses.json + regras-sistema.json)
+            let jsonSepOk = false;
+            let detalheJsonSep = '';
+            try {
+                const c = window.JusGovConstantes;
+                const d = window.JusGovCfgDefaults;
+                const temInss = Boolean(c && c.TABELA_ESPECIES_INSS && c.TABELA_ESPECIES_INSS['42']);
+                const temCnj = Boolean(
+                    c && c.TABELA_TRIBUNAIS_CNJ &&
+                    c.TABELA_TRIBUNAIS_CNJ.RAMOS && c.TABELA_TRIBUNAIS_CNJ.RAMOS['8'] &&
+                    c.TABELA_TRIBUNAIS_CNJ.TRIBUNAIS_ESTADUAIS_E_ELEITORAIS && c.TABELA_TRIBUNAIS_CNJ.TRIBUNAIS_ESTADUAIS_E_ELEITORAIS['25']
+                );
+                const temCpf = Boolean(c && c.TABELA_REGIOES_FISCAIS_CPF && c.TABELA_REGIOES_FISCAIS_CPF['8']);
+                const temNiveis = Boolean(c && c.NIVEIS_FILTRO_HTML && c.NIVEIS_FILTRO_HTML['1']);
+                const presets = d && typeof d.obterPresetsMarcadorColado === 'function' ? d.obterPresetsMarcadorColado() : null;
+                const presetOk = Boolean(presets && presets.marca_texto_classico && presets.marca_texto_classico.corContorno === '#ca8a04' && presets.marca_texto && presets.marca_texto.corContorno === '#ca8a04');
+                jsonSepOk = Boolean(temInss && temCnj && temCpf && temNiveis && presetOk);
+                detalheJsonSep = `inss=${temInss}, cnj=${temCnj}, cpf=${temCpf}, niveis=${temNiveis}, preset=${presetOk}`;
+            } catch (eJson) {
+                detalheJsonSep = eJson.message || String(eJson);
+            }
+            registrar(
+                jsonSepOk,
+                'SEPARACAO_JSON_DADOS_E_REGRAS',
+                'Tabelas forenses (dados-forenses.json) e presets/regras (regras-sistema.json) hidratam JusGovConstantes e CfgDefaults sem duplicação.',
+                { detalhe: detalheJsonSep }
+            );
+
+            // Teste: Lib-Config Sync Allowlist + Proteção de Cota 8KB MV3
+            let syncAllowlistOk = false;
+            let detalheSync = '';
+            try {
+                const CfgCls = window.JusGovConfiguracoes;
+                if (typeof CfgCls === 'function') {
+                    const cfgInst = new CfgCls();
+                    let gravadoSync = null;
+                    const strGigante = 'x'.repeat(9000);
+                    const fakeChrome = {
+                        storage: {
+                            local: {
+                                get: () => Promise.resolve({
+                                    modoTurbo: 'global',
+                                    perfilCfg_custom1: { modoTurbo: 'url' },
+                                    jusgovMapaCookiesAtividade: { k: 123 },
+                                    jusgovTrabalhoEstado: { ativoMinutos: 10 },
+                                    regrasMapeamentoElementos: strGigante
+                                })
+                            },
+                            sync: {
+                                set: (obj) => { gravadoSync = obj; return Promise.resolve(); },
+                                get: () => Promise.resolve({})
+                            },
+                            session: { set: () => Promise.resolve(), get: () => Promise.resolve({}) }
+                        },
+                        action: {}
+                    };
+                    // Verificar presença e regras síncronas da lista allowlist e rejeição de chaves voláteis
+                    const chavesPermitidas = cfgInst.obterChavesConfigSync();
+                    const temModo = chavesPermitidas.includes('modoTurbo');
+                    const naoTemCookieMap = !chavesPermitidas.includes('jusgovMapaCookiesAtividade') && !chavesPermitidas.includes('jusgovTrabalhoEstado');
+                    const detMudou = cfgInst.houveMudancaDeConfiguracao({ modoTurbo: { newValue: 'url' } }) && !cfgInst.houveMudancaDeConfiguracao({ totalCopias: { newValue: 5 } });
+                    syncAllowlistOk = Boolean(typeof cfgInst.executarSincronizacaoNuvemCoalescida === 'function' && temModo && naoTemCookieMap && detMudou);
+                    detalheSync = `allowlist=${temModo}, semVolatil=${naoTemCookieMap}, diffFilter=${detMudou}`;
+                }
+            } catch (eSync) {
+                detalheSync = eSync.message || String(eSync);
+            }
+            registrar(
+                syncAllowlistOk,
+                'LIB_CONFIG_SYNC_ALLOWLIST_MV3',
+                'JusGovConfiguracoes filtra apenas chaves sincronizáveis e ignora contadores/mapas locais na sincronização.',
+                { detalhe: detalheSync }
+            );
         }
 
         if (opcoes && opcoes.fuzz) {

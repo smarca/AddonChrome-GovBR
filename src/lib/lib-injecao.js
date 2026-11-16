@@ -40,7 +40,6 @@
         'src/cfg/cfg-defaults.js',
         'src/lib/lib-constantes.js',
         'src/lib/lib-verificadores.js',
-        'src/mod-copia/copia-constantes.js',
         'src/mod-copia/copia-aviso-flutuante.js',
         'src/mod-copia/copia-dialogo-mapeamento.js',
         'src/mod-copia/copia-acumulador.js',
@@ -348,6 +347,31 @@
         limparDebounceAba(tabId) {
             if (tabId) {
                 this.mapaDebounceInjecaoTab.delete(tabId);
+            }
+        }
+
+        /**
+         * Injeta folhas CSS anti-ampulhetas sob demanda no carregamento de uma aba compativel.
+         */
+        async injetarCssAmpuletasNaAba(tabId, url, config, chromeApi = null, urlsUtilOpcional = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            const urlsUtil = urlsUtilOpcional || this.urls;
+            if (!tabId || !url || !config || config.ativoAmpuletas === false) return false;
+            if (!apiChrome || !apiChrome.scripting || typeof apiChrome.scripting.insertCSS !== 'function') return false;
+            const corresponde = urlsUtil && typeof urlsUtil.urlCorrespondeAosPadroes === 'function'
+                ? urlsUtil.urlCorrespondeAosPadroes(url, config.urlsAmpuletas || [])
+                : false;
+            if (!corresponde) return false;
+            try {
+                const cssExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_CSS_PJE, apiChrome);
+                if (cssExistentes.length === 0) return false;
+                await apiChrome.scripting.insertCSS({
+                    target: { tabId, allFrames: true },
+                    files: cssExistentes
+                });
+                return true;
+            } catch (_) {
+                return false;
             }
         }
     }

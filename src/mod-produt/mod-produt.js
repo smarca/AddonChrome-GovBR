@@ -10,7 +10,7 @@
  * - Métodos Públicos: definirProvedorConfig(fn), obterDataLocalChaveHoje(),
  *   obterOuIniciarEstadoTrabalhoHoje(), resetarEstadoTrabalhoHoje(),
  *   registrarAtividadeTrabalho(), projetarModalProdutividadeEmTodasJanelas(titulo, mensagem, subtitulo),
- *   processarTickTrabalho(obterConfigFn)
+ *   processarTickTrabalho(obterConfigFn), abrirAssistenteIaLateral(msg, chromeApi)
  * - Regras / Seções: Diretriz 14, Diretriz 16, Seção 6.142 (Tempo de Trabalho e Pomodoro)
  *
  * ESPECIFICAÇÃO DE ENGENHARIA E DIRETRIZES DE MANUTENÇÃO:
@@ -367,6 +367,115 @@
 
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
             } catch (_) { }
+        }
+
+        /**
+         * Localiza uma guia ativa do Google Gemini (ou cria nova aba) e injeta o prompt F1 com seguranca.
+         * @param {Object} msg
+         * @param {Object} [chromeApi]
+         */
+        async abrirAssistenteIaLateral(msg = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.tabs) return false;
+
+            const preencherPromptGemini = (textoPrompt) => {
+                const tentarPreenchimento = (tentativa) => {
+                    const editavel = document.querySelector('rich-textarea p, rich-textarea div[contenteditable="true"], div.ql-editor, textarea, rich-textarea div[role="textbox"]');
+                    if (editavel) {
+                        editavel.focus();
+                        let inseriu = false;
+                        try { inseriu = document.execCommand('insertText', false, textoPrompt); } catch (_) { }
+                        if (!inseriu || (editavel.textContent || '').trim().length === 0) {
+                            if (editavel.tagName === 'TEXTAREA' || editavel.tagName === 'INPUT') {
+                                editavel.value = textoPrompt;
+                            } else {
+                                editavel.textContent = textoPrompt;
+                            }
+                        }
+                        try {
+                            editavel.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                            editavel.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                        } catch (_) { }
+                    } else if (tentativa < 20) {
+                        setTimeout(() => tentarPreenchimento(tentativa + 1), 350);
+                    }
+                };
+                tentarPreenchimento(0);
+            };
+
+            try {
+                const abasGemini = await apiChrome.tabs.query({ url: '*://gemini.google.com/*' });
+                let abaAlvoId = null;
+                let abaAlvoWindowId = null;
+                let ehNovaAba = false;
+
+                if (abasGemini && abasGemini.length > 0 && abasGemini[0].id) {
+                    const abaAlvo = abasGemini[0];
+                    abaAlvoId = abaAlvo.id;
+                    abaAlvoWindowId = abaAlvo.windowId;
+                    await apiChrome.tabs.update(abaAlvoId, { active: true });
+                    if (abaAlvoWindowId && apiChrome.windows) {
+                        await apiChrome.windows.update(abaAlvoWindowId, { focused: true });
+                    }
+                } else {
+                    const novaAba = await apiChrome.tabs.create({ url: 'https://gemini.google.com/app', active: true });
+                    abaAlvoId = novaAba.id;
+                    ehNovaAba = true;
+                }
+
+                let promptTxt = (typeof msg.prompt === 'string' && msg.prompt.trim().length > 0) ? msg.prompt : '';
+                if (!promptTxt && (msg.acao === 'ABRIR_PAINEL_F1_GEMINI' || msg.texto !== undefined)) {
+                    const config = this._obterConfig ? await this._obterConfig() : {};
+                    const padraoCfg = (typeof self !== 'undefined' && self.JusGovCfgDefaults && typeof self.JusGovCfgDefaults.PROMPT_F1_GEMINI_PADRAO === 'string')
+                        ? self.JusGovCfgDefaults.PROMPT_F1_GEMINI_PADRAO
+                        : "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
+                    const template = (config && typeof config.promptF1Gemini === 'string' && config.promptF1Gemini.trim().length > 0)
+                        ? config.promptF1Gemini
+                        : padraoCfg;
+                    const limpo = String(msg.texto || '').trim();
+                    if (template.includes('{{TEXTO}}')) {
+                        promptTxt = template.replace(/\{\{TEXTO\}\}/g, limpo);
+                    } else if (template.includes('{SELECAO}')) {
+                        promptTxt = template.replace(/\{SELECAO\}/g, limpo);
+                    } else {
+                        promptTxt = (template + ' ' + limpo).trim();
+                    }
+                }
+
+                if (abaAlvoId && promptTxt.trim().length > 0 && apiChrome.scripting) {
+                    if (ehNovaAba) {
+                        const listener = (tabId, mudanca) => {
+                            if (tabId === abaAlvoId && mudanca.status === 'complete') {
+                                apiChrome.tabs.onUpdated.removeListener(listener);
+                                setTimeout(async () => {
+                                    try {
+                                        await apiChrome.scripting.executeScript({
+                                            target: { tabId: abaAlvoId },
+                                            func: preencherPromptGemini,
+                                            args: [promptTxt]
+                                        });
+                                    } catch (_) { }
+                                }, 500);
+                            }
+                        };
+                        apiChrome.tabs.onUpdated.addListener(listener);
+                        setTimeout(() => {
+                            try { apiChrome.tabs.onUpdated.removeListener(listener); } catch (_) { }
+                        }, 20000);
+                    } else {
+                        try {
+                            await apiChrome.scripting.executeScript({
+                                target: { tabId: abaAlvoId },
+                                func: preencherPromptGemini,
+                                args: [promptTxt]
+                            });
+                        } catch (_) { }
+                    }
+                }
+                return true;
+            } catch (_) {
+                return false;
+            }
         }
     }
 

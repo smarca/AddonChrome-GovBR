@@ -109,17 +109,21 @@ const ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML = Object.freeze([
     '5s',
     'Até Interação'
 ]);
-const PRESETS_MARCADOR_CONTEUDO_COLADO = Object.freeze({
-    verde_forense: { corContorno: '#0d9488', corFundo: '#ccfbf1' },
-    marca_texto_classico: { corContorno: '#ca8a04', corFundo: '#fef08a' },
-    azul_indigo: { corContorno: '#4f46e5', corFundo: '#e0e7ff' },
-    ambar_suave: { corContorno: '#d97706', corFundo: '#fef3c7' },
-    alto_contraste: { corContorno: '#1e293b', corFundo: '#e2e8f0' }
-});
+const PRESETS_MARCADOR_CONTEUDO_COLADO = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterPresetsMarcadorColado === 'function')
+    ? JusGovCfgDefaults.obterPresetsMarcadorColado()
+    : Object.freeze({
+        verde_forense: { corContorno: '#0d9488', corFundo: '#ccfbf1' },
+        marca_texto_classico: { corContorno: '#ca8a04', corFundo: '#fef08a' },
+        azul_indigo: { corContorno: '#4f46e5', corFundo: '#e0e7ff' },
+        ambar_suave: { corContorno: '#d97706', corFundo: '#fef3c7' },
+        alto_contraste: { corContorno: '#1e293b', corFundo: '#e2e8f0' }
+    });
 const COR_PADRAO_FLASH_BORDER = '#0d9488';
 const COR_PADRAO_FUNDO_MARCADOR = '#ccfbf1';
 const LIMITE_MAXIMO_CONTADOR_OPERACIONAL = 900000000;
-const PROMPT_F1_GEMINI_PADRAO = "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
+const PROMPT_F1_GEMINI_PADRAO = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.PROMPT_F1_GEMINI_PADRAO === 'string')
+    ? JusGovCfgDefaults.PROMPT_F1_GEMINI_PADRAO
+    : "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
 
 document.addEventListener('DOMContentLoaded', () => {
     /* Exibir versao oficial dinamica do manifesto no subtitulo do cabecalho */
@@ -168,25 +172,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Controles da Secao Avancada Categorizada */
     const selectModoPlaceholdersMinutasHtml = document.getElementById('selectModoPlaceholdersMinutasHtml');
-    const optColagemBotaoDireito = document.getElementById('optColagemBotaoDireito');
-    const lblSwitchColagemBotaoDireito = document.getElementById('lblSwitchColagemBotaoDireito');
-    const avisoPermissaoBotaoDireito = document.getElementById('avisoPermissaoBotaoDireito');
     const optAlternarAbasRecentesCtrlTab = document.getElementById('optAlternarAbasRecentesCtrlTab');
     const optCapturaBotoesMouse4e5 = document.getElementById('optCapturaBotoesMouse4e5');
     const optColarBotaoMeio = document.getElementById('optColarBotaoMeio');
     const lblSwitchColarBotaoMeio = document.getElementById('lblSwitchColarBotaoMeio');
-    const avisoPermissaoBotaoMeio = document.getElementById('avisoPermissaoBotaoMeio');
     const optNavegacaoTecladoCampos = document.getElementById('optNavegacaoTecladoCampos');
     const optCaixaEntradaRapida = document.getElementById('optCaixaEntradaRapida');
     const optBloquearNovasJanelas = document.getElementById('optBloquearNovasJanelas');
     const optPreservarJanelasAutenticacao = document.getElementById('optPreservarJanelasAutenticacao');
-    const optAbaEmPrimeiroPlano = document.getElementById('optAbaEmPrimeiroPlano') || document.getElementById('optAbaEmSegundoPlano');
-    const optAbaEmSegundoPlano = optAbaEmPrimeiroPlano;
+    const optAbaEmPrimeiroPlano = document.getElementById('optAbaEmPrimeiroPlano');
     const optReutilizarAbasAbertas = document.getElementById('optReutilizarAbasAbertas');
     const containerSubOpcoesReutilizarAbas = document.getElementById('containerSubOpcoesReutilizarAbas');
     const optReutilizarFocoPrimeiroPlano = document.getElementById('optReutilizarFocoPrimeiroPlano');
     const containerSubCriteriosAcoesReutilizar = document.getElementById('containerSubCriteriosAcoesReutilizar');
-    const selectReutilizarAcaoConteudo = document.getElementById('selectReutilizarAcaoConteudo');
     const optMonitorarUrlOriginal = document.getElementById('optMonitorarUrlOriginal');
     const optMonitorarUrlAtual = document.getElementById('optMonitorarUrlAtual');
     const optProtegerGuiasModificadas = document.getElementById('optProtegerGuiasModificadas');
@@ -223,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const containerModoExibicaoValidacao = document.getElementById('containerModoExibicaoValidacao');
     const optPosicaoAvisosValidacao = document.getElementById('optPosicaoAvisosValidacao');
     const containerPosicaoAvisosValidacao = document.getElementById('containerPosicaoAvisosValidacao');
-    const checkOpcaoAmpuletas = document.getElementById('checkOpcaoAmpuletas') || document.getElementById('optAntiAmpulhetaPjeAtivo');
+    const checkOpcaoAmpuletas = document.getElementById('checkOpcaoAmpuletas');
     const optConverterCabecalhoPje = document.getElementById('optConverterCabecalhoPje');
     const optTempoFlashMs = document.getElementById('optTempoFlashMs');
     const optCorFlashBorder = document.getElementById('optCorFlashBorder');
@@ -650,7 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Controles do Laboratorio, Console e Auditoria */
     const previewAreaTransferencia = document.getElementById('previewAreaTransferencia');
     const previewAreaTransferenciaAnterior = document.getElementById('previewAreaTransferenciaAnterior');
-    const avisoPermissaoClipboardInspector = document.getElementById('avisoPermissaoClipboardInspector');
     const btnAtualizarPreview = document.getElementById('btnAtualizarPreview');
     const btnDownloadXMouse = document.getElementById('btnDownloadXMouse');
     const btnExecutarAuditoriaDebug = document.getElementById('btnExecutarAuditoriaDebug');
@@ -658,7 +655,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const painelResultadoAuditoria = document.getElementById('painelResultadoAuditoria');
     const btnLimparConsole = document.getElementById('btnLimparConsole');
     const visorMensagensConsole = document.getElementById('visorMensagensConsole');
-    const painelMensagensConsole = document.getElementById('painelMensagensConsole');
     const lblContadorConsole = document.getElementById('lblContadorConsole');
     const toastNotificacao = document.getElementById('toastNotificacao');
 
@@ -764,10 +760,6 @@ document.addEventListener('DOMContentLoaded', () => {
             visorMensagensConsole.textContent = textoConsolidado;
             visorMensagensConsole.scrollTop = visorMensagensConsole.scrollHeight;
         }
-        if (painelMensagensConsole && painelMensagensConsole.style.display === 'block') {
-            painelMensagensConsole.textContent = textoConsolidado;
-            painelMensagensConsole.scrollTop = painelMensagensConsole.scrollHeight;
-        }
     }
 
     function registrarMensagemDiretaNoVisorConsole(nivelNome, textoMsg) {
@@ -795,10 +787,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (visorMensagensConsole) {
             visorMensagensConsole.textContent = textoConsolidado;
             visorMensagensConsole.scrollTop = visorMensagensConsole.scrollHeight;
-        }
-        if (painelMensagensConsole && painelMensagensConsole.style.display === 'block') {
-            painelMensagensConsole.textContent = textoConsolidado;
-            painelMensagensConsole.scrollTop = painelMensagensConsole.scrollHeight;
         }
     }
 
@@ -849,14 +837,14 @@ document.addEventListener('DOMContentLoaded', () => {
      * FUNCAO: exibirToast
      * OBJETIVO DE RECONSTRUCAO: Mostrar confirmacao visual discreta no canto
      * inferior direito da pagina de Opcoes apos salvar, importar ou restaurar.
-     * Utiliza .innerHTML para renderizar as entidades HTML (ç, etc).
+     * Utiliza .textContent (Diretriz anti-XSS DOM).
      */
-    function exibirToast(mensagemHTML) {
-        /* Passo 2.1: Atualizar texto HTML e exibir toast por 3 segundos */
+    function exibirToast(mensagem) {
+        /* Passo 2.1: Atualizar texto puro e exibir toast por 3 segundos */
         if (!toastNotificacao) return;
         if (timerToast) clearTimeout(timerToast);
 
-        toastNotificacao.innerHTML = mensagemHTML;
+        toastNotificacao.textContent = String(mensagem ?? '');
         toastNotificacao.classList.add('visivel');
         timerToast = setTimeout(() => {
             toastNotificacao.classList.remove('visivel');
@@ -956,7 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!lblValorTempoConferencia || !optTempoConferenciaDocumentos) return;
         const idx = parseInt(optTempoConferenciaDocumentos.value, 10);
         const idxSeguro = (Number.isInteger(idx) && idx >= 0 && idx < ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML.length) ? idx : 6;
-        lblValorTempoConferencia.innerHTML = ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML[idxSeguro];
+        lblValorTempoConferencia.textContent = ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML[idxSeguro];
     }
 
     function normalizarCorHexFundoMarcador(corBruta) {
@@ -1170,14 +1158,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!lblValorTempoFlash || !optTempoFlashMs) return;
         const ms = normalizarTempoFlashMs(optTempoFlashMs.value);
         if (ms === -1) {
-            lblValorTempoFlash.innerHTML = 'Até Interação';
+            lblValorTempoFlash.textContent = 'Até Interação';
         } else if (ms <= 0) {
-            lblValorTempoFlash.innerHTML = '0 (Desabilitado)';
+            lblValorTempoFlash.textContent = '0 (Desabilitado)';
         } else if (ms < 1000) {
-            lblValorTempoFlash.innerHTML = `${ms} ms`;
+            lblValorTempoFlash.textContent = `${ms} ms`;
         } else {
             const segStr = (ms / 1000).toFixed(ms % 1000 === 0 ? 1 : (ms % 500 === 0 ? 1 : 2)).replace('.', ',');
-            lblValorTempoFlash.innerHTML = `${segStr}s (${ms} ms)`;
+            lblValorTempoFlash.textContent = `${segStr}s (${ms} ms)`;
         }
     }
 
@@ -1218,13 +1206,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!optNivelFiltroEstilos || !lblValorNivelFiltro) return;
         const val = Number(optNivelFiltroEstilos.value);
         if (val === 2) {
-            lblValorNivelFiltro.innerHTML = '2 - Intermediário (Parágrafos/Tabelas)';
+            lblValorNivelFiltro.textContent = '2 - Intermediário (Parágrafos/Tabelas)';
         } else if (val === 3) {
-            lblValorNivelFiltro.innerHTML = '3 - Avançado (Blocos e Listas)';
+            lblValorNivelFiltro.textContent = '3 - Avançado (Blocos e Listas)';
         } else if (val === 4) {
-            lblValorNivelFiltro.innerHTML = '4 - Estendido (Estrutura e Seções)';
+            lblValorNivelFiltro.textContent = '4 - Estendido (Estrutura e Seções)';
         } else {
-            lblValorNivelFiltro.innerHTML = '1 - Básico (Inline / Mesclagem)';
+            lblValorNivelFiltro.textContent = '1 - Básico (Inline / Mesclagem)';
         }
     }
 
@@ -1260,14 +1248,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optReutilizarAcaoRecarregar) optReutilizarAcaoRecarregar.disabled = !ativoFoco;
         if (optReutilizarAcaoRecarregarSeModificada) optReutilizarAcaoRecarregarSeModificada.disabled = !ativoFoco;
         if (optReutilizarAcaoRecarregarSeNaoModificada) optReutilizarAcaoRecarregarSeNaoModificada.disabled = !ativoFoco;
-        if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.disabled = !ativoFoco;
         if (optMonitorarUrlOriginal) optMonitorarUrlOriginal.disabled = !ativoFoco;
         if (optMonitorarUrlAtual) optMonitorarUrlAtual.disabled = !ativoFoco;
 
         const recargaCondicionalAtiva = Boolean(
             (optReutilizarAcaoRecarregarSeModificada && optReutilizarAcaoRecarregarSeModificada.checked) ||
-            (optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked) ||
-            (selectReutilizarAcaoConteudo && (selectReutilizarAcaoConteudo.value === 'recarregar_se_modificada' || selectReutilizarAcaoConteudo.value === 'recarregar_se_nao_modificada'))
+            (optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked)
         );
 
         if (optProtegerGuiasModificadas) {
@@ -1413,7 +1399,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectModoPlaceholdersMinutasHtml.value = 'placeholders';
                 }
             }
-            if (optColagemBotaoDireito) optColagemBotaoDireito.checked = false;
             if (optAlternarAbasRecentesCtrlTab) optAlternarAbasRecentesCtrlTab.checked = (dados.alternarAbasRecentesCtrlTabAtiva !== false);
             if (optCapturaBotoesMouse4e5) optCapturaBotoesMouse4e5.checked = (dados.capturaBotoesMouse4e5Ativa !== false);
             if (optColarBotaoMeio) optColarBotaoMeio.checked = (dados.colarBotaoMeioAtivo !== false);
@@ -1437,7 +1422,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optMonitorarUrlAtual) optMonitorarUrlAtual.checked = (dados.monitorarUrlAtualPagina !== false);
             if (optProtegerGuiasModificadas) optProtegerGuiasModificadas.checked = (dados.protegerGuiasModificadas !== false);
             const acaoCarregada = dados.reutilizarAbasAcaoConteudo || 'manter';
-            if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.value = acaoCarregada;
             if (optReutilizarAcaoRecarregar && acaoCarregada === 'recarregar') {
                 optReutilizarAcaoRecarregar.checked = true;
             } else if (optReutilizarAcaoRecarregarSeModificada && acaoCarregada === 'recarregar_se_modificada') {
@@ -1704,15 +1688,13 @@ document.addEventListener('DOMContentLoaded', () => {
             reutilizarAbasAbertas: optReutilizarAbasAbertas ? optReutilizarAbasAbertas.checked : true,
             reutilizarAbasFocoPrimeiroPlano: optReutilizarFocoPrimeiroPlano ? optReutilizarFocoPrimeiroPlano.checked : true,
             protegerGuiasModificadas: optProtegerGuiasModificadas ? optProtegerGuiasModificadas.checked : true,
-            reutilizarAbasAcaoConteudo: selectReutilizarAcaoConteudo
-                ? selectReutilizarAcaoConteudo.value
-                : ((optReutilizarAcaoRecarregar && optReutilizarAcaoRecarregar.checked)
-                    ? 'recarregar'
-                    : ((optReutilizarAcaoRecarregarSeModificada && optReutilizarAcaoRecarregarSeModificada.checked)
-                        ? 'recarregar_se_modificada'
-                        : ((optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked)
-                            ? 'recarregar_se_nao_modificada'
-                            : 'manter'))),
+            reutilizarAbasAcaoConteudo: (optReutilizarAcaoRecarregar && optReutilizarAcaoRecarregar.checked)
+                ? 'recarregar'
+                : ((optReutilizarAcaoRecarregarSeModificada && optReutilizarAcaoRecarregarSeModificada.checked)
+                    ? 'recarregar_se_modificada'
+                    : ((optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked)
+                        ? 'recarregar_se_nao_modificada'
+                        : 'manter')),
             monitorarUrlOriginalAbertura: optMonitorarUrlOriginal ? optMonitorarUrlOriginal.checked : false,
             monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
             criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
@@ -1803,7 +1785,6 @@ document.addEventListener('DOMContentLoaded', () => {
     adicionarOuvinteSeguro(checkOpcaoAmpuletas, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optConverterCabecalhoPje, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(selectModoPlaceholdersMinutasHtml, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optColagemBotaoDireito, 'change', alternarColagemBotaoDireito);
     adicionarOuvinteSeguro(optAlternarAbasRecentesCtrlTab, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optCapturaBotoesMouse4e5, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optColarBotaoMeio, 'change', () => {
@@ -1827,17 +1808,6 @@ document.addEventListener('DOMContentLoaded', () => {
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optProtegerGuiasModificadas, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(selectReutilizarAcaoConteudo, 'change', () => {
-        if (selectReutilizarAcaoConteudo) {
-            const val = selectReutilizarAcaoConteudo.value;
-            if (optReutilizarAcaoRecarregar && val === 'recarregar') optReutilizarAcaoRecarregar.checked = true;
-            else if (optReutilizarAcaoRecarregarSeModificada && val === 'recarregar_se_modificada') optReutilizarAcaoRecarregarSeModificada.checked = true;
-            else if (optReutilizarAcaoRecarregarSeNaoModificada && val === 'recarregar_se_nao_modificada') optReutilizarAcaoRecarregarSeNaoModificada.checked = true;
-            else if (optReutilizarAcaoManter) optReutilizarAcaoManter.checked = true;
-        }
-        salvarConfiguracoes();
-        atualizarVisibilidadeSubOpcoesReutilizar();
-    });
     const aoAlterarAcaoConteudoReutilizar = () => {
         atualizarVisibilidadeSubOpcoesReutilizar();
         salvarConfiguracoes();
@@ -2698,15 +2668,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarVisualAtencaoSwitches() {
-        if (lblSwitchColagemBotaoDireito) lblSwitchColagemBotaoDireito.classList.remove('slider-atencao');
         if (lblSwitchColarBotaoMeio) lblSwitchColarBotaoMeio.classList.remove('slider-atencao');
-        if (avisoPermissaoBotaoDireito) avisoPermissaoBotaoDireito.style.display = 'none';
-        if (avisoPermissaoBotaoMeio) avisoPermissaoBotaoMeio.style.display = 'none';
     }
 
     function atualizarEstadoVisualSubopcoesMouse() {
-        const ativo = optColarBotaoMeio ? optColarBotaoMeio.checked : true;
-        if (optColagemBotaoDireito) optColagemBotaoDireito.disabled = !ativo;
         atualizarVisualAtencaoSwitches();
         atualizarCoresEBotoesClipboard();
         atualizarVisorClipboardPassivo();
@@ -2719,12 +2684,6 @@ document.addEventListener('DOMContentLoaded', () => {
             containerOpcoesDescarte.style.pointerEvents = ativo ? 'auto' : 'none';
         }
         if (optTempoInatividadeDescarteMinutos) optTempoInatividadeDescarteMinutos.disabled = !ativo;
-    }
-
-    async function alternarColagemBotaoDireito() {
-        if (!optColagemBotaoDireito) return;
-        salvarConfiguracoes();
-        atualizarVisualAtencaoSwitches();
     }
 
     async function alternarColarBotaoMeio() {
@@ -2848,7 +2807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const painelLab = document.getElementById('abaLaboratorio');
     adicionarOuvinteSeguro(painelLab, 'mouseup', (e) => {
         if (!e || !e.target) return;
-        if (e.target.closest('#btnAtualizarPreview') || e.target.closest('#previewAreaTransferencia') || e.target.closest('#previewAreaTransferenciaAnterior') || e.target.closest('#btnDownloadXMouse') || e.target.closest('#avisoPermissaoClipboardInspector')) {
+        if (e.target.closest('#btnAtualizarPreview') || e.target.closest('#previewAreaTransferencia') || e.target.closest('#previewAreaTransferenciaAnterior') || e.target.closest('#btnDownloadXMouse')) {
             return;
         }
         if (e.target.closest('.sample-token')) {
@@ -2919,7 +2878,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lblContadorConsole) lblContadorConsole.textContent = '0';
         const msgVazia = '(Console limpo - nenhuma mensagem ou erro registrado)';
         if (visorMensagensConsole) visorMensagensConsole.textContent = msgVazia;
-        if (painelMensagensConsole) painelMensagensConsole.textContent = msgVazia;
         if (painelResultadoAuditoria) {
             painelResultadoAuditoria.textContent = '';
             painelResultadoAuditoria.style.display = 'none';
@@ -3105,9 +3063,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (changes.selecaoEditavelAtiva !== undefined && selectModoPlaceholdersMinutasHtml) {
                     selectModoPlaceholdersMinutasHtml.value = (changes.selecaoEditavelAtiva.newValue !== false) ? 'placeholders' : 'desabilitado';
                 }
-                if (changes.colagemBotaoDireitoAtiva !== undefined && optColagemBotaoDireito) {
-                    optColagemBotaoDireito.checked = Boolean(changes.colagemBotaoDireitoAtiva.newValue);
-                }
                 if (changes.regrasMapeamentoElementos && Array.isArray(changes.regrasMapeamentoElementos.newValue)) {
                     renderizarListaRegrasMapeamento(changes.regrasMapeamentoElementos.newValue);
                 }
@@ -3158,7 +3113,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (changes.reutilizarAbasAcaoConteudo !== undefined) {
                     const novaAcao = changes.reutilizarAbasAcaoConteudo.newValue || 'manter';
-                    if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.value = novaAcao;
                     if (optReutilizarAcaoRecarregar && novaAcao === 'recarregar') {
                         optReutilizarAcaoRecarregar.checked = true;
                     } else if (optReutilizarAcaoRecarregarSeModificada && novaAcao === 'recarregar_se_modificada') {
@@ -3312,8 +3266,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     (async () => {
-        if (window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.carregarCatalogoPerfisJson === 'function') {
-            await window.JusGovCfgDefaults.carregarCatalogoPerfisJson(typeof chrome !== 'undefined' ? chrome : null);
+        if (window.JusGovCfgDefaults) {
+            const apiChrome = typeof chrome !== 'undefined' ? chrome : null;
+            await Promise.all([
+                typeof window.JusGovCfgDefaults.carregarCatalogoPerfisJson === 'function'
+                    ? window.JusGovCfgDefaults.carregarCatalogoPerfisJson(apiChrome)
+                    : Promise.resolve(),
+                typeof window.JusGovCfgDefaults.carregarDadosForensesJson === 'function'
+                    ? window.JusGovCfgDefaults.carregarDadosForensesJson(apiChrome)
+                    : Promise.resolve(),
+                typeof window.JusGovCfgDefaults.carregarRegrasSistemaJson === 'function'
+                    ? window.JusGovCfgDefaults.carregarRegrasSistemaJson(apiChrome)
+                    : Promise.resolve()
+            ]);
         }
         configurarNavegacaoAbas();
         carregarConfiguracoesDoStorage();

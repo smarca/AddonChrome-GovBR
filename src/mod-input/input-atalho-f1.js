@@ -44,7 +44,7 @@
 
     class AtalhoF1Gemini {
         #ativo = true;
-        #promptPadrao = 'Analise juridicamente e formate o seguinte texto processual extraído do PJe:\n\n"{{TEXTO}}"';
+        #promptPadrao = "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
         #ultimoDisparoTimestamp = 0;
         #intervaloMinimoDisparoMs = 300;
 

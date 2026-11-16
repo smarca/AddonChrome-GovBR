@@ -44,58 +44,37 @@
         }
 
         eEspacoBranco(ch) {
+            if (typeof this.#constantes.eEspacoBranco === 'function') return this.#constantes.eEspacoBranco(ch);
             if (!ch) return false;
             const c = ch.charCodeAt(0);
-            const tab = this.#constantes.TABELA_MASCARA_ASCII;
-            const masc = this.#constantes.MASCARA_CARACTERE || {};
-            if (tab && c < 128) return (tab[c] & masc.ESPACO_BRANCO) !== 0;
-            return c === 160 || (this.#constantes.EXPRESSOES_REGULARES && this.#constantes.EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE ? this.#constantes.EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE.test(ch) : /\s/.test(ch));
+            return c === 160 || /\s/.test(ch);
         }
 
         eQuebraDeLinha(ch) {
-            return ch === '\n' || ch === '\r';
+            return typeof this.#constantes.eQuebraDeLinha === 'function' ? this.#constantes.eQuebraDeLinha(ch) : (ch === '\n' || ch === '\r');
         }
 
         ePontuacaoFim(ch) {
+            if (typeof this.#constantes.ePontuacaoFim === 'function') return this.#constantes.ePontuacaoFim(ch);
             if (!ch) return false;
             const c = ch.charCodeAt(0);
-            const tab = this.#constantes.TABELA_MASCARA_ASCII;
-            const masc = this.#constantes.MASCARA_CARACTERE || {};
-            if (tab && c < 128) return (tab[c] & masc.PONTUACAO_FIM) !== 0;
-            return c === 8212 || c === 8211 || c === 8230;
+            return c === 8212 || c === 8211 || c === 8230 || /[.!?]/.test(ch);
         }
 
         eDelimitadorPar(ch) {
-            if (!ch) return false;
-            const c = ch.charCodeAt(0);
-            const tab = this.#constantes.TABELA_MASCARA_ASCII;
-            const masc = this.#constantes.MASCARA_CARACTERE || {};
-            return tab && c < 128 && (tab[c] & masc.DELIMITADOR_PAR) !== 0;
+            if (typeof this.#constantes.eDelimitadorPar === 'function') return this.#constantes.eDelimitadorPar(ch);
+            return Boolean(ch) && '()[]{}<>'.indexOf(ch) !== -1;
         }
 
         eCaractereAspas(ch) {
-            if (!ch) return false;
-            const c = ch.charCodeAt(0);
-            const tab = this.#constantes.TABELA_MASCARA_ASCII;
-            const masc = this.#constantes.MASCARA_CARACTERE || {};
-            if (tab && c < 128) return (tab[c] & masc.DELIMITADOR_ASPAS) !== 0;
+            if (typeof this.#constantes.eCaractereAspas === 'function') return this.#constantes.eCaractereAspas(ch);
             const aspas = this.#constantes.CARACTERES_ASPAS_TODOS || '';
-            return aspas.indexOf(ch) !== -1;
+            return Boolean(ch) && aspas.indexOf(ch) !== -1;
         }
 
         eAlfanumericoUnicode(ch) {
-            if (!ch) return false;
-            const c = ch.charCodeAt(0);
-            const tab = this.#constantes.TABELA_MASCARA_ASCII;
-            const masc = this.#constantes.MASCARA_CARACTERE || {};
-            if (tab && c < 128) {
-                return (tab[c] & (masc.DIGITO | masc.LETRA_ASCII)) !== 0;
-            }
-            const rx = this.#constantes.EXPRESSOES_REGULARES;
-            if (rx && rx.CHAR_ALFANUMERICO_UNICODE) {
-                return rx.CHAR_ALFANUMERICO_UNICODE.test(ch);
-            }
-            return /[\p{L}\p{N}]/u.test(ch);
+            if (typeof this.#constantes.eAlfanumericoUnicode === 'function') return this.#constantes.eAlfanumericoUnicode(ch);
+            return Boolean(ch) && /[\p{L}\p{N}]/u.test(ch);
         }
 
         tentarExpandirSentencaPorDoisPontos(texto, idx) {

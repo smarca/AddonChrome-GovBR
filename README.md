@@ -108,12 +108,15 @@ AddonChrome-GovBR/
 ├── README.md                   # Documentação de apresentação para o GitHub
 ├── docs/                       # Documentação técnica viva, arquitetura, backlog e regras de negócio (Docs-as-Code)
 ├── * src/                      # (*) INDISPENSÁVEL: Código-fonte em tempo de execução da extensão
-│   ├── * cfg/                  # (*) Configuração, Service Worker (background.js), Popup, Opções e Suíte de Testes (debug.js)
-│   ├── * ico/                  # (*) Ícones oficiais da extensão (16, 48, 128px)
-│   ├── * mod-copia/            # (*) Motor de Seleção/Cópia Inteligente, Padrões Forenses, Acumulador e Validador Matemático
-│   ├── * mod-input/            # (*) Tratamento de Inputs, Placeholders e Proteção de Campos de Digitação
-│   ├── * mod-navegador/        # (*) Gerenciador de Guias, Janelas e Navegação
-│   └── * mod-anti-ampulheta/   # (*) Acelerador e Otimizações Visuais (Anti-Ampulhetas e Injeção de Desbloqueio)
+│   ├── * cfg/                  # (*) Service Worker, Perfis/Dados JSON, Popup, Opções e Suíte de Testes (debug.js)
+│   ├── * ico/                  # (*) Ícone oficial da extensão (128px)
+│   ├── * lib/                  # (*) Bibliotecas puras compartilhadas (validadores, geradores, constantes, URLs, injeção, config)
+│   ├── * mod-copia/            # (*) Motor de Seleção/Cópia Inteligente, Acumulador, Sanitizador e Flash Visual
+│   ├── * mod-input/            # (*) Botões laterais 4/5, botão do meio, setas em campos, F1 IA e Caixa Rápida Ins+Ins
+│   ├── * mod-navegador/        # (*) Gerenciador de Guias, Anti-Duplicação, Janela Única, Tab Groups e Descarte
+│   ├── * mod-anti-ampulheta/   # (*) Acelerador Multissistema (PJe, eProc, Projudi, SAJ, PDPJ, Creta)
+│   ├── * mod-produt/           # (*) Contadores de Trabalho, Temporizador Pomodoro e Assistente F1
+│   └── * mod-manut/            # (*) Auto-Limpeza seletiva de cache e cookies antigos inativos
 └── util/                       # Scripts utilitários de manutenção, auditoria V8 e sincronização
 ```
 

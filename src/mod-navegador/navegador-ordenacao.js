@@ -106,10 +106,16 @@
                 }
 
                 // Detecta sufixos ccTLD/SLD comuns (.jus.br, .gov.br, .leg.br, .mp.br, .com.br, etc.)
+                const rsOrd = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                    ? JusGovCfgDefaults.obterRegrasSistema()
+                    : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+                const sufixosSld = (rsOrd && rsOrd.ordenacaoGuias && Array.isArray(rsOrd.ordenacaoGuias.sufixosSld))
+                    ? rsOrd.ordenacaoGuias.sufixosSld
+                    : ['jus', 'leg', 'mp', 'gov', 'def', 'mil', 'edu', 'com', 'org', 'net', 'adv'];
                 let numSufixo = 1;
                 const penultima = partes[partes.length - 2];
                 const ultima = partes[partes.length - 1];
-                if (ultima.length === 2 && (penultima.length <= 3 || ['jus', 'leg', 'mp', 'gov', 'def', 'mil', 'edu', 'com', 'org', 'net', 'adv'].includes(penultima))) {
+                if (ultima.length === 2 && (penultima.length <= 3 || sufixosSld.includes(penultima))) {
                     numSufixo = 2; // ex: jus.br
                 }
 
@@ -457,7 +463,12 @@
                     gruposPorHost.get(host).push(t.id);
                 }
 
-                const coresDisponiveis = ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'purple', 'pink'];
+                const rsPal = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                    ? JusGovCfgDefaults.obterRegrasSistema()
+                    : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+                const coresDisponiveis = (rsPal && rsPal.ordenacaoGuias && Array.isArray(rsPal.ordenacaoGuias.paletaGrupos) && rsPal.ordenacaoGuias.paletaGrupos.length > 0)
+                    ? rsPal.ordenacaoGuias.paletaGrupos
+                    : ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'purple', 'pink'];
                 let corIdx = 0;
                 let totalGrupos = 0;
 

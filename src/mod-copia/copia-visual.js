@@ -44,13 +44,19 @@
         return;
     }
 
-    const PRESETS_PADRAO_MARCADOR = Object.freeze({
-        verde_forense: Object.freeze({ corContorno: '#0d9488', corFundo: '#ccfbf1', opacidadeFundo: 0.28, estiloBadge: 'sobrescrito' }),
-        marca_texto: Object.freeze({ corContorno: '#eab308', corFundo: '#fef08a', opacidadeFundo: 0.36, estiloBadge: 'sobrescrito' }),
-        azul_indigo: Object.freeze({ corContorno: '#4f46e5', corFundo: '#e0e7ff', opacidadeFundo: 0.28, estiloBadge: 'circular' }),
-        ambar_suave: Object.freeze({ corContorno: '#d97706', corFundo: '#fde68a', opacidadeFundo: 0.30, estiloBadge: 'translucido' }),
-        alto_contraste: Object.freeze({ corContorno: '#1e293b', corFundo: '#facc15', opacidadeFundo: 0.42, estiloBadge: 'circular' })
+    const PRESET_VISUAL_MINIMO = Object.freeze({
+        verde_forense: Object.freeze({ corContorno: '#0d9488', corFundo: '#ccfbf1', opacidadeFundo: 0.28, estiloBadge: 'sobrescrito' })
     });
+
+    function obterPresetsMarcadorVisuais() {
+        try {
+            const g = (typeof self !== 'undefined' && self.JusGovCfgDefaults) || (typeof window !== 'undefined' && window.JusGovCfgDefaults);
+            if (g && typeof g.obterPresetsMarcadorColado === 'function') {
+                return g.obterPresetsMarcadorColado();
+            }
+        } catch (_) { }
+        return PRESET_VISUAL_MINIMO;
+    }
 
     class FeedbackVisual {
         #timerFlashBorder;
@@ -120,9 +126,10 @@
                 this.#configMarcadorColado.ativo = opcoes.marcadorConteudoColadoAtivo;
             }
             const presetChave = opcoes.preset || opcoes.presetMarcadorColado;
-            if (typeof presetChave === 'string' && PRESETS_PADRAO_MARCADOR[presetChave]) {
+            const presetsDisponiveis = obterPresetsMarcadorVisuais();
+            if (typeof presetChave === 'string' && presetsDisponiveis[presetChave]) {
                 this.#configMarcadorColado.preset = presetChave;
-                const p = PRESETS_PADRAO_MARCADOR[presetChave];
+                const p = presetsDisponiveis[presetChave];
                 if (!opcoes.corContorno && !opcoes.corContornoMarcadorColado) this.#configMarcadorColado.corContorno = p.corContorno;
                 if (!opcoes.corFundo && !opcoes.corFundoMarcadorColado) this.#configMarcadorColado.corFundo = p.corFundo;
                 if (opcoes.opacidadeFundo === undefined && opcoes.opacidadeFundoMarcadorColado === undefined) this.#configMarcadorColado.opacidadeFundo = p.opacidadeFundo;

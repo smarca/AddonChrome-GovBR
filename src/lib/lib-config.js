@@ -7,10 +7,14 @@
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-config.js
  * - Classe Exportada: JusGovConfiguracoes (self.JusGovConfiguracoes / window.JusGovConfiguracoes)
- * - Métodos Públicos: obterConfiguracoesGerais, sincronizarEstado, sincronizarComportamentoIcone, desenharIconeVetorialFallback
+ * - Métodos Públicos: obterConfiguracoesGerais, sincronizarEstado, sincronizarComportamentoIcone,
+ *   desenharIconeVetorialFallback, obterChavesConfigSync, houveMudancaDeConfiguracao,
+ *   sincronizarMenusContexto, tratarCliqueIconeExtensao, executarSincronizacaoNuvemCoalescida,
+ *   gerenciarRequisicaoPerfil, alternarPerfil, criarPerfil, renomearPerfil, excluirPerfil,
+ *   resetarPerfis, exportarBackupTotal, importarBackup
  * - Padrão Arquitetural: UMD (Universal Module Definition) para compatibilidade cruzada
  *   com Service Worker (Background MV3), Content Scripts, Popups/Options e ambiente Node/Jest.
- * - Regras / Seções: Diretrizes 1/4/11/16, Seções 1, 4, 5 (BP-06 / ARQ-01)
+ * - Regras / Seções: Diretrizes 1/4/11/16, Seções 1, 4, 5, FEAT-34/35 (Perfis e JSON externos)
  *
  * ESPECIFICAÇÃO DE ENGENHARIA E DIRETRIZES DE MANUTENÇÃO (BLUEPRINT):
  * 1) FINALIDADE:
@@ -35,6 +39,33 @@
     const CHAVE_PERFIL_ATIVO = 'perfilAtivoId';
     const CHAVE_LISTA_PERFIS = 'listaPerfis';
     const PREFIXO_CHAVE_PERFIL_CFG = 'perfilCfg_';
+    const LIMITE_BYTES_ITEM_SYNC = 8000;
+    const JANELA_DUPLO_CLIQUE_ICONE_MS = 260;
+
+    /* Lista canonica de chaves sincronizaveis (evita reinjecao por alteracao em contadores locais) */
+    const CHAVES_CONFIGURACAO_SINCRONIZAVEL = Object.freeze([
+        'urlsTurbo', 'urlsAmpuletas', 'modoTurbo', 'comportamentoCliqueIcone', 'ativoAmpuletas',
+        'manterFormatacaoBasica', 'nivelFiltroFormatacao', 'selecaoEditavelAtiva',
+        'modoPlaceholdersMinutasHtml', 'placeholdersMinutasHtmlAtivo', 'colagemBotaoDireitoAtiva',
+        'capturaBotoesMouse4e5Ativa', 'colarBotaoMeioAtivo', 'navegacaoTecladoCamposAtiva',
+        'bloquearNovasJanelas', 'preservarJanelasAutenticacao', 'abaEmPrimeiroPlano', 'abaEmSegundoPlano',
+        'reutilizarAbasAbertas', 'reutilizarAbasFocoPrimeiroPlano', 'protegerGuiasModificadas',
+        'reutilizarAbasAcaoConteudo', 'monitorarUrlOriginalAbertura', 'monitorarUrlAtualPagina',
+        'criterioOrdenacaoGuias', 'sentidoOrdenacaoGuias', 'ordenarGuiasFixadas',
+        'fecharHierarquiaEmCascata', 'modoBarraFavoritosSuperior', 'descarteGuiasInativasAtivo',
+        'tempoInatividadeDescarteMinutos', 'validacaoMatematicaAtiva', 'tempoConferenciaDocumentosMs',
+        'modoExibicaoValidacao', 'posicaoAvisosValidacao', 'tempoFlashBorderMs', 'corFlashBorder',
+        'marcadorConteudoColadoAtivo', 'presetMarcadorColado', 'corContornoMarcadorColado',
+        'corFundoMarcadorColado', 'opacidadeFundoMarcadorColado', 'estiloBadgeMarcadorColado',
+        'tipoContornoMarcadorColado', 'minimoCaracteresInterface', 'converterCabecalhoPjeAtivo',
+        'atalhoF1GeminiAtivo', 'modoShiftCnj', 'incluirSeparadorFinalAcumulador', 'separadorTabelas',
+        'promptF1Gemini', 'tempoExibicaoAlertaMs', 'separadorAcumulador', 'regrasMapeamentoElementos',
+        'autoLimpezaCacheCookiesAtiva', 'autoLimpezaIdade', 'tempoTrabalhoCorridoAtivo',
+        'tempoTrabalhoCorridoHoras', 'tempoTrabalhoAtivoAtivo', 'tempoTrabalhoAtivoHoras',
+        'pomodoroAtivo', 'pomodoroProporcao', 'pomodoroFocoMinutos', 'pomodoroCiclos',
+        'perfilAtivoId', 'listaPerfis'
+    ]);
+    const SET_CHAVES_SYNC = new Set(CHAVES_CONFIGURACAO_SINCRONIZAVEL);
 
     function obterDefaultsModulo() {
         if (typeof self !== 'undefined' && self.JusGovCfgDefaults) return self.JusGovCfgDefaults;
@@ -1059,20 +1090,23 @@
             }
 
             try {
-                let corFundo = '#10b981';
-                let corBorda = '#059669';
-                let corRaio = '#fef08a';
+                const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                    ? JusGovCfgDefaults.obterRegrasSistema()
+                    : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+                const paletas = (rs && rs.iconeExtensaoPaletas) ? rs.iconeExtensaoPaletas : null;
+                const chavePaleta = (modoAtivo === 'url') ? 'url' : (modoAtivo === 'desligado' ? 'desligado' : 'global');
+                const paleta = (paletas && paletas[chavePaleta]) ? paletas[chavePaleta] : null;
+
+                let corFundo = (paleta && paleta.gradTop) || '#10b981';
+                let corBorda = (paleta && paleta.borda) || '#059669';
+                let corRaio = (paleta && paleta.raio) || '#fef08a';
                 let tituloModo = 'Ativo (Global)';
 
                 if (modoAtivo === 'url') {
-                    corFundo = '#1a73e8';
-                    corBorda = '#1557b0';
-                    corRaio = '#fbbc04';
+                    if (!paleta) { corFundo = '#1a73e8'; corBorda = '#1557b0'; corRaio = '#fbbc04'; }
                     tituloModo = 'Ativo (Lista)';
                 } else if (modoAtivo === 'desligado') {
-                    corFundo = '#64748b';
-                    corBorda = '#475569';
-                    corRaio = '#cbd5e1';
+                    if (!paleta) { corFundo = '#64748b'; corBorda = '#475569'; corRaio = '#cbd5e1'; }
                     tituloModo = 'Pausado';
                 }
 
@@ -1136,6 +1170,152 @@
 
                 apiChrome.action.setIcon({ imageData: imageDataMap }).catch(() => { });
             } catch (_) { }
+        }
+
+        obterChavesConfigSync() {
+            return CHAVES_CONFIGURACAO_SINCRONIZAVEL;
+        }
+
+        houveMudancaDeConfiguracao(changes) {
+            if (!changes || typeof changes !== 'object') return false;
+            return CHAVES_CONFIGURACAO_SINCRONIZAVEL.some((chave) => Object.prototype.hasOwnProperty.call(changes, chave));
+        }
+
+        async sincronizarMenusContexto(chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.contextMenus || !apiChrome.storage || !apiChrome.storage.sync) return;
+            try {
+                const config = await apiChrome.storage.sync.get(['comportamentoCliqueIcone']);
+                const isAcoesRapidas = config && config.comportamentoCliqueIcone === 'acoes_rapidas';
+                apiChrome.contextMenus.removeAll(() => {
+                    apiChrome.contextMenus.create({ id: 'toggle-comportamento-icone', type: 'checkbox', title: 'Ações Rápidas no Ícone', checked: Boolean(isAcoesRapidas), contexts: ['action'] }, () => { });
+                    apiChrome.contextMenus.create({ id: 'configurar-extensao', title: 'Configurar Extensão', contexts: ['action'] }, () => { });
+                    apiChrome.contextMenus.create({ id: 'abrir-painel-extensao', title: 'Desenvolvimento (Página do Plugin)', contexts: ['action'] }, () => { });
+                });
+            } catch (_) { }
+        }
+
+        tratarCliqueIconeExtensao(chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome) return;
+            if (this._timerCliqueIcone !== undefined && this._timerCliqueIcone !== null) {
+                clearTimeout(this._timerCliqueIcone);
+                this._timerCliqueIcone = null;
+                if (apiChrome.runtime && typeof apiChrome.runtime.openOptionsPage === 'function') {
+                    apiChrome.runtime.openOptionsPage();
+                }
+                return;
+            }
+            this._timerCliqueIcone = setTimeout(async () => {
+                this._timerCliqueIcone = null;
+                try {
+                    const atual = await apiChrome.storage.sync.get(['modoTurbo']);
+                    const modoAtual = (atual && atual.modoTurbo) || 'global';
+                    const proximoModo = modoAtual === 'global'
+                        ? 'url'
+                        : (modoAtual === 'url' ? 'desligado' : 'global');
+                    await apiChrome.storage.sync.set({ modoTurbo: proximoModo });
+                    this.desenharIconeVetorialFallback(proximoModo, 'acoes_rapidas', apiChrome);
+                } catch (_) { }
+            }, JANELA_DUPLO_CLIQUE_ICONE_MS);
+        }
+
+        /* Sincronizacao coalescida para chrome.storage.sync: aceita exclusivamente chaves de configuracao/perfil
+         * e valida cota maxima de 8KB por item (evitando vazamento de chaves locais de cookies/trabalho/clipboard). */
+        async executarSincronizacaoNuvemCoalescida(chromeApi = null, dependencias = {}) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage) return false;
+            try {
+                if (apiChrome.storage.local && apiChrome.storage.sync) {
+                    const dadosLocais = await apiChrome.storage.local.get(null);
+                    if (dadosLocais && typeof dadosLocais === 'object') {
+                        const payloadSync = {};
+                        const chaves = Object.keys(dadosLocais);
+                        for (let i = 0; i < chaves.length; i++) {
+                            const k = chaves[i];
+                            const ehChavePermitida = SET_CHAVES_SYNC.has(k) || k.startsWith(PREFIXO_CHAVE_PERFIL_CFG);
+                            if (!ehChavePermitida) continue;
+                            try {
+                                const bytes = JSON.stringify({ [k]: dadosLocais[k] }).length;
+                                if (bytes <= LIMITE_BYTES_ITEM_SYNC) {
+                                    payloadSync[k] = dadosLocais[k];
+                                }
+                            } catch (_) { }
+                        }
+                        if (Object.keys(payloadSync).length > 0) {
+                            await apiChrome.storage.sync.set(payloadSync);
+                        }
+                    }
+                }
+                await this.sincronizarEstado(apiChrome, dependencias);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        /* Roteador unificado das requisicoes IPC de Perfis de Uso (FEATS-34/35). */
+        async gerenciarRequisicaoPerfil(msg, chromeApi = null, dependencias = {}) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!msg || typeof msg.acao !== 'string') return { ok: false };
+            try {
+                if (msg.acao === 'OBTER_PERFIS') {
+                    const catalogo = await this.carregarCatalogoPerfis(apiChrome);
+                    const syncData = await apiChrome.storage.sync.get(['listaPerfis', 'perfilAtivoId']);
+                    const estrutura = this.garantirEstruturaPerfis(syncData || {}, catalogo);
+                    if (estrutura.alteracoes) {
+                        await apiChrome.storage.sync.set(estrutura.alteracoes);
+                    }
+                    return { ok: true, listaPerfis: estrutura.listaPerfis, perfilAtivoId: estrutura.perfilAtivoId };
+                }
+                if (msg.acao === 'ALTERNAR_PERFIL') {
+                    const res = await this.alternarPerfil(msg.perfilId, apiChrome);
+                    let miniTipExibidoNaAba = false;
+                    if (res && res.ok) {
+                        await this.sincronizarEstado(apiChrome, dependencias);
+                        const nomePerfil = (res.perfil && res.perfil.nome) ? res.perfil.nome : res.perfilAtivoId;
+                        try {
+                            if (apiChrome && apiChrome.runtime && typeof apiChrome.runtime.sendMessage === 'function') {
+                                apiChrome.runtime.sendMessage({ acao: 'PERFIL_ALTERADO', perfilId: res.perfilAtivoId, nomePerfil }).catch(() => { });
+                            }
+                        } catch (_) { }
+                        if (msg.exibirMiniTip !== false && apiChrome && apiChrome.tabs && typeof apiChrome.tabs.query === 'function') {
+                            try {
+                                const abas = await apiChrome.tabs.query({ active: true, lastFocusedWindow: true });
+                                const abaAtiva = Array.isArray(abas) ? abas[0] : null;
+                                if (abaAtiva && abaAtiva.id) {
+                                    await apiChrome.tabs.sendMessage(abaAtiva.id, {
+                                        acao: 'exibirMiniTipGlobal',
+                                        mensagem: `Perfil de Uso:\n${nomePerfil}`,
+                                        corBorda: '#2563eb'
+                                    }, { frameId: 0 });
+                                    miniTipExibidoNaAba = true;
+                                }
+                            } catch (_) { }
+                        }
+                    }
+                    return res ? { ...res, miniTipExibidoNaAba } : { ok: false };
+                }
+                if (msg.acao === 'CRIAR_PERFIL') {
+                    const res = await this.criarPerfil(msg.nome, { origem: msg.origem || 'padrao', ativar: msg.ativar !== false }, apiChrome);
+                    if (res && res.ok) await this.sincronizarEstado(apiChrome, dependencias);
+                    return res || { ok: false };
+                }
+                if (msg.acao === 'RENOMEAR_PERFIL') {
+                    return (await this.renomearPerfil(msg.perfilId, msg.novoNome, apiChrome)) || { ok: false };
+                }
+                if (msg.acao === 'EXCLUIR_PERFIL') {
+                    return (await this.excluirPerfil(msg.perfilId, apiChrome)) || { ok: false };
+                }
+                if (msg.acao === 'RESETAR_PERFIS') {
+                    const res = await this.resetarPerfis(msg.escopo || 'atual', apiChrome);
+                    if (res && res.ok) await this.sincronizarEstado(apiChrome, dependencias);
+                    return res || { ok: false };
+                }
+            } catch (err) {
+                return { ok: false, erro: err ? err.message : 'Erro ao processar perfil.' };
+            }
+            return { ok: false };
         }
     }
 

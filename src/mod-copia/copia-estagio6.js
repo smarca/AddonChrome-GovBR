@@ -24,6 +24,17 @@
  *    tabelas de custas) mantêm a seleção ativa no DOM para conferência visual.
  * 2. Se a célula contiver um botão de ação rápida (ex: ícone de exclusão ou edição no PJe),
  *    o clique prioritário não deve ser interceptado como seleção de texto puro.
+ *
+ * RECONSTRUÇÃO CLEAN-ROOM (INVARIANTE E ALGORITMO DE 3 PASSOS):
+ * - INVARIANTE CRÍTICA: Nunca selecionar célula/linha se o alvo ou qualquer ancestral
+ *   até o container `td, th, [role="cell"], [role="gridcell"], .rich-table-cell` for
+ *   BUTTON, A, INPUT, SELECT, TEXTAREA, LABEL ou possuir `role="button"|"link"`.
+ * - PASSO 1 (`isCelulaTabelaDadosLeitura`): Partir de `parentElement` se TEXT_NODE;
+ *   localizar ancestral via `.closest(...)`; percorrer até `celula` bloqueando interativos.
+ * - PASSO 2 (`obterLinhaTabelaAncestral` / `obterCelulaTabelaAncestral`): Mapear linha
+ *   (`tr, [role="row"]`) ou célula para delimitação de eixo horizontal/vertical.
+ * - PASSO 3 (`acumularSelecaoTabela`): Delegar ao Acumulador a coleta da coluna inteira
+ *   (por `cellIndex`) ou linha completa, respeitando `modoBaralhoShift` (FIFO vs DOM order).
  * 
  * DOCUMENTAÇÃO RELACIONADA:
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.6: Estágio 6 - Tabelas e Acumulador)

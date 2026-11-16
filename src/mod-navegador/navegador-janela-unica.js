@@ -82,11 +82,18 @@
             }
             if (!alvoJanela) return false;
 
+            const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                ? JusGovCfgDefaults.obterRegrasSistema()
+                : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+            const exc = (rs && rs.excecoesAutenticacao) ? rs.excecoesAutenticacao : null;
+
             /* Janelas popup ou painéis do sistema com dimensões típicas de login */
             if (alvoJanela.type === 'popup' || alvoJanela.type === 'panel') {
                 const w = alvoJanela.width || 0;
                 const h = alvoJanela.height || 0;
-                if (w > 0 && w <= 820 && h > 0 && h <= 750) {
+                const maxW = (exc && typeof exc.larguraMaxPopup === 'number') ? exc.larguraMaxPopup : 820;
+                const maxH = (exc && typeof exc.alturaMaxPopup === 'number') ? exc.alturaMaxPopup : 750;
+                if (w > 0 && w <= maxW && h > 0 && h <= maxH) {
                     return true;
                 }
             }
@@ -95,15 +102,15 @@
             const titLower = String(tituloStr || '').toLowerCase();
 
             /* Endpoints estritos e ferramentas de autenticação/certificados digitais */
-            const dominiosAuth = [
-                'sso.acesso.gov.br', 'acesso.gov.br', 'icp-brasil.org.br',
-                'portal.icp-brasil.org.br', 'pjeoffice', 'shodo', 'shodô',
-                'assinador'
-            ];
+            const dominiosAuth = (exc && Array.isArray(exc.dominiosAuth) && exc.dominiosAuth.length > 0)
+                ? exc.dominiosAuth
+                : ['sso.acesso.gov.br', 'acesso.gov.br', 'icp-brasil.org.br', 'portal.icp-brasil.org.br', 'pjeoffice', 'shodo', 'shodô', 'assinador'];
             if (dominiosAuth.some(d => urlLower.includes(d))) return true;
 
             /* Padrões de protocolo/caminho com fronteira estrita de delimitadores (evita falsos positivos como "processo") */
-            const regexFronteiraAuth = /(?:^|[./?&=_\s-])(?:sso|oauth|openid|saml|login|auth|autenticacao|certificado|token|validar)(?:[./?&=_\s-]|$)/i;
+            const regexFronteiraAuth = (exc && typeof exc.regexFronteiraAuth === 'string' && exc.regexFronteiraAuth)
+                ? new RegExp(exc.regexFronteiraAuth, 'i')
+                : /(?:^|[./?&=_\s-])(?:sso|oauth|openid|saml|login|auth|autenticacao|certificado|token|validar)(?:[./?&=_\s-]|$)/i;
             if (regexFronteiraAuth.test(urlLower) || regexFronteiraAuth.test(titLower)) {
                 return true;
             }

@@ -46,34 +46,31 @@
         }
 
         eAlfanumericoUnicode(ch) {
+            if (typeof this.#constantes.eAlfanumericoUnicode === 'function') return this.#constantes.eAlfanumericoUnicode(ch);
             if (!ch) return false;
             const c = ch.charCodeAt(0);
             const tab = this.#constantes.TABELA_MASCARA_ASCII;
             const masc = this.#constantes.MASCARA_CARACTERE || {};
-            if (tab && c < 128) {
-                return (tab[c] & (masc.DIGITO | masc.LETRA_ASCII)) !== 0;
-            }
-            const rx = this.#constantes.EXPRESSOES_REGULARES;
-            if (rx && rx.CHAR_ALFANUMERICO_UNICODE) {
-                return rx.CHAR_ALFANUMERICO_UNICODE.test(ch);
-            }
+            if (tab && c < 128) return (tab[c] & (masc.DIGITO | masc.LETRA_ASCII)) !== 0;
             return /[\p{L}\p{N}]/u.test(ch);
         }
 
         eEspacoBranco(ch) {
+            if (typeof this.#constantes.eEspacoBranco === 'function') return this.#constantes.eEspacoBranco(ch);
             if (!ch) return false;
             const c = ch.charCodeAt(0);
             const tab = this.#constantes.TABELA_MASCARA_ASCII;
             const masc = this.#constantes.MASCARA_CARACTERE || {};
             if (tab && c < 128) return (tab[c] & masc.ESPACO_BRANCO) !== 0;
-            return c === 160 || (this.#constantes.EXPRESSOES_REGULARES && this.#constantes.EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE ? this.#constantes.EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE.test(ch) : /\s/.test(ch));
+            return c === 160 || /\s/.test(ch);
         }
 
         eQuebraDeLinha(ch) {
-            return ch === '\n' || ch === '\r';
+            return typeof this.#constantes.eQuebraDeLinha === 'function' ? this.#constantes.eQuebraDeLinha(ch) : (ch === '\n' || ch === '\r');
         }
 
         ePontuacaoFim(ch) {
+            if (typeof this.#constantes.ePontuacaoFim === 'function') return this.#constantes.ePontuacaoFim(ch);
             if (!ch) return false;
             const c = ch.charCodeAt(0);
             const tab = this.#constantes.TABELA_MASCARA_ASCII;

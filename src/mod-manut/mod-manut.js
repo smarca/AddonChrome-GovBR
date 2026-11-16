@@ -75,7 +75,15 @@
          * @returns {number}
          */
         obterMsIdadeLimpeza(idadeStr) {
-            switch (String(idadeStr || '7d')) {
+            const chave = String(idadeStr || '7d');
+            const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                ? JusGovCfgDefaults.obterRegrasSistema()
+                : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+            const tabela = (rs && rs.manutencao && rs.manutencao.idadesLimpezaMs) ? rs.manutencao.idadesLimpezaMs : null;
+            if (tabela && typeof tabela[chave] === 'number') {
+                return tabela[chave];
+            }
+            switch (chave) {
                 case '12h': return 12 * 3600 * 1000;
                 case '1d': return 24 * 3600 * 1000;
                 case '3d': return 3 * 24 * 3600 * 1000;

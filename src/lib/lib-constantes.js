@@ -656,233 +656,115 @@
     ]);
 
     /* ==========================================================================
-     * SECAO 5: ARQUITETURA DE FILTROS HTML PROGRESSIVOS EM 5 NIVEIS
-     * O porque: Sanitizacao ativa e interoperabilidade com editores juridicos,
-     * baseada em direcao unidirecional ascendente (cada nivel herda do anterior).
+     * SECAO 5 & 6: LEITURA DESACOPLADA DE DADOS FORENSES E REGRAS EM JSON
+     * (dados-forenses.json e regras-sistema.json carregados via JusGovCfgDefaults / preload)
      * ========================================================================== */
-    const NIVEIS_FILTRO_HTML = Object.freeze({
-        0: Object.freeze({
-            indice: 0,
-            id: 'texto_puro',
-            chave: 'texto_puro',
-            nome: 'Texto Puro',
-            escopo: 'Remove 100% das tags HTML/XML, converte entidades (&nbsp; -> espaco, &amp; -> &), normaliza quebras de linha (\\r\\n -> \\n). Sanitizacao ativa via node.textContent.',
-            alvo: 'input, textarea, logs, variaveis de busca, campos de sistema legados sem suporte a markup.'
+    const TABELAS_FORENSES_VAZIAS = Object.freeze({
+        especiesInss: Object.freeze({}),
+        tribunaisCnj: Object.freeze({
+            RAMOS: Object.freeze({}),
+            TRIBUNAIS_FEDERAIS: Object.freeze({}),
+            TRIBUNAIS_TRABALHO: Object.freeze({}),
+            TRIBUNAIS_ESTADUAIS_E_ELEITORAIS: Object.freeze({})
         }),
-        1: Object.freeze({
-            indice: 1,
-            id: 'basico',
-            chave: 'basico',
-            nome: 'Basico (Inline)',
-            escopo: 'Apenas formatacao de caracteres e paragrafos simples: b, strong, i, em, u, s, sub, sup, span, br, p. Proibido qualquer atributo CSS de bloco ou quebras estruturais complexas.',
-            alvo: 'Caixas de comentario, anotacoes rapidas, chats internos.'
-        }),
-        2: Object.freeze({
-            indice: 2,
-            id: 'intermediario',
-            chave: 'intermediario',
-            nome: 'Intermediario (Paragrafo/Fluxo)',
-            escopo: 'Nivel 1 + p, blockquote, ul, ol, li, hr. CSS restrito a alinhamento (text-align) e recuo simples (margin-left / text-indent). Sem tabelas.',
-            alvo: 'CKEditor / TinyMCE em modo padrao de redacao juridica (despachos simples, certidoes).'
-        }),
-        3: Object.freeze({
-            indice: 3,
-            id: 'avancado',
-            chave: 'avancado',
-            nome: 'Avancado (Documental / RTF classico)',
-            escopo: 'Nivel 2 + h1-h6, pre, code, table, thead, tbody, tr, th, td. CSS inline para bordas, preenchimento (padding) e larguras de coluna (width).',
-            alvo: 'Editores RTF completos, relatorios formatados, minutas com tabelas de calculo.'
-        }),
-        4: Object.freeze({
-            indice: 4,
-            id: 'estendido',
-            chave: 'estendido',
-            nome: 'Estendido (Suites Office / Canvas)',
-            escopo: 'Nivel 3 + img, colspan, rowspan, metadados de pagina/secao, listas multinivel aninhadas, div com posicionamento controlado.',
-            alvo: 'LibreOffice Online, Google Docs, DOCX, ODT.'
-        })
+        regioesFiscaisCpf: Object.freeze({})
     });
+
+    function obterDadosForensesDinamicos() {
+        const cfgDef = raiz.JusGovCfgDefaults || (typeof window !== 'undefined' ? window.JusGovCfgDefaults : null);
+        if (cfgDef && typeof cfgDef.obterDadosForenses === 'function') {
+            return cfgDef.obterDadosForenses();
+        }
+        if (raiz.__JUSGOV_DADOS_FORENSES_JSON__ && typeof raiz.__JUSGOV_DADOS_FORENSES_JSON__ === 'object') {
+            return raiz.__JUSGOV_DADOS_FORENSES_JSON__;
+        }
+        return TABELAS_FORENSES_VAZIAS;
+    }
+
+    function obterRegrasSistemaDinamicas() {
+        const cfgDef = raiz.JusGovCfgDefaults || (typeof window !== 'undefined' ? window.JusGovCfgDefaults : null);
+        if (cfgDef && typeof cfgDef.obterRegrasSistema === 'function') {
+            return cfgDef.obterRegrasSistema();
+        }
+        if (raiz.__JUSGOV_REGRAS_SISTEMA_JSON__ && typeof raiz.__JUSGOV_REGRAS_SISTEMA_JSON__ === 'object') {
+            return raiz.__JUSGOV_REGRAS_SISTEMA_JSON__;
+        }
+        return {};
+    }
+
+    // Dispara hidratação assíncrona imediata caso os JSONs ainda não tenham sido pré-carregados
+    try {
+        const cfgDefInit = raiz.JusGovCfgDefaults || (typeof window !== 'undefined' ? window.JusGovCfgDefaults : null);
+        if (cfgDefInit) {
+            if (typeof cfgDefInit.carregarDadosForensesJson === 'function') cfgDefInit.carregarDadosForensesJson().catch(() => { });
+            if (typeof cfgDefInit.carregarRegrasSistemaJson === 'function') cfgDefInit.carregarRegrasSistemaJson().catch(() => { });
+        }
+    } catch (_) { }
 
     /* ==========================================================================
-     * SECAO 6: TABELAS OFICIAIS FORENSES (WIKI FORENSE)
+     * SECAO 7: CLASSIFICADORES LÉXICOS E ESCAPE HTML COMPARTILHADOS (DRY)
      * ========================================================================== */
+    function eAlfanumericoUnicode(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) {
+            return (TABELA_MASCARA_ASCII[c] & (MASCARA_CARACTERE.DIGITO | MASCARA_CARACTERE.LETRA_ASCII)) !== 0;
+        }
+        return EXPRESSOES_REGULARES.CHAR_ALFANUMERICO_UNICODE.test(ch);
+    }
 
-    /* Tabela Oficial das 90+ Especies de Beneficios da Previdencia Social (INSS/Dataprev) */
-    const TABELA_ESPECIES_INSS = Object.freeze({
-        '01': Object.freeze({ desc: 'Pensão por Morte de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '02': Object.freeze({ desc: 'Pensão por Morte por Acidente do Trabalho Rural', categoria: 'Rural', natureza: 'Acidentário', status: 'Extinto' }),
-        '03': Object.freeze({ desc: 'Pensão por Morte de Empregador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '04': Object.freeze({ desc: 'Aposentadoria por Velhice de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '05': Object.freeze({ desc: 'Aposentadoria por Invalidez de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '06': Object.freeze({ desc: 'Aposentadoria por Invalidez por Acidente do Trabalho Rural', categoria: 'Rural', natureza: 'Acidentário', status: 'Extinto' }),
-        '07': Object.freeze({ desc: 'Aposentadoria por Idade de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Ativo' }),
-        '08': Object.freeze({ desc: 'Aposentadoria por Idade de Empregador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '10': Object.freeze({ desc: 'Auxílio-Doença de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '11': Object.freeze({ desc: 'Renda Mensal Vitalícia por Invalidez de Trabalhador Rural', categoria: 'Rural', natureza: 'Assistencial', status: 'Extinto' }),
-        '12': Object.freeze({ desc: 'Renda Mensal Vitalícia por Idade de Trabalhador Rural', categoria: 'Rural', natureza: 'Assistencial', status: 'Extinto' }),
-        '13': Object.freeze({ desc: 'Auxílio-Acidente de Trabalhador Rural', categoria: 'Rural', natureza: 'Acidentário', status: 'Extinto' }),
-        '15': Object.freeze({ desc: 'Auxílio-Reclusão de Trabalhador Rural', categoria: 'Rural', natureza: 'Contributivo', status: 'Extinto' }),
-        '18': Object.freeze({ desc: 'Auxílio-Inclusão à Pessoa com Deficiência', categoria: 'LOAS', natureza: 'Assistencial', status: 'Ativo' }),
-        '19': Object.freeze({ desc: 'Pensão de Estudante (Lei 7.004/82)', categoria: 'Estatutário', natureza: 'Especial', status: 'Extinto' }),
-        '20': Object.freeze({ desc: 'Pensão Especial para Hansenianos (Lei 11.520/07)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '21': Object.freeze({ desc: 'Pensão por Morte Previdenciária', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '22': Object.freeze({ desc: 'Pensão por Morte Estatutária', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '23': Object.freeze({ desc: 'Pensão por Morte de Ex-Combatente', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '24': Object.freeze({ desc: 'Pensão Especial (Talidomida - Lei 7.070/82)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '25': Object.freeze({ desc: 'Auxílio-Reclusão Previdenciário', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '26': Object.freeze({ desc: 'Pensão Especial de Seringueiro (Soldado da Borracha)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '27': Object.freeze({ desc: 'Pensão por Morte de Servidor Público Federal', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '28': Object.freeze({ desc: 'Pensão por Morte de Ferroviário CLT', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '29': Object.freeze({ desc: 'Pensão por Morte de Ex-Combatente Marítimo', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '30': Object.freeze({ desc: 'Renda Mensal Vitalícia por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Extinto' }),
-        '31': Object.freeze({ desc: 'Auxílio por Incapacidade Temporária Previdenciário', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '32': Object.freeze({ desc: 'Aposentadoria por Incapacidade Permanente Previdenciária', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '33': Object.freeze({ desc: 'Aposentadoria por Invalidez de Aeronauta', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '34': Object.freeze({ desc: 'Aposentadoria por Invalidez de Ex-Combatente Marítimo', categoria: 'Especial', natureza: 'Indenizatório', status: 'Extinto' }),
-        '35': Object.freeze({ desc: 'Auxílio-Doença de Ex-Combatente Marítimo', categoria: 'Especial', natureza: 'Indenizatório', status: 'Extinto' }),
-        '36': Object.freeze({ desc: 'Auxílio-Acidente Previdenciário', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '37': Object.freeze({ desc: 'Aposentadoria de Extranumerário da União', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '38': Object.freeze({ desc: 'Aposentadoria da Extinta FEPETI', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '39': Object.freeze({ desc: 'Auxílio-Doença de Ferroviário CLT', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '40': Object.freeze({ desc: 'Renda Mensal Vitalícia por Idade', categoria: 'Assistencial', natureza: 'Assistencial', status: 'Extinto' }),
-        '41': Object.freeze({ desc: 'Aposentadoria por Idade Urbana', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '42': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição Previdenciária', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '43': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Ex-Combatente', categoria: 'Especial', natureza: 'Indenizatório', status: 'Extinto' }),
-        '44': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Aeronauta', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '45': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Jornalista', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '46': Object.freeze({ desc: 'Aposentadoria Especial (Insalubridade / Periculosidade)', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '47': Object.freeze({ desc: 'Aposentadoria Ordinária (Lei 3.807/60)', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '48': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Ferroviário', categoria: 'Especial', natureza: 'Contributivo', status: 'Extinto' }),
-        '49': Object.freeze({ desc: 'Aposentadoria Ordinária de Servidor', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '50': Object.freeze({ desc: 'Auxílio-Doença de Servidor Público Federal', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '51': Object.freeze({ desc: 'Aposentadoria por Invalidez de Servidor Público Federal', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '52': Object.freeze({ desc: 'Aposentadoria por Idade de Servidor Público Federal', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '53': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Servidor Público', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '54': Object.freeze({ desc: 'Pensão Especial Vitalícia (Lei 9.793/99)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '55': Object.freeze({ desc: 'Pensão por Morte de Servidor Público Extranumerário', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '56': Object.freeze({ desc: 'Pensão por Morte de Militar da União', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '57': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Professor', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '58': Object.freeze({ desc: 'Aposentadoria de Anistiado Político (Lei 10.559/02)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '59': Object.freeze({ desc: 'Pensão por Morte de Anistiado Político (Lei 10.559/02)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '60': Object.freeze({ desc: 'Pensão Especial às Vítimas de Hemodiálise de Caruaru', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '72': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição de Ex-Atleta Profissional', categoria: 'RGPS', natureza: 'Contributivo', status: 'Extinto' }),
-        '76': Object.freeze({ desc: 'Salário-Família Estatutário', categoria: 'Estatutário', natureza: 'Assistencial', status: 'Extinto' }),
-        '78': Object.freeze({ desc: 'Aposentadoria por Idade de Pessoa com Deficiência', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '79': Object.freeze({ desc: 'Abono de Permanência em Serviço', categoria: 'RGPS', natureza: 'Contributivo', status: 'Extinto' }),
-        '80': Object.freeze({ desc: 'Salário-Maternidade', categoria: 'RGPS', natureza: 'Contributivo', status: 'Ativo' }),
-        '81': Object.freeze({ desc: 'Aposentadoria por Idade Compulsória (Ex-SASSE)', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '82': Object.freeze({ desc: 'Aposentadoria por Tempo de Contribuição (Ex-SASSE)', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '83': Object.freeze({ desc: 'Aposentadoria por Invalidez (Ex-SASSE)', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '84': Object.freeze({ desc: 'Pensão por Morte (Ex-SASSE)', categoria: 'Estatutário', natureza: 'Contributivo', status: 'Extinto' }),
-        '85': Object.freeze({ desc: 'Pensão Vitalícia de Seringueiro (Soldado da Borracha)', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '86': Object.freeze({ desc: 'Pensão Vitalícia a Dependente de Seringueiro', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '87': Object.freeze({ desc: 'Benefício de Prestação Continuada (BPC/LOAS) - Deficiência', categoria: 'LOAS', natureza: 'Assistencial', status: 'Ativo' }),
-        '88': Object.freeze({ desc: 'Benefício de Prestação Continuada (BPC/LOAS) - Idoso', categoria: 'LOAS', natureza: 'Assistencial', status: 'Ativo' }),
-        '89': Object.freeze({ desc: 'Pensão Especial a Vítimas do Césio 137 de Goiânia', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' }),
-        '90': Object.freeze({ desc: 'Renda Mensal Vitalícia por Invalidez', categoria: 'Assistencial', natureza: 'Assistencial', status: 'Extinto' }),
-        '91': Object.freeze({ desc: 'Auxílio por Incapacidade Temporária por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Ativo' }),
-        '92': Object.freeze({ desc: 'Aposentadoria por Incapacidade Permanente por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Ativo' }),
-        '93': Object.freeze({ desc: 'Pensão por Morte por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Ativo' }),
-        '94': Object.freeze({ desc: 'Auxílio-Acidente por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Ativo' }),
-        '95': Object.freeze({ desc: 'Auxílio-Suplementar por Acidente do Trabalho', categoria: 'RGPS', natureza: 'Acidentário', status: 'Extinto' }),
-        '96': Object.freeze({ desc: 'Pensão Especial Hanseníase e Zika Vírus', categoria: 'Especial', natureza: 'Indenizatório', status: 'Ativo' })
-    });
+    function eEspacoBranco(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) {
+            return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.ESPACO_BRANCO) !== 0;
+        }
+        return c === 160 || EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE.test(ch);
+    }
 
-    /* Tabela de Ramos e Tribunais do Poder Judiciario Nacional (Estrutura J.TR do Processo CNJ) */
-    const TABELA_TRIBUNAIS_CNJ = Object.freeze({
-        RAMOS: Object.freeze({
-            '1': 'Supremo Tribunal Federal',
-            '2': 'Conselho Nacional de Justiça',
-            '3': 'Superior Tribunal de Justiça',
-            '4': 'Justiça Federal',
-            '5': 'Justiça do Trabalho',
-            '6': 'Justiça Eleitoral',
-            '7': 'Justiça Militar da União',
-            '8': 'Justiça Estadual',
-            '9': 'Justiça Militar Estadual'
-        }),
-        TRIBUNAIS_FEDERAIS: Object.freeze({
-            '00': 'Conselho da Justiça Federal',
-            '01': 'TRF da 1ª Região',
-            '02': 'TRF da 2ª Região',
-            '03': 'TRF da 3ª Região',
-            '04': 'TRF da 4ª Região',
-            '05': 'TRF da 5ª Região',
-            '06': 'TRF da 6ª Região'
-        }),
-        TRIBUNAIS_TRABALHO: Object.freeze({
-            '00': 'Tribunal Superior do Trabalho (TST)',
-            '01': 'TRT da 1ª Região (RJ)',
-            '02': 'TRT da 2ª Região (SP)',
-            '03': 'TRT da 3ª Região (MG)',
-            '04': 'TRT da 4ª Região (RS)',
-            '05': 'TRT da 5ª Região (BA)',
-            '06': 'TRT da 6ª Região (PE)',
-            '07': 'TRT da 7ª Região (CE)',
-            '08': 'TRT da 8ª Região (PA/AP)',
-            '09': 'TRT da 9ª Região (PR)',
-            '10': 'TRT da 10ª Região (DF/TO)',
-            '11': 'TRT da 11ª Região (AM/RR)',
-            '12': 'TRT da 12ª Região (SC)',
-            '13': 'TRT da 13ª Região (PB)',
-            '14': 'TRT da 14ª Região (RO/AC)',
-            '15': 'TRT da 15ª Região (Campinas/SP)',
-            '16': 'TRT da 16ª Região (MA)',
-            '17': 'TRT da 17ª Região (ES)',
-            '18': 'TRT da 18ª Região (GO)',
-            '19': 'TRT da 19ª Região (AL)',
-            '20': 'TRT da 20ª Região (SE)',
-            '21': 'TRT da 21ª Região (RN)',
-            '22': 'TRT da 22ª Região (PI)',
-            '23': 'TRT da 23ª Região (MT)',
-            '24': 'TRT da 24ª Região (MS)'
-        }),
-        TRIBUNAIS_ESTADUAIS_E_ELEITORAIS: Object.freeze({
-            '01': Object.freeze({ estadual: 'TJAC (Acre)', eleitoral: 'TRE-AC (Acre)' }),
-            '02': Object.freeze({ estadual: 'TJAL (Alagoas)', eleitoral: 'TRE-AL (Alagoas)' }),
-            '03': Object.freeze({ estadual: 'TJAP (Amapá)', eleitoral: 'TRE-AP (Amapá)' }),
-            '04': Object.freeze({ estadual: 'TJAM (Amazonas)', eleitoral: 'TRE-AM (Amazonas)' }),
-            '05': Object.freeze({ estadual: 'TJBA (Bahia)', eleitoral: 'TRE-BA (Bahia)' }),
-            '06': Object.freeze({ estadual: 'TJCE (Ceará)', eleitoral: 'TRE-CE (Ceará)' }),
-            '07': Object.freeze({ estadual: 'TJDFT (Distrito Federal e Territórios)', eleitoral: 'TRE-DF (Distrito Federal)' }),
-            '08': Object.freeze({ estadual: 'TJES (Espírito Santo)', eleitoral: 'TRE-ES (Espírito Santo)' }),
-            '09': Object.freeze({ estadual: 'TJGO (Goiás)', eleitoral: 'TRE-GO (Goiás)' }),
-            '10': Object.freeze({ estadual: 'TJMA (Maranhão)', eleitoral: 'TRE-MA (Maranhão)' }),
-            '11': Object.freeze({ estadual: 'TJMT (Mato Grosso)', eleitoral: 'TRE-MT (Mato Grosso)' }),
-            '12': Object.freeze({ estadual: 'TJMS (Mato Grosso do Sul)', eleitoral: 'TRE-MS (Mato Grosso do Sul)' }),
-            '13': Object.freeze({ estadual: 'TJMG (Minas Gerais)', eleitoral: 'TRE-MG (Minas Gerais)', militar: 'TJMMG (Minas Gerais)' }),
-            '14': Object.freeze({ estadual: 'TJPA (Pará)', eleitoral: 'TRE-PA (Pará)' }),
-            '15': Object.freeze({ estadual: 'TJPB (Paraíba)', eleitoral: 'TRE-PB (Paraíba)' }),
-            '16': Object.freeze({ estadual: 'TJPR (Paraná)', eleitoral: 'TRE-PR (Paraná)' }),
-            '17': Object.freeze({ estadual: 'TJPE (Pernambuco)', eleitoral: 'TRE-PE (Pernambuco)' }),
-            '18': Object.freeze({ estadual: 'TJPI (Piauí)', eleitoral: 'TRE-PI (Piauí)' }),
-            '19': Object.freeze({ estadual: 'TJRJ (Rio de Janeiro)', eleitoral: 'TRE-RJ (Rio de Janeiro)' }),
-            '20': Object.freeze({ estadual: 'TJRN (Rio Grande do Norte)', eleitoral: 'TRE-RN (Rio Grande do Norte)' }),
-            '21': Object.freeze({ estadual: 'TJRS (Rio Grande do Sul)', eleitoral: 'TRE-RS (Rio Grande do Sul)', militar: 'TJMRS (Rio Grande do Sul)' }),
-            '22': Object.freeze({ estadual: 'TJRO (Rondônia)', eleitoral: 'TRE-RO (Rondônia)' }),
-            '23': Object.freeze({ estadual: 'TJRR (Roraima)', eleitoral: 'TRE-RR (Roraima)' }),
-            '24': Object.freeze({ estadual: 'TJSC (Santa Catarina)', eleitoral: 'TRE-SC (Santa Catarina)' }),
-            '25': Object.freeze({ estadual: 'TJSP (São Paulo)', eleitoral: 'TRE-SP (São Paulo)', militar: 'TJMMSP (São Paulo)' }),
-            '26': Object.freeze({ estadual: 'TJSE (Sergipe)', eleitoral: 'TRE-SE (Sergipe)' }),
-            '27': Object.freeze({ estadual: 'TJTO (Tocantins)', eleitoral: 'TRE-TO (Tocantins)' })
-        })
-    });
+    function eQuebraDeLinha(ch) {
+        return ch === '\n' || ch === '\r';
+    }
 
-    /* Tabela da Regiao Fiscal da Receita Federal do Brasil (9º Digito do CPF) */
-    const TABELA_REGIOES_FISCAIS_CPF = Object.freeze({
-        '1': '1ª Região Fiscal da RFB (DF, GO, MS, MT, TO)',
-        '2': '2ª Região Fiscal da RFB (AC, AM, AP, PA, RO, RR)',
-        '3': '3ª Região Fiscal da RFB (CE, MA, PI)',
-        '4': '4ª Região Fiscal da RFB (AL, PB, PE, RN)',
-        '5': '5ª Região Fiscal da RFB (BA, SE)',
-        '6': '6ª Região Fiscal da RFB (MG)',
-        '7': '7ª Região Fiscal da RFB (ES, RJ)',
-        '8': '8ª Região Fiscal da RFB (SP)',
-        '9': '9ª Região Fiscal da RFB (PR, SC)',
-        '0': '10ª Região Fiscal da RFB (RS)'
-    });
+    function ePontuacaoFim(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) {
+            return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.PONTUACAO_FIM) !== 0;
+        }
+        return c === 8212 || c === 8211 || c === 8230;
+    }
 
-    /* Passo 6.1: Exportar o namespace imutavel JusGovConstantes congelado para o V8 */
+    function eDelimitadorPar(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        return c < 128 && (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.DELIMITADOR_PAR) !== 0;
+    }
+
+    function eCaractereAspas(ch) {
+        if (!ch) return false;
+        return CARACTERES_ASPAS_TODOS.indexOf(ch) !== -1;
+    }
+
+    function eSimboloRepetivel(ch) {
+        if (!ch) return false;
+        const c = ch.charCodeAt(0);
+        if (c < 128) {
+            return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.SIMBOLO_REPETIVEL) !== 0;
+        }
+        return EXPRESSOES_REGULARES.CHAR_SIMBOLO_REPETIVEL.test(ch);
+    }
+
+    function escaparTextoHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /* Passo 6.1: Exportar o namespace imutavel JusGovConstantes com getters dinâmicos para tabelas JSON */
     const exportado = Object.freeze({
         MASCARA_CARACTERE,
         TABELA_MASCARA_ASCII,
@@ -893,10 +775,30 @@
         EXPRESSOES_REGULARES,
         REGEX_AUDITORIA,
         CATALOGO_PADROES_JURIDICOS,
-        NIVEIS_FILTRO_HTML,
-        TABELA_ESPECIES_INSS,
-        TABELA_TRIBUNAIS_CNJ,
-        TABELA_REGIOES_FISCAIS_CPF
+        eAlfanumericoUnicode,
+        eEspacoBranco,
+        eQuebraDeLinha,
+        ePontuacaoFim,
+        eDelimitadorPar,
+        eCaractereAspas,
+        eSimboloRepetivel,
+        escaparTextoHtml,
+        get NIVEIS_FILTRO_HTML() {
+            const rs = obterRegrasSistemaDinamicas();
+            return (rs && rs.niveisFiltroHtml) ? rs.niveisFiltroHtml : {};
+        },
+        get TABELA_ESPECIES_INSS() {
+            const df = obterDadosForensesDinamicos();
+            return (df && df.especiesInss) ? df.especiesInss : TABELAS_FORENSES_VAZIAS.especiesInss;
+        },
+        get TABELA_TRIBUNAIS_CNJ() {
+            const df = obterDadosForensesDinamicos();
+            return (df && df.tribunaisCnj) ? df.tribunaisCnj : TABELAS_FORENSES_VAZIAS.tribunaisCnj;
+        },
+        get TABELA_REGIOES_FISCAIS_CPF() {
+            const df = obterDadosForensesDinamicos();
+            return (df && df.regioesFiscaisCpf) ? df.regioesFiscaisCpf : TABELAS_FORENSES_VAZIAS.regioesFiscaisCpf;
+        }
     });
     raiz.JusGovConstantes = exportado;
     raiz.JusGovCopiaConstantes = exportado;

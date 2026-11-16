@@ -94,18 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoDominioAba = document.getElementById('infoDominioAba') || document.getElementById('currentDomain');
     const barraDominioAtual = document.getElementById('barraDominioAtual') || document.querySelector('.barra-dominio-atual');
     const btnAlternarDominioAba = document.getElementById('btnAlternarDominioAba') || document.getElementById('btnToggleDomain');
-    const checkRemoverFormatacoes = document.getElementById('checkRemoverFormatacoes') || document.getElementById('chkRemoveFormat');
-    const descModoFormatacao = document.getElementById('descModoFormatacao');
-    const containerNivelFiltroPopup = document.getElementById('containerNivelFiltroPopup');
-    const optNivelFiltroPopup = document.getElementById('optNivelFiltroPopup');
-    const lblValorNivelFiltroPopup = document.getElementById('lblValorNivelFiltroPopup');
-    const lblDescNivelFiltroPopup = document.getElementById('lblDescNivelFiltroPopup');
     const checkAmpuletas = document.getElementById('checkAmpuletas') || document.getElementById('chkAmpuletas');
     const containerAmpuletas = document.getElementById('containerAmpuletas');
     const tituloAmpuletas = document.getElementById('tituloAmpuletas');
     const subtituloAmpuletas = document.getElementById('subtituloAmpuletas');
-    const selectComportamentoIconePopup = document.getElementById('selectComportamentoIconePopup');
-    const descComportamentoIcone = document.getElementById('descComportamentoIcone');
     const btnAbrirOpcoes = document.getElementById('btnAbrirOpcoes') || document.getElementById('btnOptions');
     const btnBugsOnline = document.getElementById('btnBugsOnline');
     const rodapeProdutividadeOnline = document.getElementById('rodapeProdutividadeOnline');
@@ -153,12 +145,19 @@ document.addEventListener('DOMContentLoaded', () => {
             barraDominioAtual.style.display = (modoAtivo === 'url') ? 'flex' : 'none';
         }
 
-        /* Passo 2.2: Aplicar destaque visual, rotulo descritivo e cores do SVG */
+        /* Passo 2.2: Aplicar destaque visual, rotulo descritivo e cores do SVG via DOM seguro */
+        const preencherBadgeDuasLinhas = (linha1, linha2) => {
+            badgeStatusGeral.textContent = '';
+            badgeStatusGeral.appendChild(document.createTextNode(linha1));
+            badgeStatusGeral.appendChild(document.createElement('br'));
+            badgeStatusGeral.appendChild(document.createTextNode(linha2));
+        };
+
         if (modoAtivo === 'global') {
             if (btnModoGlobal) btnModoGlobal.classList.add('ativo');
-            if (labelModoAtual) labelModoAtual.innerHTML = 'Todos os Sites';
+            if (labelModoAtual) labelModoAtual.textContent = 'Todos os Sites';
             if (badgeStatusGeral) {
-                badgeStatusGeral.innerHTML = 'ATIVO<br>(GLOBAL)';
+                preencherBadgeDuasLinhas('ATIVO', '(GLOBAL)');
                 badgeStatusGeral.classList.remove('inativo', 'lista');
             }
             if (iconeBg) {
@@ -170,9 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (modoAtivo === 'url') {
             if (btnModoUrl) btnModoUrl.classList.add('ativo');
-            if (labelModoAtual) labelModoAtual.innerHTML = 'Lista de Sites';
+            if (labelModoAtual) labelModoAtual.textContent = 'Lista de Sites';
             if (badgeStatusGeral) {
-                badgeStatusGeral.innerHTML = 'ATIVO<br>(LISTA)';
+                preencherBadgeDuasLinhas('ATIVO', '(LISTA)');
                 badgeStatusGeral.classList.remove('inativo');
                 badgeStatusGeral.classList.add('lista');
             }
@@ -185,9 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             if (btnModoDesligado) btnModoDesligado.classList.add('ativo');
-            if (labelModoAtual) labelModoAtual.innerHTML = 'Desligado';
+            if (labelModoAtual) labelModoAtual.textContent = 'Desligado';
             if (badgeStatusGeral) {
-                badgeStatusGeral.innerHTML = 'PAUSADO';
+                badgeStatusGeral.textContent = 'PAUSADO';
                 badgeStatusGeral.classList.remove('lista');
                 badgeStatusGeral.classList.add('inativo');
             }
@@ -202,84 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /*
-     * FUNCAO: atualizarInterfaceFormatacao
-     * OBJETIVO DE RECONSTRUCAO: Sincronizar o checkbox "Remover Formatacoes" e
-     * seu texto explicativo (utilizando entidades HTML no JavaScript) com o
-     * booleano interno, ofuscando o controle de nivel quando Somente Texto estiver ativo.
-     */
-    function atualizarInterfaceFormatacao(manterBasica) {
-        /* Passo 2.3: Inverter logica visual (Marcado = Remover Formatacoes / Somente Texto) */
-        const removerFormatacoes = !manterBasica;
-        if (checkRemoverFormatacoes) {
-            checkRemoverFormatacoes.checked = removerFormatacoes;
-        }
-
-        if (containerNivelFiltroPopup) {
-            if (removerFormatacoes) {
-                containerNivelFiltroPopup.style.opacity = '0.45';
-                containerNivelFiltroPopup.style.pointerEvents = 'none';
-            } else {
-                containerNivelFiltroPopup.style.opacity = '1';
-                containerNivelFiltroPopup.style.pointerEvents = 'auto';
-            }
-        }
-
-        if (descModoFormatacao) {
-            if (removerFormatacoes) {
-                descModoFormatacao.innerHTML = 'Ativo: copia somente texto limpo. Se desmarcar, preserva formatos de acordo com o Nível de Filtro.';
-            } else {
-                descModoFormatacao.innerHTML = 'Ativo: Mantém formatos conforme o Nível de Filtro (fontes sempre limpas para herdar destino).';
-            }
-        }
-    }
-
-    function converterNivelFiltroParaIndice(nivel) {
-        if (typeof nivel === 'number') {
-            if (nivel >= 0 && nivel <= 4) return nivel;
-        }
-        const s = String(nivel || '').toLowerCase().trim();
-        if (s === '0' || s === 'texto_puro' || s === 'puro' || s === 'texto') return 0;
-        if (s === '1' || s === 'basico' || s === 'inline') return 1;
-        if (s === '2' || s === 'intermediario' || s === 'paragrafo' || s === 'fluxo') return 2;
-        if (s === '3' || s === 'avancado' || s === 'documental' || s === 'rtf') return 3;
-        if (s === '4' || s === 'estendido' || s === 'extendido' || s === 'sem_filtro' || s === 'office') return 4;
-        return 1;
-    }
-
-    function converterIndiceParaNivelFiltro(indice) {
-        const idx = Number(indice);
-        if (idx === 0) return 'texto_puro';
-        if (idx === 1) return 'basico';
-        if (idx === 2) return 'intermediario';
-        if (idx === 3) return 'avancado';
-        if (idx === 4) return 'estendido';
-        return 'basico';
-    }
-
-    function atualizarInterfaceNivelFiltro(nivel) {
-        const idx = converterNivelFiltroParaIndice(nivel);
-        if (optNivelFiltroPopup) {
-            optNivelFiltroPopup.value = String(idx);
-        }
-        if (lblValorNivelFiltroPopup) {
-            if (idx === 0) lblValorNivelFiltroPopup.innerHTML = '0 - Texto Puro';
-            else if (idx === 1) lblValorNivelFiltroPopup.innerHTML = '1 - Básico (Inline)';
-            else if (idx === 2) lblValorNivelFiltroPopup.innerHTML = '2 - Intermediário (Parágrafo)';
-            else if (idx === 3) lblValorNivelFiltroPopup.innerHTML = '3 - Avançado (Documental)';
-            else if (idx === 4) lblValorNivelFiltroPopup.innerHTML = '4 - Estendido (Suítes Office)';
-            else lblValorNivelFiltroPopup.innerHTML = '1 - Básico';
-        }
-        if (lblDescNivelFiltroPopup) {
-            if (idx === 0) lblDescNivelFiltroPopup.innerHTML = 'Nível 0: Remove 100% das tags, converte entidades, quebras normalizadas.';
-            else if (idx === 1) lblDescNivelFiltroPopup.innerHTML = 'Nível 1: Formatação de caracteres (negrito, itálico, sublinhado, riscado, sub/sup, quebras).';
-            else if (idx === 2) lblDescNivelFiltroPopup.innerHTML = 'Nível 2: Parágrafos, listas, citações, alinhamento e recuo simples. Sem tabelas.';
-            else if (idx === 3) lblDescNivelFiltroPopup.innerHTML = 'Nível 3: Títulos h1-h6, tabelas, código, bordas, padding e larguras.';
-            else if (idx === 4) lblDescNivelFiltroPopup.innerHTML = 'Nível 4: Imagens, mesclagem colspan/rowspan, listas multinível e suites Office.';
-            else lblDescNivelFiltroPopup.innerHTML = 'Estilos Básicos: Formatação de caracteres.';
-        }
-    }
-
-    /*
      * FUNCAO: atualizarBotaoDominioAba
      * OBJETIVO DE RECONSTRUCAO: Indicar se o dominio da aba atual ja consta na
      * lista urlsTurbo e permitir adiciona-lo ou remove-lo rapidamente. Exibe a
@@ -288,7 +209,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function atualizarBotaoDominioAba() {
         /* Passo 2.4: Verificar se o hostname da aba atual e valido e se consta em cacheUrlsTurbo */
         if (!hostnameAbaAtual) {
-            if (infoDominioAba) infoDominioAba.innerHTML = 'Site: <strong>Indisponível</strong>';
+            if (infoDominioAba) {
+                infoDominioAba.textContent = 'Site: ';
+                const forteIndisp = document.createElement('strong');
+                forteIndisp.textContent = 'Indisponível';
+                infoDominioAba.appendChild(forteIndisp);
+            }
             if (btnAlternarDominioAba) btnAlternarDominioAba.disabled = true;
             if (containerAmpuletas) containerAmpuletas.style.display = 'none';
             return;
@@ -334,37 +260,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (btnAlternarDominioAba) {
-            if (jaEstaNaLista) {
-                btnAlternarDominioAba.innerHTML = '- Remover da Lista';
-            } else {
-                btnAlternarDominioAba.innerHTML = '+ Incluir na Lista';
-            }
-        }
-    }
-
-    /*
-     * FUNCAO: atualizarInterfaceComportamentoIcone
-     * OBJETIVO DE RECONSTRUCAO: Sincronizar o seletor de comportamento do icone
-     * e o texto explicativo sobre o clique simples vs duplo clique.
-     */
-    function atualizarInterfaceComportamentoIcone(comp) {
-        const valor = (comp === 'acoes_rapidas') ? 'acoes_rapidas' : 'popup';
-        if (selectComportamentoIconePopup) {
-            selectComportamentoIconePopup.value = valor;
-        }
-        if (descComportamentoIcone) {
-            if (valor === 'acoes_rapidas') {
-                descComportamentoIcone.innerHTML = 'Ações Rápidas: 1 clique altera o modo na barra e 2 cliques abrem as Opções.';
-            } else {
-                descComportamentoIcone.innerHTML = 'Padrão: 1 clique abre este painel popup.';
-            }
+            btnAlternarDominioAba.textContent = jaEstaNaLista ? '- Remover da Lista' : '+ Incluir na Lista';
         }
     }
 
     function renderizarSeletorPerfisPopup(listaPerfis, perfilAtivoId) {
         if (!selectPerfilPopup || !Array.isArray(listaPerfis) || listaPerfis.length === 0) return;
         const atual = String(perfilAtivoId || 'padrao');
-        selectPerfilPopup.innerHTML = '';
+        selectPerfilPopup.textContent = '';
         listaPerfis.forEach((perfil) => {
             if (!perfil || !perfil.id) return;
             const opt = document.createElement('option');
@@ -412,9 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 atualizarInterfaceModo(modo);
-                atualizarInterfaceFormatacao(Boolean(cfg.manterFormatacaoBasica));
-                atualizarInterfaceNivelFiltro(cfg.nivelFiltroFormatacao || 'basico');
-                atualizarInterfaceComportamentoIcone(cfg.comportamentoCliqueIcone);
                 if (checkAmpuletas) checkAmpuletas.checked = (cfg.ativoAmpuletas !== false);
                 atualizarBotaoDominioAba();
             });
@@ -480,37 +380,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    /* Passo 4.3: Evento do switch "Remover Formatacoes (Texto Puro)" */
-    adicionarOuvinteSeguro(checkRemoverFormatacoes, 'change', (e) => {
-        const manterBasica = !e.target.checked;
-        atualizarInterfaceFormatacao(manterBasica);
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ manterFormatacaoBasica: manterBasica });
-        }
-    });
-
-    /* Passo 4.3.1: Evento do slider de Nivel de Filtro de Estilos */
-    adicionarOuvinteSeguro(optNivelFiltroPopup, 'input', (e) => {
-        const nivel = converterIndiceParaNivelFiltro(e.target.value);
-        atualizarInterfaceNivelFiltro(nivel);
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ nivelFiltroFormatacao: nivel });
-        }
-    });
-
     /* Passo 4.4: Evento do switch "PJe Turbo (Anti-Ampulhetas)" */
     adicionarOuvinteSeguro(checkAmpuletas, 'change', (e) => {
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
             chrome.storage.sync.set({ ativoAmpuletas: e.target.checked });
-        }
-    });
-
-    /* Passo 4.4.1: Evento de selecao do comportamento de clique do icone na barra do Chrome */
-    adicionarOuvinteSeguro(selectComportamentoIconePopup, 'change', (e) => {
-        const novoComp = (e.target && e.target.value === 'acoes_rapidas') ? 'acoes_rapidas' : 'popup';
-        atualizarInterfaceComportamentoIcone(novoComp);
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ comportamentoCliqueIcone: novoComp });
         }
     });
 
@@ -594,21 +467,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 if (changes.modoTurbo) atualizarInterfaceModo(changes.modoTurbo.newValue);
-                if (changes.manterFormatacaoBasica !== undefined) {
-                    atualizarInterfaceFormatacao(Boolean(changes.manterFormatacaoBasica.newValue));
-                }
-                if (changes.nivelFiltroFormatacao !== undefined) {
-                    atualizarInterfaceNivelFiltro(changes.nivelFiltroFormatacao.newValue);
-                }
                 if (changes.ativoAmpuletas !== undefined && checkAmpuletas) {
                     checkAmpuletas.checked = (changes.ativoAmpuletas.newValue !== false);
                 }
                 if (changes.urlsTurbo) {
                     cacheUrlsTurbo = Array.isArray(changes.urlsTurbo.newValue) ? changes.urlsTurbo.newValue : [];
                     atualizarBotaoDominioAba();
-                }
-                if (changes.comportamentoCliqueIcone !== undefined) {
-                    atualizarInterfaceComportamentoIcone(changes.comportamentoCliqueIcone.newValue);
                 }
             } else if (area === 'local' && changes.jusgovTrabalhoEstado) {
                 atualizarContadoresProdutividadePopup();

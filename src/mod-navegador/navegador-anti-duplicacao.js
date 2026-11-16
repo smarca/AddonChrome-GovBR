@@ -142,7 +142,12 @@
                     caminho = caminho.slice(0, -1);
                 }
                 /* Remove parâmetros efêmeros de rastreamento que geram falsos negativos em tribunais */
-                const paramsParaRemover = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', '_cid', 'ts'];
+                const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                    ? JusGovCfgDefaults.obterRegrasSistema()
+                    : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+                const paramsParaRemover = (rs && rs.antiDuplicacao && Array.isArray(rs.antiDuplicacao.paramsRemover))
+                    ? rs.antiDuplicacao.paramsRemover
+                    : ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', '_cid', 'ts'];
                 const params = new URLSearchParams(u.search);
                 paramsParaRemover.forEach(p => params.delete(p));
                 params.sort();
@@ -336,8 +341,13 @@
          * @param {Object} [config]
          */
         async processarAbaAtualizada(tabId, changeInfo, tab, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}) {
-            if (!tabId || !chromeApi || !chromeApi.tabs) return { duplicada: false };
+            if (!tabId || !chromeApi || !chromeApi.tabs) return { duplicada: false, duplicacaoManualPermitida: false };
+            let duplicacaoManualPermitida = false;
             try {
+                const regInicial = this.#mapaAbasUrls.get(tabId);
+                if (regInicial && regInicial.duplicacaoManualPermitida) {
+                    duplicacaoManualPermitida = true;
+                }
                 if (changeInfo.url) {
                     const uNova = this.normalizarUrlParaComparacao(changeInfo.url);
                     let reg = this.#mapaAbasUrls.get(tabId);

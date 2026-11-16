@@ -124,7 +124,10 @@
 
                 try {
                     const regexEscapada = padrao.trim().replace(/[.+^${}()|[\]\\]/g, '\\$&');
-                    const regexStr = regexEscapada.replace(/\*/g, '.*');
+                    const regexComSubdominioOpcional = regexEscapada
+                        .replace(/^\*:\/\//, '[^/:]+://')
+                        .replace(/:\/\/\*\\\./g, '://(?:[^/]+\\.)?');
+                    const regexStr = regexComSubdominioOpcional.replace(/\*/g, '.*');
                     const regex = new RegExp('^' + regexStr + '$', 'i');
                     if (regex.test(url)) return true;
                 } catch (_) {

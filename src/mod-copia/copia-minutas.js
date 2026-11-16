@@ -25,6 +25,20 @@
  * 2. Modo Placeholders Simples: Seleciona unicamente o token de placeholder sob o cursor.
  * 3. Modo Avançado / Ctrl+Avançado: Permite acionar o motor de estágios (palavra, expressão,
  *    delimitador, parágrafo em 3 cliques) dentro de minutas ricas de sentença/decisão.
+ *
+ * RECONSTRUÇÃO CLEAN-ROOM (PSEUDOCÓDIGO INTERCALADO / CONTRATOS):
+ * - INVARIANTE DE ESTADO: `definirModo(v)` normaliza 4 enums fechados ('desabilitado',
+ *   'placeholders', 'ctrl_avancado', 'avancado'); booleanos legados mapeiam para
+ *   'placeholders' (true) ou 'desabilitado' (false).
+ * - DETECÇÃO (`localizarCampoSimbolosSobCursor(texto, idx)`):
+ *   1) Varre `EXPRESSOES_REGULARES.CAMPO_PLACEHOLDER_EDITAVEL` (`<...>`, `[...]`, `@@@...@@@`, `###...###`)
+ *      com índice global `/gu` verificando `idx >= ini && idx <= fim`.
+ *   2) Fallback linear: se sob cursor houver símbolo repetido (`@`, `#`, `_`, `-`, `*`, `?`, `.`),
+ *      expande esquerda/direita enquanto idêntico e retorna `{ inicio, fim }` se tamanho >= 2.
+ * - ORQUESTRAÇÃO (`tratarCliqueEmEditorMultilinhaSemCopia(e, deps)`):
+ *   Nunca escreve no Clipboard; bloqueia execução se `#modo === 'desabilitado'`, calcula offset
+ *   no bloco via `GeometriaDOM` / `selectionStart`, aplica seleção em TEXTAREA ou `Selection`
+ *   preservando integridade da pilha nativa de Undo/Redo do navegador.
  * 
  * DOCUMENTAÇÃO RELACIONADA:
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regras 2.14, 2.15: Minutas e Placeholders)

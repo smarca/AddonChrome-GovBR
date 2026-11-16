@@ -127,56 +127,119 @@
         });
     }
 
-    let catalogoPerfisAtivo = (() => {
+    const DADOS_FORENSES_MINIMO = Object.freeze({
+        versaoEsquema: 1,
+        especiesInss: Object.freeze({}),
+        tribunaisCnj: Object.freeze({
+            RAMOS: Object.freeze({}),
+            TRIBUNAIS_FEDERAIS: Object.freeze({}),
+            TRIBUNAIS_TRABALHO: Object.freeze({}),
+            TRIBUNAIS_ESTADUAIS_E_ELEITORAIS: Object.freeze({})
+        }),
+        regioesFiscaisCpf: Object.freeze({})
+    });
+
+    const REGRAS_SISTEMA_MINIMO = Object.freeze({
+        versaoEsquema: 1,
+        niveisFiltroHtml: Object.freeze({}),
+        presetsMarcadorColado: Object.freeze({
+            verde_forense: Object.freeze({ id: 'verde_forense', nome: 'Verde Forense Suave', corContorno: '#0d9488', corFundo: '#ccfbf1', opacidadeFundo: 0.28, estiloBadge: 'sobrescrito' })
+        }),
+        excecoesAutenticacao: Object.freeze({ larguraMaxPopup: 820, alturaMaxPopup: 750, dominiosAuth: Object.freeze([]), regexFronteiraAuth: '' }),
+        antiDuplicacao: Object.freeze({ paramsRemover: Object.freeze([]) }),
+        ordenacaoGuias: Object.freeze({ sufixosSld: Object.freeze([]), paletaGrupos: Object.freeze(['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'purple', 'pink']) }),
+        manutencao: Object.freeze({ idadesLimpezaMs: Object.freeze({}) }),
+        iconeExtensaoPaletas: Object.freeze({}),
+        sistemasJudiciais: Object.freeze([])
+    });
+
+    function lerPreloadOuRequireJson(chaveGlobal, caminhoRelativo) {
         try {
             const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
-            if (g && g.__JUSGOV_PERFIS_JSON__) {
-                return congelarCatalogoPerfis(g.__JUSGOV_PERFIS_JSON__);
+            if (g && g[chaveGlobal] && typeof g[chaveGlobal] === 'object') {
+                return g[chaveGlobal];
             }
         } catch (_) { }
         try {
             if (typeof module === 'object' && module.exports && typeof require === 'function') {
-                return congelarCatalogoPerfis(require('./perfis.json'));
+                return require(caminhoRelativo);
             }
         } catch (_) { }
         return null;
+    }
+
+    async function buscarJsonEmDisco(chaveGlobal, nomeArquivo, chromeApi = null) {
+        const emCache = lerPreloadOuRequireJson(chaveGlobal, `./${nomeArquivo}`);
+        if (emCache) return emCache;
+        if (typeof fetch !== 'function') return null;
+
+        const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+        const urlsCandidatas = [];
+        if (apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
+            urlsCandidatas.push(apiChrome.runtime.getURL(`src/cfg/${nomeArquivo}`));
+        }
+        urlsCandidatas.push(nomeArquivo, `./src/cfg/${nomeArquivo}`, `../cfg/${nomeArquivo}`);
+
+        const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+        for (let i = 0; i < urlsCandidatas.length; i++) {
+            try {
+                const resp = await fetch(urlsCandidatas[i]);
+                if (resp && resp.ok) {
+                    const json = await resp.json();
+                    if (json && typeof json === 'object') {
+                        if (g) g[chaveGlobal] = json;
+                        return json;
+                    }
+                }
+            } catch (_) { }
+        }
+
+        /* Fallback seguro para Content Scripts sem exposicao em web_accessible_resources (Privacidade Chrome Web Store) */
+        if (apiChrome && apiChrome.runtime && typeof apiChrome.runtime.sendMessage === 'function') {
+            try {
+                const respIpc = await new Promise((resolve) => {
+                    apiChrome.runtime.sendMessage({ acao: 'OBTER_JSON_ESTATICO', arquivo: nomeArquivo }, (r) => {
+                        if (apiChrome.runtime && apiChrome.runtime.lastError) {
+                            resolve(null);
+                            return;
+                        }
+                        resolve(r || null);
+                    });
+                });
+                if (respIpc && respIpc.ok && respIpc.dados && typeof respIpc.dados === 'object') {
+                    if (g) g[chaveGlobal] = respIpc.dados;
+                    return respIpc.dados;
+                }
+            } catch (_) { }
+        }
+        return null;
+    }
+
+    let catalogoPerfisAtivo = (() => {
+        const bruto = lerPreloadOuRequireJson('__JUSGOV_PERFIS_JSON__', './perfis.json');
+        return bruto ? congelarCatalogoPerfis(bruto) : null;
     })();
+    let dadosForensesAtivo = lerPreloadOuRequireJson('__JUSGOV_DADOS_FORENSES_JSON__', './dados-forenses.json');
+    let regrasSistemaAtivo = lerPreloadOuRequireJson('__JUSGOV_REGRAS_SISTEMA_JSON__', './regras-sistema.json');
 
     let promessaCarregamentoPerfis = null;
+    let promessaCarregamentoForenses = null;
+    let promessaCarregamentoRegras = null;
 
     async function carregarCatalogoPerfisJson(chromeApi = null) {
+        const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+        if (!catalogoPerfisAtivo && g && g.__JUSGOV_PERFIS_JSON__) {
+            catalogoPerfisAtivo = congelarCatalogoPerfis(g.__JUSGOV_PERFIS_JSON__);
+        }
         if (catalogoPerfisAtivo) return catalogoPerfisAtivo;
         if (promessaCarregamentoPerfis) return promessaCarregamentoPerfis;
 
         promessaCarregamentoPerfis = (async () => {
-            try {
-                const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
-                if (g && g.__JUSGOV_PERFIS_JSON__) {
-                    catalogoPerfisAtivo = congelarCatalogoPerfis(g.__JUSGOV_PERFIS_JSON__);
-                    return catalogoPerfisAtivo;
-                }
-                if (typeof fetch === 'function') {
-                    const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
-                    const urlsCandidatas = [];
-                    if (apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
-                        urlsCandidatas.push(apiChrome.runtime.getURL('src/cfg/perfis.json'));
-                    }
-                    urlsCandidatas.push('perfis.json', './src/cfg/perfis.json', '../cfg/perfis.json');
-                    for (let i = 0; i < urlsCandidatas.length; i++) {
-                        try {
-                            const resp = await fetch(urlsCandidatas[i]);
-                            if (resp && resp.ok) {
-                                const json = await resp.json();
-                                if (json && typeof json === 'object') {
-                                    catalogoPerfisAtivo = congelarCatalogoPerfis(json);
-                                    if (g) g.__JUSGOV_PERFIS_JSON__ = json;
-                                    return catalogoPerfisAtivo;
-                                }
-                            }
-                        } catch (_) { }
-                    }
-                }
-            } catch (_) { }
+            const json = await buscarJsonEmDisco('__JUSGOV_PERFIS_JSON__', 'perfis.json', chromeApi);
+            if (json) {
+                catalogoPerfisAtivo = congelarCatalogoPerfis(json);
+                return catalogoPerfisAtivo;
+            }
             return catalogoPerfisAtivo || CATALOGO_PERFIS_MINIMO;
         })();
 
@@ -185,6 +248,81 @@
         } finally {
             promessaCarregamentoPerfis = null;
         }
+    }
+
+    async function carregarDadosForensesJson(chromeApi = null) {
+        const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+        if (!dadosForensesAtivo && g && g.__JUSGOV_DADOS_FORENSES_JSON__) {
+            dadosForensesAtivo = g.__JUSGOV_DADOS_FORENSES_JSON__;
+        }
+        if (dadosForensesAtivo) return dadosForensesAtivo;
+        if (promessaCarregamentoForenses) return promessaCarregamentoForenses;
+
+        promessaCarregamentoForenses = (async () => {
+            const json = await buscarJsonEmDisco('__JUSGOV_DADOS_FORENSES_JSON__', 'dados-forenses.json', chromeApi);
+            if (json) {
+                dadosForensesAtivo = json;
+                return dadosForensesAtivo;
+            }
+            return dadosForensesAtivo || DADOS_FORENSES_MINIMO;
+        })();
+
+        try {
+            return await promessaCarregamentoForenses;
+        } finally {
+            promessaCarregamentoForenses = null;
+        }
+    }
+
+    async function carregarRegrasSistemaJson(chromeApi = null) {
+        const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+        if (!regrasSistemaAtivo && g && g.__JUSGOV_REGRAS_SISTEMA_JSON__) {
+            regrasSistemaAtivo = g.__JUSGOV_REGRAS_SISTEMA_JSON__;
+        }
+        if (regrasSistemaAtivo) return regrasSistemaAtivo;
+        if (promessaCarregamentoRegras) return promessaCarregamentoRegras;
+
+        promessaCarregamentoRegras = (async () => {
+            const json = await buscarJsonEmDisco('__JUSGOV_REGRAS_SISTEMA_JSON__', 'regras-sistema.json', chromeApi);
+            if (json) {
+                regrasSistemaAtivo = json;
+                return regrasSistemaAtivo;
+            }
+            return regrasSistemaAtivo || REGRAS_SISTEMA_MINIMO;
+        })();
+
+        try {
+            return await promessaCarregamentoRegras;
+        } finally {
+            promessaCarregamentoRegras = null;
+        }
+    }
+
+    function obterDadosForenses() {
+        if (!dadosForensesAtivo) {
+            const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+            if (g && g.__JUSGOV_DADOS_FORENSES_JSON__) dadosForensesAtivo = g.__JUSGOV_DADOS_FORENSES_JSON__;
+        }
+        return dadosForensesAtivo || DADOS_FORENSES_MINIMO;
+    }
+
+    function obterRegrasSistema() {
+        if (!regrasSistemaAtivo) {
+            const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+            if (g && g.__JUSGOV_REGRAS_SISTEMA_JSON__) regrasSistemaAtivo = g.__JUSGOV_REGRAS_SISTEMA_JSON__;
+        }
+        return regrasSistemaAtivo || REGRAS_SISTEMA_MINIMO;
+    }
+
+    function obterPresetsMarcadorColado() {
+        const rs = obterRegrasSistema();
+        const mapa = (rs && rs.presetsMarcadorColado && typeof rs.presetsMarcadorColado === 'object')
+            ? rs.presetsMarcadorColado
+            : REGRAS_SISTEMA_MINIMO.presetsMarcadorColado;
+        if (mapa.marca_texto_classico && !mapa.marca_texto) {
+            return Object.assign({}, mapa, { marca_texto: mapa.marca_texto_classico });
+        }
+        return mapa;
     }
 
     function obterCatalogoPerfis(catalogoOpcional = null) {
@@ -236,51 +374,9 @@
         return base;
     }
 
-    /* Passo 1.3: Catálogo de pré-definições visuais para Marcadores Permanentes de Conteúdo Colado (Seção 6.105 / FEAT-21) */
-    const PRESETS_MARCADOR_COLADO = Object.freeze({
-        verde_forense: Object.freeze({
-            id: 'verde_forense',
-            nome: 'Verde Forense Suave',
-            corContorno: '#0d9488',
-            corFundo: '#14b8a6',
-            opacidadeFundo: 0.14,
-            estiloBadge: 'sobrescrito'
-        }),
-        marca_texto: Object.freeze({
-            id: 'marca_texto',
-            nome: 'Marca-Texto Clássico',
-            corContorno: '#d97706',
-            corFundo: '#facc15',
-            opacidadeFundo: 0.24,
-            estiloBadge: 'badge_circular'
-        }),
-        azul_indigo: Object.freeze({
-            id: 'azul_indigo',
-            nome: 'Azul Índigo Institucional',
-            corContorno: '#4f46e5',
-            corFundo: '#6366f1',
-            opacidadeFundo: 0.14,
-            estiloBadge: 'chip_forense'
-        }),
-        ambar_suave: Object.freeze({
-            id: 'ambar_suave',
-            nome: 'Âmbar Suave',
-            corContorno: '#b45309',
-            corFundo: '#f59e0b',
-            opacidadeFundo: 0.16,
-            estiloBadge: 'sobrescrito'
-        }),
-        alto_contraste: Object.freeze({
-            id: 'alto_contraste',
-            nome: 'Alto Contraste Acessível',
-            corContorno: '#111827',
-            corFundo: '#38bdf8',
-            opacidadeFundo: 0.25,
-            estiloBadge: 'badge_circular'
-        })
-    });
+    /* Passo 1.3: Pré-definições visuais para Marcadores Permanentes carregadas dinamicamente via regras-sistema.json */
 
-    /* Passo 1.4: Namespace dinâmico de defaults resolvido a partir de src/cfg/perfis.json */
+    /* Passo 1.4: Namespace dinâmico de defaults resolvido a partir de perfis.json, dados-forenses.json e regras-sistema.json */
     return Object.freeze({
         CONFIGURACAO_MOTOR,
         get PADROES_DEFAULT_TURBO() {
@@ -292,7 +388,9 @@
             return Array.isArray(urls) ? urls : Object.freeze([]);
         },
         PADROES_DEFAULT_REGRAS_MAPEAMENTO,
-        PRESETS_MARCADOR_COLADO,
+        get PRESETS_MARCADOR_COLADO() {
+            return obterPresetsMarcadorColado();
+        },
         get PROMPT_F1_GEMINI_PADRAO() {
             return obterCatalogoPerfis().configPadrao.promptF1Gemini || '';
         },
@@ -300,7 +398,12 @@
             return obterCatalogoPerfis().configPadrao;
         },
         carregarCatalogoPerfisJson,
+        carregarDadosForensesJson,
+        carregarRegrasSistemaJson,
         obterCatalogoPerfis,
+        obterDadosForenses,
+        obterRegrasSistema,
+        obterPresetsMarcadorColado,
         obterDefinicaoPerfilPredefinido,
         obterConfigBasePadrao,
         obterConfigPadraoParaPerfil

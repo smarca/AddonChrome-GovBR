@@ -228,7 +228,7 @@
 
             const btnFechar = doc.createElement('button');
             btnFechar.type = 'button';
-            btnFechar.innerHTML = '&times;';
+            btnFechar.textContent = '×';
             btnFechar.title = 'Fechar (Esc)';
             btnFechar.style.cssText = [
                 'background: transparent',

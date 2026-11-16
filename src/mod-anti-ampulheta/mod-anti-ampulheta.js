@@ -80,8 +80,8 @@
         'generico-anti-ampulheta.css'
     ]);
 
-    /* Matriz ordenada de prioridade dos sistemas judiciais (Seção 6.103 / FEAT-20) */
-    const MATRIZ_SISTEMAS_JUDICIAIS = Object.freeze([
+    /* Matriz ordenada de prioridade dos sistemas judiciais (Seção 6.103 / FEAT-20 - fallback caso JSON não carregado) */
+    const MATRIZ_SISTEMAS_JUDICIAIS_FALLBACK = Object.freeze([
         Object.freeze({ id: 'pje', nome: 'PJe', css: 'pje-anti-ampulheta.css', padrao: /\bpje\b|pje\.|\.jus\.br\/pje/i }),
         Object.freeze({ id: 'eproc', nome: 'Eproc', css: 'eproc-anti-ampulheta.css', padrao: /\beproc\b|eproc\./i }),
         Object.freeze({ id: 'pdpj', nome: 'PDPJ', css: 'pdpj-stf-stj-anti-ampulheta.css', padrao: /\bpdpj\b|\bprevjud\b|stf\.jus\.br|stj\.jus\.br/i }),
@@ -90,6 +90,26 @@
         Object.freeze({ id: 'creta', nome: 'Creta', css: 'creta-anti-ampulheta.css', padrao: /\bcreta\b|creta\./i }),
         Object.freeze({ id: 'seeu', nome: 'SEEU', css: 'seeu-projudi-anti-ampulheta.css', padrao: /\bseeu\b|seeu\./i })
     ]);
+
+    let _cacheSistemasJsonRef = null;
+    let _cacheSistemasCompilados = null;
+
+    function obterMatrizSistemasJudiciais() {
+        const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+            ? JusGovCfgDefaults.obterRegrasSistema()
+            : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+        const lista = rs && Array.isArray(rs.sistemasJudiciais) ? rs.sistemasJudiciais : null;
+        if (!lista || lista.length === 0) return MATRIZ_SISTEMAS_JUDICIAIS_FALLBACK;
+        if (_cacheSistemasJsonRef === lista && _cacheSistemasCompilados) return _cacheSistemasCompilados;
+        _cacheSistemasJsonRef = lista;
+        _cacheSistemasCompilados = Object.freeze(lista.map((s) => Object.freeze({
+            id: s.id,
+            nome: s.nome,
+            css: s.css,
+            padrao: s.padrao instanceof RegExp ? s.padrao : new RegExp(String(s.padraoRegex || ''), 'i')
+        })));
+        return _cacheSistemasCompilados;
+    }
 
     /* =====================================================================
      * FOLHA DE ESTILO CONSOLIDADA ANTI-AMPULHETAS (DESACOPLADA EM SEÇÃO 6.102 / ARQ-03)
@@ -308,6 +328,7 @@
         #observadorBlindagem = null;
         #cssBlindado = false;
         #documentoAssociado = null;
+        #debounceTimer = null;
 
         /**
          * @param {Object} [opcoes={}]
@@ -402,12 +423,12 @@
             const alvo = documento.body || documento.documentElement;
             if (!alvo) return;
 
-            let debounceTimer = null;
             this.#observador = new MutationObserver(() => {
-                if (!this.#ativo) return;
-                if (debounceTimer) return;
-                debounceTimer = setTimeout(() => {
-                    debounceTimer = null;
+                if (!this.#ativo || !this.#inicializado) return;
+                if (this.#debounceTimer) return;
+                this.#debounceTimer = setTimeout(() => {
+                    this.#debounceTimer = null;
+                    if (!this.#inicializado || !this.#ativo) return;
                     this.desbloquearInterface(documento);
                 }, 150);
             });
@@ -557,7 +578,7 @@
 
             let sistemaIdentificado = null;
             const textoAlvo = `${dominio} ${urlCompleta}`;
-            for (const sis of MATRIZ_SISTEMAS_JUDICIAIS) {
+            for (const sis of obterMatrizSistemasJudiciais()) {
                 if (sis.padrao.test(textoAlvo)) {
                     sistemaIdentificado = sis;
                     break;
@@ -630,6 +651,13 @@
          * Destrói observadores e listeners associados ao documento.
          */
         destruir() {
+            if (this.#debounceTimer) {
+                try {
+                    clearTimeout(this.#debounceTimer);
+                } catch (_) { }
+                this.#debounceTimer = null;
+            }
+
             if (this.#abortController) {
                 try {
                     this.#abortController.abort();

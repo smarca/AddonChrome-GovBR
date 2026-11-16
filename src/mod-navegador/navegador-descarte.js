@@ -75,7 +75,7 @@
             if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.discard !== 'function') return 0;
 
             try {
-                const query = windowId ? { windowId } : { currentWindow: true };
+                const query = windowId ? { windowId } : { lastFocusedWindow: true };
                 const abas = await chromeApi.tabs.query(query);
                 if (!abas || abas.length === 0) return 0;
 

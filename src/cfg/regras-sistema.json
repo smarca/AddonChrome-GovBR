@@ -1,0 +1,143 @@
+{
+  "versaoEsquema": 1,
+  "niveisFiltroHtml": {
+    "0": {
+      "indice": 0,
+      "id": "texto_puro",
+      "chave": "texto_puro",
+      "nome": "Texto Puro",
+      "escopo": "Remove 100% das tags HTML/XML, converte entidades (&nbsp; -> espaco, &amp; -> &), normaliza quebras de linha (\\r\\n -> \\n). Sanitizacao ativa via node.textContent.",
+      "alvo": "input, textarea, logs, variaveis de busca, campos de sistema legados sem suporte a markup."
+    },
+    "1": {
+      "indice": 1,
+      "id": "basico",
+      "chave": "basico",
+      "nome": "Basico (Inline)",
+      "escopo": "Apenas formatacao de caracteres e paragrafos simples: b, strong, i, em, u, s, sub, sup, span, br, p. Proibido qualquer atributo CSS de bloco ou quebras estruturais complexas.",
+      "alvo": "Caixas de comentario, anotacoes rapidas, chats internos."
+    },
+    "2": {
+      "indice": 2,
+      "id": "intermediario",
+      "chave": "intermediario",
+      "nome": "Intermediario (Paragrafo/Fluxo)",
+      "escopo": "Nivel 1 + p, blockquote, ul, ol, li, hr. CSS restrito a alinhamento (text-align) e recuo simples (margin-left / text-indent). Sem tabelas.",
+      "alvo": "CKEditor / TinyMCE em modo padrao de redacao juridica (despachos simples, certidoes)."
+    },
+    "3": {
+      "indice": 3,
+      "id": "avancado",
+      "chave": "avancado",
+      "nome": "Avancado (Documental / RTF classico)",
+      "escopo": "Nivel 2 + h1-h6, pre, code, table, thead, tbody, tr, th, td. CSS inline para bordas, preenchimento (padding) e larguras de coluna (width).",
+      "alvo": "Editores RTF completos, relatorios formatados, minutas com tabelas de calculo."
+    },
+    "4": {
+      "indice": 4,
+      "id": "estendido",
+      "chave": "estendido",
+      "nome": "Estendido (Suites Office / Canvas)",
+      "escopo": "Nivel 3 + img, colspan, rowspan, metadados de pagina/secao, listas multinivel aninhadas, div com posicionamento controlado.",
+      "alvo": "LibreOffice Online, Google Docs, DOCX, ODT."
+    }
+  },
+  "presetsMarcadorColado": {
+    "verde_forense": {
+      "id": "verde_forense",
+      "nome": "Verde Forense Suave",
+      "corContorno": "#0d9488",
+      "corFundo": "#ccfbf1",
+      "opacidadeFundo": 0.28,
+      "estiloBadge": "sobrescrito"
+    },
+    "marca_texto_classico": {
+      "id": "marca_texto_classico",
+      "nome": "Marca-Texto Clássico",
+      "corContorno": "#ca8a04",
+      "corFundo": "#fef08a",
+      "opacidadeFundo": 0.36,
+      "estiloBadge": "sobrescrito"
+    },
+    "azul_indigo": {
+      "id": "azul_indigo",
+      "nome": "Azul Índigo Institucional",
+      "corContorno": "#4f46e5",
+      "corFundo": "#e0e7ff",
+      "opacidadeFundo": 0.28,
+      "estiloBadge": "circular"
+    },
+    "ambar_suave": {
+      "id": "ambar_suave",
+      "nome": "Âmbar Suave",
+      "corContorno": "#d97706",
+      "corFundo": "#fef3c7",
+      "opacidadeFundo": 0.30,
+      "estiloBadge": "translucido"
+    },
+    "alto_contraste": {
+      "id": "alto_contraste",
+      "nome": "Alto Contraste Acessível",
+      "corContorno": "#1e293b",
+      "corFundo": "#e2e8f0",
+      "opacidadeFundo": 0.42,
+      "estiloBadge": "circular"
+    }
+  },
+  "excecoesAutenticacao": {
+    "larguraMaxPopup": 820,
+    "alturaMaxPopup": 750,
+    "dominiosAuth": [
+      "sso.acesso.gov.br",
+      "acesso.gov.br",
+      "icp-brasil.org.br",
+      "portal.icp-brasil.org.br",
+      "pjeoffice",
+      "shodo",
+      "shodô",
+      "assinador"
+    ],
+    "regexFronteiraAuth": "(?:^|[./?&=_\\s-])(?:sso|oauth|openid|saml|login|auth|autenticacao|certificado|token|validar)(?:[./?&=_\\s-]|$)"
+  },
+  "antiDuplicacao": {
+    "paramsRemover": [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "fbclid",
+      "gclid",
+      "_cid",
+      "ts"
+    ]
+  },
+  "ordenacaoGuias": {
+    "sufixosSld": ["jus", "leg", "mp", "gov", "def", "mil", "edu", "com", "org", "net", "adv"],
+    "paletaGrupos": ["blue", "cyan", "green", "yellow", "orange", "red", "purple", "pink"]
+  },
+  "manutencao": {
+    "idadesLimpezaMs": {
+      "12h": 43200000,
+      "1d": 86400000,
+      "3d": 259200000,
+      "7d": 604800000,
+      "15d": 1296000000,
+      "30d": 2592000000
+    }
+  },
+  "iconeExtensaoPaletas": {
+    "global": { "gradTop": "#10b981", "gradBot": "#059669", "borda": "#047857", "raio": "#fef08a", "rotulo": "GLOBAL" },
+    "url": { "gradTop": "#1a73e8", "gradBot": "#1557b0", "borda": "#0f3c7a", "raio": "#fbbc04", "rotulo": "URL" },
+    "desligado": { "gradTop": "#64748b", "gradBot": "#475569", "borda": "#334155", "raio": "#cbd5e1", "rotulo": "OFF" }
+  },
+  "sistemasJudiciais": [
+    { "id": "pje", "nome": "PJe", "css": "pje-anti-ampulheta.css", "padraoRegex": "\\bpje\\b|pje\\.|\\.jus\\.br/pje" },
+    { "id": "eproc", "nome": "Eproc", "css": "eproc-anti-ampulheta.css", "padraoRegex": "\\beproc\\b|eproc\\." },
+    { "id": "pdpj", "nome": "PDPJ", "css": "pdpj-stf-stj-anti-ampulheta.css", "padraoRegex": "\\bpdpj\\b|\\bprevjud\\b|stf\\.jus\\.br|stj\\.jus\\.br" },
+    { "id": "projudi", "nome": "Projudi", "css": "seeu-projudi-anti-ampulheta.css", "padraoRegex": "\\bprojudi\\b|projudi\\." },
+    { "id": "saj", "nome": "SAJ", "css": "saj-anti-ampulheta.css", "padraoRegex": "\\besaj\\b|\\bsaj\\b|esaj\\.|tjsp\\.jus\\.br/esaj" },
+    { "id": "creta", "nome": "Creta", "css": "creta-anti-ampulheta.css", "padraoRegex": "\\bcreta\\b|creta\\." },
+    { "id": "seeu", "nome": "SEEU", "css": "seeu-projudi-anti-ampulheta.css", "padraoRegex": "\\bseeu\\b|seeu\\." }
+  ]
+}

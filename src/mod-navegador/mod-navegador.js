@@ -10,7 +10,9 @@
  * - Métodos Públicos: atualizarConfiguracoes(cfg), tratarNovaJanela, tratarNovaAba,
  *   tratarAbaAtualizada, tratarAbaRemovida, tratarIntervaloDescarte, fecharGuiasDuplicadas,
  *   agruparGuiasPorDominio, desagruparGuias, descartarGuiasEmSegundoPlano, inicializarSessaoAbas,
- *   marcarPaginaModificada, get janelaUnica/antiDuplicacao/ordenacao/descarte, static get NULL_OBJECTS
+ *   inicializarHistoricoAbasAtivas, registrarAbaAtivadaHistorico, removerAbaHistorico,
+ *   alternarParaUltimaAbaAtiva, navegarAbaCircular, obterWindowIdAlvo, verificarOuAtivarAba,
+ *   abrirNovaAba, baixarLink, marcarPaginaModificada, get janelaUnica/antiDuplicacao/ordenacao/descarte, static get NULL_OBJECTS
  * - Dependências Injetadas: GerenciadorJanelaUnica, GerenciadorAntiDuplicacao, GerenciadorOrdenacaoGuias, GerenciadorDescarteGuias
  * - Regras / Seções: Diretrizes 11/14/16, ADR-006 (Null Objects c/ setters no-op em strict mode), Seção 6.47, Seção 6.64, Seção 6.78 (BP-06 / ARQ-01)
  *
@@ -239,13 +241,246 @@
         }
 
         /**
-         * Inicializa o rastreamento de abas na sessão
+         * Inicializa o rastreamento de abas e historico Ctrl+Tab na sessao (chrome.storage.session)
+         * garantindo sobrevivencia a hibernacao do Service Worker Manifest V3.
          * @param {Object} [chromeApi]
          */
         async inicializarSessaoAbas(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (this.#antiDuplicacao && typeof this.#antiDuplicacao.inicializarMapaAbas === 'function') {
                 await this.#antiDuplicacao.inicializarMapaAbas(chromeApi);
             }
+            await this.inicializarHistoricoAbasAtivas(chromeApi);
+        }
+
+        async _carregarHistoricoSession(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!this._histAbas) {
+                this._histAbas = { currentTabId: null, previousTabId: null, porJanela: {} };
+            }
+            if (this._histCarregado || !chromeApi || !chromeApi.storage || !chromeApi.storage.session) {
+                return this._histAbas;
+            }
+            try {
+                const res = await chromeApi.storage.session.get('jusgovHistoricoAbasAtivas');
+                if (res && res.jusgovHistoricoAbasAtivas && typeof res.jusgovHistoricoAbasAtivas === 'object') {
+                    const dados = res.jusgovHistoricoAbasAtivas;
+                    this._histAbas.currentTabId = dados.currentTabId || null;
+                    this._histAbas.previousTabId = dados.previousTabId || null;
+                    this._histAbas.porJanela = (dados.porJanela && typeof dados.porJanela === 'object') ? { ...dados.porJanela } : {};
+                }
+                this._histCarregado = true;
+            } catch (_) { }
+            return this._histAbas;
+        }
+
+        _salvarHistoricoSession(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!this._histAbas || !chromeApi || !chromeApi.storage || !chromeApi.storage.session) return;
+            try {
+                chromeApi.storage.session.set({ jusgovHistoricoAbasAtivas: this._histAbas }).catch(() => { });
+            } catch (_) { }
+        }
+
+        async inicializarHistoricoAbasAtivas(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const hist = await this._carregarHistoricoSession(chromeApi);
+            if (chromeApi && chromeApi.tabs && typeof chromeApi.tabs.query === 'function') {
+                try {
+                    const abas = await chromeApi.tabs.query({ active: true, lastFocusedWindow: true });
+                    if (Array.isArray(abas) && abas.length > 0 && abas[0].id) {
+                        const aba = abas[0];
+                        if (!hist.currentTabId) hist.currentTabId = aba.id;
+                        const winKey = aba.windowId ? String(aba.windowId) : null;
+                        if (winKey) {
+                            if (!hist.porJanela[winKey]) {
+                                hist.porJanela[winKey] = { currentTabId: aba.id, previousTabId: null };
+                            } else if (!hist.porJanela[winKey].currentTabId) {
+                                hist.porJanela[winKey].currentTabId = aba.id;
+                            }
+                        }
+                        this._salvarHistoricoSession(chromeApi);
+                    }
+                } catch (_) { }
+            }
+        }
+
+        async registrarAbaAtivadaHistorico(activeInfo, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!activeInfo || !activeInfo.tabId) return;
+            const hist = await this._carregarHistoricoSession(chromeApi);
+            const winKey = activeInfo.windowId ? String(activeInfo.windowId) : null;
+            if (winKey) {
+                if (!hist.porJanela[winKey]) {
+                    hist.porJanela[winKey] = { currentTabId: null, previousTabId: null };
+                }
+                const winHist = hist.porJanela[winKey];
+                if (winHist.currentTabId && winHist.currentTabId !== activeInfo.tabId) {
+                    winHist.previousTabId = winHist.currentTabId;
+                }
+                winHist.currentTabId = activeInfo.tabId;
+            }
+            if (hist.currentTabId && hist.currentTabId !== activeInfo.tabId) {
+                hist.previousTabId = hist.currentTabId;
+            }
+            hist.currentTabId = activeInfo.tabId;
+            this._salvarHistoricoSession(chromeApi);
+        }
+
+        async removerAbaHistorico(tabId, removeInfo = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!tabId) return;
+            const hist = await this._carregarHistoricoSession(chromeApi);
+            if (hist.currentTabId === tabId) hist.currentTabId = null;
+            if (hist.previousTabId === tabId) hist.previousTabId = null;
+            const winKey = removeInfo && removeInfo.windowId ? String(removeInfo.windowId) : null;
+            if (winKey && hist.porJanela[winKey]) {
+                if (hist.porJanela[winKey].currentTabId === tabId) hist.porJanela[winKey].currentTabId = null;
+                if (hist.porJanela[winKey].previousTabId === tabId) hist.porJanela[winKey].previousTabId = null;
+            }
+            this._salvarHistoricoSession(chromeApi);
+        }
+
+        async alternarParaUltimaAbaAtiva(windowIdOpcional = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!api || !api.tabs) return false;
+            const hist = await this._carregarHistoricoSession(api);
+            let alvoTabId = null;
+            const winKey = windowIdOpcional ? String(windowIdOpcional) : null;
+            if (winKey && hist.porJanela[winKey] && hist.porJanela[winKey].previousTabId) {
+                alvoTabId = hist.porJanela[winKey].previousTabId;
+            }
+            if (!alvoTabId) alvoTabId = hist.previousTabId;
+            if (!alvoTabId) return false;
+            try {
+                const tab = await api.tabs.get(alvoTabId);
+                if (!tab) throw new Error('Tab ausente');
+                await api.tabs.update(alvoTabId, { active: true });
+                return true;
+            } catch (_) {
+                if (hist.previousTabId === alvoTabId) hist.previousTabId = null;
+                if (winKey && hist.porJanela[winKey] && hist.porJanela[winKey].previousTabId === alvoTabId) {
+                    hist.porJanela[winKey].previousTabId = null;
+                }
+                this._salvarHistoricoSession(api);
+                return false;
+            }
+        }
+
+        async navegarAbaCircular(direcao, sender = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!api || !api.tabs || (direcao !== 'anterior' && direcao !== 'proxima')) return false;
+            const windowId = (sender && sender.tab && sender.tab.windowId) ? sender.tab.windowId : undefined;
+            const queryInfo = (windowId !== undefined) ? { windowId } : { lastFocusedWindow: true };
+            try {
+                const abas = await api.tabs.query(queryInfo);
+                if (!abas || abas.length <= 1) return false;
+                abas.sort((a, b) => a.index - b.index);
+                let idxAtiva = abas.findIndex(t => t.active);
+                if (idxAtiva === -1 && sender && sender.tab && sender.tab.id) {
+                    idxAtiva = abas.findIndex(t => t.id === sender.tab.id);
+                }
+                if (idxAtiva === -1) idxAtiva = 0;
+                const novoIdx = (direcao === 'anterior')
+                    ? (idxAtiva - 1 + abas.length) % abas.length
+                    : (idxAtiva + 1) % abas.length;
+                const abaDestino = abas[novoIdx];
+                if (abaDestino && abaDestino.id) {
+                    await api.tabs.update(abaDestino.id, { active: true });
+                    return true;
+                }
+            } catch (_) { }
+            return false;
+        }
+
+        async obterWindowIdAlvo(sender = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (sender && sender.tab && sender.tab.windowId) return sender.tab.windowId;
+            if (api && api.windows && typeof api.windows.getLastFocused === 'function') {
+                try {
+                    const ativa = await api.windows.getLastFocused({ windowTypes: ['normal'] });
+                    return ativa ? ativa.id : null;
+                } catch (_) { }
+            }
+            return null;
+        }
+
+        async verificarOuAtivarAba(urlAlvo, sender = null, config = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            const cfg = config || this.#configuracoes || {};
+            if (!api || !api.tabs || !urlAlvo || cfg.reutilizarAbasAbertas !== true) {
+                return { reutilizada: false };
+            }
+            try {
+                const antiDup = this.#antiDuplicacao;
+                const normalizador = (antiDup && typeof antiDup.normalizarUrlParaComparacao === 'function')
+                    ? (u) => antiDup.normalizarUrlParaComparacao(u)
+                    : (u) => String(u || '').trim().toLowerCase();
+                const mapaAbas = (antiDup && typeof antiDup.obterMapaAbasUrls === 'function')
+                    ? antiDup.obterMapaAbasUrls()
+                    : new Map();
+                const urlAlvoNorm = normalizador(urlAlvo);
+                if (!urlAlvoNorm) return { reutilizada: false };
+
+                const windowId = sender && sender.tab ? sender.tab.windowId : undefined;
+                const abas = await api.tabs.query(windowId ? { windowId } : {});
+                const monitorarOrig = Boolean(cfg.monitorarUrlOriginalAbertura);
+                const monitorarAtual = (cfg.monitorarUrlAtualPagina !== false);
+                const abaExistente = abas.find(t => {
+                    const reg = mapaAbas.get(t.id);
+                    if (reg && reg.duplicacaoManualPermitida) return false;
+                    const uAtual = normalizador(t.url || t.pendingUrl || '');
+                    if (monitorarAtual && urlAlvoNorm === uAtual) return true;
+                    if (monitorarOrig && reg) {
+                        const uOrig = reg.urlOriginal || '';
+                        const uRegAtual = reg.urlAtual || '';
+                        return (urlAlvoNorm === uOrig || urlAlvoNorm === uRegAtual);
+                    }
+                    return false;
+                });
+                if (abaExistente) {
+                    const emPrimeiroPlano = (cfg.abaEmPrimeiroPlano !== undefined)
+                        ? Boolean(cfg.abaEmPrimeiroPlano)
+                        : (cfg.abaEmSegundoPlano === false);
+                    if (emPrimeiroPlano) {
+                        await api.tabs.update(abaExistente.id, { active: true });
+                        if (abaExistente.windowId && !(sender && sender.url && sender.url.includes('options.html')) && api.windows) {
+                            await api.windows.update(abaExistente.windowId, { focused: true });
+                        }
+                    }
+                    return { reutilizada: true, tabId: abaExistente.id };
+                }
+            } catch (_) { }
+            return { reutilizada: false };
+        }
+
+        async abrirNovaAba(urlBruta, sender = null, config = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!api || !api.tabs || !urlBruta) return false;
+            try {
+                const urlAlvo = (sender && sender.tab && sender.tab.url) ? new URL(urlBruta, sender.tab.url).href : urlBruta;
+                const cfg = config || this.#configuracoes || {};
+                const emPrimeiroPlano = (cfg.abaEmPrimeiroPlano !== undefined)
+                    ? Boolean(cfg.abaEmPrimeiroPlano)
+                    : (cfg.abaEmSegundoPlano === false);
+                await api.tabs.create({ url: urlAlvo, active: emPrimeiroPlano });
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        async baixarLink(urlBruta, sender = null, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!api || !urlBruta) return false;
+            try {
+                const urlAlvo = (sender && sender.tab && sender.tab.url) ? new URL(urlBruta, sender.tab.url).href : urlBruta;
+                if (api.downloads && typeof api.downloads.download === 'function') {
+                    try {
+                        await api.downloads.download({ url: urlAlvo });
+                        return true;
+                    } catch (_) { }
+                }
+                if (api.tabs && typeof api.tabs.create === 'function') {
+                    await api.tabs.create({ url: urlAlvo, active: false });
+                    return true;
+                }
+            } catch (_) { }
+            return false;
         }
 
         /**

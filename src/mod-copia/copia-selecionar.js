@@ -549,22 +549,45 @@
     let regrasInternasInterface = [];
 
     (function carregarRegrasInternasInterface() {
+        const aplicarRegrasInterface = (dados) => {
+            if (Array.isArray(dados)) {
+                regrasInternasInterface = dados.filter(r => r && r.origem !== 'usuario');
+                cacheClassificacaoCustomEl = null;
+                cacheClassificacaoCustomTs = 0;
+                cacheClassificacaoCustomRes = null;
+            }
+        };
         try {
             if (typeof window !== 'undefined' && Array.isArray(window.__JUSGOV_INTERFACE_JSON__)) {
-                regrasInternasInterface = window.__JUSGOV_INTERFACE_JSON__.filter(r => r && r.origem !== 'usuario');
+                aplicarRegrasInterface(window.__JUSGOV_INTERFACE_JSON__);
+                return;
             }
-            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
-                fetch(chrome.runtime.getURL('src/cfg/interface.json'))
-                    .then((resp) => resp && resp.ok ? resp.json() : [])
-                    .then((dados) => {
-                        if (Array.isArray(dados)) {
-                            regrasInternasInterface = dados.filter(r => r && r.origem !== 'usuario');
-                            cacheClassificacaoCustomEl = null;
-                            cacheClassificacaoCustomTs = 0;
-                            cacheClassificacaoCustomRes = null;
-                        }
-                    })
-                    .catch(() => { });
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                const tentarIpc = () => {
+                    if (typeof chrome.runtime.sendMessage !== 'function') return;
+                    try {
+                        chrome.runtime.sendMessage({ acao: 'OBTER_JSON_ESTATICO', arquivo: 'interface.json' }, (resp) => {
+                            if (chrome.runtime && chrome.runtime.lastError) return;
+                            if (resp && resp.ok && Array.isArray(resp.dados)) {
+                                aplicarRegrasInterface(resp.dados);
+                            }
+                        });
+                    } catch (_) { }
+                };
+                if (typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
+                    fetch(chrome.runtime.getURL('src/cfg/interface.json'))
+                        .then((resp) => (resp && resp.ok ? resp.json() : null))
+                        .then((dados) => {
+                            if (Array.isArray(dados)) {
+                                aplicarRegrasInterface(dados);
+                            } else {
+                                tentarIpc();
+                            }
+                        })
+                        .catch(tentarIpc);
+                } else {
+                    tentarIpc();
+                }
             }
         } catch (_) { }
     })();
@@ -2433,55 +2456,15 @@
 
     /* ==========================================================================
      * SECAO 3: CLASSIFICADORES DE CARACTERES EM TEMPO CONSTANTE O(1) (BITMASK)
+     * Delega diretamente para JusGovConstantes (fonte unica de verdade).
      * ========================================================================== */
-    function eAlfanumericoUnicode(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        if (c < 128) {
-            return (TABELA_MASCARA_ASCII[c] & (MASCARA_CARACTERE.DIGITO | MASCARA_CARACTERE.LETRA_ASCII)) !== 0;
-        }
-        return EXPRESSOES_REGULARES.CHAR_ALFANUMERICO_UNICODE.test(ch);
-    }
-
-    function eEspacoBranco(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.ESPACO_BRANCO) !== 0;
-        return c === 160 || EXPRESSOES_REGULARES.CHAR_ESPACO_UNICODE.test(ch);
-    }
-
-    function ePontuacaoFim(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.PONTUACAO_FIM) !== 0;
-        return c === 8212 || c === 8211 || c === 8230;
-    }
-
-    function eDelimitadorPar(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        return c < 128 && (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.DELIMITADOR_PAR) !== 0;
-    }
-
-    function eCaractereAspas(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        if (c < 128) return (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.DELIMITADOR_ASPAS) !== 0;
-        return CARACTERES_ASPAS_TODOS.indexOf(ch) !== -1;
-    }
-
-    function eSimboloRepetivel(ch) {
-        if (!ch) return false;
-        const c = ch.charCodeAt(0);
-        if (c < 128 && (TABELA_MASCARA_ASCII[c] & MASCARA_CARACTERE.SIMBOLO_REPETIVEL) !== 0) {
-            return true;
-        }
-        return EXPRESSOES_REGULARES.CHAR_SIMBOLO_REPETIVEL.test(ch);
-    }
-
-    function eQuebraDeLinha(ch) {
-        return ch === '\n' || ch === '\r';
-    }
+    const eAlfanumericoUnicode = C_EXT.eAlfanumericoUnicode;
+    const eEspacoBranco = C_EXT.eEspacoBranco;
+    const ePontuacaoFim = C_EXT.ePontuacaoFim;
+    const eDelimitadorPar = C_EXT.eDelimitadorPar;
+    const eCaractereAspas = C_EXT.eCaractereAspas;
+    const eSimboloRepetivel = C_EXT.eSimboloRepetivel;
+    const eQuebraDeLinha = C_EXT.eQuebraDeLinha;
 
     /* ==========================================================================
      * SECAO 4: RESOLUCAO DO PONTO DE CLIQUE E EXTRACAO DE TEXTO COM JANELA O(1)
