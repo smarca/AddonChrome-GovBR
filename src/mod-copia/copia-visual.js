@@ -148,7 +148,13 @@
                 this.#configMarcadorColado.opacidadeFundo = Math.max(0.05, Math.min(0.85, Number(opacidade)));
             }
             const estiloBadge = opcoes.estiloBadge || opcoes.estiloBadgeMarcadorColado;
-            if (['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(estiloBadge)) {
+            const consts = (typeof JusGovConstantes !== 'undefined' && JusGovConstantes)
+                ? JusGovConstantes
+                : ((typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : null);
+            const estilosValidos = (consts && Array.isArray(consts.ESTILOS_BADGE_MARCADOR_COLADO))
+                ? consts.ESTILOS_BADGE_MARCADOR_COLADO
+                : ['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto', 'apenas_numeral'];
+            if (estilosValidos.includes(estiloBadge)) {
                 this.#configMarcadorColado.estiloBadge = estiloBadge;
             } else if (['chip', 'bolinha', 'pilula'].includes(estiloBadge)) {
                 this.#configMarcadorColado.estiloBadge = 'sobrescrito';
@@ -355,9 +361,12 @@
                 let destino = null;
                 for (let j = 0; j < blocos.length; j++) {
                     const ultima = blocos[j][blocos[j].length - 1];
-                    const folga = Math.max(6, (s.bottom - s.top) * 0.6);
-                    const contiguo = (s.top >= ultima.top) && ((s.top - ultima.bottom) <= folga);
-                    const sobrepoe = (s.left < ultima.right) && (s.right > ultima.left);
+                    const alturaRef = Math.max(12, s.bottom - s.top, ultima.bottom - ultima.top);
+                    /* BUG-69: Tolerância vertical de 1.85x altura cobre espaçamentos entre linhas e parágrafos
+                     * contíguos do mesmo Range sem quebrar o polígono SVG contínuo (preservando rolagem e abas). */
+                    const folga = Math.max(14, alturaRef * 1.85);
+                    const contiguo = (s.top >= ultima.top - 2) && ((s.top - ultima.bottom) <= folga);
+                    const sobrepoe = (s.left < ultima.right + 28) && (s.right > ultima.left - 28);
                     if (contiguo && sobrepoe) { destino = blocos[j]; break; }
                 }
                 if (destino) destino.push(s); else blocos.push([s]);
@@ -1165,6 +1174,23 @@
                             'padding:0 3.5px',
                             'box-sizing:border-box',
                             'opacity:0.82'
+                        );
+                    } else if (estiloBadge === 'apenas_numeral') {
+                        baseBadgeCss.push(
+                            'display:inline-flex',
+                            'align-items:center',
+                            'justify-content:center',
+                            'font-size:10px',
+                            `color:${corContorno}`,
+                            'background:transparent',
+                            'border:none',
+                            'border-radius:0',
+                            'min-width:auto',
+                            'height:auto',
+                            'padding:0 1px',
+                            'box-sizing:border-box',
+                            'box-shadow:none',
+                            'text-shadow:0 0 2px rgba(255,255,255,0.85)'
                         );
                     } else {
                         baseBadgeCss.push(

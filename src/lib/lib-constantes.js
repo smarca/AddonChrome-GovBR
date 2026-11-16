@@ -764,11 +764,33 @@
             .replace(/'/g, '&#39;');
     }
 
+    const ESTILOS_BADGE_MARCADOR_COLADO = Object.freeze([
+        'sobrescrito',
+        'translucido',
+        'circular',
+        'sobrescrito_retangular',
+        'retangular_translucido',
+        'retangular_compacto',
+        'apenas_numeral',
+        'sem_etiqueta'
+    ]);
+
+    const MODOS_AVISO_POMODORO = Object.freeze([
+        'modal',
+        'badge',
+        'barra_descanso',
+        'barra_sempre',
+        'badge_e_barra_descanso',
+        'completo'
+    ]);
+
     /* Passo 6.1: Exportar o namespace imutavel JusGovConstantes com getters dinâmicos para tabelas JSON */
     const exportado = Object.freeze({
         MASCARA_CARACTERE,
         TABELA_MASCARA_ASCII,
         CONFIGURACAO_MOTOR,
+        ESTILOS_BADGE_MARCADOR_COLADO,
+        MODOS_AVISO_POMODORO,
         PARES_ABERTURA,
         PARES_FECHAMENTO,
         CARACTERES_ASPAS_TODOS,

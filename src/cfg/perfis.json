@@ -71,6 +71,8 @@
     "pomodoroProporcao": 4.5,
     "pomodoroFocoMinutos": 25,
     "pomodoroCiclos": 4,
+    "pomodoroPausasAutomaticas": true,
+    "pomodoroModoAviso": "completo",
     "urlsTurbo": [
       "*://*.jus.br/*",
       "*://*.gov.br/*",

@@ -542,595 +542,53 @@
     }
     const teclasPressionadasAtivas = new Set();
 
-    /* Regras de Mapeamento Manual Avançado de Elementos (XPath / CSS) Padrões de Fábrica (Seção 6.20 e Seção 6.85) - Vazio de início como padrão */
+    /* Regras de Mapeamento Manual Avançado de Elementos (XPath / CSS) e Inspetor Visual: delegados para copia-regras-inspetor.js (SRP/DIP + Null Object) */
     const PADROES_FABRICA_REGRAS_MAPEAMENTO = Object.freeze([]);
-
-    let regrasMapeamentoElementos = [];
-    let regrasInternasInterface = [];
-
-    (function carregarRegrasInternasInterface() {
-        const aplicarRegrasInterface = (dados) => {
-            if (Array.isArray(dados)) {
-                regrasInternasInterface = dados.filter(r => r && r.origem !== 'usuario');
-                cacheClassificacaoCustomEl = null;
-                cacheClassificacaoCustomTs = 0;
-                cacheClassificacaoCustomRes = null;
-            }
-        };
-        try {
-            if (typeof window !== 'undefined' && Array.isArray(window.__JUSGOV_INTERFACE_JSON__)) {
-                aplicarRegrasInterface(window.__JUSGOV_INTERFACE_JSON__);
-                return;
-            }
-            if (typeof chrome !== 'undefined' && chrome.runtime) {
-                const tentarIpc = () => {
-                    if (typeof chrome.runtime.sendMessage !== 'function') return;
-                    try {
-                        chrome.runtime.sendMessage({ acao: 'OBTER_JSON_ESTATICO', arquivo: 'interface.json' }, (resp) => {
-                            if (chrome.runtime && chrome.runtime.lastError) return;
-                            if (resp && resp.ok && Array.isArray(resp.dados)) {
-                                aplicarRegrasInterface(resp.dados);
-                            }
-                        });
-                    } catch (_) { }
-                };
-                if (typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
-                    fetch(chrome.runtime.getURL('src/cfg/interface.json'))
-                        .then((resp) => (resp && resp.ok ? resp.json() : null))
-                        .then((dados) => {
-                            if (Array.isArray(dados)) {
-                                aplicarRegrasInterface(dados);
-                            } else {
-                                tentarIpc();
-                            }
-                        })
-                        .catch(tentarIpc);
-                } else {
-                    tentarIpc();
-                }
-            }
-        } catch (_) { }
-    })();
-
-    function definirRegrasMapeamentoElementos(novasRegras) {
-        if (Array.isArray(novasRegras)) {
-            regrasMapeamentoElementos = [...novasRegras];
-        } else {
-            regrasMapeamentoElementos = [];
-        }
-        cacheClassificacaoCustomEl = null;
-        cacheClassificacaoCustomTs = 0;
-        cacheClassificacaoCustomRes = null;
-    }
-
-    function obterRegrasMapeamentoElementos() {
-        return regrasMapeamentoElementos;
-    }
-
-    function elementoCorrespondeXPath(el, expressaoXPath, herdarFilhos = true) {
-        if (!el || typeof expressaoXPath !== 'string' || !expressaoXPath.trim()) return false;
-        const doc = el.ownerDocument || (typeof document !== 'undefined' ? document : null);
-        if (!doc || typeof doc.evaluate !== 'function') return false;
-        try {
-            const expr = expressaoXPath.trim();
-            const snap = doc.evaluate(
-                expr,
-                doc,
-                null,
-                XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                null
-            );
-            if (!snap || snap.snapshotLength === 0) return false;
-            for (let i = 0; i < snap.snapshotLength; i++) {
-                const no = snap.snapshotItem(i);
-                if (!no) continue;
-                if (no === el) return true;
-                if (herdarFilhos && typeof no.contains === 'function' && no.contains(el)) {
-                    return true;
-                }
-            }
-            /* Seção 6.134: Suporte a XPath Completo com Filhos em iframes internos (ex.: downloadBinario.seam) */
-            if (herdarFilhos && doc.defaultView && doc.defaultView.frameElement) {
-                const frameEl = doc.defaultView.frameElement;
-                const parentDoc = frameEl.ownerDocument;
-                if (parentDoc && typeof parentDoc.evaluate === 'function') {
-                    const snapParent = parentDoc.evaluate(expr, parentDoc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-                    for (let j = 0; j < (snapParent ? snapParent.snapshotLength : 0); j++) {
-                        const noParent = snapParent.snapshotItem(j);
-                        if (noParent && (noParent === frameEl || (typeof noParent.contains === 'function' && noParent.contains(frameEl)))) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        } catch (_) { }
-        return false;
-    }
-
-    function elementoCorrespondeCss(el, seletorCss, herdarFilhos = true) {
-        if (!el || typeof seletorCss !== 'string' || !seletorCss.trim()) return false;
-        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!base) return false;
-        try {
-            const sel = seletorCss.trim();
-            if (typeof base.matches === 'function' && base.matches(sel)) return true;
-            if (herdarFilhos && typeof base.closest === 'function' && base.closest(sel)) return true;
-            /* Seção 6.134: Suporte CSS cross-frame para iframes pais (ex.: iframe#frameBinario / downloadBinario.seam) */
-            if (herdarFilhos) {
-                let winAtual = base.ownerDocument && base.ownerDocument.defaultView;
-                while (winAtual && winAtual.frameElement) {
-                    const frameEl = winAtual.frameElement;
-                    if (typeof frameEl.matches === 'function' && frameEl.matches(sel)) return true;
-                    if (typeof frameEl.closest === 'function' && frameEl.closest(sel)) return true;
-                    winAtual = frameEl.ownerDocument && frameEl.ownerDocument.defaultView;
-                }
-            }
-        } catch (_) { }
-        return false;
-    }
-
-    function normalizarExpressaoAtributoCss(expressao, tipoSeletor = '') {
-        if (typeof expressao !== 'string') return '';
-        let expr = expressao.trim();
-        const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
-        if (!ehXPath && !expr.startsWith('[') && /^[a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=/.test(expr)) {
-            if (/^[a-zA-Z_][\w-]*=$/.test(expr)) {
-                expr = `[${expr.slice(0, -1)}]`;
-            } else {
-                const m = expr.match(/^([a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=)(.+)$/);
-                if (m) {
-                    const val = m[2].trim();
-                    const jaAspas = (val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"));
-                    expr = `[${m[1]}${jaAspas ? val : `"${val.replace(/"/g, '\\"')}"`}]`;
-                }
-            }
-        }
-        return expr;
-    }
-
-    function validarExpressaoSeletor(expressao, tipoSeletor = '') {
-        if (typeof expressao !== 'string' || !expressao.trim()) return false;
-        const expr = normalizarExpressaoAtributoCss(expressao, tipoSeletor);
-        try {
-            const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
-            if (ehXPath) {
-                if (typeof document !== 'undefined' && typeof document.evaluate === 'function') {
-                    document.evaluate(expr, document, null, XPathResult.ANY_TYPE, null);
-                }
-                return true;
-            }
-            if (typeof document !== 'undefined' && typeof document.createDocumentFragment === 'function') {
-                document.createDocumentFragment().querySelector(expr);
-            }
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    function elementoCorrespondeRegraMapeamento(el, expressao, herdarFilhos = true, tipoSeletor = '') {
-        if (!el || typeof expressao !== 'string' || !expressao.trim()) return false;
-        try {
-            const expr = normalizarExpressaoAtributoCss(expressao, tipoSeletor);
-            if (!expr) return false;
-            if (expr.startsWith('/') || expr.startsWith('(')) {
-                return elementoCorrespondeXPath(el, expr, herdarFilhos);
-            }
-            if (/^document\.querySelector/i.test(expr)) {
-                const m = expr.match(/^document\.querySelector(?:All)?\(\s*['"`](.*?)['"`]\s*\)/i);
-                if (m && m[1]) {
-                    return elementoCorrespondeCss(el, m[1], herdarFilhos);
-                }
-            }
-            return elementoCorrespondeCss(el, expr, herdarFilhos);
-        } catch (_) {
-            return false;
-        }
-    }
-
-    let cacheClassificacaoCustomEl = null;
-    let cacheClassificacaoCustomTs = 0;
-    let cacheClassificacaoCustomRes = null;
-
-    function obterClassificacaoRegraCustomizada(el, apenasUsuario = false) {
-        if (!el) return null;
-        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!base) return null;
-
-        if (!apenasUsuario) {
-            const agora = Date.now();
-            if (base === cacheClassificacaoCustomEl && (agora - cacheClassificacaoCustomTs) < 16) {
-                return cacheClassificacaoCustomRes;
-            }
-            const det = obterDiagnosticoRegraDetalhado(base, false);
-            const resultado = det ? det.tipo : null;
-            cacheClassificacaoCustomEl = base;
-            cacheClassificacaoCustomTs = agora;
-            cacheClassificacaoCustomRes = resultado;
-            return resultado;
-        }
-
-        const detUsuario = obterDiagnosticoRegraDetalhado(base, true);
-        return detUsuario ? detUsuario.tipo : null;
-    }
-
-    function descreverNoCurto(el) {
-        if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-        const tag = (el.tagName || '').toLowerCase();
-        const idSufixo = el.id ? `#${el.id}` : '';
-        const clsStr = (typeof el.className === 'string' && el.className.trim())
-            ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.')
-            : '';
-        return `<${tag}${idSufixo}${clsStr}>`;
-    }
-
-    function temEventosAssociadosAoObjeto(el) {
-        if (!el) return null;
-        let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        let profundidade = 0;
-        const ATRIBUTOS_CLIQUE = new Set(['onclick', 'ondblclick', 'onmousedown', 'onmouseup', 'onpointerdown', 'onpointerup', '(click)', '@click', 'v-on:click', 'ng-click', 'routerlink']);
-        const TAGS_ESTRUTURAIS_WIZ = new Set(['c-wiz', 'c-data', 'main', 'section', 'article']);
-        const RX_JSACTION_CLIQUE = /(?:^|[;\s])(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|tap)\s*:/i;
-
-        while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 2) {
-            profundidade++;
-            if (atual.nodeType === Node.ELEMENT_NODE) {
-                const descNo = descreverNoCurto(atual);
-                const onde = profundidade === 1 ? 'no elemento' : `no ancestral +${profundidade - 1}`;
-
-                if (atual.onclick) return `evento JS onclick em ${descNo} (${onde})`;
-                if (atual.ondblclick) return `evento JS ondblclick em ${descNo} (${onde})`;
-                if (atual.onmousedown) return `evento JS onmousedown em ${descNo} (${onde})`;
-                if (atual.onmouseup) return `evento JS onmouseup em ${descNo} (${onde})`;
-                if (atual.onpointerdown) return `evento JS onpointerdown em ${descNo} (${onde})`;
-                if (atual.onpointerup) return `evento JS onpointerup em ${descNo} (${onde})`;
-
-                if (atual.attributes && atual.attributes.length > 0) {
-                    const tagAtual = (atual.tagName || '').toLowerCase();
-                    for (let a = 0; a < atual.attributes.length; a++) {
-                        const attrNome = (atual.attributes[a].name || '').toLowerCase();
-                        if (ATRIBUTOS_CLIQUE.has(attrNome)) {
-                            return `atributo ${attrNome} em ${descNo} (${onde})`;
-                        }
-                        /* Seção 6.144 (Google Wiz / DevConsole): jsaction em containers/ancestrais ou hooks de ciclo de vida não tornam texto corrido em interface;
-                         * aceita ancestral direto (+1, profundidade <= 2) apenas se for wrapper compacto de botão/controle sem blocos de leitura internos. */
-                        const jsActionEmWrapperCurto = (
-                            profundidade === 2 &&
-                            !TAGS_ESTRUTURAIS_WIZ.has(tagAtual) &&
-                            (!atual.querySelector || !atual.querySelector('p, h1, h2, h3, h4, h5, h6, article, section, main, pre, code, table')) &&
-                            String(atual.textContent || '').trim().length <= 80
-                        );
-                        if (attrNome === 'jsaction' && !TAGS_ESTRUTURAIS_WIZ.has(tagAtual) && (profundidade === 1 || jsActionEmWrapperCurto)) {
-                            const valJsAction = String(atual.attributes[a].value || '');
-                            if (RX_JSACTION_CLIQUE.test(valJsAction)) {
-                                return `atributo jsaction (clique) em ${descNo} (${onde})`;
-                            }
-                        }
-                    }
-                }
-            }
-            atual = atual.parentElement || (atual.getRootNode && atual.getRootNode().host) || null;
-        }
-        return null;
-    }
-
-    function resolverTipoElementoPorPrioridade(el) {
-        return obterDiagnosticoElemento(el).tipo;
-    }
-
-    function obterDiagnosticoRegraDetalhado(el, apenasUsuario = false) {
-        if (!el) return null;
-        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!base) return null;
-        const grupos = apenasUsuario
-            ? [{ origem: 'Regra do Usuário', lista: regrasMapeamentoElementos }]
-            : [
-                { origem: 'Regra do Usuário', lista: regrasMapeamentoElementos },
-                { origem: 'Regra Interna', lista: regrasInternasInterface }
-            ];
-        let achado = null;
-        const historico = [];
-        for (let g = 0; g < grupos.length; g++) {
-            const { origem, lista } = grupos[g];
-            if (!Array.isArray(lista) || lista.length === 0) continue;
-            let deveParar = false;
-            for (let i = 0; i < lista.length; i++) {
-                const regra = lista[i];
-                if (!regra || regra.ativo === false || !regra.expressao) continue;
-                const herdar = regra.herdarFilhos !== false;
-                if (elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar, regra.tipoSeletor || '')) {
-                    const parou = (regra.continuarProxima !== true);
-                    const item = {
-                        tipo: regra.tipo || 'semiflexivel',
-                        origem,
-                        regra: regra.expressao,
-                        tipoSeletor: regra.tipoSeletor || '',
-                        observacao: regra.observacao || '',
-                        parou
-                    };
-                    achado = item;
-                    historico.push(item);
-                    if (parou) {
-                        deveParar = true;
-                        break;
-                    }
-                }
-            }
-            if (deveParar || achado !== null) break;
-        }
-        if (achado) {
-            achado.historico = historico;
-        }
-        return achado;
-    }
-
-    function obterDiagnosticoElemento(el) {
-        const diag = {
-            tipo: 'textual',
-            origem: 'Padrão (Texto)',
-            rotuloDetalhe: 'Motivo',
-            detalhe: 'Textual',
-            observacao: '',
-            trilha: []
-        };
-        if (!el) {
-            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-            return diag;
-        }
-        const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-        if (!base) {
-            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-            return diag;
-        }
-
-        const registrarEtapa = (passo, descricao, tipo, parou = false, observacao = '') => {
-            diag.trilha.forEach((t) => { t.decisivo = false; });
-            diag.trilha.push({ passo, descricao, tipo, parou, observacao, decisivo: true });
+    const regrasEInspetor = (typeof window !== 'undefined' && typeof window.JusGovRegrasEInspetor === 'function')
+        ? new window.JusGovRegrasEInspetor({
+            ehCampoEditavelFn: (el) => isElementoEmCampoEditavel(el) && !isElementoInterfaceDeEditorRico(el)
+        })
+        : {
+            limparCache: () => { },
+            obterIdFrameInspetor: () => '',
+            temPainelInspetorVisivel: () => false,
+            carregarRegrasInternas: () => { },
+            definirRegrasUsuario: () => { },
+            obterRegrasUsuario: () => [],
+            adicionarRegrasUsuario: () => { },
+            definirRegrasInternas: () => { },
+            elementoCorrespondeXPath: () => false,
+            elementoCorrespondeCss: () => false,
+            normalizarExpressaoAtributoCss: (e) => String(e || '').trim(),
+            validarExpressaoSeletor: () => false,
+            elementoCorrespondeRegraMapeamento: () => false,
+            obterClassificacaoRegraCustomizada: () => null,
+            descreverNoCurto: () => '',
+            temEventosAssociadosAoObjeto: () => null,
+            resolverTipoElementoPorPrioridade: () => 'textual',
+            obterDiagnosticoRegraDetalhado: () => null,
+            obterDiagnosticoElemento: () => ({ tipo: 'textual', origem: 'Padrão (Texto)', rotuloDetalhe: 'Motivo', detalhe: 'Textual', observacao: '', trilha: [] }),
+            ocultarInspetorTempoReal: () => { },
+            notificarOutrosFramesOcultarInspetor: () => { },
+            atualizarInspetorTempoReal: () => { }
         };
 
-        /* Passo 1: Cursor do mouse */
-        if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
-            try {
-                const cur = window.getComputedStyle(base).cursor;
-                if (cur === 'text' || cur === 'vertical-text' || cur === 'cell') {
-                    diag.tipo = 'textual';
-                    diag.origem = 'Cursor do Mouse';
-                    diag.rotuloDetalhe = 'Cursor CSS';
-                    diag.detalhe = `cursor: ${cur}`;
-                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'textual', false);
-                } else if (cur === 'default' || cur === 'arrow' || cur === 'context-menu') {
-                    diag.tipo = 'semiflexivel';
-                    diag.origem = 'Cursor do Mouse';
-                    diag.rotuloDetalhe = 'Cursor CSS';
-                    diag.detalhe = `cursor: ${cur}`;
-                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'semiflexivel', false);
-                } else if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grabbing' || cur === 'grab' || cur === 'progress' || cur === 'help') {
-                    diag.tipo = 'interface';
-                    diag.origem = 'Cursor do Mouse';
-                    diag.rotuloDetalhe = 'Cursor CSS';
-                    diag.detalhe = `cursor: ${cur}`;
-                    registrarEtapa('1. Mouse', `cursor: ${cur}`, 'interface', false);
-                }
-            } catch (_) { }
-        }
-
-        /* Passo 2: Existência de eventos associados */
-        const motivoEvento = temEventosAssociadosAoObjeto(base);
-        if (motivoEvento) {
-            diag.tipo = 'interface';
-            diag.origem = 'Eventos / Controle';
-            diag.rotuloDetalhe = 'Gatilho';
-            diag.detalhe = motivoEvento;
-            registrarEtapa('2. Evento JS', motivoEvento, 'interface', false);
-        }
-
-        /* Passo 3: Heurísticas extras de Browser (se ainda não for interface) */
-        if (diag.tipo !== 'interface') {
-            try {
-                const stExtra = (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
-                    ? window.getComputedStyle(base)
-                    : null;
-                const us = stExtra ? (stExtra.userSelect || stExtra.webkitUserSelect) : '';
-                const tabIdx = base.getAttribute ? base.getAttribute('tabindex') : null;
-                if (us === 'none') {
-                    diag.tipo = 'interface';
-                    diag.origem = 'Heurística Browser';
-                    diag.rotuloDetalhe = 'Heurística';
-                    diag.detalhe = 'user-select: none';
-                    registrarEtapa('3. Heurística', 'user-select: none', 'interface', false);
-                } else if (tabIdx === '0') {
-                    diag.tipo = 'interface';
-                    diag.origem = 'Heurística Browser';
-                    diag.rotuloDetalhe = 'Heurística';
-                    diag.detalhe = 'tabindex="0"';
-                    registrarEtapa('3. Heurística', 'tabindex="0"', 'interface', false);
-                } else {
-                    const tagB = (base.tagName || '').toUpperCase();
-                    const ehParagrafo = tagB === 'P' || tagB === 'ARTICLE' || tagB === 'BLOCKQUOTE';
-                    const txt = (base.textContent || '').trim();
-                    if (!ehParagrafo && txt.length > 0 && txt.length <= 80 && !txt.includes('\n')) {
-                        const temMascara = /\b(\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}(?::\d{2})?|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b/.test(txt);
-                        if (temMascara) {
-                            diag.tipo = 'semiflexivel';
-                            diag.origem = 'Heurística Browser';
-                            diag.rotuloDetalhe = 'Heurística';
-                            diag.detalhe = 'Texto curto com máscara forense';
-                            registrarEtapa('3. Heurística', 'máscara forense curta', 'semiflexivel', false);
-                        }
-                    } else if (txt.length > 100) {
-                        diag.tipo = 'textual';
-                        diag.origem = 'Heurística Browser';
-                        diag.rotuloDetalhe = 'Heurística';
-                        diag.detalhe = `Bloco de texto longo (${txt.length} chars)`;
-                        registrarEtapa('3. Heurística', `texto longo (${txt.length} chars)`, 'textual', false);
-                    }
-                }
-            } catch (_) { }
-        }
-
-        /* Passo 4: Regras XPath/CSS definidas (Usuário -> Internas) */
-        const regraDetalhe = obterDiagnosticoRegraDetalhado(base);
-        if (regraDetalhe) {
-            diag.tipo = regraDetalhe.tipo;
-            diag.origem = regraDetalhe.origem;
-            diag.rotuloDetalhe = 'Regra';
-            diag.detalhe = `${regraDetalhe.tipoSeletor ? '[' + regraDetalhe.tipoSeletor + '] ' : ''}${regraDetalhe.regra}`;
-            diag.observacao = regraDetalhe.observacao || '';
-            const listaHist = Array.isArray(regraDetalhe.historico) && regraDetalhe.historico.length > 0
-                ? regraDetalhe.historico
-                : [regraDetalhe];
-            for (let h = 0; h < listaHist.length; h++) {
-                const itemH = listaHist[h];
-                const prefixoSel = itemH.tipoSeletor ? `[${itemH.tipoSeletor}] ` : '';
-                registrarEtapa(`4. ${itemH.origem}`, `${prefixoSel}${itemH.regra}`, itemH.tipo, Boolean(itemH.parou), itemH.observacao || '');
-            }
-        }
-
-        if (diag.trilha.length === 0) {
-            diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-        }
-
-        return diag;
-    }
-
-    let painelInspetorTempoRealEl = null;
-    const ID_FRAME_INSPETOR_ATUAL = 'jusgov_insp_' + Math.random().toString(36).slice(2);
-
-    function ocultarInspetorTempoReal() {
-        if (painelInspetorTempoRealEl && painelInspetorTempoRealEl.parentNode) {
-            painelInspetorTempoRealEl.parentNode.removeChild(painelInspetorTempoRealEl);
-        }
-        painelInspetorTempoRealEl = null;
-    }
-
-    function notificarOutrosFramesOcultarInspetor() {
-        try {
-            const payload = { __jusgovAcao: 'OCULTAR_INSPETOR_TEMPO_REAL', origemId: ID_FRAME_INSPETOR_ATUAL };
-            if (window.top && window.top !== window) {
-                window.top.postMessage(payload, '*');
-            } else if (window.frames && window.frames.length > 0) {
-                for (let i = 0; i < window.frames.length; i++) {
-                    try { window.frames[i].postMessage(payload, '*'); } catch (_) { }
-                }
-            }
-        } catch (_) { }
-    }
-
-    function atualizarInspetorTempoReal(x, y, alvo) {
-        if (typeof document === 'undefined' || !document.body) return;
-        const base = (alvo && alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
-        if (!base || (base.closest && base.closest('[data-jusgov-ignore="true"]'))) return;
-        if (base.tagName === 'IFRAME' || base.tagName === 'FRAME') {
-            ocultarInspetorTempoReal();
-            return;
-        }
-
-        notificarOutrosFramesOcultarInspetor();
-
-        if (!painelInspetorTempoRealEl) {
-            painelInspetorTempoRealEl = document.createElement('div');
-            painelInspetorTempoRealEl.id = 'jusgov-inspetor-tempo-real';
-            painelInspetorTempoRealEl.setAttribute('data-jusgov-ignore', 'true');
-            painelInspetorTempoRealEl.style.cssText = 'position: fixed; z-index: 2147483647; pointer-events: none; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border: 1px solid #38bdf8; border-radius: 8px; padding: 8px 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; line-height: 1.45; box-shadow: 0 10px 25px rgba(0,0,0,0.55); max-width: 420px; word-break: break-word;';
-            document.body.appendChild(painelInspetorTempoRealEl);
-        }
-
-        const ehCampoEditavel = isElementoEmCampoEditavel(base) && !isElementoInterfaceDeEditorRico(base);
-        const diag = obterDiagnosticoElemento(base);
-        const coresTipo = {
-            interface: { nome: 'Interface', cor: '#fbbf24' },
-            semiflexivel: { nome: 'SemiFlexível', cor: '#38bdf8' },
-            textual: { nome: 'Textual', cor: '#34d399' },
-            editavel: { nome: 'Editável', cor: '#c084fc' }
-        };
-        const infoTipo = coresTipo[diag.tipo] || coresTipo.textual;
-        const tag = (base.tagName || '').toLowerCase();
-        const idStr = base.id ? ` id="${base.id}"` : '';
-        const nameAttr = base.getAttribute ? base.getAttribute('name') : '';
-        const nameStr = nameAttr ? ` name="${nameAttr}"` : '';
-        const roleAttr = base.getAttribute ? base.getAttribute('role') : '';
-        const roleStr = roleAttr ? ` role="${roleAttr}"` : '';
-        const typeAttr = base.getAttribute ? base.getAttribute('type') : '';
-        const typeStr = typeAttr ? ` type="${typeAttr}"` : '';
-        const clsStr = (typeof base.className === 'string' && base.className.trim()) ? ` class="${base.className.trim().split(/\s+/).slice(0, 4).join(' ')}"` : '';
-
-        painelInspetorTempoRealEl.innerHTML = '';
-        const l1 = document.createElement('div');
-        l1.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 4px;';
-        const badgeTipo = document.createElement('span');
-        badgeTipo.style.cssText = `font-weight: 700; color: ${ehCampoEditavel ? '#c084fc' : infoTipo.cor};`;
-        badgeTipo.textContent = ehCampoEditavel ? '● Campo Editável (Regra de Ouro)' : `● ${infoTipo.nome}`;
-        const badgeOrigem = document.createElement('span');
-        badgeOrigem.style.cssText = 'font-size: 10px; color: #94a3b8; background: #1e293b; padding: 1px 6px; border-radius: 4px;';
-        badgeOrigem.textContent = ehCampoEditavel ? 'Edição Nativa' : diag.origem;
-        l1.appendChild(badgeTipo);
-        l1.appendChild(badgeOrigem);
-
-        const l2 = document.createElement('div');
-        l2.style.cssText = 'font-family: monospace; font-size: 10px; color: #cbd5e1; margin-bottom: 3px;';
-        l2.textContent = `Elemento: <${tag}${idStr}${nameStr}${typeStr}${roleStr}${clsStr}>`;
-
-        painelInspetorTempoRealEl.appendChild(l1);
-        painelInspetorTempoRealEl.appendChild(l2);
-
-        if (ehCampoEditavel) {
-            const l3 = document.createElement('div');
-            l3.style.cssText = 'font-family: monospace; font-size: 10px; font-weight: 700; color: #c084fc;';
-            l3.textContent = 'Comportamento: Edição livre (nunca intercepta clique/seleção)';
-            painelInspetorTempoRealEl.appendChild(l3);
-        }
-
-        if (Array.isArray(diag.trilha) && diag.trilha.length > 0) {
-            const boxTrilha = document.createElement('div');
-            boxTrilha.style.cssText = 'font-family: monospace; font-size: 9.5px; margin-top: 5px; border-top: 1px dashed #334155; padding-top: 4px; display: flex; flex-direction: column; gap: 2px;';
-            diag.trilha.forEach((etapa) => {
-                const linhaT = document.createElement('div');
-                const corEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].cor : '#94a3b8';
-                const nomeEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].nome : etapa.tipo;
-                const tagParada = etapa.parou ? ' [PAROU]' : (etapa.passo.startsWith('4.') ? ' [continua]' : '');
-                const textoEtapa = etapa.descricao
-                    ? `${etapa.passo}: ${etapa.descricao} → ${nomeEtapa}${tagParada}`
-                    : `${etapa.passo}: ${nomeEtapa}${tagParada}`;
-                if (etapa.decisivo && !ehCampoEditavel) {
-                    linhaT.style.cssText = `color: #f8fafc; background: rgba(56, 189, 248, 0.14); border-left: 2px solid ${corEtapa}; padding: 1px 5px; border-radius: 3px; font-weight: 700;`;
-                    linhaT.textContent = `★ ${textoEtapa}`;
-                } else {
-                    linhaT.style.cssText = 'color: #94a3b8; padding-left: 7px;';
-                    linhaT.textContent = `• ${textoEtapa}`;
-                }
-                boxTrilha.appendChild(linhaT);
-
-                if (etapa.observacao) {
-                    const linhaObs = document.createElement('div');
-                    linhaObs.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; color: #fbbf24; font-style: italic; padding-left: 14px; margin-bottom: 2px;';
-                    linhaObs.textContent = `Obs: ${etapa.observacao}`;
-                    boxTrilha.appendChild(linhaObs);
-                }
-            });
-            painelInspetorTempoRealEl.appendChild(boxTrilha);
-        }
-
-        const rectPainel = painelInspetorTempoRealEl.getBoundingClientRect();
-        const larguraPainel = rectPainel.width || 420;
-        const alturaPainel = rectPainel.height || 200;
-        const margemTela = 8;
-        const deslocamentoCursor = 16;
-
-        let left = x + deslocamentoCursor;
-        if (left + larguraPainel > window.innerWidth - margemTela) {
-            left = x - larguraPainel - deslocamentoCursor;
-        }
-        left = Math.max(margemTela, Math.min(left, window.innerWidth - larguraPainel - margemTela));
-
-        let top = y + deslocamentoCursor;
-        if (top + alturaPainel > window.innerHeight - margemTela) {
-            top = y - alturaPainel - deslocamentoCursor;
-        }
-        top = Math.max(margemTela, Math.min(top, window.innerHeight - alturaPainel - margemTela));
-
-        painelInspetorTempoRealEl.style.left = `${Math.round(left)}px`;
-        painelInspetorTempoRealEl.style.top = `${Math.round(top)}px`;
-    }
+    const definirRegrasMapeamentoElementos = (novasRegras) => regrasEInspetor.definirRegrasUsuario(novasRegras);
+    const obterRegrasMapeamentoElementos = () => regrasEInspetor.obterRegrasUsuario();
+    const elementoCorrespondeXPath = (el, expr, herdar = true) => regrasEInspetor.elementoCorrespondeXPath(el, expr, herdar);
+    const elementoCorrespondeCss = (el, sel, herdar = true) => regrasEInspetor.elementoCorrespondeCss(el, sel, herdar);
+    const normalizarExpressaoAtributoCss = (expr, tipo = '') => regrasEInspetor.normalizarExpressaoAtributoCss(expr, tipo);
+    const validarExpressaoSeletor = (expr, tipo = '') => regrasEInspetor.validarExpressaoSeletor(expr, tipo);
+    const elementoCorrespondeRegraMapeamento = (el, expr, herdar = true, tipo = '') => regrasEInspetor.elementoCorrespondeRegraMapeamento(el, expr, herdar, tipo);
+    const obterClassificacaoRegraCustomizada = (el, apenasUsuario = false) => regrasEInspetor.obterClassificacaoRegraCustomizada(el, apenasUsuario);
+    const descreverNoCurto = (el) => regrasEInspetor.descreverNoCurto(el);
+    const temEventosAssociadosAoObjeto = (el) => regrasEInspetor.temEventosAssociadosAoObjeto(el);
+    const resolverTipoElementoPorPrioridade = (el) => regrasEInspetor.resolverTipoElementoPorPrioridade(el);
+    const obterDiagnosticoRegraDetalhado = (el, apenasUsuario = false) => regrasEInspetor.obterDiagnosticoRegraDetalhado(el, apenasUsuario);
+    const obterDiagnosticoElemento = (el) => regrasEInspetor.obterDiagnosticoElemento(el);
+    const ocultarInspetorTempoReal = () => regrasEInspetor.ocultarInspetorTempoReal();
+    const notificarOutrosFramesOcultarInspetor = () => regrasEInspetor.notificarOutrosFramesOcultarInspetor();
+    const atualizarInspetorTempoReal = (x, y, alvo) => regrasEInspetor.atualizarInspetorTempoReal(x, y, alvo);
 
     const dialogoMapeamento = (typeof window !== 'undefined' && window.JusGovDialogoMapeamentoRegra) ? new window.JusGovDialogoMapeamentoRegra() : null;
     function fecharModalSalvarRegraMapeamento() { return dialogoMapeamento ? dialogoMapeamento.fecharModal() : null; }
@@ -1140,10 +598,7 @@
             normalizarExpressaoAtributoCss,
             obterDiagnosticoElemento,
             aoSalvarRegras: (novasRegras) => {
-                regrasMapeamentoElementos.push(...novasRegras);
-                cacheClassificacaoCustomEl = null;
-                cacheClassificacaoCustomTs = 0;
-                cacheClassificacaoCustomRes = null;
+                regrasEInspetor.adicionarRegrasUsuario(novasRegras);
                 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
                     chrome.storage.sync.get(['regrasMapeamentoElementos'], (res) => {
                         const atuais = Array.isArray(res && res.regrasMapeamentoElementos) ? res.regrasMapeamentoElementos : [];
@@ -2905,394 +2360,41 @@
      * @MAPA-IA-VAR: Gestão de Estado de Clipboard Interno em 2 Slots
      * @MAPA-IA-FN: salvarClipboardInternoComBackup
      */
-    function salvarClipboardInternoComBackup(novoPayload) {
-        try {
-            if (!novoPayload || typeof novoPayload !== 'object') return false;
-            const LIMITE_BYTES_EMULACAO = 512 * 1024;
-            const txt = typeof novoPayload.texto === 'string' ? novoPayload.texto : '';
-            const html = typeof novoPayload.html === 'string' ? novoPayload.html : '';
+    /* Delegação Modular (SRP/DIP + Null Object): Gestão de Clipboard Interno, Gravação Multi-MIME e Colagem (copia-clipboard.js) */
+    const gerenciadorClipboard = (typeof window !== 'undefined' && typeof window.JusGovClipboardInterno === 'function')
+        ? new window.JusGovClipboardInterno({
+            obterEstadoOpcoes: () => ({
+                manterFormatacaoBasica,
+                nivelFiltroFormatacao,
+                ultimoTextoLimpo: ultimoTextoSelecionadoLimpo
+            }),
+            normalizarNivelFiltro,
+            verificarSeTextoEhBlocoOuPalavraUnica,
+            aplicarFiltroHtmlPorNivel,
+            envolverHtmlComResetDeCursorParaWord,
+            extrairTextoPuroSanitizado,
+            aplicarFiltro1DadosLixo,
+            aplicarFiltro3InformacoesELinhas,
+            confirmarVisualMarcador: (txt) => (visual && typeof visual.confirmarColagemEMarcarPermanente === 'function')
+                ? visual.confirmarColagemEMarcarPermanente(txt)
+                : null
+        })
+        : {
+            salvarClipboardInternoComBackup: () => false,
+            registrarUltimaSelecao: () => { },
+            gravarNaAreaDeTransferencia: async () => false,
+            emularTeclasColar: () => false,
+            emularTeclasWinV: () => { },
+            inserirTextoEmElemento: () => { },
+            confirmarColagemGlobalEMarcarPermanente: () => null,
+            executarColagemBotaoDireito: async () => { }
+        };
 
-            /* BLIND-01 (Seção 6.104): Verificação defensiva de estouro/overflow de payload */
-            if (txt.length > LIMITE_BYTES_EMULACAO || html.length > LIMITE_BYTES_EMULACAO) {
-                if (Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
-                    window.__JUSGOV_HISTORICO_CLIPBOARD__[0] = null;
-                }
-                window.__JUSGOV_ULTIMO_CLIPBOARD__ = null;
-                return false;
-            }
-
-            const txtSeguro = txt;
-            const htmlSeguro = html;
-
-            const atual = window.__JUSGOV_ULTIMO_CLIPBOARD__;
-            const textoAtualLimpo = (atual && typeof atual.texto === 'string') ? atual.texto.trim() : '';
-            const novoTextoLimpo = txtSeguro.trim();
-            const ehConteudoIdenticoAoAtual = Boolean(textoAtualLimpo && novoTextoLimpo && textoAtualLimpo === novoTextoLimpo);
-
-            /* Inicialização defensiva do Histórico de 2 Níveis (USAB-11 / USAB-19 — Seções 6.110 e 6.120) */
-            if (!Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
-                window.__JUSGOV_HISTORICO_CLIPBOARD__ = [];
-                if (atual && (atual.texto || atual.html)) {
-                    window.__JUSGOV_HISTORICO_CLIPBOARD__.push({
-                        texto: atual.texto || '',
-                        html: atual.html || '',
-                        formatado: Boolean(atual.formatado),
-                        timestamp: Date.now()
-                    });
-                }
-            }
-
-            /* BUG-17 (Seção 6.73) & USAB-11/19 (Seções 6.110/6.120): Se o novo payload for textualmente idêntico ao que já reside no Slot 1 (atual),
-             * a operação é idempotente em relação à pilha de histórico: NÃO desloca nem sobrescreve o Slot 2 (ANTERIOR__),
-             * preservando a penúltima seleção intacta para ser colada com Ctrl + Botão do Meio. */
-            const preservarHistorico = Boolean(novoPayload.preservarHistorico);
-            if (!ehConteudoIdenticoAoAtual && !preservarHistorico) {
-                if (atual && (atual.texto || atual.html)) {
-                    window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = {
-                        texto: atual.texto || '',
-                        html: atual.html || '',
-                        formatado: Boolean(atual.formatado)
-                    };
-                }
-                window.__JUSGOV_HISTORICO_CLIPBOARD__.unshift({
-                    texto: txtSeguro,
-                    html: htmlSeguro,
-                    formatado: Boolean(novoPayload.formatado),
-                    timestamp: Date.now()
-                });
-                if (window.__JUSGOV_HISTORICO_CLIPBOARD__.length > 2) {
-                    window.__JUSGOV_HISTORICO_CLIPBOARD__.length = 2;
-                }
-            } else if (preservarHistorico && Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
-                window.__JUSGOV_HISTORICO_CLIPBOARD__[0] = {
-                    texto: txtSeguro,
-                    html: htmlSeguro,
-                    formatado: Boolean(novoPayload.formatado),
-                    timestamp: Date.now()
-                };
-            }
-
-            window.__JUSGOV_ULTIMO_CLIPBOARD__ = {
-                texto: txtSeguro,
-                html: htmlSeguro,
-                formatado: Boolean(novoPayload.formatado)
-            };
-            registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__, window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__, window.__JUSGOV_HISTORICO_CLIPBOARD__);
-            return true;
-        } catch (erroOverflow) {
-            /* BLIND-01 (Seção 6.104): Em caso de estouro ou falha em memória, deixa nula a posição e retorna false sem lançar erro */
-            try {
-                if (Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
-                    window.__JUSGOV_HISTORICO_CLIPBOARD__[0] = null;
-                }
-            } catch (_) { }
-            return false;
-        }
-    }
-
-    async function gravarNaAreaDeTransferencia(textoFinal, rangeDOMOpcional = null, opcoesGravacao = {}) {
-        /* Passo 5.3: Gravacao com suporte a formatos basicos, avancados ou sem filtro.
-         * BLIND-01 (Seção 6.104): PRIMEIRO copia interno; somente se der certo internamente copia para o sistema operacional.
-         * Se falhar internamente por estouro ou erro, NÃO copia para o sistema. */
-        if (!textoFinal || typeof textoFinal !== 'string') return false;
-        const preservarHistorico = Boolean(opcoesGravacao && opcoesGravacao.preservarHistorico);
-
-        let deveManterFormatacao = Boolean(manterFormatacaoBasica && rangeDOMOpcional);
-        const nivelNorm = normalizarNivelFiltro(nivelFiltroFormatacao);
-        if (nivelNorm === 'texto_puro') {
-            deveManterFormatacao = false;
-        }
-        if (deveManterFormatacao && verificarSeTextoEhBlocoOuPalavraUnica(textoFinal)) {
-            /* Regra de Ouro: Bloco forense ou palavra unica e sempre somente texto puro */
-            deveManterFormatacao = false;
-        }
-
-        /* DIRETRIZ AUDITORIA AUTOMATIZADA: Durante a execucao da suite de testes de auditoria,
-         * preserva a integridade do clipboard real do usuario no Windows e previne violacoes de
-         * Permissions Policy do Chromium (crbug.com/414348233) decorrentes de disparos sinteticos sem ativacao. */
-        if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) {
-            const okInterno = salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false, preservarHistorico });
-            return Boolean(okInterno);
-        }
-
-        if (deveManterFormatacao) {
-            /* Passo 5.3.1: Aplicar o filtro correspondente ao nivel ativo na arquitetura progressiva */
-            const codigoHTML = aplicarFiltroHtmlPorNivel(rangeDOMOpcional, nivelNorm);
-
-            if (codigoHTML) {
-                const htmlParaClipboard = envolverHtmlComResetDeCursorParaWord(codigoHTML);
-                const textoPlanoMultilinha = extrairTextoPuroSanitizado(codigoHTML) || textoFinal;
-
-                /* BLIND-01 (Seção 6.104): Gravação interna PRIMEIRO */
-                const salvouInterno = salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: htmlParaClipboard, formatado: true, preservarHistorico });
-                if (!salvouInterno) {
-                    return false;
-                }
-
-                try {
-                    const temFocoParaClip = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
-                    if (temFocoParaClip && typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
-                        const blobHtml = new Blob([htmlParaClipboard], { type: 'text/html' });
-                        const blobTexto = new Blob([textoPlanoMultilinha], { type: 'text/plain' });
-                        const dadosParaCopiar = new ClipboardItem({
-                            'text/html': blobHtml,
-                            'text/plain': blobTexto
-                        });
-                        await navigator.clipboard.write([dadosParaCopiar]);
-                        console.log('Texto formatado copiado! HTML:', htmlParaClipboard);
-                        return true;
-                    }
-                } catch (err) {
-                    /* Restricao assincrona de I/O ou Permissions Policy no documento/iframe; prossegue para fallback */
-                }
-
-                try {
-                    let copiouViaEvento = false;
-                    const manipuladorCopy = (ev) => {
-                        if (ev && ev.clipboardData) {
-                            ev.clipboardData.setData('text/html', htmlParaClipboard);
-                            ev.clipboardData.setData('text/plain', textoPlanoMultilinha);
-                            ev.preventDefault();
-                            copiouViaEvento = true;
-                        }
-                    };
-                    document.addEventListener('copy', manipuladorCopy, { capture: true, once: true });
-                    const sucessoCopy = document.execCommand('copy');
-                    document.removeEventListener('copy', manipuladorCopy, { capture: true });
-                    if (sucessoCopy || copiouViaEvento) {
-                        return true;
-                    }
-                } catch (errCopy) {
-                    /* Fallback copy HTML protegido com try/catch */
-                }
-            }
-        }
-
-        let textoPuroFinal = '';
-        if (rangeDOMOpcional && nivelNorm === 'texto_puro') {
-            textoPuroFinal = extrairTextoPuroSanitizado(rangeDOMOpcional);
-        }
-        if (!textoPuroFinal) {
-            textoPuroFinal = (typeof textoFinal === 'string' && (textoFinal.indexOf('<') !== -1 || textoFinal.indexOf('\r') !== -1))
-                ? extrairTextoPuroSanitizado(textoFinal)
-                : aplicarFiltro3InformacoesELinhas(aplicarFiltro1DadosLixo(textoFinal));
-        }
-        textoPuroFinal = (textoPuroFinal || '').replace(/[ ]{2,}/g, ' ').trim();
-
-        /* BLIND-01 (Seção 6.104): Gravação interna PRIMEIRO. Se falhar, não copia para o sistema */
-        const salvouInternoTexto = salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false, preservarHistorico });
-        if (!salvouInternoTexto) {
-            return false;
-        }
-
-        let gravouSistema = false;
-        try {
-            const temFocoParaTexto = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
-            if (temFocoParaTexto && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                await navigator.clipboard.writeText(textoPuroFinal);
-                gravouSistema = true;
-            }
-        } catch (errTxt) {
-            /* Restricao de Permissions Policy ou foco de janela no iframe; fallback para textarea + execCommand */
-        }
-
-        if (!gravouSistema) {
-            try {
-                const areaTemp = document.createElement('textarea');
-                areaTemp.setAttribute('data-jusgov-ignore', 'true');
-                areaTemp.value = textoPuroFinal;
-                areaTemp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-                document.body.appendChild(areaTemp);
-                areaTemp.select();
-                gravouSistema = Boolean(document.execCommand('copy'));
-                document.body.removeChild(areaTemp);
-            } catch (errArea) {
-                /* Fallback textarea protegido com try/catch */
-            }
-        }
-
-        /* Retorna true garantindo continuidade e fluidez visual ao usuario mesmo em documentos com Permissions Policy restritiva */
-        return true;
-    }
-
-    /*
-     * FUNCAO: registrarUltimaSelecao
-     * OBJETIVO DE RECONSTRUCAO: Persistir a "Ultima Selecao" (conteudo exato, TXT e/ou HTML, enviado por este
-     * addon a area de transferencia no momento da copia) e o item anterior para colagem simulada.
-     */
-    function registrarUltimaSelecao(novoItem, itemAnteriorOpcional, historicoOpcional = null) {
-        if (!novoItem || (!novoItem.texto && !novoItem.html)) return;
-        try {
-            const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
-            if (storageLocal) {
-                const historicoParaSalvar = Array.isArray(historicoOpcional)
-                    ? historicoOpcional
-                    : ((typeof window !== 'undefined' && Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) ? window.__JUSGOV_HISTORICO_CLIPBOARD__ : []);
-                const payloadStorage = {
-                    ultimoClipboardInterno: {
-                        texto: novoItem.texto || '',
-                        html: novoItem.html || '',
-                        formatado: Boolean(novoItem.formatado),
-                        timestamp: Date.now()
-                    },
-                    historicoClipboardInterno: historicoParaSalvar
-                };
-                if (itemAnteriorOpcional && (itemAnteriorOpcional.texto || itemAnteriorOpcional.html)) {
-                    payloadStorage.ultimoClipboardAnteriorInterno = {
-                        texto: itemAnteriorOpcional.texto || '',
-                        html: itemAnteriorOpcional.html || '',
-                        formatado: Boolean(itemAnteriorOpcional.formatado),
-                        timestamp: Date.now()
-                    };
-                }
-                storageLocal.set(payloadStorage);
-            }
-        } catch (_) { }
-    }
-
-    /*
-     * FUNCAO: emularTeclasColar
-     * O PORQUE: Ao colar com o botao do meio um conteudo com estilos quando a opcao
-     * "Usar area de transferencia (clipboard) do sistema" estiver desativada (false),
-     * emula os eventos nativos de teclado (Ctrl+V) e ClipboardEvent('paste') para que o
-     * sistema/editor web receba e processe os dados formatados diretamente pelos seus proprios
-     * manipuladores de colagem nativos sem depender de permissao do clipboard do SO.
-     */
-    function emularTeclasColar(alvo, texto, html) {
-        try {
-            if (!alvo) return false;
-            if (typeof alvo.focus === 'function') {
-                try { alvo.focus(); } catch (_) { }
-            }
-
-            // 1. Despacha KeyDown de Ctrl+V
-            const evtDown = new KeyboardEvent('keydown', {
-                key: 'v',
-                code: 'KeyV',
-                keyCode: 86,
-                which: 86,
-                ctrlKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-            });
-            alvo.dispatchEvent(evtDown);
-
-            // 2. Despacha ClipboardEvent('paste') com text/html e text/plain sintetico
-            let pasteTratadoPeloEditor = false;
-            const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable="true"]')) || document.designMode === 'on');
-            try {
-                if (typeof DataTransfer !== 'undefined') {
-                    const dt = new DataTransfer();
-                    if (html && ehEditorRico) dt.setData('text/html', html);
-                    dt.setData('text/plain', texto || '');
-                    const evtPaste = new ClipboardEvent('paste', {
-                        clipboardData: dt,
-                        bubbles: true,
-                        cancelable: true,
-                        composed: true
-                    });
-                    pasteTratadoPeloEditor = !alvo.dispatchEvent(evtPaste);
-                }
-            } catch (_) { }
-
-            // 3. Se o editor nao tratou por conta propria, aciona execCommand de insercao
-            if (!pasteTratadoPeloEditor) {
-                let colouExec = false;
-                try {
-                    colouExec = document.execCommand('paste');
-                } catch (_) { }
-                if (!colouExec) {
-                    if (html && ehEditorRico) {
-                        try {
-                            colouExec = document.execCommand('insertHTML', false, html);
-                        } catch (_) { }
-                    }
-                    if (!colouExec) {
-                        const conteudoParaInserir = (ehEditorRico && html) ? html : (texto || '');
-                        inserirTextoEmElemento(alvo, conteudoParaInserir, Boolean(ehEditorRico && html));
-                    }
-                }
-            }
-
-            // 4. Despacha KeyUp de Ctrl+V
-            const evtUp = new KeyboardEvent('keyup', {
-                key: 'v',
-                code: 'KeyV',
-                keyCode: 86,
-                which: 86,
-                ctrlKey: true,
-                bubbles: true,
-                composed: true
-            });
-            alvo.dispatchEvent(evtUp);
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    /*
-     * FUNCAO: emularTeclasWinV
-     * O PORQUE: Quando a colagem Rollback (Ctrl + Botao do Meio) contem estilos (HTML/RTF),
-     * despacha para o sistema/aplicacao os eventos da combinacao de teclas "Win + V" (Meta + V)
-     * para ativar o historico avancado de area de transferencia da aplicacao / SO.
-     */
-    function emularTeclasWinV(alvo) {
-        try {
-            const el = alvo || (typeof document !== 'undefined' ? (document.activeElement || document.body) : null);
-            if (!el) return;
-            if (typeof el.focus === 'function') {
-                try { el.focus(); } catch (_) { }
-            }
-
-            // 1. Keydown tecla Windows (MetaLeft, key="Meta")
-            el.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'Meta',
-                code: 'MetaLeft',
-                keyCode: 91,
-                which: 91,
-                metaKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-            }));
-
-            // 2. Keydown tecla 'v' com metaKey (Win + V)
-            el.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'v',
-                code: 'KeyV',
-                keyCode: 86,
-                which: 86,
-                metaKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-            }));
-
-            // 3. Keyup tecla 'v'
-            el.dispatchEvent(new KeyboardEvent('keyup', {
-                key: 'v',
-                code: 'KeyV',
-                keyCode: 86,
-                which: 86,
-                metaKey: true,
-                bubbles: true,
-                composed: true
-            }));
-
-            // 4. Keyup tecla Windows (MetaLeft)
-            el.dispatchEvent(new KeyboardEvent('keyup', {
-                key: 'Meta',
-                code: 'MetaLeft',
-                keyCode: 91,
-                which: 91,
-                metaKey: false,
-                bubbles: true,
-                composed: true
-            }));
-        } catch (_) { }
-    }
+    const salvarClipboardInternoComBackup = (novoPayload) => gerenciadorClipboard.salvarClipboardInternoComBackup(novoPayload);
+    const registrarUltimaSelecao = (novoItem, itemAnt, hist) => gerenciadorClipboard.registrarUltimaSelecao(novoItem, itemAnt, hist);
+    const gravarNaAreaDeTransferencia = (textoFinal, rangeDOM = null, opcoesGrav = {}) => gerenciadorClipboard.gravarNaAreaDeTransferencia(textoFinal, rangeDOM, opcoesGrav);
+    const emularTeclasColar = (alvo, texto, html) => gerenciadorClipboard.emularTeclasColar(alvo, texto, html);
+    const emularTeclasWinV = (alvo) => gerenciadorClipboard.emularTeclasWinV(alvo);
 
     /* ==========================================================================
      * SECAO 5.4: FEEDBACK VISUAL FLASH BORDER E MINITIPS
@@ -4594,7 +3696,7 @@
         }
         if (e.ctrlKey && e.altKey && e.shiftKey) {
             atualizarInspetorTempoReal(e.clientX, e.clientY, e.target);
-        } else if (painelInspetorTempoRealEl) {
+        } else if (regrasEInspetor.temPainelInspetorVisivel()) {
             ocultarInspetorTempoReal();
         }
         if ((e.buttons & 1) !== 1) return;
@@ -5114,6 +4216,11 @@
             if ((e.detail === 1 || e.detail === 2) && !isComponenteBotaoOuFormularioEstrito(elAlvoEfetivo)) {
                 const ponto = obterPontoDoClique(e.clientX, e.clientY);
                 if (ponto) {
+                    const noElPonto = (ponto.no && ponto.no.nodeType === Node.TEXT_NODE) ? ponto.no.parentElement : ponto.no;
+                    if (noElPonto && typeof noElPonto.closest === 'function' && noElPonto.closest('label, button, select, textarea, input, [role="button"], [role="checkbox"], [role="radio"], [role="switch"]')) {
+                        ignorarProximoClick = false;
+                        return;
+                    }
                     const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
                     if (mapa) {
                         /* DIRETRIZ REFORÇO INTERFACE: Subcategoria de Blocos Verificáveis.
@@ -5215,6 +4322,13 @@
         if (!ponto) {
             await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
             return;
+        }
+        if (!temModificadorTeclado) {
+            const noElPontoSimples = (ponto.no && ponto.no.nodeType === Node.TEXT_NODE) ? ponto.no.parentElement : ponto.no;
+            if (noElPontoSimples && typeof noElPontoSimples.closest === 'function' && noElPontoSimples.closest('label, button, select, textarea, input, [role="button"], [role="checkbox"], [role="radio"], [role="switch"]')) {
+                ignorarProximoClick = false;
+                return;
+            }
         }
 
         if (!e.shiftKey) {
@@ -5501,211 +4615,14 @@
      * OBJETIVO DE RECONSTRUCAO: Inserir texto ou fragmento HTML de forma segura e universal
      * em <input>, <textarea> ou conteudos com contenteditable / editores online.
      */
-    function inserirTextoEmElemento(alvo, texto, ehHtmlFormatado) {
-        try {
-            if (!alvo) return;
-            alvo.focus();
-
-            if (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA') {
-                const tipoInput = (alvo.getAttribute('type') || alvo.type || 'text').toLowerCase();
-                const ehTipoTemporal = ['date', 'datetime-local', 'month', 'week', 'time'].includes(tipoInput);
-
-                if (ehTipoTemporal) {
-                    let valorData = (texto || '').trim();
-                    if (tipoInput === 'date') {
-                        // Converte DD/MM/AAAA ou DD-MM-AAAA ou DD.MM.AAAA para AAAA-MM-DD aceito pelo padrao HTML5
-                        const mDataBr = valorData.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
-                        if (mDataBr) {
-                            const dia = mDataBr[1].padStart(2, '0');
-                            const mes = mDataBr[2].padStart(2, '0');
-                            const ano = mDataBr[3];
-                            valorData = `${ano}-${mes}-${dia}`;
-                        }
-                    }
-                    try {
-                        const proto = (typeof HTMLTextAreaElement !== 'undefined' && (alvo instanceof HTMLTextAreaElement || (alvo.tagName && alvo.tagName.toUpperCase() === 'TEXTAREA')))
-                            ? HTMLTextAreaElement.prototype
-                            : (typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null);
-                        const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
-                        if (descriptor && descriptor.set) {
-                            descriptor.set.call(alvo, valorData);
-                        } else {
-                            alvo.value = valorData;
-                        }
-                    } catch (_) {
-                        alvo.value = valorData;
-                    }
-                    try {
-                        alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                        alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    } catch (_) { }
-                    return;
-                }
-
-                let start = null;
-                let end = null;
-                try {
-                    start = (typeof alvo.selectionStart === 'number') ? alvo.selectionStart : null;
-                    end = (typeof alvo.selectionEnd === 'number') ? alvo.selectionEnd : null;
-                } catch (_) {
-                    start = null;
-                    end = null;
-                }
-
-                let inseriuComRange = false;
-                if (start !== null && end !== null && typeof alvo.setRangeText === 'function') {
-                    try {
-                        alvo.setRangeText(texto, start, end, 'end');
-                        inseriuComRange = true;
-                    } catch (_) {
-                        inseriuComRange = false;
-                    }
-                }
-
-                if (!inseriuComRange) {
-                    if (start !== null && end !== null) {
-                        alvo.value = (alvo.value || '').substring(0, start) + texto + (alvo.value || '').substring(end);
-                        try {
-                            alvo.selectionStart = alvo.selectionEnd = start + texto.length;
-                        } catch (_) { }
-                    } else {
-                        // Fallback seguro para inputs que rejeitam selectionStart (ex: type="number", "email", etc.)
-                        try {
-                            const proto = (typeof HTMLTextAreaElement !== 'undefined' && (alvo instanceof HTMLTextAreaElement || (alvo.tagName && alvo.tagName.toUpperCase() === 'TEXTAREA')))
-                                ? HTMLTextAreaElement.prototype
-                                : (typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null);
-                            const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
-                            if (descriptor && descriptor.set) {
-                                descriptor.set.call(alvo, texto);
-                            } else {
-                                alvo.value = texto;
-                            }
-                        } catch (_) {
-                            alvo.value = texto;
-                        }
-                    }
-                }
-
-                try {
-                    alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                } catch (_) { }
-                return;
-            }
-
-            let executou = false;
-            try {
-                if (ehHtmlFormatado) {
-                    executou = document.execCommand('insertHTML', false, texto);
-                } else {
-                    executou = document.execCommand('insertText', false, texto);
-                }
-            } catch (_) { }
-
-            if (!executou) {
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
-                    const range = sel.getRangeAt(0);
-                    range.deleteContents();
-                    const node = document.createTextNode(texto);
-                    range.insertNode(node);
-                    range.setStartAfter(node);
-                    range.setEndAfter(node);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-            }
-            try {
-                alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-            } catch (_) { }
-        } catch (_) { }
-    }
-
-    /*
-     * FUNCAO: confirmarColagemGlobalEMarcarPermanente (FEAT-21 / VIS-01 — Seção 6.105)
-     * OBJETIVO: Acionada exclusivamente quando o conteúdo copiado é efetivamente colado
-     * (via Botão do Meio, Botão Direito, Caixa Rápida Ins+Ins ou Ctrl+V nativo).
-     * Remove o Contorno Visual Rápido temporário na aba de origem e aplica o Marcador
-     * Permanente de Conteúdo Colado com seu numeral ordinal (1, 2, 3...), sincronizando
-     * também entre diferentes abas via chrome.storage.local.
-     */
-    function confirmarColagemGlobalEMarcarPermanente(textoColado, origemRemota = false) {
-        try {
-            const txt = (typeof textoColado === 'string' && textoColado.trim().length > 0)
-                ? textoColado.trim()
-                : ((window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto) || ultimoTextoSelecionadoLimpo || '');
-            let resMarcador = null;
-            if (visual && typeof visual.confirmarColagemEMarcarPermanente === 'function') {
-                resMarcador = visual.confirmarColagemEMarcarPermanente(txt);
-            }
-            if (!origemRemota && txt) {
-                const idInstancia = (typeof window !== 'undefined')
-                    ? (window.__JUSGOV_ID_INSTANCIA_FRAME__ || (window.__JUSGOV_ID_INSTANCIA_FRAME__ = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`))
-                    : 'frame';
-                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                    chrome.storage.local.set({
-                        ultimaColagemConfirmadaGlobal: {
-                            idOrigem: idInstancia,
-                            texto: txt,
-                            timestamp: Date.now()
-                        }
-                    });
-                }
-            }
-            return resMarcador;
-        } catch (_) {
-            return null;
-        }
-    }
+    const inserirTextoEmElemento = (alvo, texto, ehHtml) => gerenciadorClipboard.inserirTextoEmElemento(alvo, texto, ehHtml);
+    const confirmarColagemGlobalEMarcarPermanente = (textoColado, origemRemota = false) => gerenciadorClipboard.confirmarColagemGlobalEMarcarPermanente(textoColado, origemRemota);
 
     if (typeof window !== 'undefined') {
         window.__JUSGOV_CONFIRMAR_COLAGEM_CONTEUDO__ = (textoColado) => confirmarColagemGlobalEMarcarPermanente(textoColado, false);
     }
 
-    /*
-     * FUNCAO: executarColagemBotaoDireito
-     * OBJETIVO DE RECONSTRUCAO: Executar colagem (botao do meio / botao direito) usando a simulacao
-     * interna de clipboard do addon ("Ultima Selecao" em window.__JUSGOV_ULTIMO_CLIPBOARD__ ou a selecao
-     * anterior em window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ quando acionado via Ctrl + Botao do Meio).
-     * Tudo protegido com try/catch.
-     */
-    async function executarColagemBotaoDireito(alvo, modo, usarAnterior = false) {
-        try {
-            if (!alvo) return;
-
-            /* Regra: 1 clique com botao direito utiliza formato estilo padrao/avancado;
-             * 2 cliques rapidos forcam obrigatoriamente colar SOMENTE TEXTO puro do clipboard. */
-            const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
-
-            const ehEditorRico = Boolean(alvo.isContentEditable ||
-                (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
-                (alvo.closest && alvo.closest('[contenteditable="true"], [contenteditable=""], .ck-editor__editable, .ck-content')) ||
-                document.designMode === 'on');
-            const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
-
-            const itemInterno = usarAnterior
-                ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
-                : window.__JUSGOV_ULTIMO_CLIPBOARD__;
-            const textoEmulado = (typeof itemInterno === 'string')
-                ? itemInterno
-                : ((itemInterno && itemInterno.texto) || (!usarAnterior ? ultimoTextoSelecionadoLimpo : '') || '');
-            const htmlEmulado = (itemInterno && typeof itemInterno === 'object' && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
-
-            if (textoEmulado && textoEmulado.trim().length > 0) {
-                if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
-                    /* Campo somente texto (input, textarea) ou modo texto puro: SEMPRE cola texto puro */
-                    inserirTextoEmElemento(alvo, textoEmulado, false);
-                } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
-                    /* Editor Web / HTML / RTF / contenteditable: cola com formatacao */
-                    inserirTextoEmElemento(alvo, htmlEmulado, true);
-                } else {
-                    inserirTextoEmElemento(alvo, textoEmulado, false);
-                }
-                confirmarColagemGlobalEMarcarPermanente(textoEmulado, false);
-            }
-        } catch (_) { }
-    }
+    const executarColagemBotaoDireito = (alvo, modo, usarAnterior = false) => gerenciadorClipboard.executarColagemBotaoDireito(alvo, modo, usarAnterior);
 
     /*
      * FUNCAO: aoClicarAuxiliarMouse
@@ -6870,7 +5787,7 @@
         window.addEventListener('message', (evMsg) => {
             const d = evMsg && evMsg.data;
             if (!d || d.__jusgovAcao !== 'OCULTAR_INSPETOR_TEMPO_REAL') return;
-            if (d.origemId !== ID_FRAME_INSPETOR_ATUAL) {
+            if (d.origemId !== regrasEInspetor.obterIdFrameInspetor()) {
                 ocultarInspetorTempoReal();
             }
             if (window === window.top && window.frames && window.frames.length > 0 && d.__repassado !== true) {
@@ -7009,6 +5926,8 @@
             notificarAtividadeTrabalhoThrottled();
         }, { capture: true, passive: true, signal });
         window.addEventListener('mousedown', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
+        window.addEventListener('mousemove', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
+        window.addEventListener('wheel', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
     }
 
     function sincronizarConfiguracaoMarcadorVisual() {
@@ -7812,10 +6731,7 @@
         definirRegrasMapeamentoElementos,
         obterRegrasMapeamentoElementos,
         definirRegrasInternasInterface: (regras) => {
-            regrasInternasInterface = Array.isArray(regras) ? [...regras] : [];
-            cacheClassificacaoCustomEl = null;
-            cacheClassificacaoCustomTs = 0;
-            cacheClassificacaoCustomRes = null;
+            regrasEInspetor.definirRegrasInternas(regras);
         },
         obterClassificacaoRegraCustomizada,
         obterDiagnosticoElemento,
@@ -7859,7 +6775,7 @@
                 converterCabecalhoPjeAtivo,
                 atalhoF1GeminiAtivo,
                 ativoAmpuletas,
-                regrasMapeamentoElementos: [...regrasMapeamentoElementos]
+                regrasMapeamentoElementos: [...obterRegrasMapeamentoElementos()]
             };
         },
         blindarCSS,

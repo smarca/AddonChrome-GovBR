@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "JusGovBR — Seleção/Cópia Inteligente",
   "short_name": "JusGovBR",
-  "version": "261115.0.1",
-  "version_name": "261115.0.1",
+  "version": "261115.0.4",
+  "version_name": "261115.0.4",
   "description": "JusGovBR — Seleção/Cópia Inteligente",
   "author": "smarca@gmail.com",
   "minimum_chrome_version": "116",
@@ -35,8 +35,8 @@
     "default_popup": "src/cfg/popup.html"
   },
   "icons": {
-    "16": "src/ico/icon128.png",
-    "48": "src/ico/icon128.png",
+    "16": "src/ico/icon16.png",
+    "48": "src/ico/icon48.png",
     "128": "src/ico/icon128.png"
   },
   "web_accessible_resources": []

@@ -121,6 +121,12 @@ const ARQUIVOS_JSON_ESTATICOS_PERMITIDOS = Object.freeze({
 });
 const cacheJsonEstaticoSw = new Map();
 
+function registrarErroSw(origem, erro) {
+    if (typeof self !== 'undefined' && self.__JUSGOV_DEBUG_SW__ === true && typeof console !== 'undefined' && console.warn) {
+        console.warn(`[JusGovBR SW:${origem}]`, erro && erro.message ? erro.message : erro);
+    }
+}
+
 async function obterJsonEstaticoDoPacote(nomeArquivo) {
     const caminhoRel = ARQUIVOS_JSON_ESTATICOS_PERMITIDOS[String(nomeArquivo || '')];
     if (!caminhoRel) return null;
@@ -135,7 +141,9 @@ async function obterJsonEstaticoDoPacote(nomeArquivo) {
                 cacheJsonEstaticoSw.set(caminhoRel, dados);
                 return dados;
             }
-        } catch (_) { }
+        } catch (err) {
+            registrarErroSw('obterJsonEstaticoDoPacote', err);
+        }
     }
     return null;
 }
@@ -148,17 +156,33 @@ const NOME_ALARME_SYNC_NUVEM = 'jusgov-sync-nuvem-debounced';
 const NOME_ALARME_AUTO_LIMPEZA_5M = 'JUSGOV_AUTO_LIMPEZA_5M';
 const NOME_ALARME_TRABALHO_TICK = 'JUSGOV_TICK_TRABALHO';
 
+function garantirAlarmePeriodico(nome, periodInMinutes) {
+    if (typeof chrome === 'undefined' || !chrome.alarms || !chrome.alarms.get) return;
+    try {
+        chrome.alarms.get(nome, (existente) => {
+            if (chrome.runtime && chrome.runtime.lastError) return;
+            if (!existente) {
+                chrome.alarms.create(nome, { periodInMinutes });
+            }
+        });
+    } catch (err) {
+        registrarErroSw(`garantirAlarmePeriodico:${nome}`, err);
+    }
+}
+
 function agendarSincronizacaoNuvemDebounced(minutosAtraso = 1) {
     if (typeof chrome !== 'undefined' && chrome.alarms) {
         try {
             chrome.alarms.create(NOME_ALARME_SYNC_NUVEM, { delayInMinutes: minutosAtraso });
             return;
-        } catch (_) { }
+        } catch (err) {
+            registrarErroSw('agendarSincronizacaoNuvemDebounced', err);
+        }
     }
     if (instanciaConfig && typeof instanciaConfig.executarSincronizacaoNuvemCoalescida === 'function') {
         instanciaConfig.executarSincronizacaoNuvemCoalescida(chrome, {
             urls: instanciaUrls, injecao: instanciaInjecao, navegador: instanciaModuloNavegador
-        }).catch(() => { });
+        }).catch((err) => registrarErroSw('syncFallback', err));
     }
 }
 
@@ -230,6 +254,12 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
                 checked: changes.comportamentoCliqueIcone.newValue === 'acoes_rapidas'
             }).catch(() => { });
         }
+        if (instanciaModuloProdutividade && (
+            changes.pomodoroAtivo || changes.pomodoroProporcao || changes.pomodoroFocoMinutos ||
+            changes.pomodoroCiclos || changes.pomodoroPausasAutomaticas || changes.pomodoroModoAviso || changes.perfilAtivoId
+        )) {
+            obterConfiguracoesGerais().then((cfg) => instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg)).catch(() => { });
+        }
     }
 });
 
@@ -281,8 +311,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const op = acao === 'PING_ATIVIDADE_TRABALHO'
             ? instanciaModuloProdutividade.registrarAtividadeTrabalho().then(() => ({ ok: true }))
             : (acao === 'OBTER_STATUS_TRABALHO'
-                ? instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje().then((estado) => ({ ok: true, estado }))
-                : instanciaModuloProdutividade.resetarEstadoTrabalhoHoje().then((estado) => ({ ok: true, estado })));
+                ? Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]).then(([estado, cfg]) => ({
+                    ok: true,
+                    estado,
+                    resumoPomodoro: instanciaModuloProdutividade.calcularResumoPomodoro(estado, cfg)
+                }))
+                : Promise.all([
+                    instanciaModuloProdutividade.resetarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]).then(async ([estado, cfg]) => {
+                    await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, estado);
+                    return {
+                        ok: true,
+                        estado,
+                        resumoPomodoro: instanciaModuloProdutividade.calcularResumoPomodoro(estado, cfg)
+                    };
+                }));
         op.then((r) => sendResponse(r)).catch(() => sendResponse({ ok: false }));
         return true;
     }
@@ -485,6 +532,9 @@ if (chrome.tabs && chrome.tabs.onUpdated) {
                 if (config.modoTurbo !== 'desligado') instanciaInjecao.agendarInjecaoSeguraNaAba(tabId, null, chrome);
                 if (changeInfo.status === 'complete') {
                     instanciaInjecao.injetarCssAmpuletasNaAba(tabId, url, config, chrome, instanciaUrls).catch(() => { });
+                    if (instanciaModuloProdutividade && tab.active) {
+                        instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(config, null, tabId).catch(() => { });
+                    }
                 }
             }
         } catch (_) { }
@@ -496,7 +546,14 @@ if (chrome.tabs && chrome.tabs.onActivated) {
         if (instanciaModuloNavegador) {
             instanciaModuloNavegador.registrarAbaAtivadaHistorico(activeInfo, chrome).catch(() => { });
         }
-        if (instanciaModuloProdutividade) instanciaModuloProdutividade.registrarAtividadeTrabalho();
+        if (instanciaModuloProdutividade) {
+            instanciaModuloProdutividade.registrarAtividadeTrabalho();
+            if (activeInfo && activeInfo.tabId) {
+                obterConfiguracoesGerais().then((cfg) => {
+                    return instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, activeInfo.tabId);
+                }).catch(() => { });
+            }
+        }
         if (instanciaModuloManutencao && activeInfo && activeInfo.tabId && chrome.tabs.get) {
             chrome.tabs.get(activeInfo.tabId, (tab) => {
                 if (chrome.runtime && chrome.runtime.lastError) return;
@@ -560,8 +617,8 @@ if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged)
 
 if (typeof chrome !== 'undefined' && chrome.alarms) {
     try {
-        chrome.alarms.create(NOME_ALARME_DESCARTE_RAM, { periodInMinutes: 5 });
-        chrome.alarms.create(NOME_ALARME_TRABALHO_TICK, { periodInMinutes: 1 });
+        garantirAlarmePeriodico(NOME_ALARME_DESCARTE_RAM, 5);
+        garantirAlarmePeriodico(NOME_ALARME_TRABALHO_TICK, 1);
         chrome.alarms.onAlarm.addListener(async (alarme) => {
             if (!alarme || !alarme.name) return;
             try {
@@ -576,7 +633,11 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
                 } else if (alarme.name === NOME_ALARME_TRABALHO_TICK && instanciaModuloProdutividade) {
                     await instanciaModuloProdutividade.processarTickTrabalho(obterConfiguracoesGerais);
                 }
-            } catch (_) { }
+            } catch (err) {
+                registrarErroSw(`onAlarm:${alarme.name}`, err);
+            }
         });
-    } catch (_) { }
+    } catch (err) {
+        registrarErroSw('setupAlarms', err);
+    }
 }

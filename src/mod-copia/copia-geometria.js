@@ -38,6 +38,20 @@
         'BLOCKQUOTE', 'PRE', 'TR', 'HR', 'SECTION', 'ARTICLE', 'DD', 'DT'
     ]);
 
+    /* BUG-66: Seletores de controles/rótulos de interface nos quais cliques fora do alvo nunca devem entrar por fallback geométrico */
+    const SELETOR_CONTROLE_OU_ROTULO_INTERATIVO = 'label, button, a[href], input, select, textarea, option, summary, [role="button"], [role="checkbox"], [role="radio"], [role="switch"], [role="option"], [role="tab"]';
+
+    function pertenceAControleOuRotuloInterativo(no, raizLimite = null) {
+        let atual = (no && no.nodeType === Node.TEXT_NODE) ? no.parentElement : no;
+        while (atual && atual !== raizLimite) {
+            if (typeof atual.matches === 'function' && atual.matches(SELETOR_CONTROLE_OU_ROTULO_INTERATIVO)) {
+                return true;
+            }
+            atual = atual.parentElement;
+        }
+        return false;
+    }
+
     function isQuebraOuEspaco(ch) {
         return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\u00A0';
     }
@@ -86,11 +100,20 @@
                 }
             }
 
-            /* BUG-42 / USAB-10 (Seção 6.109): Trava de Proximidade Geométrica para Clique Único.
-             * Quando o usuário clica longe do texto (ex.: áreas vazias acima do 1º parágrafo, abaixo do último
-             * parágrafo ou nas margens laterais da página), caretRangeFromPoint/caretPositionFromPoint retorna
-             * por padrão o primeiro ou o último TextNode do documento. Verificamos se a coordenada (x, y) está
-             * dentro da tolerância máxima de distância física (dx <= 24px e dy <= 12px) do caractere/nó retornado.
+            const elControleSobPonto = (elSobPonto && typeof elSobPonto.closest === 'function')
+                ? elSobPonto.closest(SELETOR_CONTROLE_OU_ROTULO_INTERATIVO)
+                : null;
+
+            /* BUG-66: Se o ponteiro está fisicamente fora de <label>/controle (ex.: margem/espaço vazio de <td> ou <div>),
+             * descartar TextNode interno de controle/rótulo devolvido por magnetismo de caretRangeFromPoint. */
+            if (no && no.nodeType === Node.TEXT_NODE && (x > 0 || y > 0) && !elControleSobPonto && pertenceAControleOuRotuloInterativo(no)) {
+                no = null;
+                offset = 0;
+            }
+
+            /* BUG-42 / USAB-10 (Seção 6.109) + BUG-66: Trava de Proximidade Geométrica para Clique Único.
+             * Quando o usuário clica longe do texto (ex.: áreas vazias acima/abaixo do parágrafo, margens laterais
+             * ou espaços vazios ao lado de <label>/controles em tabelas), rejeitamos se exceder a tolerância física.
              * Nota: Coordenadas sintéticas (0, 0) usadas em testes unitários sem layout preservam o comportamento direto. */
             if (no && no.nodeType === Node.TEXT_NODE && (x > 0 || y > 0)) {
                 try {
@@ -110,7 +133,15 @@
                         if (rectProx && (rectProx.width > 0 || rectProx.height > 0)) {
                             const dx = x < rectProx.left ? (rectProx.left - x) : (x > rectProx.right ? (x - rectProx.right) : 0);
                             const dy = y < rectProx.top ? (rectProx.top - y) : (y > rectProx.bottom ? (y - rectProx.bottom) : 0);
-                            if (dx > 24 || dy > 12) {
+                            const emCelulaComControle = Boolean(
+                                elSobPonto && typeof elSobPonto.closest === 'function' &&
+                                elSobPonto.closest('td, th, form, fieldset') &&
+                                typeof elSobPonto.querySelector === 'function' &&
+                                elSobPonto.querySelector(SELETOR_CONTROLE_OU_ROTULO_INTERATIVO)
+                            );
+                            const maxDx = emCelulaComControle ? 6 : 24;
+                            const maxDy = emCelulaComControle ? 4 : 12;
+                            if (dx > maxDx || dy > maxDy) {
                                 no = null;
                                 offset = 0;
                             }
@@ -140,16 +171,22 @@
          */
         localizarPontoTextoDentroDeElemento(elRaiz, x, y) {
             if (!elRaiz) return null;
+            const raizEhControle = pertenceAControleOuRotuloInterativo(elRaiz);
             const walker = document.createTreeWalker(elRaiz, NodeFilter.SHOW_TEXT, null);
             let melhorNo = null;
             let melhorOffset = 0;
             let menorDist = Infinity;
+            let melhorDx = Infinity;
+            let melhorDy = Infinity;
             let n;
             let totalTestesRect = 0;
             const LIMITE_TESTES_RECT = 160;
             const r = document.createRange();
 
             while ((n = walker.nextNode())) {
+                /* BUG-66: Nunca invadir <label>, <button>, <a> ou controles filhos ao procurar texto em célula/contêiner pai */
+                if (!raizEhControle && pertenceAControleOuRotuloInterativo(n, elRaiz)) continue;
+
                 const txt = n.nodeValue || '';
                 const len = txt.length;
                 if (len === 0) continue;
@@ -160,7 +197,7 @@
                     if (!rectNo || (rectNo.width === 0 && rectNo.height === 0)) continue;
                     const dxNo = x < rectNo.left ? (rectNo.left - x) : (x > rectNo.right ? (x - rectNo.right) : 0);
                     const dyNo = y < rectNo.top ? (rectNo.top - y) : (y > rectNo.bottom ? (y - rectNo.bottom) : 0);
-                    if ((dxNo + dyNo * 2) > 48 && len > 24) continue;
+                    if (dxNo > 12 || dyNo > 6) continue;
                 } catch (_) { }
 
                 for (let i = 0; i < len; i++) {
@@ -176,6 +213,8 @@
                         const dist = dx + dy * 2;
                         if (dist < menorDist) {
                             menorDist = dist;
+                            melhorDx = dx;
+                            melhorDy = dy;
                             melhorNo = n;
                             melhorOffset = i;
                             if (dx === 0 && dy === 0) {
@@ -187,7 +226,7 @@
                 if (totalTestesRect > LIMITE_TESTES_RECT) break;
             }
 
-            if (melhorNo && menorDist <= 48) {
+            if (melhorNo && melhorDx <= 6 && melhorDy <= 4) {
                 return { no: melhorNo, offset: melhorOffset };
             }
             return null;

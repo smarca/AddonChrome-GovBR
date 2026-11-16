@@ -1510,6 +1510,7 @@
                                 <option value="sobrescrito_retangular">Sobrescrito Discreto Retangular</option>
                                 <option value="retangular_translucido">Retangular Translúcido</option>
                                 <option value="retangular_compacto">Retangular Compacto</option>
+                                <option value="apenas_numeral">Apenas Numeral</option>
                                 <option value="sem_etiqueta">Sem Etiqueta</option>
                             </select>
                             <span id="previewMarcadorColadoExemploWrap" style="position: relative; display: inline-flex; align-items: center; margin: 4px 10px 0 6px;">
@@ -2018,14 +2019,14 @@
                     <div id="containerSubControlesOrdenacao" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; transition: opacity 0.2s ease;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Sentido:</span>
-                            <label class="switch" for="optSentidoOrdenacaoGuiasSwitch" style="flex-shrink: 0; user-select: none; cursor: pointer;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z) ou Da Direita para a Esquerda (Z-A)">
+                            <label class="switch" for="optSentidoOrdenacaoGuiasSwitch" style="flex-shrink: 0; user-select: none; cursor: pointer;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z ou Novo-Antigo) ou Da Direita para a Esquerda (Z-A ou Antigo-Novo)">
                                 <input type="checkbox" id="optSentidoOrdenacaoGuiasSwitch" checked>
                                 <span class="slider"></span>
                             </label>
-                            <span id="lblSentidoOrdenacaoGuias" style="font-size: 12px; color: var(--texto-principal); cursor: pointer; user-select: none;" title="Clique para alternar o sentido da ordenação">Da Esquerda para a Direita (A-Z)</span>
+                            <span id="lblSentidoOrdenacaoGuias" style="font-size: 12px; color: var(--texto-principal); cursor: pointer; user-select: none;" title="Clique para alternar o sentido da ordenação">Da Esquerda para a Direita (A-Z ou Novo-Antigo)</span>
                             <select id="optSentidoOrdenacaoGuias" style="display: none;">
-                                <option value="esq_dir" selected>Da Esquerda para a Direita (A-Z / Antigos)</option>
-                                <option value="dir_esq">Da Direita para a Esquerda (Z-A / Recentes)</option>
+                                <option value="esq_dir" selected>Da Esquerda para a Direita (A-Z ou Novo-Antigo)</option>
+                                <option value="dir_esq">Da Direita para a Esquerda (Z-A ou Antigo-Novo)</option>
                             </select>
                         </div>
                         <label
@@ -2119,7 +2120,7 @@
                 <div class="setting-item">
                     <div>
                         <div class="setting-label">Tempo de Trabalho Corrido (Meta Diária)</div>
-                        <div class="setting-help">Conta a jornada diária e exibe modal ao atingir a meta. <strong>Regra:</strong> inatividade &lt; 5 min segue como Tempo Ativo; com <strong>5 min seguidos</strong> confirma <strong>Pausa</strong> e todo o intervalo vai para <em>Pausas</em>. <strong>Serão:</strong> o dia vira às <strong>04:00</strong>, salvo trabalho contínuo (descanso &lt; 3h), que segue no dia anterior. Estatísticas são registradas mesmo com alertas e Pomodoro desativados.</div>
+                        <div class="setting-help">Conta a jornada diária corrida enquanto o Chrome está em execução e exibe alerta ao atingir a meta. <strong>Serão:</strong> o dia vira às <strong>04:00</strong>, salvo trabalho contínuo (descanso &lt; 3h), que segue no dia anterior.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select id="optTempoTrabalhoCorridoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
@@ -2145,7 +2146,7 @@
                 <div class="setting-item">
                     <div>
                         <div class="setting-label">Tempo Ativo de Trabalho (Meta Diária)</div>
-                        <div class="setting-help">Conta apenas minutos com atividade real no navegador e pausa automaticamente após 5 minutos sem interação.</div>
+                        <div class="setting-help">Conta apenas minutos com atividade real no navegador (qualquer movimentação de mouse ou teclado). <strong>Regra:</strong> inatividade &lt; 5 min segue como Tempo Ativo; com <strong>5 min seguidos</strong> sem interação confirma <strong>Pausa</strong> e todo o intervalo vai para <em>Pausas</em>.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select id="optTempoTrabalhoAtivoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
@@ -2229,11 +2230,31 @@
                         <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
                             Pausa Maior: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">24 min</span>
                         </span>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                            Exibir contador via:
+                            <select id="optPomodoroModoAviso" class="input-select" style="padding: 4px 8px; font-size: 12px;" title="Escolha como exibir os alertas e o contador contínuo ao trocar de aba">
+                                <option value="completo" selected>Completo (Janela Central + Badge + Barra nas Abas)</option>
+                                <option value="badge_e_barra_descanso">Badge no Ícone + Barra nas Abas (Só no Descanso)</option>
+                                <option value="barra_descanso">Barra Flutuante nas Abas (Só no Descanso)</option>
+                                <option value="barra_sempre">Barra Flutuante nas Abas (Foco e Descanso)</option>
+                                <option value="badge">Apenas Badge no Ícone do Chrome</option>
+                                <option value="modal">Apenas Janela Central ao Concluir (Atual)</option>
+                            </select>
+                        </label>
                     </div>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
-                    <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje — Tempo: Corrido 00:00</span>
-                    <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                        <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje — Tempo: Corrido 00:00</span>
+                        <div id="lblStatusPomodoroDetalhado" class="setting-help" style="margin: 0; font-size: 12px; display: none; flex-wrap: wrap; align-items: center; gap: 6px;"></div>
+                    </div>
+                    <div style="margin-left: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end;">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-principal); cursor: pointer;" title="Quando ocioso pelo tempo suficiente, marca Alívio ou Descanso Maior automaticamente (reiniciando o ciclo no Descanso Maior)">
+                            <input type="checkbox" id="optPomodoroPausasAutomaticas" checked>
+                            Registrar Pausas Automáticas
+                        </label>
+                        <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
+                    </div>
                 </div>
             </section>
 
@@ -3642,6 +3663,8 @@
     <script src="../lib/lib-config.js"></script>
     <script src="../mod-copia/copia-aviso-flutuante.js"></script>
     <script src="../mod-copia/copia-dialogo-mapeamento.js"></script>
+    <script src="../mod-copia/copia-regras-inspetor.js"></script>
+    <script src="../mod-copia/copia-clipboard.js"></script>
     <script src="../mod-copia/copia-acumulador.js"></script>
     <script src="../mod-copia/copia-geometria.js"></script>
     <script src="../mod-copia/copia-filtros.js"></script>
@@ -3669,6 +3692,8 @@
     <script src="../mod-copia/copia-selecionar.js"></script>
     <script src="exemplos.js"></script>
     <script src="debug.js"></script>
+    <script src="options-mapeamento.js"></script>
+    <script src="options-laboratorio.js"></script>
     <script src="options.js"></script>
     <script src="editor_demo.js"></script>
 </body>

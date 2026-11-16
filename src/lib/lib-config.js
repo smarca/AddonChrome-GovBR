@@ -63,6 +63,7 @@
         'autoLimpezaCacheCookiesAtiva', 'autoLimpezaIdade', 'tempoTrabalhoCorridoAtivo',
         'tempoTrabalhoCorridoHoras', 'tempoTrabalhoAtivoAtivo', 'tempoTrabalhoAtivoHoras',
         'pomodoroAtivo', 'pomodoroProporcao', 'pomodoroFocoMinutos', 'pomodoroCiclos',
+        'pomodoroPausasAutomaticas', 'pomodoroModoAviso',
         'perfilAtivoId', 'listaPerfis'
     ]);
     const SET_CHAVES_SYNC = new Set(CHAVES_CONFIGURACAO_SINCRONIZAVEL);
@@ -882,7 +883,17 @@
                 config.opacidadeFundoMarcadorColado = padraoPerfil.opacidadeFundoMarcadorColado;
                 precisaSalvar = true;
             }
-            if (typeof config.estiloBadgeMarcadorColado !== 'string' || !['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(config.estiloBadgeMarcadorColado)) {
+            const consts = (typeof JusGovConstantes !== 'undefined' && JusGovConstantes)
+                ? JusGovConstantes
+                : ((typeof self !== 'undefined' && self.JusGovConstantes) ? self.JusGovConstantes : null);
+            const estilosBadgeValidos = (consts && Array.isArray(consts.ESTILOS_BADGE_MARCADOR_COLADO))
+                ? consts.ESTILOS_BADGE_MARCADOR_COLADO
+                : ['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto', 'apenas_numeral'];
+            const modosAvisoPomodoroValidos = (consts && Array.isArray(consts.MODOS_AVISO_POMODORO))
+                ? consts.MODOS_AVISO_POMODORO
+                : ['modal', 'badge', 'barra_descanso', 'barra_sempre', 'badge_e_barra_descanso', 'completo'];
+
+            if (typeof config.estiloBadgeMarcadorColado !== 'string' || !estilosBadgeValidos.includes(config.estiloBadgeMarcadorColado)) {
                 config.estiloBadgeMarcadorColado = padraoPerfil.estiloBadgeMarcadorColado;
                 precisaSalvar = true;
             }
@@ -942,6 +953,16 @@
             }
             if (typeof config.pomodoroCiclos !== 'number' || !Number.isInteger(config.pomodoroCiclos) || config.pomodoroCiclos < 2 || config.pomodoroCiclos > 10) {
                 config.pomodoroCiclos = padraoPerfil.pomodoroCiclos;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroPausasAutomaticas !== 'boolean') {
+                config.pomodoroPausasAutomaticas = (padraoPerfil.pomodoroPausasAutomaticas !== undefined)
+                    ? Boolean(padraoPerfil.pomodoroPausasAutomaticas)
+                    : true;
+                precisaSalvar = true;
+            }
+            if (typeof config.pomodoroModoAviso !== 'string' || !modosAvisoPomodoroValidos.includes(config.pomodoroModoAviso)) {
+                config.pomodoroModoAviso = padraoPerfil.pomodoroModoAviso || 'completo';
                 precisaSalvar = true;
             }
 

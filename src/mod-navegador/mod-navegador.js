@@ -101,6 +101,14 @@
         extrairDominio: () => 'desconhecido',
         extrairInfoDominio: () => ({ baseDominio: '', subDominio: '', ehPuro: true, caminho: '', urlNormalizada: '' }),
         compararAbasParaOrdenacao: () => 0,
+        compararPorCriacaoCronologica: () => 0,
+        registrarCriacaoAba: () => { },
+        registrarRelacaoPaiFilha: () => { },
+        garantirArvoreHidratada: async () => { },
+        removerDaArvore: () => { },
+        obterDescendentesDaAba: () => [],
+        marcarFechamentoCascata: () => { },
+        consumirFechamentoCascata: () => false,
         agendarOrdenacaoAbas: () => { },
         executarOrdenacaoGuias: async () => { },
         agruparPorDominio: async () => 0,
@@ -250,6 +258,9 @@
                 await this.#antiDuplicacao.inicializarMapaAbas(chromeApi);
             }
             await this.inicializarHistoricoAbasAtivas(chromeApi);
+            if (this.#ordenacao && typeof this.#ordenacao.garantirArvoreHidratada === 'function') {
+                await this.#ordenacao.garantirArvoreHidratada(chromeApi);
+            }
         }
 
         async _carregarHistoricoSession(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
@@ -517,7 +528,27 @@
             }
 
             if (tab && tab.id && tab.openerTabId && this.#ordenacao && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
-                this.#ordenacao.registrarRelacaoPaiFilha(tab.id, tab.openerTabId);
+                if (typeof this.#ordenacao.garantirArvoreHidratada === 'function') {
+                    await this.#ordenacao.garantirArvoreHidratada(chromeApi);
+                }
+                this.#ordenacao.registrarRelacaoPaiFilha(tab.id, tab.openerTabId, chromeApi);
+                const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio;
+                const sentAtual = (this.#configuracoes && this.#configuracoes.sentidoOrdenacaoGuias) || this.#ordenacao.sentido || 'esq_dir';
+                if (critAtual === 'hierarquia_arvore' && chromeApi && chromeApi.tabs && typeof chromeApi.tabs.get === 'function') {
+                    try {
+                        const abaPai = await chromeApi.tabs.get(tab.openerTabId);
+                        if (abaPai && typeof abaPai.index === 'number') {
+                            if (typeof abaPai.groupId === 'number' && abaPai.groupId > 0 && (!tab.groupId || tab.groupId <= 0) && typeof chromeApi.tabs.group === 'function') {
+                                await chromeApi.tabs.group({ groupId: abaPai.groupId, tabIds: [tab.id] }).catch(() => { });
+                            }
+                            if (sentAtual === 'esq_dir' && typeof chromeApi.tabs.move === 'function') {
+                                await chromeApi.tabs.move(tab.id, { index: abaPai.index + 1 }).catch(() => { });
+                            }
+                        }
+                    } catch (_) { }
+                }
+            } else if (tab && tab.id && this.#ordenacao && typeof this.#ordenacao.registrarCriacaoAba === 'function') {
+                this.#ordenacao.registrarCriacaoAba(tab.id);
             }
 
             if (tab && tab.windowId && this.#ordenacao && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
@@ -568,7 +599,7 @@
                     }
                 }
                 if (typeof this.#ordenacao.removerDaArvore === 'function') {
-                    this.#ordenacao.removerDaArvore(tabId);
+                    this.#ordenacao.removerDaArvore(tabId, chromeApi);
                 }
             }
             if (this.#antiDuplicacao && typeof this.#antiDuplicacao.processarAbaRemovida === 'function') {

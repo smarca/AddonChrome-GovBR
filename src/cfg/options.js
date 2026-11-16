@@ -265,8 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblPomodoroAlivioCalculado = document.getElementById('lblPomodoroAlivioCalculado');
     const optPomodoroCiclos = document.getElementById('optPomodoroCiclos');
     const lblPomodoroPausaMaiorCalculada = document.getElementById('lblPomodoroPausaMaiorCalculada');
+    const optPomodoroModoAviso = document.getElementById('optPomodoroModoAviso');
+    const optPomodoroPausasAutomaticas = document.getElementById('optPomodoroPausasAutomaticas');
     const painelConfigPomodoro = document.getElementById('painelConfigPomodoro');
     const lblStatusProdutividadeTrabalho = document.getElementById('lblStatusProdutividadeTrabalho');
+    const lblStatusPomodoroDetalhado = document.getElementById('lblStatusPomodoroDetalhado');
     const btnResetarContadoresTrabalho = document.getElementById('btnResetarContadoresTrabalho');
 
     /* Botoes de Persistencia e Backup */
@@ -309,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         cachePerfilAtivoId = String(perfilAtivoId || cachePerfilAtivoId || 'padrao');
         if (selectPerfilAtivo && cacheListaPerfis.length > 0) {
-            selectPerfilAtivo.innerHTML = '';
+            selectPerfilAtivo.replaceChildren();
             cacheListaPerfis.forEach((perfil) => {
                 if (!perfil || !perfil.id) return;
                 const opt = document.createElement('option');
@@ -337,490 +340,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /* Mapeamento Manual Avançado de Elementos (XPath / CSS) (Seção 6.20 e Seção 6.85) */
+    /* Delegacao Modular (SRP/DIP): Mapeamento Manual (options-mapeamento.js) e Laboratorio/Console (options-laboratorio.js) */
     const detalhesMapeamentoXPath = document.getElementById('detalhesMapeamentoXPath');
-    const btnAdicionarRegraMapeamento = document.getElementById('btnAdicionarRegraMapeamento');
-    const btnSalvarRegrasMapeamento = document.getElementById('btnSalvarRegrasMapeamento');
-    const btnExportarMapeamentoJson = document.getElementById('btnExportarMapeamentoJson');
-    const btnImportarMapeamentoJson = document.getElementById('btnImportarMapeamentoJson');
-    const inputImportarMapeamentoArquivo = document.getElementById('inputImportarMapeamentoArquivo');
-    const containerListaRegrasMapeamento = document.getElementById('containerListaRegrasMapeamento');
-    let regrasMapeamentoAtuais = [];
-
-    function normalizarExpressaoAtributoOptions(expressao, tipoSeletor = '') {
-        if (typeof expressao !== 'string') return '';
-        let expr = expressao.trim();
-        const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
-        if (!ehXPath && !expr.startsWith('[') && /^[a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=/.test(expr)) {
-            if (/^[a-zA-Z_][\w-]*=$/.test(expr)) {
-                expr = `[${expr.slice(0, -1)}]`;
-            } else {
-                const m = expr.match(/^([a-zA-Z_][\w-]*(?:\^|\*|\$|~|\|)?=)(.+)$/);
-                if (m) {
-                    const val = m[2].trim();
-                    const jaAspas = (val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"));
-                    expr = `[${m[1]}${jaAspas ? val : `"${val.replace(/"/g, '\\"')}"`}]`;
-                }
-            }
-        }
-        return expr;
-    }
-
-    function validarExpressaoSeletorOptions(expressao, tipoSeletor = '') {
-        if (typeof expressao !== 'string' || !expressao.trim()) return true; // vazio ainda em edição
-        const expr = normalizarExpressaoAtributoOptions(expressao, tipoSeletor);
-        try {
-            const ehXPath = (typeof tipoSeletor === 'string' && tipoSeletor.toLowerCase().includes('xpath')) || expr.startsWith('/') || expr.startsWith('(');
-            if (ehXPath) {
-                document.evaluate(expr, document, null, XPathResult.ANY_TYPE, null);
-                return true;
-            }
-            document.createDocumentFragment().querySelector(expr);
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    function normalizarTipoSeletorRotulo(regra) {
-        const mapaLegado = {
-            'Seletor CSS': 'CSS (Hierárquico)',
-            'Seletor CSS-2': 'CSS (Estrutural)',
-            'XPath Simplificado': 'XPath (Simplificado)',
-            'XPath Completo': 'XPath (Completo)'
-        };
-        if (regra && regra.tipoSeletor && typeof regra.tipoSeletor === 'string') {
-            return mapaLegado[regra.tipoSeletor] || regra.tipoSeletor;
-        }
-        const expr = (regra && regra.expressao) ? String(regra.expressao).trim() : '';
-        if (expr.startsWith('//') || expr.startsWith('(')) return 'XPath (Simplificado)';
-        if (expr.startsWith('/')) return 'XPath (Completo)';
-        if (expr.includes(':nth-child(')) return 'CSS (Estrutural)';
-        if (expr.includes('>') || expr.includes(':nth-of-type(')) return 'CSS (Hierárquico)';
-        return 'CSS (Simples)';
-    }
-
-    function renderizarListaRegrasMapeamento(regras, somenteLeitura = false) {
-        if (!containerListaRegrasMapeamento) return;
-        const listaRenderizar = Array.isArray(regras) ? [...regras] : [...PADROES_FABRICA_REGRAS_MAPEAMENTO];
-        if (!somenteLeitura) {
-            regrasMapeamentoAtuais = listaRenderizar;
-        }
-        containerListaRegrasMapeamento.innerHTML = '';
-
-        if (listaRenderizar.length === 0) {
-            const vazio = document.createElement('div');
-            vazio.style.cssText = 'color: #94a3b8; font-size: 12px; font-style: italic; padding: 10px 0; line-height: 1.5;';
-            vazio.textContent = somenteLeitura
-                ? 'Nenhuma regra interna encontrada.'
-                : 'Nenhuma regra customizada cadastrada. Utilize Ctrl + Alt + Shift + Clique sobre qualquer elemento em páginas web para abrir o assistente e cadastrar novas regras.';
-            containerListaRegrasMapeamento.appendChild(vazio);
-            return;
-        }
-
-        let idxArrastando = null;
-
-        listaRenderizar.forEach((regra, idx) => {
-            const item = document.createElement('div');
-            item.className = 'item-regra-mapeamento';
-            item.style.cssText = 'display: flex; gap: 8px; align-items: center; background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; flex-wrap: wrap;';
-
-            if (!somenteLeitura) {
-                item.draggable = true;
-                item.addEventListener('dragstart', (ev) => {
-                    idxArrastando = idx;
-                    item.style.opacity = '0.5';
-                    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
-                });
-                item.addEventListener('dragend', () => {
-                    item.style.opacity = '1';
-                    idxArrastando = null;
-                });
-                item.addEventListener('dragover', (ev) => {
-                    ev.preventDefault();
-                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-                });
-                item.addEventListener('drop', (ev) => {
-                    ev.preventDefault();
-                    if (idxArrastando === null || idxArrastando === idx) return;
-                    const [movida] = regrasMapeamentoAtuais.splice(idxArrastando, 1);
-                    regrasMapeamentoAtuais.splice(idx, 0, movida);
-                    renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                    marcarAlteracoesPendentesMapeamento(true);
-                });
-
-                const alca = document.createElement('span');
-                alca.textContent = '⋮⋮';
-                alca.title = 'Arrastar para reordenar prioridade';
-                alca.style.cssText = 'cursor: grab; color: #64748b; font-size: 14px; font-weight: 700; user-select: none; padding: 0 2px;';
-                item.appendChild(alca);
-            }
-
-            // Seletor com Tipo de Pesquisa (CSS Simples, Hierárquico, Estrutural, XPath Simplificado, XPath Completo)
-            const selectTipoSeletor = document.createElement('select');
-            selectTipoSeletor.className = 'select-customizado';
-            selectTipoSeletor.style.cssText = 'font-size: 10px; font-weight: 700; color: #38bdf8; background: #0f172a; border: 1px solid #0284c7; padding: 3px 6px; border-radius: 4px; cursor: pointer;';
-            const tipoAtualRotulo = normalizarTipoSeletorRotulo(regra);
-            ['CSS (Simples)', 'CSS (Hierárquico)', 'CSS (Estrutural)', 'XPath (Simplificado)', 'XPath (Completo)'].forEach((nomeTipo) => {
-                const opt = document.createElement('option');
-                opt.value = nomeTipo;
-                opt.textContent = nomeTipo;
-                if (tipoAtualRotulo === nomeTipo) opt.selected = true;
-                selectTipoSeletor.appendChild(opt);
-            });
-            selectTipoSeletor.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].tipoSeletor = selectTipoSeletor.value;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-
-            // Campo Expressao (XPath / CSS)
-            const inputExpr = document.createElement('input');
-            inputExpr.type = 'text';
-            inputExpr.className = 'campo-input-escuro';
-            inputExpr.style.cssText = 'flex: 2 1 200px; min-width: 160px; font-family: monospace; font-size: 11px; padding: 4px 8px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px;';
-            inputExpr.value = regra.expressao || '';
-            inputExpr.placeholder = 'Expressão (XPath ou CSS)';
-            inputExpr.addEventListener('input', () => {
-                regrasMapeamentoAtuais[idx].expressao = inputExpr.value.trim();
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-            inputExpr.addEventListener('change', () => {
-                const tipoSel = selectTipoSeletor ? selectTipoSeletor.value : '';
-                const valor = normalizarExpressaoAtributoOptions(inputExpr.value, tipoSel);
-                if (!validarExpressaoSeletorOptions(valor, tipoSel)) {
-                    inputExpr.style.borderColor = '#ef4444';
-                    exibirToast(`⚠️ Expressão inválida para ${tipoSel || 'regra'}. Corrija antes de salvar.`);
-                    return;
-                }
-                inputExpr.value = valor;
-                inputExpr.style.borderColor = '#475569';
-                regrasMapeamentoAtuais[idx].expressao = valor;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-
-            // Seletor de Modo Comportamental (Interface, SemiFlexível, Textual, Editável)
-            const selectTipo = document.createElement('select');
-            selectTipo.className = 'select-customizado';
-            selectTipo.style.cssText = 'padding: 4px 8px; font-size: 11px; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; cursor: pointer; flex: 0 0 auto; width: auto;';
-
-            const optInterface = document.createElement('option');
-            optInterface.value = 'interface';
-            optInterface.textContent = 'Interface';
-            optInterface.title = 'Desseleção / Alt';
-            if (regra.tipo === 'interface') optInterface.selected = true;
-
-            const optSemiflexivel = document.createElement('option');
-            optSemiflexivel.value = 'semiflexivel';
-            optSemiflexivel.textContent = 'SemiFlexível';
-            optSemiflexivel.title = 'Máscaras Forenses';
-            if (regra.tipo === 'semiflexivel') optSemiflexivel.selected = true;
-
-            const optTextual = document.createElement('option');
-            optTextual.value = 'textual';
-            optTextual.textContent = 'Textual';
-            optTextual.title = 'Leitura / Manter';
-            if (regra.tipo === 'textual') optTextual.selected = true;
-
-            const optEditavel = document.createElement('option');
-            optEditavel.value = 'editavel';
-            optEditavel.textContent = 'Editável';
-            optEditavel.title = 'Inputs, Textarea, Datas e Placeholders';
-            if (regra.tipo === 'editavel') optEditavel.selected = true;
-
-            selectTipo.appendChild(optInterface);
-            selectTipo.appendChild(optSemiflexivel);
-            selectTipo.appendChild(optTextual);
-            selectTipo.appendChild(optEditavel);
-
-            selectTipo.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].tipo = selectTipo.value;
-                const continuarPadrao = (selectTipo.value === 'textual');
-                regrasMapeamentoAtuais[idx].continuarProxima = continuarPadrao;
-                chkContinuar.checked = continuarPadrao;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-
-            // Campo Observação (até 150 caracteres)
-            const inputObs = document.createElement('input');
-            inputObs.type = 'text';
-            inputObs.maxLength = 150;
-            inputObs.className = 'campo-input-escuro';
-            inputObs.style.cssText = 'flex: 1 1 140px; min-width: 120px; font-size: 11px; padding: 4px 8px; background: #0f172a; color: #cbd5e1; border: 1px solid #475569; border-radius: 4px;';
-            inputObs.value = regra.observacao || '';
-            inputObs.placeholder = 'Observação (até 150 carac.)';
-            inputObs.title = regra.observacao || 'Observação identificadora da regra';
-            inputObs.addEventListener('input', () => {
-                regrasMapeamentoAtuais[idx].observacao = inputObs.value.trim().substring(0, 150);
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-
-            // Checkbox Herdar Filhos
-            const labelHerdar = document.createElement('label');
-            labelHerdar.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; cursor: pointer; user-select: none; margin: 0;';
-            const chkHerdar = document.createElement('input');
-            chkHerdar.type = 'checkbox';
-            chkHerdar.checked = regra.herdarFilhos !== false;
-            chkHerdar.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].herdarFilhos = chkHerdar.checked;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-            labelHerdar.appendChild(chkHerdar);
-            labelHerdar.appendChild(document.createTextNode('Filhos'));
-
-            // Checkbox Ativo
-            const labelAtivo = document.createElement('label');
-            labelAtivo.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; cursor: pointer; user-select: none; margin: 0;';
-            const chkAtivo = document.createElement('input');
-            chkAtivo.type = 'checkbox';
-            chkAtivo.checked = regra.ativo !== false;
-            chkAtivo.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].ativo = chkAtivo.checked;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-            labelAtivo.appendChild(chkAtivo);
-            labelAtivo.appendChild(document.createTextNode('Ativo'));
-
-            // Checkbox Permitir Próxima Regra (padrão: parar nesta regra)
-            const labelContinuar = document.createElement('label');
-            labelContinuar.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; cursor: pointer; user-select: none; margin: 0;';
-            labelContinuar.title = 'Permitir processar próxima regra após esta';
-            const chkContinuar = document.createElement('input');
-            chkContinuar.type = 'checkbox';
-            chkContinuar.checked = regra.continuarProxima === true;
-            chkContinuar.addEventListener('change', () => {
-                regrasMapeamentoAtuais[idx].continuarProxima = chkContinuar.checked;
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-            labelContinuar.appendChild(chkContinuar);
-            labelContinuar.appendChild(document.createTextNode('Continuar'));
-
-            // Botao Excluir
-            const btnExcluir = document.createElement('button');
-            btnExcluir.type = 'button';
-            btnExcluir.className = 'btn btn-secundario';
-            btnExcluir.style.cssText = 'padding: 2px 6px; font-size: 12px; line-height: 1; border-color: #ef4444; color: #ef4444; cursor: pointer;';
-            btnExcluir.title = 'Excluir regra';
-            btnExcluir.textContent = '🗑️';
-            btnExcluir.addEventListener('click', () => {
-                regrasMapeamentoAtuais.splice(idx, 1);
-                renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                marcarAlteracoesPendentesMapeamento(true);
-            });
-
-            if (somenteLeitura) {
-                selectTipoSeletor.disabled = true;
-                inputExpr.readOnly = true;
-                selectTipo.disabled = true;
-                inputObs.readOnly = true;
-                chkHerdar.disabled = true;
-                chkAtivo.disabled = true;
-                chkContinuar.disabled = true;
-            }
-
-            item.appendChild(selectTipoSeletor);
-            item.appendChild(inputExpr);
-            item.appendChild(selectTipo);
-            item.appendChild(inputObs);
-            item.appendChild(labelHerdar);
-            item.appendChild(labelAtivo);
-            item.appendChild(labelContinuar);
-            if (!somenteLeitura) {
-                item.appendChild(btnExcluir);
-            }
-
-            containerListaRegrasMapeamento.appendChild(item);
-        });
-    }
-
-    function salvarRegrasMapeamento() {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ regrasMapeamentoElementos: regrasMapeamentoAtuais }, () => {
-                if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
-                    chrome.runtime.sendMessage({
-                        acao: 'regrasMapeamentoAtualizadas',
-                        regrasMapeamentoElementos: regrasMapeamentoAtuais
-                    }).catch(() => { });
-                }
-            });
-        }
-    }
-
-    /* Controles do Laboratorio, Console e Auditoria */
-    const previewAreaTransferencia = document.getElementById('previewAreaTransferencia');
-    const previewAreaTransferenciaAnterior = document.getElementById('previewAreaTransferenciaAnterior');
-    const btnAtualizarPreview = document.getElementById('btnAtualizarPreview');
-    const btnDownloadXMouse = document.getElementById('btnDownloadXMouse');
-    const btnExecutarAuditoriaDebug = document.getElementById('btnExecutarAuditoriaDebug');
-    const btnExecutarFuzzingDebug = document.getElementById('btnExecutarFuzzingDebug');
-    const painelResultadoAuditoria = document.getElementById('painelResultadoAuditoria');
-    const btnLimparConsole = document.getElementById('btnLimparConsole');
-    const visorMensagensConsole = document.getElementById('visorMensagensConsole');
-    const lblContadorConsole = document.getElementById('lblContadorConsole');
     const toastNotificacao = document.getElementById('toastNotificacao');
-
     let timerToast = null;
-    const historicoMensagensConsole = [];
 
-    /* Passo 1.2.1: Sistema de Prioridades e Interceptador Seguro de Console */
-    const PRIORIDADES_LOG = Object.freeze({
-        TRACE: 10,
-        DEBUG: 20,
-        INFO: 30,
-        WARN: 40,
-        ERROR: 50,
-        FATAL: 60
-    });
+    const moduloMapeamento = (typeof window !== 'undefined' && typeof window.JusGovOptionsMapeamento === 'function')
+        ? new window.JusGovOptionsMapeamento()
+        : {
+            inicializar: () => { },
+            renderizarLista: () => { },
+            obterRegrasAtuais: () => [...PADROES_FABRICA_REGRAS_MAPEAMENTO],
+            adicionarRegrasESalvar: () => false,
+            salvarRegras: () => { }
+        };
+    const renderizarListaRegrasMapeamento = (regras, somenteLeitura = false) => moduloMapeamento.renderizarLista(regras, somenteLeitura);
 
-    let nivelMinimoLog = PRIORIDADES_LOG.WARN; // Somente >= WARN por padrao em producao
-    if (typeof window !== 'undefined' && window.__JUSGOV_LOG_LEVEL__) {
-        const lvlStr = String(window.__JUSGOV_LOG_LEVEL__).toUpperCase();
-        if (PRIORIDADES_LOG[lvlStr] !== undefined) {
-            nivelMinimoLog = PRIORIDADES_LOG[lvlStr];
-        }
-    }
-
-    window.JusGovConfigurarNivelLog = function (nivel) {
-        if (typeof nivel === 'string') {
-            const up = nivel.toUpperCase();
-            if (PRIORIDADES_LOG[up] !== undefined) {
-                nivelMinimoLog = PRIORIDADES_LOG[up];
-                return true;
-            }
-        } else if (typeof nivel === 'number' && Number.isFinite(nivel)) {
-            nivelMinimoLog = nivel;
-            return true;
-        }
-        return false;
-    };
-
-    const consoleOriginal = {
-        trace: console.trace ? console.trace.bind(console) : () => { },
-        debug: console.debug ? console.debug.bind(console) : () => { },
-        log: console.log.bind(console),
-        info: console.info ? console.info.bind(console) : console.log.bind(console),
-        warn: console.warn.bind(console),
-        error: console.error.bind(console)
-    };
-
-    function formatarArgumentoConsole(arg) {
-        if (arg === null) return 'null';
-        if (arg === undefined) return 'undefined';
-        if (arg instanceof Error) {
-            return `${arg.name}: ${arg.message}`;
-        }
-        if (typeof arg === 'object') {
-            try { return JSON.stringify(arg); } catch (_) { return String(arg); }
-        }
-        return String(arg);
-    }
-
-    function registrarMensagemNoVisorConsole(nivelNome, args) {
-        const prioChave = String(nivelNome || 'INFO').toUpperCase();
-        const valorPrio = PRIORIDADES_LOG[prioChave] || PRIORIDADES_LOG.INFO;
-
-        /* Filtrar: somente mensagens com prioridade >= nivelMinimoLog (padrao: WARN) sao exibidas no console */
-        if (valorPrio < nivelMinimoLog) {
-            return;
-        }
-
-        const textoMsg = Array.from(args).map(formatarArgumentoConsole).join(' ');
-        /* Filtrar saidas de baterias de testes automatizados para manter o console isolado apenas para operacao e erros */
-        if (typeof textoMsg === 'string' && (
-            textoMsg.includes('RELATORIO DE AUDITORIA') ||
-            textoMsg.includes('BATERIA') ||
-            textoMsg.includes('Escala de Cursor') ||
-            textoMsg.includes('[OK] [') ||
-            textoMsg.includes('[FALHA] [')
-        )) {
-            return;
-        }
-
-        const agora = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        const dd = pad(agora.getDate());
-        const mm = pad(agora.getMonth() + 1);
-        const aaaa = agora.getFullYear();
-        const hh = pad(agora.getHours());
-        const min = pad(agora.getMinutes());
-        const ss = pad(agora.getSeconds());
-        const dms = Math.floor(agora.getMilliseconds() / 100);
-        const prefixoDataHora = `${dd}/${mm}/${aaaa} ${hh}:${min}:${ss}.${dms}`;
-        const prioFormatada = prioChave.toLowerCase();
-
-        const linhaFormatada = `${prefixoDataHora} [${prioFormatada}] ${textoMsg}`;
-        historicoMensagensConsole.push(linhaFormatada);
-        if (historicoMensagensConsole.length > 250) {
-            historicoMensagensConsole.shift();
-        }
-        if (lblContadorConsole) {
-            lblContadorConsole.textContent = String(historicoMensagensConsole.length);
-        }
-        const textoConsolidado = historicoMensagensConsole.join('\n');
-        if (visorMensagensConsole) {
-            visorMensagensConsole.textContent = textoConsolidado;
-            visorMensagensConsole.scrollTop = visorMensagensConsole.scrollHeight;
-        }
-    }
-
-    function registrarMensagemDiretaNoVisorConsole(nivelNome, textoMsg) {
-        const agora = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        const dd = pad(agora.getDate());
-        const mm = pad(agora.getMonth() + 1);
-        const aaaa = agora.getFullYear();
-        const hh = pad(agora.getHours());
-        const min = pad(agora.getMinutes());
-        const ss = pad(agora.getSeconds());
-        const dms = Math.floor(agora.getMilliseconds() / 100);
-        const prefixoDataHora = `${dd}/${mm}/${aaaa} ${hh}:${min}:${ss}.${dms}`;
-        const prioFormatada = String(nivelNome || 'INFO').toLowerCase();
-
-        const linhaFormatada = `${prefixoDataHora} [${prioFormatada}] ${textoMsg}`;
-        historicoMensagensConsole.push(linhaFormatada);
-        if (historicoMensagensConsole.length > 250) {
-            historicoMensagensConsole.shift();
-        }
-        if (lblContadorConsole) {
-            lblContadorConsole.textContent = String(historicoMensagensConsole.length);
-        }
-        const textoConsolidado = historicoMensagensConsole.join('\n');
-        if (visorMensagensConsole) {
-            visorMensagensConsole.textContent = textoConsolidado;
-            visorMensagensConsole.scrollTop = visorMensagensConsole.scrollHeight;
-        }
-    }
-
-    console.trace = function (...args) {
-        consoleOriginal.trace(...args);
-        registrarMensagemNoVisorConsole('TRACE', args);
-    };
-    console.debug = function (...args) {
-        consoleOriginal.debug(...args);
-        registrarMensagemNoVisorConsole('DEBUG', args);
-    };
-    console.log = function (...args) {
-        consoleOriginal.log(...args);
-        registrarMensagemNoVisorConsole('INFO', args);
-    };
-    console.info = function (...args) {
-        consoleOriginal.info(...args);
-        registrarMensagemNoVisorConsole('INFO', args);
-    };
-    console.warn = function (...args) {
-        consoleOriginal.warn(...args);
-        registrarMensagemNoVisorConsole('WARN', args);
-    };
-    console.error = function (...args) {
-        consoleOriginal.error(...args);
-        registrarMensagemNoVisorConsole('ERROR', args);
-    };
-
-    window.addEventListener('error', (ev) => {
-        registrarMensagemNoVisorConsole('ERROR', [ev.message || 'Erro desconhecido', ev.filename ? `(${ev.filename}:${ev.lineno})` : '']);
-    });
-    window.addEventListener('unhandledrejection', (ev) => {
-        registrarMensagemNoVisorConsole('FATAL', ['Promise rejeitada nao tratada:', ev.reason]);
-    });
+    const moduloLaboratorio = (typeof window !== 'undefined' && typeof window.JusGovOptionsLaboratorio === 'function')
+        ? new window.JusGovOptionsLaboratorio()
+        : {
+            instalarInterceptadorConsole: () => { },
+            inicializar: () => { },
+            atualizarCoresEBotoesClipboard: () => { },
+            atualizarVisualAtencaoSwitches: () => { },
+            atualizarVisorClipboardPassivo: () => { },
+            acionarLeituraClipboardComPrompt: async () => { },
+            obterEstadoPermissaoClipboard: async () => 'granted',
+            estaLendoManualmente: () => false
+        };
+    moduloLaboratorio.instalarInterceptadorConsole();
+    const atualizarCoresEBotoesClipboard = () => moduloLaboratorio.atualizarCoresEBotoesClipboard();
+    const atualizarVisualAtencaoSwitches = () => moduloLaboratorio.atualizarVisualAtencaoSwitches();
+    const atualizarVisorClipboardPassivo = () => moduloLaboratorio.atualizarVisorClipboardPassivo();
+    const acionarLeituraClipboardComPrompt = (e) => moduloLaboratorio.acionarLeituraClipboardComPrompt(e);
+    const obterEstadoPermissaoClipboard = () => moduloLaboratorio.obterEstadoPermissaoClipboard();
 
     /*
      * FUNCAO: adicionarOuvinteSeguro
@@ -850,6 +403,9 @@ document.addEventListener('DOMContentLoaded', () => {
             toastNotificacao.classList.remove('visivel');
         }, 3000);
     }
+
+    moduloMapeamento.inicializar({ adicionarOuvinteSeguro, exibirToast });
+    moduloLaboratorio.inicializar({ adicionarOuvinteSeguro, exibirToast });
 
     function ativarAbaPorId(idAlvo) {
         if (!idAlvo) return;
@@ -962,8 +518,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizarEstiloBadgeMarcadorColado(val) {
         const v = String(val || '').trim().toLowerCase();
-        if (['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(v)) return v;
+        const lista = (typeof JusGovConstantes !== 'undefined' && Array.isArray(JusGovConstantes.ESTILOS_BADGE_MARCADOR_COLADO))
+            ? JusGovConstantes.ESTILOS_BADGE_MARCADOR_COLADO
+            : ['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto', 'apenas_numeral'];
+        if (lista.includes(v)) return v;
         return 'sobrescrito';
+    }
+
+    function normalizarModoAvisoPomodoro(val) {
+        const v = String(val || '').trim().toLowerCase();
+        const lista = (typeof JusGovConstantes !== 'undefined' && Array.isArray(JusGovConstantes.MODOS_AVISO_POMODORO))
+            ? JusGovConstantes.MODOS_AVISO_POMODORO
+            : ['modal', 'badge', 'barra_descanso', 'barra_sempre', 'badge_e_barra_descanso', 'completo'];
+        if (lista.includes(v)) return v;
+        return 'completo';
     }
 
     function normalizarTipoContornoMarcadorColado(val) {
@@ -1013,9 +581,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 previewMarcadorColadoBadge.style.padding = '0 3.5px';
                 previewMarcadorColadoBadge.style.fontSize = '9px';
                 previewMarcadorColadoBadge.textContent = '1';
+                previewMarcadorColadoBadge.style.borderStyle = 'solid';
+                previewMarcadorColadoBadge.style.borderWidth = '1px';
+                previewMarcadorColadoBadge.style.boxShadow = '0 1px 2px rgba(0,0,0,0.12)';
                 const ehRetangular = estiloBadge.startsWith('retangular_') || estiloBadge === 'sobrescrito_retangular';
                 previewMarcadorColadoBadge.style.borderRadius = ehRetangular ? '3px' : '999px';
-                if (estiloBadge === 'circular' || estiloBadge === 'retangular_compacto') {
+                if (estiloBadge === 'apenas_numeral') {
+                    previewMarcadorColadoBadge.style.border = 'none';
+                    previewMarcadorColadoBadge.style.borderRadius = '0';
+                    previewMarcadorColadoBadge.style.background = 'transparent';
+                    previewMarcadorColadoBadge.style.boxShadow = 'none';
+                    previewMarcadorColadoBadge.style.minWidth = 'auto';
+                    previewMarcadorColadoBadge.style.height = 'auto';
+                    previewMarcadorColadoBadge.style.padding = '0 1px';
+                    previewMarcadorColadoBadge.style.fontSize = '10px';
+                    previewMarcadorColadoBadge.style.color = corBorda;
+                    previewMarcadorColadoBadge.style.opacity = '1';
+                } else if (estiloBadge === 'circular' || estiloBadge === 'retangular_compacto') {
                     previewMarcadorColadoBadge.style.borderColor = corBorda;
                     previewMarcadorColadoBadge.style.color = '#ffffff';
                     previewMarcadorColadoBadge.style.background = corBorda;
@@ -1073,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarStatusProdutividadeUI() {
         if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined') return;
-        const renderizarEstado = (st) => {
+        const renderizarEstado = (st, resumo = null) => {
             if (!st) return;
             const dataStr = st.data ? ` (${st.data})` : '';
             const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
@@ -1086,25 +668,68 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pausas !== 0) {
                 partes.push(`Pausas ${pausas}`);
             }
-            const baseTxt = partes.join(' • ');
-            if (optPomodoroAtivo && optPomodoroAtivo.checked) {
-                const faseMapa = { foco: 'Foco', alivio: 'Alívio', pausa_maior: 'Pausa Maior' };
-                const faseTxt = faseMapa[st.pomodoroFase] || 'Foco';
-                lblStatusProdutividadeTrabalho.textContent = `${baseTxt} • Pomodoro: ${faseTxt} (${st.pomodoroMinutosNaFase || 0} min, ciclo ${(st.pomodoroCicloAtual || 0) + 1})`;
-            } else {
-                lblStatusProdutividadeTrabalho.textContent = baseTxt;
+            lblStatusProdutividadeTrabalho.textContent = partes.join(' • ');
+
+            if (lblStatusPomodoroDetalhado) {
+                if (optPomodoroAtivo && optPomodoroAtivo.checked) {
+                    const focoCfg = optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25;
+                    const propCfg = optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5;
+                    const ciclosCfg = optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4;
+                    const alivioCfg = Math.max(1, Math.round(focoCfg / propCfg));
+                    const pausaMaiorCfg = Math.max(1, Math.round(alivioCfg * ciclosCfg));
+                    const fase = (resumo && resumo.fase) || st.pomodoroFase || 'foco';
+                    const minNaFase = (resumo && typeof resumo.minutosNaFase === 'number') ? resumo.minutosNaFase : Math.max(0, Math.floor(Number(st.pomodoroMinutosNaFase || 0)));
+                    const ciclosMax = (resumo && resumo.ciclosMax) || ciclosCfg;
+                    const cicloAtual = (resumo && resumo.cicloAtual) || (fase === 'foco' ? Math.min(ciclosMax, (st.pomodoroCicloAtual || 0) + 1) : Math.max(1, Math.min(ciclosMax, st.pomodoroCicloAtual || 1)));
+                    const emDescanso = (fase === 'alivio' || fase === 'pausa_maior');
+                    const descansoPendente = resumo ? Boolean(resumo.descansoPendente) : Boolean(st.pomodoroDescansoPendente || (emDescanso && !st.pomodoroDescansoRealizadoNoCiclo));
+                    const descansoRealizado = resumo ? Boolean(resumo.descansoRealizado) : Boolean(st.pomodoroDescansoRealizadoNoCiclo && !descansoPendente);
+
+                    const filhos = [];
+                    const addItem = (texto, estilo = '') => {
+                        const sp = document.createElement('span');
+                        sp.textContent = texto;
+                        if (estilo) sp.style.cssText = estilo;
+                        filhos.push(sp);
+                    };
+                    const addSep = () => addItem('•', 'opacity:0.5;');
+
+                    addItem(`🍅 Pomodoro: Foco ${fase === 'foco' ? `${minNaFase}/${focoCfg}` : `${focoCfg}/${focoCfg}`} min`, 'font-weight:600;color:var(--texto-principal);');
+                    if (fase === 'alivio') {
+                        addSep();
+                        addItem(`Alívio em andamento: ${minNaFase}/${alivioCfg} min`, 'font-weight:600;color:#0284c7;');
+                    } else if (fase === 'pausa_maior') {
+                        addSep();
+                        addItem(`Descanso em andamento: ${minNaFase}/${pausaMaiorCfg} min`, 'font-weight:600;color:#0284c7;');
+                    }
+                    addSep();
+                    addItem(`Ciclo ${cicloAtual}/${ciclosMax}`);
+                    addSep();
+                    if (descansoPendente) {
+                        addItem('Descanso do ciclo: Pendente', 'font-weight:700;color:#dc2626;');
+                    } else if (descansoRealizado) {
+                        addItem('Descanso do ciclo: Realizado', 'font-weight:700;color:#0d9488;');
+                    } else {
+                        addItem('Descanso do ciclo: Aguardando foco', 'color:var(--texto-secundario);');
+                    }
+                    lblStatusPomodoroDetalhado.replaceChildren(...filhos);
+                    lblStatusPomodoroDetalhado.style.display = 'flex';
+                } else {
+                    lblStatusPomodoroDetalhado.replaceChildren();
+                    lblStatusPomodoroDetalhado.style.display = 'none';
+                }
             }
         };
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizarEstado(resp.estado);
+                    renderizarEstado(resp.estado, resp.resumoPomodoro || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
                     chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
                         if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
-                            renderizarEstado(dados.jusgovTrabalhoEstado);
+                            renderizarEstado(dados.jusgovTrabalhoEstado, null);
                         }
                     });
                 }
@@ -1436,11 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sentidoEfetivo = dados.sentidoOrdenacaoGuias || 'esq_dir';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = sentidoEfetivo;
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (sentidoEfetivo === 'esq_dir');
-            if (lblSentidoOrdenacaoGuias) {
-                lblSentidoOrdenacaoGuias.textContent = (sentidoEfetivo === 'esq_dir')
-                    ? 'Da Esquerda para a Direita (A-Z)'
-                    : 'Da Direita para a Esquerda (Z-A)';
-            }
+            aplicarRotuloSentidoOrdenacao(sentidoEfetivo === 'esq_dir');
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = Boolean(dados.ordenarGuiasFixadas);
             if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = Boolean(dados.fecharHierarquiaEmCascata);
             if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = Boolean(dados.modoBarraFavoritosSuperior);
@@ -1551,6 +1172,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optPomodoroCiclos) {
                 const cic = Number(dados.pomodoroCiclos);
                 optPomodoroCiclos.value = (Number.isInteger(cic) && cic >= 2 && cic <= 10) ? String(cic) : '4';
+            }
+            if (optPomodoroModoAviso) {
+                optPomodoroModoAviso.value = normalizarModoAvisoPomodoro(dados.pomodoroModoAviso);
+            }
+            if (optPomodoroPausasAutomaticas) {
+                optPomodoroPausasAutomaticas.checked = (dados.pomodoroPausasAutomaticas !== false);
             }
             atualizarCalculoPomodoroUI();
             atualizarStatusProdutividadeUI();
@@ -1733,8 +1360,10 @@ document.addEventListener('DOMContentLoaded', () => {
             pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5,
             pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
             pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4,
+            pomodoroPausasAutomaticas: optPomodoroPausasAutomaticas ? optPomodoroPausasAutomaticas.checked : true,
+            pomodoroModoAviso: optPomodoroModoAviso ? normalizarModoAvisoPomodoro(optPomodoroModoAviso.value) : 'completo',
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
-            regrasMapeamentoElementos: Array.isArray(regrasMapeamentoAtuais) ? regrasMapeamentoAtuais : [...PADROES_FABRICA_REGRAS_MAPEAMENTO]
+            regrasMapeamentoElementos: moduloMapeamento.obterRegrasAtuais()
         };
     }
 
@@ -1857,15 +1486,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function aplicarRotuloSentidoOrdenacao(isEsqDir) {
+        if (lblSentidoOrdenacaoGuias) {
+            lblSentidoOrdenacaoGuias.textContent = isEsqDir
+                ? 'Da Esquerda para a Direita (A-Z ou Novo-Antigo)'
+                : 'Da Direita para a Esquerda (Z-A ou Antigo-Novo)';
+        }
+    }
+
     /* Controle do Switch de Sentido de Ordenação */
     function atualizarSentidoOrdenacao(isEsqDir, reordenarSeAtivo = true) {
         if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = isEsqDir;
         if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = isEsqDir ? 'esq_dir' : 'dir_esq';
-        if (lblSentidoOrdenacaoGuias) {
-            lblSentidoOrdenacaoGuias.textContent = isEsqDir
-                ? 'Da Esquerda para a Direita (A-Z)'
-                : 'Da Direita para a Esquerda (Z-A)';
-        }
+        aplicarRotuloSentidoOrdenacao(isEsqDir);
         salvarConfiguracoes();
         if (reordenarSeAtivo && optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum') {
             const crit = optCriterioOrdenacaoGuias.value;
@@ -1972,14 +1605,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         {
                             modoManualVazio: true,
                             aoSalvarRegras: (regrasNovas) => {
-                                if (Array.isArray(regrasNovas) && regrasNovas.length > 0) {
-                                    regrasNovas.forEach((rn) => {
-                                        if (rn && rn.expressao && rn.expressao.trim()) {
-                                            regrasMapeamentoAtuais.push(rn);
-                                        }
-                                    });
-                                    renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                                    salvarRegrasMapeamento();
+                                if (moduloMapeamento.adicionarRegrasESalvar(regrasNovas)) {
                                     exibirToast('Regra manual adicionada e salva!');
                                 }
                             }
@@ -2020,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = 'nenhum';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = 'esq_dir';
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = true;
-            if (lblSentidoOrdenacaoGuias) lblSentidoOrdenacaoGuias.textContent = 'Da Esquerda para a Direita (A-Z)';
+            aplicarRotuloSentidoOrdenacao(true);
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = false;
             if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = false;
             atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
@@ -2160,20 +1786,26 @@ document.addEventListener('DOMContentLoaded', () => {
     adicionarOuvinteSeguro(optTempoTrabalhoAtivoHoras, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optPomodoroAtivo, 'change', () => {
         atualizarCalculoPomodoroUI();
+        atualizarStatusProdutividadeUI();
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optPomodoroProporcao, 'change', () => {
         atualizarCalculoPomodoroUI();
+        atualizarStatusProdutividadeUI();
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optPomodoroFocoMinutos, 'change', () => {
         atualizarCalculoPomodoroUI();
+        atualizarStatusProdutividadeUI();
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optPomodoroCiclos, 'change', () => {
         atualizarCalculoPomodoroUI();
+        atualizarStatusProdutividadeUI();
         salvarConfiguracoes();
     });
+    adicionarOuvinteSeguro(optPomodoroModoAviso, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optPomodoroPausasAutomaticas, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(btnResetarContadoresTrabalho, 'click', () => {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'RESETAR_CONTADORES_TRABALHO' }, (resp) => {
@@ -2521,156 +2153,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* Passo 4.5.1: Exportar e Importar JSON do Mapeamento Manual Avançado (Seção 6.20 e Seção 6.85) */
+    /* Passo 4.5.1: Sincronizacao de perfil pelo Popup */
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
         chrome.runtime.onMessage.addListener((msg) => {
-            if (msg && msg.acao === 'regrasMapeamentoAtualizadas' && Array.isArray(msg.regrasMapeamentoElementos)) {
-                renderizarListaRegrasMapeamento(msg.regrasMapeamentoElementos);
-            } else if (msg && msg.acao === 'PERFIL_ALTERADO') {
+            if (msg && msg.acao === 'PERFIL_ALTERADO') {
                 carregarConfiguracoesDoStorage();
             }
         });
     }
 
-    const tabRegrasUsuario = document.getElementById('tabRegrasUsuario');
-    const tabRegrasInternas = document.getElementById('tabRegrasInternas');
-
-    if (tabRegrasUsuario && tabRegrasInternas) {
-        adicionarOuvinteSeguro(tabRegrasUsuario, 'click', () => {
-            tabRegrasUsuario.style.borderColor = '#38bdf8';
-            tabRegrasUsuario.style.color = '#38bdf8';
-            tabRegrasUsuario.style.opacity = '1';
-            tabRegrasInternas.style.borderColor = '';
-            tabRegrasInternas.style.color = '';
-            tabRegrasInternas.style.opacity = '0.7';
-            if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'inline-flex';
-            if (btnSalvarRegrasMapeamento) btnSalvarRegrasMapeamento.style.display = 'inline-flex';
-            if (btnExportarMapeamentoJson) btnExportarMapeamentoJson.style.display = 'inline-flex';
-            if (btnImportarMapeamentoJson) btnImportarMapeamentoJson.style.display = 'inline-flex';
-            renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-        });
-
-        adicionarOuvinteSeguro(tabRegrasInternas, 'click', async () => {
-            tabRegrasInternas.style.borderColor = '#38bdf8';
-            tabRegrasInternas.style.color = '#38bdf8';
-            tabRegrasInternas.style.opacity = '1';
-            tabRegrasUsuario.style.borderColor = '';
-            tabRegrasUsuario.style.color = '';
-            tabRegrasUsuario.style.opacity = '0.7';
-            if (btnAdicionarRegraMapeamento) btnAdicionarRegraMapeamento.style.display = 'none';
-            if (btnSalvarRegrasMapeamento) btnSalvarRegrasMapeamento.style.display = 'none';
-            if (btnExportarMapeamentoJson) btnExportarMapeamentoJson.style.display = 'none';
-            if (btnImportarMapeamentoJson) btnImportarMapeamentoJson.style.display = 'none';
-            try {
-                const url = chrome.runtime.getURL('src/cfg/interface.json');
-                const resp = await fetch(url);
-                const internas = await resp.json();
-                const apenasInternas = Array.isArray(internas) ? internas.filter(r => r && r.origem !== 'usuario') : [];
-                renderizarListaRegrasMapeamento(apenasInternas, true);
-            } catch (_) {
-                if (containerListaRegrasMapeamento) {
-                    containerListaRegrasMapeamento.innerHTML = '<div style="color: #94a3b8; font-size: 12px;">Não foi possível carregar interface.json.</div>';
-                }
-            }
-        });
-    }
-
-    function marcarAlteracoesPendentesMapeamento(pendente) {
-        if (!btnSalvarRegrasMapeamento) return;
-        btnSalvarRegrasMapeamento.innerHTML = pendente ? '<span>💾</span> Salvar *' : '<span>💾</span> Salvar';
-        btnSalvarRegrasMapeamento.style.borderColor = pendente ? '#f59e0b' : '';
-    }
-
-    if (btnAdicionarRegraMapeamento) {
-        adicionarOuvinteSeguro(btnAdicionarRegraMapeamento, 'click', () => {
-            regrasMapeamentoAtuais.push({
-                id: 'regra_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                tipoSeletor: 'CSS (Simples)',
-                expressao: '',
-                tipo: 'interface',
-                observacao: '',
-                herdarFilhos: true,
-                ativo: true,
-                continuarProxima: false
-            });
-            renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-            marcarAlteracoesPendentesMapeamento(true);
-        });
-    }
-
-    if (btnSalvarRegrasMapeamento) {
-        adicionarOuvinteSeguro(btnSalvarRegrasMapeamento, 'click', () => {
-            const invalida = regrasMapeamentoAtuais.find(r => r && r.expressao && !validarExpressaoSeletorOptions(r.expressao, r.tipoSeletor));
-            if (invalida) {
-                exibirToast(`⚠️ Há regra com expressão inválida (${invalida.tipoSeletor || 'Seletor'}). Corrija antes de salvar.`);
-                return;
-            }
-            salvarRegrasMapeamento();
-            marcarAlteracoesPendentesMapeamento(false);
-            exibirToast('Regras de mapeamento salvas!');
-        });
-    }
-
-    if (btnExportarMapeamentoJson) {
-        adicionarOuvinteSeguro(btnExportarMapeamentoJson, 'click', () => {
-            const blob = new Blob([JSON.stringify(regrasMapeamentoAtuais, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'jusgovbr-regras-mapeamento.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            exibirToast('Regras de mapeamento exportadas em JSON!');
-        });
-    }
-
-    if (btnImportarMapeamentoJson && inputImportarMapeamentoArquivo) {
-        adicionarOuvinteSeguro(btnImportarMapeamentoJson, 'click', () => {
-            inputImportarMapeamentoArquivo.click();
-        });
-
-        adicionarOuvinteSeguro(inputImportarMapeamentoArquivo, 'change', (e) => {
-            const arquivo = e.target.files && e.target.files[0];
-            if (!arquivo) return;
-
-            const leitor = new FileReader();
-            leitor.onload = (ev) => {
-                try {
-                    const json = JSON.parse(ev.target.result);
-                    if (Array.isArray(json)) {
-                        regrasMapeamentoAtuais = json;
-                        renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                        salvarRegrasMapeamento();
-                        exibirToast('Regras de mapeamento importadas com sucesso!');
-                    } else {
-                        exibirToast('Erro: Arquivo JSON deve conter uma lista de regras.');
-                    }
-                } catch (_) {
-                    exibirToast('Erro: Arquivo JSON de mapeamento inválido.');
-                }
-            };
-            leitor.readAsText(arquivo);
-            inputImportarMapeamentoArquivo.value = '';
-        });
-    }
-
-    /* Passo 4.6: Visor "Ultima Selecao" (conteudo exato enviado por este addon a area de transferencia).
-     * Regra: o addon NUNCA le o clipboard do sistema (politicas corporativas podem proibir). */
-    function atualizarCoresEBotoesClipboard() {
-        if (!btnAtualizarPreview) return;
-        btnAtualizarPreview.classList.remove('btn-clip-permitido', 'btn-clip-bloqueado');
-        btnAtualizarPreview.setAttribute('title', 'Atualizar a exibição da Última Seleção (conteúdo enviado por este plugin à área de transferência)');
-        if (btnDownloadXMouse) {
-            btnDownloadXMouse.style.display = 'none';
-        }
-    }
-
-    function atualizarVisualAtencaoSwitches() {
-        if (lblSwitchColarBotaoMeio) lblSwitchColarBotaoMeio.classList.remove('slider-atencao');
-    }
-
+    /* Passo 4.6: Controles de estado visual de Mouse, Descarte e Permissoes */
     function atualizarEstadoVisualSubopcoesMouse() {
         atualizarVisualAtencaoSwitches();
         atualizarCoresEBotoesClipboard();
@@ -2692,343 +2184,11 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarVisualAtencaoSwitches();
     }
 
-    /* Mantida por compatibilidade: nao existe mais permissao de leitura a ser solicitada. */
-    async function obterEstadoPermissaoClipboard() {
-        return 'granted';
-    }
-
     async function inicializarMonitorPermissaoClipboard() {
         atualizarCoresEBotoesClipboard();
         atualizarVisualAtencaoSwitches();
         atualizarVisorClipboardPassivo();
     }
-
-    let leituraManualEmAndamento = false;
-
-    function formatarParaVisor(origem) {
-        if (!origem) {
-            return { html: '<span class="clip-status-vazio">&lt;vazio&gt;</span>', texto: '' };
-        }
-        if (typeof window.JusGovFormatarConteudoClipboard === 'function') {
-            return window.JusGovFormatarConteudoClipboard(origem);
-        }
-        const txt = (typeof origem === 'object' && origem) ? (origem.texto || origem.html || '') : String(origem);
-        const ehHtml = (typeof origem === 'object' && origem && Boolean(origem.html));
-        let htmlFormatado = escapeHtml(txt);
-        const spanBr = '<span class="simbolo-quebra-br" style="color: #64748b; font-weight: bold; margin: 0 1px; user-select: none;" title="Quebra de linha &lt;br&gt;">↵</span>';
-        const spanP = '<span class="simbolo-quebra-p" style="color: #818cf8; font-weight: bold; margin: 0 1px; user-select: none;" title="Parágrafo &lt;p&gt;">¶</span>';
-        if (ehHtml || /<br|<p/i.test(txt)) {
-            htmlFormatado = htmlFormatado.replace(/&lt;br\s*\/?&gt;/gi, `&lt;br&gt;${spanBr}`);
-            htmlFormatado = htmlFormatado.replace(/&lt;\/p&gt;/gi, `&lt;/p&gt;${spanP}`);
-            htmlFormatado = htmlFormatado.replace(/&lt;p(\s+[^&]*)?&gt;/gi, `&lt;p$1&gt;${spanP}`);
-        }
-        htmlFormatado = htmlFormatado.replace(/\r?\n/g, `${spanBr}\n`);
-        return {
-            html: txt ? htmlFormatado : '<span class="clip-status-vazio">&lt;vazio&gt;</span>',
-            texto: txt
-        };
-    }
-
-    function renderizarNoVisorClipboard(origemSlot1, origemSlot2) {
-        if (previewAreaTransferencia) {
-            const formatado1 = formatarParaVisor(origemSlot1);
-            previewAreaTransferencia.innerHTML = formatado1.html;
-        }
-        if (previewAreaTransferenciaAnterior) {
-            const formatado2 = formatarParaVisor(origemSlot2);
-            previewAreaTransferenciaAnterior.innerHTML = formatado2.html;
-        }
-    }
-
-    function obterClipboardInternoParaVisor() {
-        const clipInterno = (typeof window !== 'undefined' ? window.__JUSGOV_ULTIMO_CLIPBOARD__ : null);
-        if (clipInterno) {
-            if (typeof clipInterno === 'object') {
-                if (clipInterno.texto || clipInterno.html) {
-                    return clipInterno;
-                }
-            } else if (typeof clipInterno === 'string' && clipInterno.trim().length > 0) {
-                return clipInterno.trim();
-            }
-        }
-        return '';
-    }
-
-    function obterClipboardAnteriorParaVisor() {
-        const clipAnterior = (typeof window !== 'undefined' ? window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ : null);
-        if (clipAnterior) {
-            if (typeof clipAnterior === 'object') {
-                if (clipAnterior.texto || clipAnterior.html) {
-                    return clipAnterior;
-                }
-            } else if (typeof clipAnterior === 'string' && clipAnterior.trim().length > 0) {
-                return clipAnterior.trim();
-            }
-        }
-        return '';
-    }
-
-    /* Botao "Atualizar": exibe a Memória Interna de Seleção (Slot 1 + Slot 2 sem qualquer leitura do clipboard do SO) */
-    async function acionarLeituraClipboardComPrompt(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        if (!previewAreaTransferencia && !previewAreaTransferenciaAnterior) return;
-        leituraManualEmAndamento = true;
-        try {
-            renderizarNoVisorClipboard(obterClipboardInternoParaVisor(), obterClipboardAnteriorParaVisor());
-        } finally {
-            setTimeout(() => {
-                leituraManualEmAndamento = false;
-            }, 350);
-        }
-    }
-
-    function atualizarVisorClipboardPassivo() {
-        if ((!previewAreaTransferencia && !previewAreaTransferenciaAnterior) || leituraManualEmAndamento) return;
-        renderizarNoVisorClipboard(obterClipboardInternoParaVisor(), obterClipboardAnteriorParaVisor());
-    }
-
-    adicionarOuvinteSeguro(btnAtualizarPreview, 'click', acionarLeituraClipboardComPrompt);
-
-    /* Botao de download do utilitario X-Mouse Button Control */
-    if (btnDownloadXMouse) {
-        adicionarOuvinteSeguro(btnDownloadXMouse, 'click', () => {
-            const urlXMouse = 'https://www.highrez.co.uk/downloads/XMouseButtonControl.htm';
-            if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.create === 'function') {
-                chrome.tabs.create({ url: urlXMouse, active: true });
-            } else {
-                window.open(urlXMouse, '_blank');
-            }
-        });
-    }
-
-    const painelLab = document.getElementById('abaLaboratorio');
-    adicionarOuvinteSeguro(painelLab, 'mouseup', (e) => {
-        if (!e || !e.target) return;
-        if (e.target.closest('#btnAtualizarPreview') || e.target.closest('#previewAreaTransferencia') || e.target.closest('#previewAreaTransferenciaAnterior') || e.target.closest('#btnDownloadXMouse')) {
-            return;
-        }
-        if (e.target.closest('.sample-token')) {
-            setTimeout(() => {
-                if (!leituraManualEmAndamento) {
-                    atualizarVisorClipboardPassivo();
-                }
-            }, 100);
-        }
-    });
-
-    /* Passo 4.6.0: Atualização automática do visor da Área de Transferência a cada cópia */
-    window.addEventListener('copy', () => {
-        try {
-            setTimeout(() => {
-                const clipAtual = window.__JUSGOV_ULTIMO_CLIPBOARD__;
-                if (!clipAtual || (!clipAtual.formatado && !clipAtual.html)) {
-                    const sel = window.getSelection ? window.getSelection().toString() : '';
-                    if (sel && sel.trim().length > 0) {
-                        const selLimpo = sel.replace(/([^\n\r])\r?\n([^\n\r])/g, '$1 $2').trim();
-                        if (!Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
-                            window.__JUSGOV_HISTORICO_CLIPBOARD__ = [];
-                        }
-                        const payloadNovo = { texto: selLimpo, html: '', formatado: false, timestamp: Date.now() };
-                        if (window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto !== selLimpo) {
-                            window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = window.__JUSGOV_ULTIMO_CLIPBOARD__;
-                            window.__JUSGOV_HISTORICO_CLIPBOARD__.unshift(payloadNovo);
-                            if (window.__JUSGOV_HISTORICO_CLIPBOARD__.length > 2) window.__JUSGOV_HISTORICO_CLIPBOARD__.length = 2;
-                        } else if (!window.__JUSGOV_ULTIMO_CLIPBOARD__) {
-                            window.__JUSGOV_HISTORICO_CLIPBOARD__.unshift(payloadNovo);
-                            if (window.__JUSGOV_HISTORICO_CLIPBOARD__.length > 2) window.__JUSGOV_HISTORICO_CLIPBOARD__.length = 2;
-                        }
-                        window.__JUSGOV_ULTIMO_CLIPBOARD__ = payloadNovo;
-                        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                            chrome.storage.local.set({
-                                ultimoClipboardInterno: window.__JUSGOV_ULTIMO_CLIPBOARD__,
-                                ultimoClipboardAnteriorInterno: window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__,
-                                historicoClipboardInterno: window.__JUSGOV_HISTORICO_CLIPBOARD__
-                            }).catch(() => { });
-                        }
-                    }
-                }
-                if (!leituraManualEmAndamento) {
-                    atualizarVisorClipboardPassivo();
-                }
-            }, 60);
-        } catch (_) { }
-    });
-    window.addEventListener('focus', () => {
-        if (!leituraManualEmAndamento) {
-            atualizarVisorClipboardPassivo();
-        }
-    });
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && !leituraManualEmAndamento) {
-            atualizarVisorClipboardPassivo();
-        }
-    });
-    setInterval(() => {
-        if (!document.hidden && !leituraManualEmAndamento) {
-            atualizarVisorClipboardPassivo();
-        }
-    }, 5000);
-
-    /* Passo 4.6.1: Controles de Limpeza do Visor de Mensagens de Console e Ocultacao do Quadro de Testes */
-    adicionarOuvinteSeguro(btnLimparConsole, 'click', () => {
-        historicoMensagensConsole.length = 0;
-        if (lblContadorConsole) lblContadorConsole.textContent = '0';
-        const msgVazia = '(Console limpo - nenhuma mensagem ou erro registrado)';
-        if (visorMensagensConsole) visorMensagensConsole.textContent = msgVazia;
-        if (painelResultadoAuditoria) {
-            painelResultadoAuditoria.textContent = '';
-            painelResultadoAuditoria.style.display = 'none';
-        }
-    });
-
-    /* Passo 4.6.2: Indicador de Progresso Fino da Bateria de Testes / Fuzzing no Console */
-    const barraProgressoConsole = document.getElementById('barraProgressoConsole');
-    const preenchimentoProgressoConsole = document.getElementById('preenchimentoProgressoConsole');
-
-    function exibirProgressoConsole(porcentagem) {
-        if (!barraProgressoConsole || !preenchimentoProgressoConsole) return;
-        const pct = Math.max(0, Math.min(100, Math.round(porcentagem)));
-        barraProgressoConsole.style.display = 'block';
-        preenchimentoProgressoConsole.style.width = `${pct}%`;
-    }
-
-    function ocultarProgressoConsole(delayMs = 450) {
-        if (!barraProgressoConsole || !preenchimentoProgressoConsole) return;
-        preenchimentoProgressoConsole.style.width = '100%';
-        setTimeout(() => {
-            barraProgressoConsole.style.display = 'none';
-            preenchimentoProgressoConsole.style.width = '0%';
-        }, delayMs);
-    }
-
-    function renderizarRelatorioAuditoriaFormatado(textoBruto) {
-        if (!textoBruto) return '';
-        let seguro = String(textoBruto)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-
-        // Token [OK] em verde vivo (#10b981)
-        seguro = seguro.replace(/\[OK\]/g, '[<span style="color: #10b981; font-weight: bold;">OK</span>]');
-
-        // Falhas e erros em vermelho (#ef4444)
-        seguro = seguro.replace(/\[(FALHA|ERRO|ERRO AUDITORIA|ERRO FUZZING)\]/g, '[<span style="color: #ef4444; font-weight: bold;">$1</span>]');
-
-        // Avisos, alertas e atenção em amarelo/âmbar (#f59e0b)
-        seguro = seguro.replace(/\[(AVISO|ALERTA|ATENÇÃO|ATENCAO)\]/g, '[<span style="color: #f59e0b; font-weight: bold;">$1</span>]');
-
-        return seguro;
-    }
-
-    /* Passo 4.7: Executar Bateria Automatizada de Auditoria (debug.js) na Aba Laboratório */
-    adicionarOuvinteSeguro(btnExecutarAuditoriaDebug, 'click', async () => {
-        if (typeof window.JusGovExecutarAuditoria === 'function' || typeof window.JusGovExecutarAuditoriaAsync === 'function') {
-            exibirToast('Executando Auditoria... aguarde');
-            btnExecutarAuditoriaDebug.disabled = true;
-            btnExecutarAuditoriaDebug.textContent = 'Executando...';
-            if (painelResultadoAuditoria) {
-                painelResultadoAuditoria.style.display = 'block';
-                painelResultadoAuditoria.innerHTML = '<div style="padding: 16px; color: #94a3b8; font-style: italic; font-size: 13px; text-align: center;">⏳ Executando testes de auditoria... o relatório será exibido ao término.</div>';
-            }
-            exibirProgressoConsole(5);
-            try {
-                let relatorio;
-                if (typeof window.JusGovExecutarAuditoriaAsync === 'function') {
-                    relatorio = await window.JusGovExecutarAuditoriaAsync({}, (pct, nomeBateria) => {
-                        exibirProgressoConsole(pct);
-                        if (nomeBateria) {
-                            registrarMensagemDiretaNoVisorConsole('INFO', `Auditoria [${Math.round(pct)}%]: ${nomeBateria}...`);
-                        }
-                    });
-                } else {
-                    relatorio = window.JusGovExecutarAuditoria({
-                        onProgress: (pct, nomeBateria) => {
-                            exibirProgressoConsole(pct);
-                            if (nomeBateria) {
-                                registrarMensagemDiretaNoVisorConsole('INFO', `Auditoria [${Math.round(pct)}%]: ${nomeBateria}...`);
-                            }
-                        }
-                    });
-                }
-                exibirProgressoConsole(100);
-                if (painelResultadoAuditoria) {
-                    painelResultadoAuditoria.style.display = 'block';
-                    painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado(relatorio.logTexto);
-                    painelResultadoAuditoria.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-                exibirToast(`Auditoria concluída: ${relatorio.aprovados}/${relatorio.total} testes aprovados!`);
-                registrarMensagemDiretaNoVisorConsole('INFO', `Auditoria concluída: ${relatorio.aprovados}/${relatorio.total} testes aprovados.`);
-            } catch (errAuditoria) {
-                if (painelResultadoAuditoria) {
-                    painelResultadoAuditoria.style.display = 'block';
-                    painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado('[ERRO AUDITORIA] ' + (errAuditoria && errAuditoria.message ? errAuditoria.message : String(errAuditoria)));
-                }
-                registrarMensagemDiretaNoVisorConsole('ERROR', `Falha na auditoria: ${errAuditoria && errAuditoria.message ? errAuditoria.message : String(errAuditoria)}`);
-            } finally {
-                btnExecutarAuditoriaDebug.disabled = false;
-                btnExecutarAuditoriaDebug.textContent = 'Auditoria';
-                ocultarProgressoConsole(450);
-            }
-        } else {
-            if (painelResultadoAuditoria) {
-                painelResultadoAuditoria.style.display = 'block';
-                painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado('[ERRO] Módulo debug.js não carregado.');
-            }
-            registrarMensagemDiretaNoVisorConsole('ERROR', 'Módulo debug.js não carregado.');
-        }
-    });
-
-    /* Passo 4.7.1: Executar Bateria Estendida de Fuzzing Randômico (1s/T por tipo de teste) */
-    adicionarOuvinteSeguro(btnExecutarFuzzingDebug, 'click', async () => {
-        if (typeof window.JusGovExecutarFuzzing === 'function' || typeof window.JusGovExecutarFuzzingAsync === 'function') {
-            exibirToast('Executando Fuzzing (1s/T)... aguarde');
-            btnExecutarFuzzingDebug.disabled = true;
-            btnExecutarFuzzingDebug.textContent = 'Executando...';
-            if (painelResultadoAuditoria) {
-                painelResultadoAuditoria.style.display = 'block';
-                painelResultadoAuditoria.innerHTML = '<div style="padding: 16px; color: #94a3b8; font-style: italic; font-size: 13px; text-align: center;">⏳ Executando Fuzzing (1s/T)... o relatório será exibido ao término.</div>';
-            }
-            exibirProgressoConsole(5);
-            try {
-                let relatorio;
-                if (typeof window.JusGovExecutarFuzzingAsync === 'function') {
-                    relatorio = await window.JusGovExecutarFuzzingAsync(1000, (pct, nomeTeste) => {
-                        exibirProgressoConsole(pct);
-                        registrarMensagemDiretaNoVisorConsole('INFO', `Fuzzing [${Math.round(pct)}%]: ${nomeTeste}...`);
-                    });
-                } else {
-                    relatorio = window.JusGovExecutarFuzzing(1000);
-                }
-                exibirProgressoConsole(100);
-                if (painelResultadoAuditoria) {
-                    painelResultadoAuditoria.style.display = 'block';
-                    painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado(relatorio.logTexto);
-                    painelResultadoAuditoria.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-                exibirToast(`Fuzzing concluído: ${relatorio.aprovados}/${relatorio.total} aprovados!`);
-                registrarMensagemDiretaNoVisorConsole('INFO', `Fuzzing (1s/T) concluído: ${relatorio.aprovados}/${relatorio.total} aprovados.`);
-            } catch (errFuzz) {
-                if (painelResultadoAuditoria) {
-                    painelResultadoAuditoria.style.display = 'block';
-                    painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado('[ERRO FUZZING] ' + (errFuzz && errFuzz.message ? errFuzz.message : String(errFuzz)));
-                }
-                registrarMensagemDiretaNoVisorConsole('ERROR', `Falha no Fuzzing: ${errFuzz && errFuzz.message ? errFuzz.message : String(errFuzz)}`);
-            } finally {
-                btnExecutarFuzzingDebug.disabled = false;
-                btnExecutarFuzzingDebug.textContent = 'Fuzzing (1s/T)';
-                ocultarProgressoConsole(500);
-            }
-        } else {
-            if (painelResultadoAuditoria) {
-                painelResultadoAuditoria.style.display = 'block';
-                painelResultadoAuditoria.innerHTML = renderizarRelatorioAuditoriaFormatado('[ERRO] Módulo debug.js não carregado.');
-            }
-            registrarMensagemDiretaNoVisorConsole('ERROR', 'Módulo debug.js não carregado.');
-        }
-    });
 
     /* Passo 4.8: Escutar alteracoes vindas do atalho Esc+Esc, do Popup ou de contadores */
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
@@ -3136,11 +2296,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const novoSentido = changes.sentidoOrdenacaoGuias.newValue || 'esq_dir';
                     optSentidoOrdenacaoGuias.value = novoSentido;
                     if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (novoSentido === 'esq_dir');
-                    if (lblSentidoOrdenacaoGuias) {
-                        lblSentidoOrdenacaoGuias.textContent = (novoSentido === 'esq_dir')
-                            ? 'Da Esquerda para a Direita (A-Z)'
-                            : 'Da Direita para a Esquerda (Z-A)';
-                    }
+                    aplicarRotuloSentidoOrdenacao(novoSentido === 'esq_dir');
                 }
                 if (changes.ordenarGuiasFixadas !== undefined && optOrdenarGuiasFixadas) {
                     optOrdenarGuiasFixadas.checked = Boolean(changes.ordenarGuiasFixadas.newValue);
@@ -3235,7 +2391,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (changes.ultimoClipboardInterno.newValue) {
                         window.__JUSGOV_ULTIMO_CLIPBOARD__ = changes.ultimoClipboardInterno.newValue;
                     }
-                    if (!document.hidden && !leituraManualEmAndamento) {
+                    if (!document.hidden && !moduloLaboratorio.estaLendoManualmente()) {
                         atualizarVisorClipboardPassivo();
                     }
                 }
@@ -3243,7 +2399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (changes.ultimoClipboardAnteriorInterno.newValue) {
                         window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = changes.ultimoClipboardAnteriorInterno.newValue;
                     }
-                    if (!document.hidden && !leituraManualEmAndamento) {
+                    if (!document.hidden && !moduloLaboratorio.estaLendoManualmente()) {
                         atualizarVisorClipboardPassivo();
                     }
                 }
@@ -3298,7 +2454,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (Array.isArray(res.historicoClipboardInterno)) {
                         window.__JUSGOV_HISTORICO_CLIPBOARD__ = res.historicoClipboardInterno;
                     }
-                    if (!leituraManualEmAndamento) {
+                    if (!moduloLaboratorio.estaLendoManualmente()) {
                         atualizarVisorClipboardPassivo();
                     }
                 }

@@ -738,6 +738,65 @@
             }
         }
 
+        /**
+         * Renderiza HTML formatado internamente usando DOMParser inerte, removendo tags
+         * executáveis e atributos on* / javascript: antes de mover para o Shadow DOM.
+         */
+        #definirHtmlSeguroNoCartao(htmlBruto) {
+            if (!this.elementoCartaoAviso) return;
+            const bruto = String(htmlBruto || '');
+            if (!bruto) {
+                this.elementoCartaoAviso.textContent = '';
+                return;
+            }
+            if (typeof DOMParser === 'function') {
+                try {
+                    const doc = new DOMParser().parseFromString(bruto, 'text/html');
+                    if (doc && doc.body) {
+                        const bloqueados = doc.body.querySelectorAll('script, style, iframe, object, embed, svg, math, link, meta');
+                        for (let i = 0; i < bloqueados.length; i++) bloqueados[i].remove();
+                        const todos = doc.body.querySelectorAll('*');
+                        for (let i = 0; i < todos.length; i++) {
+                            const attrs = todos[i].attributes;
+                            for (let a = attrs.length - 1; a >= 0; a--) {
+                                const nome = attrs[a].name.toLowerCase();
+                                const val = String(attrs[a].value || '').trim().toLowerCase();
+                                if (nome.startsWith('on') || ((nome === 'href' || nome === 'src' || nome === 'action') && val.startsWith('javascript:'))) {
+                                    todos[i].removeAttribute(attrs[a].name);
+                                }
+                            }
+                        }
+                        const frag = document.createDocumentFragment();
+                        while (doc.body.firstChild) {
+                            frag.appendChild(document.adoptNode(doc.body.firstChild));
+                        }
+                        this.elementoCartaoAviso.replaceChildren(frag);
+                        return;
+                    }
+                } catch (_) { }
+            }
+            this.elementoCartaoAviso.textContent = bruto;
+        }
+
+        /**
+         * Renderiza texto simples preservando quebras de linha (\n) com <br> nativo sem usar innerHTML.
+         */
+        #definirTextoComQuebrasNoCartao(texto) {
+            if (!this.elementoCartaoAviso) return;
+            const bruto = String(texto || '');
+            if (!bruto.includes('\n')) {
+                this.elementoCartaoAviso.textContent = bruto.startsWith('[') ? bruto : `[!] ${bruto}`;
+                return;
+            }
+            const linhas = bruto.split(/\r?\n/);
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < linhas.length; i++) {
+                if (i > 0) frag.appendChild(document.createElement('br'));
+                frag.appendChild(document.createTextNode(linhas[i]));
+            }
+            this.elementoCartaoAviso.replaceChildren(frag);
+        }
+
         /*
          * METODO: projetarAlertaVisual
          * DIRETRIZ ROOT 6.33 (Algoritmo Inteligente Anti-Sobreposicao) + Seção 6.112 + Seção 6.115:
@@ -871,9 +930,9 @@
             }
 
             if (mensagemOuResultado && typeof mensagemOuResultado === 'object' && mensagemOuResultado.html) {
-                this.elementoCartaoAviso.innerHTML = mensagemOuResultado.html;
-            } else if (typeof mensagemOuResultado === 'string' && (mensagemOuResultado.includes('<') || mensagemOuResultado.includes('\n'))) {
-                this.elementoCartaoAviso.innerHTML = mensagemOuResultado.replace(/\n/g, '<br>');
+                this.#definirHtmlSeguroNoCartao(mensagemOuResultado.html);
+            } else if (typeof mensagemOuResultado === 'string') {
+                this.#definirTextoComQuebrasNoCartao(mensagemOuResultado);
             } else {
                 this.elementoCartaoAviso.textContent = `[!] ${mensagemOuResultado}`;
             }

@@ -437,24 +437,52 @@
             }
         }
 
+        /**
+         * Converte string HTML em árvore isolada usando DOMParser (documento inerte
+         * sem browsing context), impedindo pré-carregamento de mídia ou disparo de handlers on*.
+         */
+        #parsearHtmlParaDivIsolado(origemHtml) {
+            const container = document.createElement('div');
+            const textoHtml = String(origemHtml || '');
+            if (!textoHtml) return container;
+            if (typeof DOMParser === 'function') {
+                try {
+                    const docInerte = new DOMParser().parseFromString(textoHtml, 'text/html');
+                    if (docInerte && docInerte.body) {
+                        const perigosos = docInerte.body.querySelectorAll('script, iframe, object, embed, applet');
+                        for (let i = 0; i < perigosos.length; i++) perigosos[i].remove();
+                        while (docInerte.body.firstChild) {
+                            container.appendChild(document.adoptNode(docInerte.body.firstChild));
+                        }
+                        return container;
+                    }
+                } catch (_) { }
+            }
+            container.textContent = textoHtml;
+            return container;
+        }
+
         extrairTextoPuroSanitizado(origem) {
             if (!origem) return '';
             try {
                 let preservarQuebrasNaOrigem = false;
-                const container = document.createElement('div');
+                let container = null;
                 if (typeof origem === 'string') {
-                    container.innerHTML = origem;
-                } else if (origem instanceof Range) {
-                    const anc = origem.commonAncestorContainer || origem.startContainer;
-                    const ancEl = anc && anc.nodeType === Node.TEXT_NODE ? anc.parentElement : anc;
-                    preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(ancEl);
-                    const frag = origem.cloneContents();
-                    if (frag) container.appendChild(frag);
-                } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
-                    preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(origem);
-                    container.appendChild(origem.cloneNode(true));
+                    container = this.#parsearHtmlParaDivIsolado(origem);
                 } else {
-                    return this.aplicarFiltro3InformacoesELinhas(this.aplicarFiltro1DadosLixo(String(origem || '')));
+                    container = document.createElement('div');
+                    if (origem instanceof Range) {
+                        const anc = origem.commonAncestorContainer || origem.startContainer;
+                        const ancEl = anc && anc.nodeType === Node.TEXT_NODE ? anc.parentElement : anc;
+                        preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(ancEl);
+                        const frag = origem.cloneContents();
+                        if (frag) container.appendChild(frag);
+                    } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
+                        preservarQuebrasNaOrigem = this.#devePreservarQuebrasDoElemento(origem);
+                        container.appendChild(origem.cloneNode(true));
+                    } else {
+                        return this.aplicarFiltro3InformacoesELinhas(this.aplicarFiltro1DadosLixo(String(origem || '')));
+                    }
                 }
 
                 const nosPerigosos = container.querySelectorAll(
@@ -756,16 +784,19 @@
          */
         preSanitizarDomBase(origem) {
             if (!origem) return document.createElement('div');
-            const container = document.createElement('div');
+            let container = null;
             if (typeof origem === 'string') {
-                container.innerHTML = origem;
-            } else if (origem instanceof Range) {
-                const frag = origem.cloneContents();
-                if (frag) container.appendChild(frag);
-            } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
-                container.appendChild(origem.cloneNode(true));
+                container = this.#parsearHtmlParaDivIsolado(origem);
             } else {
-                return container;
+                container = document.createElement('div');
+                if (origem instanceof Range) {
+                    const frag = origem.cloneContents();
+                    if (frag) container.appendChild(frag);
+                } else if (origem && origem.nodeType === Node.ELEMENT_NODE) {
+                    container.appendChild(origem.cloneNode(true));
+                } else {
+                    return container;
+                }
             }
 
             // 1. Destruição Imediata de Tags Executáveis / Perigosas / Metadados:

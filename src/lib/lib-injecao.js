@@ -42,6 +42,8 @@
         'src/lib/lib-verificadores.js',
         'src/mod-copia/copia-aviso-flutuante.js',
         'src/mod-copia/copia-dialogo-mapeamento.js',
+        'src/mod-copia/copia-regras-inspetor.js',
+        'src/mod-copia/copia-clipboard.js',
         'src/mod-copia/copia-acumulador.js',
         'src/mod-copia/copia-geometria.js',
         'src/mod-copia/copia-filtros.js',

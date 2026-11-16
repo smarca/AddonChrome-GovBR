@@ -11876,6 +11876,365 @@
                 'JusGovConfiguracoes filtra apenas chaves sincronizáveis e ignora contadores/mapas locais na sincronização.',
                 { detalhe: detalheSync }
             );
+
+            // Teste: FiltrosHtml via DOMParser inerte bloqueia XSS/scripts preservando texto seguro
+            let domParserFiltrosOk = false;
+            let detalheDomParser = '';
+            try {
+                const FiltrosCls = window.JusGovFiltrosHtml;
+                if (typeof FiltrosCls === 'function') {
+                    window.__jusgovXssProbe = false;
+                    const filt = new FiltrosCls();
+                    const payload = '<img src="x" onerror="window.__jusgovXssProbe=true"><script>window.__jusgovXssProbe=true;</script><p>Texto <b>Seguro</b></p>';
+                    const textoPuro = filt.extrairTextoPuroSanitizado(payload);
+                    const divSan = filt.preSanitizarDomBase(payload);
+                    const temScript = Boolean(divSan && divSan.querySelector && divSan.querySelector('script, img'));
+                    domParserFiltrosOk = Boolean(
+                        window.__jusgovXssProbe === false &&
+                        textoPuro.includes('Texto Seguro') &&
+                        !textoPuro.includes('alert') &&
+                        !temScript
+                    );
+                    detalheDomParser = `xss=${window.__jusgovXssProbe}, texto=${JSON.stringify(textoPuro)}, tagPerigosa=${temScript}`;
+                }
+            } catch (eDom) {
+                detalheDomParser = eDom.message || String(eDom);
+            }
+            registrar(
+                domParserFiltrosOk,
+                'DOMPARSER_FILTROS_BLOQUEIA_XSS_E_PRESERVA_TEXTO',
+                'FiltrosHtml parseia strings HTML em DOMParser inerte sem disparar scripts/onerror e preserva texto.',
+                { detalhe: detalheDomParser }
+            );
+
+            // Teste: AvisoFlutuante renderiza texto/HTML sem permitir injeção de tags executáveis
+            let avisoSeguroOk = false;
+            let detalheAvisoSeg = '';
+            try {
+                const AvisoCls = window.JusGovAvisoFlutuante;
+                if (typeof AvisoCls === 'function' && document.body) {
+                    const av = new AvisoCls();
+                    const spanFake = document.createElement('span');
+                    spanFake.textContent = '123';
+                    document.body.appendChild(spanFake);
+                    const rFake = document.createRange();
+                    rFake.selectNodeContents(spanFake);
+                    // Mock geometrico minimo em ambiente headless sem layout de viewport completo
+                    rFake.getBoundingClientRect = () => ({ top: 20, bottom: 38, left: 20, right: 60, width: 40, height: 18 });
+                    rFake.getClientRects = () => [rFake.getBoundingClientRect()];
+
+                    av.projetarAlertaVisual(rFake, 'Alerta <img src=x onerror=alert(1)>\nLinha 2', false);
+                    const card = av.elementoCartaoAviso;
+                    const semImgStr = Boolean(card && !card.querySelector('img') && card.querySelector('br') && card.textContent.includes('<img'));
+
+                    av.projetarAlertaVisual(rFake, { html: '<span>Wiki OK</span><script>alert(1)</script><b onclick="alert(1)">Negrito</b>', ehWiki: true }, false);
+                    const cardHtml = av.elementoCartaoAviso;
+                    const semScriptObj = Boolean(cardHtml && !cardHtml.querySelector('script') && cardHtml.querySelector('b') && !cardHtml.querySelector('b').hasAttribute('onclick'));
+
+                    av.limparAlertaVisual();
+                    spanFake.remove();
+                    avisoSeguroOk = semImgStr && semScriptObj;
+                    detalheAvisoSeg = `strEscapada=${semImgStr}, htmlSanitizado=${semScriptObj}`;
+                }
+            } catch (eAv) {
+                detalheAvisoSeg = eAv.message || String(eAv);
+            }
+            registrar(
+                avisoSeguroOk,
+                'AVISO_FLUTUANTE_RENDERIZACAO_SEGURA',
+                'MotorValidacao renderiza avisos escapando strings perigosas e higienizando { html } via DOMParser.',
+                { detalhe: detalheAvisoSeg }
+            );
+
+            // Teste: Contratos runtime dos módulos de Service Worker (ModuloManutencao, ModuloProdutividade, Regras)
+            let contratoSwOk = false;
+            let detalheContratoSw = '';
+            try {
+                const ManutCls = window.JusGovModuloManutencao;
+                const ProdCls = window.JusGovModuloProdutividade;
+                const rs = window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.obterRegrasSistema === 'function'
+                    ? window.JusGovCfgDefaults.obterRegrasSistema()
+                    : null;
+                if (typeof ManutCls === 'function' && typeof ProdCls === 'function' && rs) {
+                    const manut = new ManutCls();
+                    const prod = new ProdCls();
+                    const temMetodos = typeof manut.executarAutoLimpezaCacheECookies === 'function' &&
+                        typeof manut.registrarAcessoUrl === 'function' &&
+                        typeof prod.processarTickTrabalho === 'function' &&
+                        typeof prod.abrirAssistenteIaLateral === 'function';
+                    const temRegrasJson = Boolean(Array.isArray(rs.sistemasJudiciais) && rs.manutencao && rs.manutencao.idadesLimpezaMs && rs.manutencao.idadesLimpezaMs['7d']);
+                    contratoSwOk = temMetodos && temRegrasJson;
+                    detalheContratoSw = `metodosSw=${temMetodos}, regrasJson=${temRegrasJson}`;
+                }
+            } catch (eSw) {
+                detalheContratoSw = eSw.message || String(eSw);
+            }
+            registrar(
+                contratoSwOk,
+                'CONTRATO_MODULOS_SW_E_REGRAS',
+                'ModuloManutencao, ModuloProdutividade e regras-sistema.json expõem contratos completos sem erros.',
+                { detalhe: detalheContratoSw }
+            );
+
+            // Teste: Fatiamento Modular de copia-selecionar.js e options.js (4 submódulos SRP/DIP)
+            let fatiamentoOk = false;
+            let detalheFat = '';
+            try {
+                const temRegras = typeof window.JusGovRegrasEInspetor === 'function';
+                const temClip = typeof window.JusGovClipboardInterno === 'function';
+                const temOptMap = typeof window.JusGovOptionsMapeamento === 'function';
+                const temOptLab = typeof window.JusGovOptionsLaboratorio === 'function';
+                if (temRegras && temClip && temOptMap && temOptLab) {
+                    const instReg = new window.JusGovRegrasEInspetor();
+                    const instClip = new window.JusGovClipboardInterno();
+                    const instMap = new window.JusGovOptionsMapeamento();
+                    const instLab = new window.JusGovOptionsLaboratorio();
+                    const exprNorm = instReg.normalizarExpressaoAtributoCss('onclick=');
+                    fatiamentoOk = Boolean(
+                        exprNorm === '[onclick]' &&
+                        typeof instClip.salvarClipboardInternoComBackup === 'function' &&
+                        typeof instMap.validarExpressaoSeletor === 'function' &&
+                        typeof instLab.obterEstadoPermissaoClipboard === 'function'
+                    );
+                    detalheFat = `expr=${exprNorm}, classes4=true`;
+                }
+            } catch (eFat) {
+                detalheFat = eFat.message || String(eFat);
+            }
+            registrar(
+                fatiamentoOk,
+                'FATIAMENTO_MODULAR_OPCOES_E_COPIA',
+                'Submódulos extraídos (copia-regras-inspetor, copia-clipboard, options-mapeamento, options-laboratorio) carregam em UMD com contratos válidos.',
+                { detalhe: detalheFat }
+            );
+
+            // Teste BUG-66: Isolamento de cliques fora/próximo a <label> e células de tabela de formulário
+            let bug66Ok = false;
+            let detalheBug66 = '';
+            try {
+                const wrapB66 = document.createElement('div');
+                wrapB66.style.cssText = 'position:fixed;left:10px;top:10px;z-index:1;';
+                const tblB66 = document.createElement('table');
+                const trB66 = document.createElement('tr');
+                const tdB66 = document.createElement('td');
+                tdB66.style.cssText = 'padding:12px 48px 24px 8px;';
+                const lblB66 = document.createElement('label');
+                const chkB66 = document.createElement('input');
+                chkB66.type = 'checkbox';
+                lblB66.appendChild(chkB66);
+                lblB66.appendChild(document.createTextNode('OpcaoTeste'));
+                tdB66.appendChild(lblB66);
+                trB66.appendChild(tdB66);
+                tblB66.appendChild(trB66);
+                wrapB66.appendChild(tblB66);
+                document.body.appendChild(wrapB66);
+
+                const instReg = (typeof window.JusGovRegrasEInspetor === 'function') ? new window.JusGovRegrasEInspetor() : null;
+                const instGeom = (typeof window.JusGovGeometriaDOM === 'function') ? new window.JusGovGeometriaDOM() : null;
+                const rTd = tdB66.getBoundingClientRect();
+                const rLbl = lblB66.getBoundingClientRect();
+                const diagTd = instReg ? instReg.obterDiagnosticoElemento(tdB66) : null;
+                const diagLbl = instReg ? instReg.obterDiagnosticoElemento(lblB66) : null;
+                const snapDir = instGeom ? instGeom.localizarPontoTextoDentroDeElemento(tdB66, rTd.right - 2, rLbl.top + 4) : 'missing';
+                const snapAbaixo = instGeom ? instGeom.localizarPontoTextoDentroDeElemento(tdB66, rLbl.left + 8, rTd.bottom - 2) : 'missing';
+                wrapB66.remove();
+
+                bug66Ok = Boolean(
+                    diagTd && diagTd.tipo === 'interface' &&
+                    diagLbl && diagLbl.tipo === 'interface' &&
+                    snapDir === null &&
+                    snapAbaixo === null
+                );
+                detalheBug66 = `diagTd=${diagTd && diagTd.tipo}, diagLbl=${diagLbl && diagLbl.tipo}, snapDir=${snapDir}, snapAbaixo=${snapAbaixo}`;
+            } catch (e66) {
+                detalheBug66 = e66.message || String(e66);
+            }
+            registrar(
+                bug66Ok,
+                'BUG_66_ISOLAMENTO_LABEL_E_TABELAS_FORMULARIO',
+                'Cliques fora/próximo de <label> em células <td> classificam como interface e não capturam texto do rótulo.',
+                { detalhe: detalheBug66 }
+            );
+
+            // Teste FEAT-36: Estilo "Apenas Numeral" em JusGovConstantes e CopiaVisual
+            let feat36Ok = false;
+            let detalheFeat36 = '';
+            try {
+                const consts = window.JusGovConstantes;
+                const listaEst = consts ? consts.ESTILOS_BADGE_MARCADOR_COLADO : [];
+                const idxApenas = Array.isArray(listaEst) ? listaEst.indexOf('apenas_numeral') : -1;
+                const idxSem = Array.isArray(listaEst) ? listaEst.indexOf('sem_etiqueta') : -1;
+                const penultimoOk = (idxApenas >= 0 && idxSem === idxApenas + 1);
+
+                let renderOk = false;
+                if (typeof window.JusGovFeedbackVisual === 'function') {
+                    const vis = new window.JusGovFeedbackVisual();
+                    const spEx = document.createElement('span');
+                    spEx.textContent = 'TextoMarcadoTeste';
+                    spEx.style.cssText = 'position:fixed;left:40px;top:40px;font-size:14px;z-index:2147483640;background:#fff;';
+                    document.body.appendChild(spEx);
+                    const rng = document.createRange();
+                    rng.selectNodeContents(spEx);
+                    vis.configurarMarcadorColado({ ativo: true, estiloBadge: 'apenas_numeral', corContorno: '#0d9488' });
+                    vis.registrarCopiaCandidataParaMarcador(rng, 'TextoMarcadoTeste');
+                    vis.confirmarColagemEMarcarPermanente('TextoMarcadoTeste');
+                    const badgeEl = document.querySelector('.jusgov-marcador-colado-badge');
+                    const csBadge = badgeEl ? window.getComputedStyle(badgeEl) : null;
+                    renderOk = Boolean(
+                        badgeEl &&
+                        badgeEl.textContent === '1' &&
+                        csBadge &&
+                        csBadge.borderTopStyle === 'none' &&
+                        (csBadge.backgroundColor === 'rgba(0, 0, 0, 0)' || csBadge.backgroundColor === 'transparent')
+                    );
+                    detalheFeat36 = `penultimo=${penultimoOk}, badge=${Boolean(badgeEl)}, txt=${badgeEl && badgeEl.textContent}, border=${csBadge && csBadge.borderTopStyle}, bg=${csBadge && csBadge.backgroundColor}`;
+                    vis.limparMarcadoresPermanentes();
+                    spEx.remove();
+                } else {
+                    detalheFeat36 = 'JusGovFeedbackVisual ausente';
+                }
+                feat36Ok = penultimoOk && renderOk;
+            } catch (e36) {
+                detalheFeat36 = e36.message || String(e36);
+            }
+            registrar(
+                feat36Ok,
+                'FEAT_36_ESTILO_BADGE_APENAS_NUMERAL',
+                'Etiqueta "Apenas Numeral" está em ESTILOS_BADGE_MARCADOR_COLADO na penúltima posição e renderiza sem fundo/borda.',
+                { detalhe: detalheFeat36 }
+            );
+
+            // Teste FEAT-37 + BUG-67: Pausas automáticas via idle, status pendente/realizado e modos de exibição
+            let feat37Ok = false;
+            let detalheFeat37 = '';
+            try {
+                const ProdCls = window.JusGovModuloProdutividade;
+                const CfgCls = window.JusGovConfiguracoes;
+                if (typeof ProdCls === 'function' && typeof CfgCls === 'function') {
+                    const mp = new ProdCls();
+                    const cfgP = { pomodoroAtivo: true, pomodoroFocoMinutos: 25, pomodoroProporcao: 4.5, pomodoroCiclos: 4, pomodoroPausasAutomaticas: true, pomodoroModoAviso: 'completo' };
+                    const tBase = 1700000000000;
+                    const stIdle = mp.criarEstadoTrabalhoZerado('2026-11-15', tBase);
+                    stIdle.pomodoroCicloAtual = 2;
+                    stIdle.pomodoroMinutosNaFase = 12;
+                    stIdle.pomodoroDescansoPendente = true;
+
+                    const resCurto = mp.registrarPausasAutomaticasProdutividade(stIdle, tBase + 3 * 60000, cfgP);
+                    const resAlivio = mp.registrarPausasAutomaticasProdutividade(stIdle, tBase + 6 * 60000, cfgP);
+                    const posAlivioOk = (!resCurto.creditado && resAlivio.creditado && resAlivio.tipo === 'alivio' && !stIdle.pomodoroDescansoPendente && stIdle.pomodoroDescansoRealizadoNoCiclo === true);
+
+                    const resDescanso = mp.registrarPausasAutomaticasProdutividade(stIdle, tBase + 25 * 60000, cfgP);
+                    const posDescansoOk = (resDescanso.creditado && resDescanso.tipo === 'pausa_maior' && stIdle.pomodoroCicloAtual === 0 && !stIdle.pomodoroDescansoPendente);
+
+                    const prefsModal = mp.resolverPreferenciasAvisoPomodoro({ pomodoroModoAviso: 'modal' });
+                    const prefsHibrido = mp.resolverPreferenciasAvisoPomodoro({ pomodoroModoAviso: 'badge_e_barra_descanso' });
+                    const modosOk = (prefsModal.usarModal === true && !prefsModal.usarBadge && prefsHibrido.usarBadge && prefsHibrido.modoBarra === 'descanso');
+
+                    const cfgMgr = new CfgCls();
+                    const syncKeysOk = cfgMgr.obterChavesConfigSync().includes('pomodoroPausasAutomaticas') && cfgMgr.obterChavesConfigSync().includes('pomodoroModoAviso');
+
+                    feat37Ok = posAlivioOk && posDescansoOk && modosOk && syncKeysOk;
+                    detalheFeat37 = `alivio=${posAlivioOk}, descanso=${posDescansoOk}, modos=${modosOk}, sync=${syncKeysOk}`;
+                }
+            } catch (e37) {
+                detalheFeat37 = e37.message || String(e37);
+            }
+            registrar(
+                feat37Ok,
+                'FEAT_37_BUG_67_POMODORO_IDLE_E_MODOS_AVISO',
+                'Pausas automáticas em idle creditam Alívio/Descanso Maior (com reset de ciclo) e preservam escolha entre Modal/Badge/Barra.',
+                { detalhe: detalheFeat37 }
+            );
+
+            // Teste BUG-68: Árvore Hierárquica contígua (Opção A: Novo-Antigo), sem mistura de escalas e sem intercalar guias estranhas
+            let bug68Ok = false;
+            let detalheBug68 = '';
+            try {
+                const OrdCls = window.JusGovGerenciadorOrdenacaoGuias;
+                if (typeof OrdCls === 'function') {
+                    const ord = new OrdCls({ criterio: 'hierarquia_arvore', sentido: 'esq_dir' });
+                    const baseT = 1763250000000;
+                    const mapaT = new Map([
+                        [102, { criadaEm: baseT + 1000 }],
+                        [103, { criadaEm: baseT + 2000 }],
+                        [104, { criadaEm: baseT + 3000 }],
+                        [105, { criadaEm: baseT + 4000 }],
+                        [106, { criadaEm: baseT + 5000 }]
+                    ]);
+                    // Simulando mistura real: pai1 (101) e guia avulsa (900) SEM criadaEm no mapa, filhos/netos COM criadaEm
+                    const abasMock = [
+                        { id: 101, index: 0, groupId: 7 },
+                        { id: 900, index: 1, groupId: -1 }, // guia estranha entre as abas
+                        { id: 102, openerTabId: 101, index: 2, groupId: 7 }, // filho1
+                        { id: 103, openerTabId: 102, index: 3, groupId: 7 }, // neto1
+                        { id: 104, openerTabId: 102, index: 4, groupId: 7 }, // neto2
+                        { id: 105, openerTabId: 101, index: 5, groupId: 7 }, // filho2
+                        { id: 106, openerTabId: 101, index: 6, groupId: 7 }  // filho3 (mais novo)
+                    ];
+                    const resEsqDir = ord.ordenarPorHierarquiaArvore(abasMock, 'esq_dir', mapaT).map(t => t.id);
+                    const resDirEsq = ord.ordenarPorHierarquiaArvore(abasMock, 'dir_esq', mapaT).map(t => t.id);
+
+                    const optAOk = JSON.stringify(resEsqDir) === JSON.stringify([101, 106, 105, 102, 104, 103, 900]);
+                    const invOk = JSON.stringify(resDirEsq) === JSON.stringify([900, 101, 102, 103, 104, 105, 106]);
+
+                    const lblSent = document.getElementById('lblSentidoOrdenacaoGuias');
+                    const rotuloOk = !lblSent || lblSent.textContent.includes('A-Z ou Novo-Antigo');
+
+                    bug68Ok = optAOk && invOk && rotuloOk;
+                    detalheBug68 = `esqDir=${JSON.stringify(resEsqDir)}, dirEsq=${JSON.stringify(resDirEsq)}, rotuloOk=${rotuloOk}`;
+                }
+            } catch (e68) {
+                detalheBug68 = e68.message || String(e68);
+            }
+            registrar(
+                bug68Ok,
+                'BUG_68_ARVORE_HIERARQUICA_OPTION_A_E_ESCALA_SEGURA',
+                'Árvore DFS mantém subgrupos contíguos sem intercalar guias estranhas (Opção A: mais novo logo à direita do pai) e rotula "A-Z ou Novo-Antigo".',
+                { detalhe: detalheBug68 }
+            );
+
+            // Teste BUG-69: Continuidade em polígono SVG único entre múltiplos parágrafos com espaçamento vertical normal
+            let bug69Ok = false;
+            let detalheBug69 = '';
+            try {
+                if (typeof window.JusGovFeedbackVisual === 'function') {
+                    const vis69 = new window.JusGovFeedbackVisual();
+                    const boxP = document.createElement('div');
+                    boxP.style.cssText = 'position:fixed;left:40px;top:40px;width:500px;font-size:13px;line-height:1.4;z-index:2147483640;background:#fff;';
+                    boxP.innerHTML = '<p style="margin:0 0 14px 0;">Tratando-se de mandado de segurança na inicial.</p><p style="margin:0 0 14px 0;">Assim, diante do descumprimento da determinação judicial.</p><p style="margin:0;">Ante o exposto, indefiro a petição inicial.</p>';
+                    document.body.appendChild(boxP);
+
+                    const rng69 = document.createRange();
+                    rng69.setStart(boxP.firstChild.firstChild, 0);
+                    rng69.setEnd(boxP.lastChild.firstChild, boxP.lastChild.firstChild.length);
+
+                    const segs69 = vis69.calcularLinhasDoRange(rng69);
+                    const blocos69 = vis69.agruparLinhasEmBlocos(segs69);
+                    const blocoUnicoOk = (blocos69.length === 1 && blocos69[0].length === 3);
+
+                    vis69.dispararFlashBorderVisual(rng69, 5000, '#0d9488');
+                    const flashSvgOk = Boolean(document.querySelector('#jusgov-flash-contour-container svg path'));
+                    vis69.configurarMarcadorColado({ ativo: true, tipoContorno: 'solido', estiloBadge: 'sobrescrito' });
+                    vis69.registrarCopiaCandidataParaMarcador(rng69, rng69.toString());
+                    vis69.confirmarColagemEMarcarPermanente(rng69.toString());
+                    const markerSvgOk = Boolean(document.querySelector('#jusgov-pasted-markers-container svg path'));
+
+                    vis69.limparFlashBorderImediatamente();
+                    vis69.limparMarcadoresPermanentes();
+                    boxP.remove();
+
+                    bug69Ok = blocoUnicoOk && flashSvgOk && markerSvgOk;
+                    detalheBug69 = `blocos=${blocos69.length}, linhas=${blocos69[0] && blocos69[0].length}, flashSvg=${flashSvgOk}, markerSvg=${markerSvgOk}`;
+                }
+            } catch (e69) {
+                detalheBug69 = e69.message || String(e69);
+            }
+            registrar(
+                bug69Ok,
+                'BUG_69_CONTINUIDADE_POLIGONO_SVG_MULTI_PARAGRAFO',
+                'agruparLinhasEmBlocos une linhas e parágrafos vizinhos de um mesmo Range em polígono SVG contínuo tanto no Flash Border quanto no Marcador Permanente.',
+                { detalhe: detalheBug69 }
+            );
         }
 
         if (opcoes && opcoes.fuzz) {

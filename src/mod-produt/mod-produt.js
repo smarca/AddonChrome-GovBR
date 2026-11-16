@@ -93,7 +93,12 @@
                 alertaAtivoDisparado: false,
                 pomodoroFase: 'foco',
                 pomodoroMinutosNaFase: 0,
-                pomodoroCicloAtual: 0
+                pomodoroCicloAtual: 0,
+                pomodoroDescansoRealizadoNoCiclo: false,
+                pomodoroDescansoPendente: false,
+                pomodoroFaseInicioTs: agora,
+                _ultimoIdleAutoCreditadoTs: 0,
+                _nivelAutoCreditado: ''
             };
         }
 
@@ -160,8 +165,126 @@
                 estado.ultimaAtividadeTs = Date.now();
                 estado.emPausa = false;
                 estado.minutosInativosPendentes = 0;
+                estado._nivelAutoCreditado = '';
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
             } catch (_) { }
+        }
+
+        /**
+         * Calcula parâmetros e resumo legível da máquina Pomodoro atual.
+         * @param {Object} estado
+         * @param {Object} [config]
+         * @param {number} [agora]
+         * @returns {Object}
+         */
+        calcularResumoPomodoro(estado = {}, config = {}, agora = Date.now()) {
+            const ativo = Boolean(config && config.pomodoroAtivo);
+            const focoMin = Math.max(25, Number(config && config.pomodoroFocoMinutos || 25));
+            const proporcao = Number(config && config.pomodoroProporcao || 4.5);
+            const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
+            const ciclosMax = Math.max(2, Number(config && config.pomodoroCiclos || 4));
+            const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
+            const fase = ['foco', 'alivio', 'pausa_maior'].includes(estado.pomodoroFase) ? estado.pomodoroFase : 'foco';
+            const minutosNaFase = Math.max(0, Math.floor(Number(estado.pomodoroMinutosNaFase || 0)));
+            const metaFaseMin = fase === 'pausa_maior' ? pausaMaiorMin : (fase === 'alivio' ? alivioMin : focoMin);
+            const minutosRestantes = Math.max(0, metaFaseMin - minutosNaFase);
+            const cicloConcluido = Math.max(0, Math.floor(Number(estado.pomodoroCicloAtual || 0)));
+            const cicloAtual = fase === 'foco' ? Math.min(ciclosMax, cicloConcluido + 1) : Math.max(1, Math.min(ciclosMax, cicloConcluido));
+            const inicioFaseTs = Number(estado.pomodoroFaseInicioTs || estado.inicioTs || agora);
+            const terminaEmTs = inicioFaseTs + metaFaseMin * 60000;
+            const segRestantes = Math.max(0, Math.ceil((terminaEmTs - agora) / 1000));
+            const emDescanso = (fase === 'alivio' || fase === 'pausa_maior');
+            const descansoPendente = Boolean(estado.pomodoroDescansoPendente || (emDescanso && !estado.pomodoroDescansoRealizadoNoCiclo));
+            const descansoRealizado = Boolean(estado.pomodoroDescansoRealizadoNoCiclo && !descansoPendente);
+            const faseLabel = fase === 'pausa_maior' ? 'Descanso Maior' : (fase === 'alivio' ? 'Alívio' : 'Foco');
+
+            return {
+                ativo,
+                fase,
+                faseLabel,
+                focoMin,
+                alivioMin,
+                pausaMaiorMin,
+                cicloConcluido,
+                cicloAtual,
+                ciclosMax,
+                minutosNaFase,
+                metaFaseMin,
+                minutosRestantes,
+                segundosRestantes: segRestantes,
+                faseInicioTs: inicioFaseTs,
+                faseTerminaEmTs: terminaEmTs,
+                emDescanso,
+                descansoPendente,
+                descansoRealizado
+            };
+        }
+
+        /**
+         * Resolve preferências de exibição dos avisos/contadores Pomodoro a partir de pomodoroModoAviso.
+         * @param {Object} [config]
+         * @returns {{ modo: string, usarModal: boolean, usarBadge: boolean, modoBarra: string }}
+         */
+        resolverPreferenciasAvisoPomodoro(config = {}) {
+            const modo = (config && typeof config.pomodoroModoAviso === 'string') ? config.pomodoroModoAviso : 'completo';
+            const usarModal = (modo === 'modal' || modo === 'completo');
+            const usarBadge = (modo === 'badge' || modo === 'badge_e_barra_descanso' || modo === 'completo');
+            let modoBarra = 'nunca';
+            if (modo === 'barra_sempre' || modo === 'completo') {
+                modoBarra = 'sempre';
+            } else if (modo === 'barra_descanso' || modo === 'badge_e_barra_descanso') {
+                modoBarra = 'descanso';
+            }
+            return { modo, usarModal, usarBadge, modoBarra };
+        }
+
+        /**
+         * Aplica crédito automático de Alívio ou Descanso Maior (com reinício de ciclo) quando o usuário
+         * permanece ocioso pelo tempo mínimo configurado e "Registrar Pausas Automáticas" está ativo (FEAT-37).
+         * @param {Object} estado
+         * @param {number} [agora]
+         * @param {Object} [config]
+         * @returns {{ creditado: boolean, tipo: string }}
+         */
+        registrarPausasAutomaticasProdutividade(estado, agora = Date.now(), config = {}) {
+            if (!estado || !config || !config.pomodoroAtivo || config.pomodoroPausasAutomaticas === false) {
+                return { creditado: false, tipo: 'desativado' };
+            }
+            const focoMin = Math.max(25, Number(config.pomodoroFocoMinutos || 25));
+            const proporcao = Number(config.pomodoroProporcao || 4.5);
+            const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
+            const ciclosMax = Math.max(2, Number(config.pomodoroCiclos || 4));
+            const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
+
+            const ultimaAtivTs = Number(estado.ultimaAtividadeTs || agora);
+            const msInativo = Math.max(0, agora - ultimaAtivTs);
+            const minInativo = Math.floor(msInativo / 60000);
+            const nivelAnterior = (estado._ultimoIdleAutoCreditadoTs === ultimaAtivTs) ? (estado._nivelAutoCreditado || '') : '';
+
+            if (minInativo >= pausaMaiorMin && nivelAnterior !== 'pausa_maior') {
+                estado.pomodoroFase = 'foco';
+                estado.pomodoroMinutosNaFase = 0;
+                estado.pomodoroCicloAtual = 0;
+                estado.pomodoroDescansoRealizadoNoCiclo = true;
+                estado.pomodoroDescansoPendente = false;
+                estado.pomodoroFaseInicioTs = agora;
+                estado._ultimoIdleAutoCreditadoTs = ultimaAtivTs;
+                estado._nivelAutoCreditado = 'pausa_maior';
+                return { creditado: true, tipo: 'pausa_maior' };
+            }
+
+            if (minInativo >= alivioMin && minInativo < pausaMaiorMin && nivelAnterior !== 'alivio' && nivelAnterior !== 'pausa_maior') {
+                estado.pomodoroFase = 'foco';
+                estado.pomodoroMinutosNaFase = 0;
+                estado.pomodoroDescansoRealizadoNoCiclo = true;
+                estado.pomodoroDescansoPendente = false;
+                estado.pomodoroFaseInicioTs = agora;
+                estado._ultimoIdleAutoCreditadoTs = ultimaAtivTs;
+                estado._nivelAutoCreditado = 'alivio';
+                return { creditado: true, tipo: 'alivio' };
+            }
+
+            return { creditado: false, tipo: 'nenhum' };
         }
 
         /**
@@ -303,6 +426,8 @@
                 const agora = Date.now();
                 const res = this.avancarMinutoEstadoTrabalho(estado, agora, config);
 
+                const prefsAviso = this.resolverPreferenciasAvisoPomodoro(config);
+
                 if (res.disparoCorrido) {
                     await this.projetarModalProdutividadeEmTodasJanelas(
                         'Tempo de Trabalho Corrido Atingido',
@@ -320,52 +445,228 @@
                 }
 
                 if (pomodoroAtivo) {
+                    const autoRes = this.registrarPausasAutomaticasProdutividade(estado, agora, config);
                     const focoMin = Math.max(25, Number(config.pomodoroFocoMinutos || 25));
                     const proporcao = Number(config.pomodoroProporcao || 4.5);
                     const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
                     const ciclosMax = Math.max(2, Number(config.pomodoroCiclos || 4));
                     const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
+                    const msInativo = Math.max(0, agora - Number(estado.ultimaAtividadeTs || agora));
+                    const minInativo = Math.floor(msInativo / 60000);
 
-                    estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
-                    if (estado.pomodoroFase === 'foco' && estado.pomodoroMinutosNaFase >= focoMin) {
-                        estado.pomodoroCicloAtual = Number(estado.pomodoroCicloAtual || 0) + 1;
-                        estado.pomodoroMinutosNaFase = 0;
-                        if (estado.pomodoroCicloAtual >= ciclosMax) {
-                            estado.pomodoroFase = 'pausa_maior';
-                            await this.projetarModalProdutividadeEmTodasJanelas(
-                                'Pomodoro: Hora da Pausa Maior!',
-                                `Você concluiu ${ciclosMax} ciclos de foco (${focoMin} min cada). Descanse por ${pausaMaiorMin} minutos.`,
-                                `Proporção ${proporcao}:1 • Pausa Maior de ${pausaMaiorMin} min`
-                            );
-                        } else {
-                            estado.pomodoroFase = 'alivio';
-                            await this.projetarModalProdutividadeEmTodasJanelas(
-                                'Pomodoro: Hora do Alívio!',
-                                `Ciclo ${estado.pomodoroCicloAtual}/${ciclosMax} concluído (${focoMin} min). Faça uma pausa de ${alivioMin} minutos.`,
-                                `Proporção ${proporcao}:1 • Alívio de ${alivioMin} min`
-                            );
+                    if (!autoRes.creditado) {
+                        const podeAvancarFoco = (estado.pomodoroFase !== 'foco') || (!estado.emPausa && minInativo < alivioMin);
+                        if (podeAvancarFoco) {
+                            estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
                         }
-                    } else if (estado.pomodoroFase === 'alivio' && estado.pomodoroMinutosNaFase >= alivioMin) {
-                        estado.pomodoroFase = 'foco';
-                        estado.pomodoroMinutosNaFase = 0;
-                        await this.projetarModalProdutividadeEmTodasJanelas(
-                            'Pomodoro: Fim do Alívio',
-                            `Retome o foco para o ciclo ${estado.pomodoroCicloAtual + 1}/${ciclosMax} (${focoMin} min).`,
-                            'Bom trabalho!'
-                        );
-                    } else if (estado.pomodoroFase === 'pausa_maior' && estado.pomodoroMinutosNaFase >= pausaMaiorMin) {
-                        estado.pomodoroFase = 'foco';
-                        estado.pomodoroMinutosNaFase = 0;
-                        estado.pomodoroCicloAtual = 0;
-                        await this.projetarModalProdutividadeEmTodasJanelas(
-                            'Pomodoro: Fim da Pausa Maior',
-                            `Novo bloco de ${ciclosMax} ciclos iniciado (${focoMin} min de foco).`,
-                            'Bom retorno!'
-                        );
+                        if (estado.pomodoroFase === 'foco' && estado.pomodoroMinutosNaFase >= focoMin) {
+                            estado.pomodoroCicloAtual = Number(estado.pomodoroCicloAtual || 0) + 1;
+                            estado.pomodoroMinutosNaFase = 0;
+                            estado.pomodoroFaseInicioTs = agora;
+                            estado.pomodoroDescansoRealizadoNoCiclo = false;
+                            estado.pomodoroDescansoPendente = true;
+                            if (estado.pomodoroCicloAtual >= ciclosMax) {
+                                estado.pomodoroFase = 'pausa_maior';
+                                if (prefsAviso.usarModal) {
+                                    await this.projetarModalProdutividadeEmTodasJanelas(
+                                        'Pomodoro: Hora da Pausa Maior!',
+                                        `Você concluiu ${ciclosMax} ciclos de foco (${focoMin} min cada). Descanse por ${pausaMaiorMin} minutos.`,
+                                        `Proporção ${proporcao}:1 • Pausa Maior de ${pausaMaiorMin} min`
+                                    );
+                                }
+                            } else {
+                                estado.pomodoroFase = 'alivio';
+                                if (prefsAviso.usarModal) {
+                                    await this.projetarModalProdutividadeEmTodasJanelas(
+                                        'Pomodoro: Hora do Alívio!',
+                                        `Ciclo ${estado.pomodoroCicloAtual}/${ciclosMax} concluído (${focoMin} min). Faça uma pausa de ${alivioMin} minutos.`,
+                                        `Proporção ${proporcao}:1 • Alívio de ${alivioMin} min`
+                                    );
+                                }
+                            }
+                        } else if (estado.pomodoroFase === 'alivio' && estado.pomodoroMinutosNaFase >= alivioMin) {
+                            const descansouNoPeriodo = (minInativo >= 1) || Boolean(estado.emPausa);
+                            estado.pomodoroFase = 'foco';
+                            estado.pomodoroMinutosNaFase = 0;
+                            estado.pomodoroFaseInicioTs = agora;
+                            estado.pomodoroDescansoRealizadoNoCiclo = descansouNoPeriodo;
+                            estado.pomodoroDescansoPendente = !descansouNoPeriodo;
+                            if (prefsAviso.usarModal) {
+                                await this.projetarModalProdutividadeEmTodasJanelas(
+                                    'Pomodoro: Fim do Alívio',
+                                    descansouNoPeriodo
+                                        ? `Retome o foco para o ciclo ${estado.pomodoroCicloAtual + 1}/${ciclosMax} (${focoMin} min).`
+                                        : `Atenção: o alívio encerrou sem descanso detectado. Retome com pausa recomendada (${focoMin} min).`,
+                                    descansouNoPeriodo ? 'Descanso realizado — bom trabalho!' : 'Descanso pendente neste ciclo'
+                                );
+                            }
+                        } else if (estado.pomodoroFase === 'pausa_maior' && estado.pomodoroMinutosNaFase >= pausaMaiorMin) {
+                            const descansouNoPeriodo = (minInativo >= 1) || Boolean(estado.emPausa);
+                            estado.pomodoroFase = 'foco';
+                            estado.pomodoroMinutosNaFase = 0;
+                            estado.pomodoroCicloAtual = 0;
+                            estado.pomodoroFaseInicioTs = agora;
+                            estado.pomodoroDescansoRealizadoNoCiclo = descansouNoPeriodo;
+                            estado.pomodoroDescansoPendente = !descansouNoPeriodo;
+                            if (prefsAviso.usarModal) {
+                                await this.projetarModalProdutividadeEmTodasJanelas(
+                                    'Pomodoro: Fim da Pausa Maior',
+                                    `Novo bloco de ${ciclosMax} ciclos iniciado (${focoMin} min de foco).`,
+                                    descansouNoPeriodo ? 'Descanso completo realizado!' : 'Descanso completo pendente'
+                                );
+                            }
+                        }
                     }
                 }
 
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
+                await this.sincronizarIndicadoresGlobaisPomodoro(config, estado);
+            } catch (_) { }
+        }
+
+        /**
+         * Atualiza o badge do ícone no Chrome e projeta/remove a faixa flutuante global nas abas ativas.
+         * @param {Object} [config]
+         * @param {Object} [estadoParam]
+         * @param {number|null} [tabIdEspecifica]
+         */
+        async sincronizarIndicadoresGlobaisPomodoro(config = null, estadoParam = null, tabIdEspecifica = null) {
+            try {
+                if (typeof chrome === 'undefined') return;
+                const cfg = config || (this._obterConfig ? await this._obterConfig() : {});
+                const estado = estadoParam || await this.obterOuIniciarEstadoTrabalhoHoje();
+                const resumo = this.calcularResumoPomodoro(estado, cfg, Date.now());
+                const prefs = this.resolverPreferenciasAvisoPomodoro(cfg);
+
+                if (chrome.action && chrome.action.setBadgeText) {
+                    if (resumo.ativo && prefs.usarBadge) {
+                        const txtMin = `${Math.max(0, resumo.minutosRestantes)}m`;
+                        const txtBadge = resumo.descansoPendente && !resumo.emDescanso ? `!${txtMin}` : txtMin;
+                        const cor = resumo.descansoPendente ? '#dc2626' : (resumo.emDescanso ? '#0284c7' : '#0d9488');
+                        chrome.action.setBadgeText({ text: txtBadge }).catch(() => { });
+                        if (chrome.action.setBadgeBackgroundColor) {
+                            chrome.action.setBadgeBackgroundColor({ color: cor }).catch(() => { });
+                        }
+                        if (chrome.action.setTitle) {
+                            const statusDesc = resumo.descansoPendente ? 'Descanso Pendente' : (resumo.descansoRealizado ? 'Descanso Realizado' : 'Foco em andamento');
+                            chrome.action.setTitle({
+                                title: `JusGovBR • Pomodoro: ${resumo.faseLabel} (${resumo.minutosNaFase}/${resumo.metaFaseMin} min • Ciclo ${resumo.cicloAtual}/${resumo.ciclosMax} • ${statusDesc})`
+                            }).catch(() => { });
+                        }
+                    } else {
+                        chrome.action.setBadgeText({ text: '' }).catch(() => { });
+                        if (chrome.action.setTitle) {
+                            chrome.action.setTitle({ title: 'JusGovBR — Seleção/Cópia Inteligente' }).catch(() => { });
+                        }
+                    }
+                }
+
+                if (!chrome.tabs || !chrome.scripting) return;
+                const deveMostrarBarra = Boolean(
+                    resumo.ativo &&
+                    (prefs.modoBarra === 'sempre' || (prefs.modoBarra === 'descanso' && (resumo.emDescanso || resumo.descansoPendente)))
+                );
+
+                let abas = [];
+                if (tabIdEspecifica) {
+                    const abaUnica = await chrome.tabs.get(tabIdEspecifica).catch(() => null);
+                    if (abaUnica) abas = [abaUnica];
+                } else {
+                    abas = await chrome.tabs.query({ active: true }).catch(() => []);
+                }
+
+                for (const aba of abas) {
+                    if (!aba || !aba.id || !aba.url || !/^https?:\/\//i.test(aba.url)) continue;
+                    chrome.scripting.executeScript({
+                        target: { tabId: aba.id },
+                        func: (exibir, dadosResumo) => {
+                            const idHost = 'jusgov-pomodoro-barra-global';
+                            let host = document.getElementById(idHost);
+                            if (!exibir) {
+                                if (host) {
+                                    if (host.__jusgovTimerInterval) clearInterval(host.__jusgovTimerInterval);
+                                    host.remove();
+                                }
+                                return;
+                            }
+
+                            const chaveFase = `${dadosResumo.fase}:${dadosResumo.cicloAtual}:${dadosResumo.faseInicioTs}`;
+                            try {
+                                if (sessionStorage.getItem('jusgovPomodoroBarraFechadaFase') === chaveFase) {
+                                    return;
+                                }
+                            } catch (_) { }
+
+                            if (!host) {
+                                host = document.createElement('div');
+                                host.id = idHost;
+                                host.setAttribute('data-jusgov-ignore', 'true');
+                                host.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;pointer-events:none;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;';
+                                const shadow = host.attachShadow({ mode: 'closed' });
+                                const pill = document.createElement('div');
+                                pill.style.cssText = 'pointer-events:auto;display:inline-flex;align-items:center;gap:10px;padding:6px 12px;border-radius:999px;background:#0f172a;color:#f8fafc;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(15,23,42,0.32);border:1.5px solid #0d9488;white-space:nowrap;';
+                                const spanFase = document.createElement('span');
+                                spanFase.setAttribute('data-parte', 'fase');
+                                const spanTempo = document.createElement('span');
+                                spanTempo.setAttribute('data-parte', 'tempo');
+                                spanTempo.style.cssText = 'font-variant-numeric:tabular-nums;font-weight:700;';
+                                const spanStatus = document.createElement('span');
+                                spanStatus.setAttribute('data-parte', 'status');
+                                spanStatus.style.cssText = 'padding:2px 7px;border-radius:999px;font-size:11px;font-weight:700;';
+                                const btnFechar = document.createElement('button');
+                                btnFechar.type = 'button';
+                                btnFechar.textContent = '×';
+                                btnFechar.title = 'Ocultar barra nesta fase';
+                                btnFechar.style.cssText = 'background:transparent;border:none;color:#cbd5e1;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;';
+                                pill.appendChild(spanFase);
+                                pill.appendChild(spanTempo);
+                                pill.appendChild(spanStatus);
+                                pill.appendChild(btnFechar);
+                                shadow.appendChild(pill);
+                                host.__jusgovUI = { pill, spanFase, spanTempo, spanStatus, btnFechar };
+                                btnFechar.addEventListener('click', (ev) => {
+                                    ev.stopPropagation();
+                                    try { sessionStorage.setItem('jusgovPomodoroBarraFechadaFase', host.__jusgovChaveFase || ''); } catch (_) { }
+                                    if (host.__jusgovTimerInterval) clearInterval(host.__jusgovTimerInterval);
+                                    host.remove();
+                                });
+                                (document.body || document.documentElement).appendChild(host);
+                            }
+
+                            host.__jusgovChaveFase = chaveFase;
+                            const ui = host.__jusgovUI;
+                            if (!ui) return;
+                            const corBorda = dadosResumo.descansoPendente ? '#dc2626' : (dadosResumo.emDescanso ? '#0284c7' : '#0d9488');
+                            ui.pill.style.borderColor = corBorda;
+                            ui.spanFase.textContent = `🍅 ${dadosResumo.faseLabel} • Ciclo ${dadosResumo.cicloAtual}/${dadosResumo.ciclosMax}`;
+                            if (dadosResumo.descansoPendente) {
+                                ui.spanStatus.textContent = 'Descanso Pendente';
+                                ui.spanStatus.style.background = '#dc2626';
+                                ui.spanStatus.style.color = '#ffffff';
+                            } else if (dadosResumo.descansoRealizado) {
+                                ui.spanStatus.textContent = 'Descanso Realizado';
+                                ui.spanStatus.style.background = '#0d9488';
+                                ui.spanStatus.style.color = '#ffffff';
+                            } else {
+                                ui.spanStatus.textContent = 'Em Foco';
+                                ui.spanStatus.style.background = 'rgba(255,255,255,0.14)';
+                                ui.spanStatus.style.color = '#e2e8f0';
+                            }
+
+                            const atualizarRelogio = () => {
+                                const diffSeg = Math.floor((Number(dadosResumo.faseTerminaEmTs || 0) - Date.now()) / 1000);
+                                const absSeg = Math.max(0, Math.abs(diffSeg));
+                                const mm = String(Math.floor(absSeg / 60)).padStart(2, '0');
+                                const ss = String(absSeg % 60).padStart(2, '0');
+                                ui.spanTempo.textContent = diffSeg >= 0 ? `${mm}:${ss}` : `+${mm}:${ss}`;
+                            };
+                            atualizarRelogio();
+                            if (host.__jusgovTimerInterval) clearInterval(host.__jusgovTimerInterval);
+                            host.__jusgovTimerInterval = setInterval(atualizarRelogio, 1000);
+                        },
+                        args: [deveMostrarBarra, resumo]
+                    }).catch(() => { });
+                }
             } catch (_) { }
         }
 

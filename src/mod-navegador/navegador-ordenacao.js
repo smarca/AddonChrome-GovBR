@@ -43,11 +43,16 @@
 
     class GerenciadorOrdenacaoGuias {
         #criterio = 'hierarquia_arvore'; // 'nenhum', 'hierarquia_arvore', 'dominio', 'dominio_titulo', 'url', 'titulo', 'dominio_criacao', 'dominio_acesso'
-        #sentido = 'esq_dir';  // 'esq_dir' (A-Z / Antigos), 'dir_esq' (Z-A / Recentes)
+        #sentido = 'esq_dir';  // 'esq_dir' (A-Z / Novo-Antigo), 'dir_esq' (Z-A / Antigo-Novo)
         #ordenarGuiasFixadas = false;
         #timerOrdenacaoAbas = null;
         #estaOrdenandoGuias = false;
         #arvoreOpener = new Map();
+        #criacaoPorAba = new Map();
+        #seqCriacao = 0;
+        #arvoreHidratada = false;
+        #promessaHidratacaoArvore = null;
+        #timerPersistirArvore = null;
         #emFechamentoCascata = new Set();
 
         /**
@@ -159,11 +164,6 @@
                 return tab.lastAccessed || 0;
             };
 
-            const extrairTimestampCriacao = (tab, reg) => {
-                if (reg && reg.criadaEm) return reg.criadaEm;
-                return tab.id || 0;
-            };
-
             if (criterio === 'titulo') {
                 const titA = (a.title || '').toLowerCase();
                 const titB = (b.title || '').toLowerCase();
@@ -172,15 +172,14 @@
             }
 
             if (criterio === 'ordem_criacao') {
-                const tA = extrairTimestampCriacao(a, regA);
-                const tB = extrairTimestampCriacao(b, regB);
-                return (sentido === 'dir_esq') ? (tB - tA) : (tA - tB);
+                const cmpCriacao = this.compararPorCriacaoCronologica(a, b, mapa);
+                return (sentido === 'dir_esq') ? cmpCriacao : -cmpCriacao;
             }
 
             if (criterio === 'tempo_acesso') {
                 const tA = extrairTimestampNavegacao(a, regA);
                 const tB = extrairTimestampNavegacao(b, regB);
-                return (sentido === 'dir_esq') ? (tB - tA) : (tA - tB);
+                return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
             }
 
             // Critérios baseados em Domínio: 'dominio', 'url', 'dominio_criacao', 'dominio_acesso'
@@ -206,15 +205,14 @@
             }
 
             if (criterio === 'dominio_criacao') {
-                const tA = extrairTimestampCriacao(a, regA);
-                const tB = extrairTimestampCriacao(b, regB);
-                return (sentido === 'dir_esq') ? (tB - tA) : (tA - tB);
+                const cmpDomCriacao = this.compararPorCriacaoCronologica(a, b, mapa);
+                return (sentido === 'dir_esq') ? cmpDomCriacao : -cmpDomCriacao;
             }
 
             if (criterio === 'dominio_acesso') {
                 const tA = extrairTimestampNavegacao(a, regA);
                 const tB = extrairTimestampNavegacao(b, regB);
-                return (sentido === 'dir_esq') ? (tB - tA) : (tA - tB);
+                return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
             }
 
             if (criterio === 'url') {
@@ -232,13 +230,140 @@
         }
 
         /**
-         * Registra relação genealógica Pai -> Filha (Seção 6.92)
+         * Registra timestamp monotônico local de criação da aba sem misturar Epoch ms com tab.id.
+         * @param {number} tabId
+         * @param {number|null} [tsCustom]
+         */
+        registrarCriacaoAba(tabId, tsCustom = null) {
+            if (typeof tabId !== 'number') return;
+            const anterior = this.#criacaoPorAba.get(tabId);
+            if (anterior !== undefined && tsCustom === null) return;
+            this.#seqCriacao += 1;
+            const base = (typeof tsCustom === 'number' && Number.isFinite(tsCustom)) ? tsCustom : Date.now();
+            this.#criacaoPorAba.set(tabId, base * 1000 + (this.#seqCriacao % 1000));
+        }
+
+        /**
+         * Compara duas abas cronologicamente sem jamais misturar Epoch ms com tab.id pequeno (BUG-68).
+         * @param {Object} a
+         * @param {Object} b
+         * @param {Map|null} [mapa]
+         * @returns {number} <0 se A mais antiga, >0 se B mais antiga
+         */
+        compararPorCriacaoCronologica(a, b, mapa = null) {
+            const extrairInfoTempo = (tab) => {
+                const reg = (mapa && typeof mapa.get === 'function') ? mapa.get(tab.id) : null;
+                if (reg && typeof reg.criadaEm === 'number' && Number.isFinite(reg.criadaEm)) {
+                    return { temTs: true, val: reg.criadaEm * 1000 };
+                }
+                const seqSalva = this.#criacaoPorAba.get(tab.id);
+                if (typeof seqSalva === 'number' && Number.isFinite(seqSalva)) {
+                    return { temTs: true, val: seqSalva };
+                }
+                const ordemVisual = (typeof tab.index === 'number') ? tab.index : (tab.id || 0);
+                return { temTs: false, val: ordemVisual };
+            };
+
+            const infoA = extrairInfoTempo(a);
+            const infoB = extrairInfoTempo(b);
+
+            if (infoA.temTs !== infoB.temTs) {
+                /* Aba preexistente não rastreada (temTs=false) precede aba criada depois na sessão */
+                return infoA.temTs ? 1 : -1;
+            }
+            const diff = infoA.val - infoB.val;
+            if (diff !== 0) return diff;
+            const idxDiff = (Number(a.index || 0)) - (Number(b.index || 0));
+            return (idxDiff !== 0) ? idxDiff : ((a.id || 0) - (b.id || 0));
+        }
+
+        /**
+         * Hidrata relações pai->filha e timestamps de criação preservados em chrome.storage.session/local (MV3 SW).
+         * @param {Object} [chromeApi]
+         */
+        async garantirArvoreHidratada(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (this.#arvoreHidratada) return;
+            if (this.#promessaHidratacaoArvore) {
+                return await this.#promessaHidratacaoArvore;
+            }
+            const storageArea = (chromeApi && chromeApi.storage)
+                ? (chromeApi.storage.session || chromeApi.storage.local || null)
+                : null;
+            if (!storageArea || typeof storageArea.get !== 'function') {
+                this.#arvoreHidratada = true;
+                return;
+            }
+            this.#promessaHidratacaoArvore = (async () => {
+                try {
+                    const dados = await storageArea.get(['jusgovArvoreOpenerEstado']);
+                    const st = dados && dados.jusgovArvoreOpenerEstado;
+                    if (st && typeof st === 'object') {
+                        if (Array.isArray(st.arvore)) {
+                            for (const par of st.arvore) {
+                                if (Array.isArray(par) && typeof par[0] === 'number' && typeof par[1] === 'number' && par[0] !== par[1]) {
+                                    if (!this.#arvoreOpener.has(par[0])) this.#arvoreOpener.set(par[0], par[1]);
+                                }
+                            }
+                        }
+                        if (Array.isArray(st.criacao)) {
+                            for (const par of st.criacao) {
+                                if (Array.isArray(par) && typeof par[0] === 'number' && typeof par[1] === 'number') {
+                                    if (!this.#criacaoPorAba.has(par[0])) this.#criacaoPorAba.set(par[0], par[1]);
+                                }
+                            }
+                        }
+                        if (typeof st.seq === 'number' && st.seq > this.#seqCriacao) {
+                            this.#seqCriacao = st.seq;
+                        }
+                    }
+                    if (chromeApi.tabs && typeof chromeApi.tabs.query === 'function') {
+                        const abasAtuais = await chromeApi.tabs.query({}).catch(() => []);
+                        const idsVivos = new Set((abasAtuais || []).map(t => t.id));
+                        for (const id of [...this.#arvoreOpener.keys()]) {
+                            if (!idsVivos.has(id)) this.#arvoreOpener.delete(id);
+                        }
+                        for (const id of [...this.#criacaoPorAba.keys()]) {
+                            if (!idsVivos.has(id)) this.#criacaoPorAba.delete(id);
+                        }
+                    }
+                } catch (_) { }
+                this.#arvoreHidratada = true;
+                this.#promessaHidratacaoArvore = null;
+            })();
+            return await this.#promessaHidratacaoArvore;
+        }
+
+        #agendarPersistenciaArvore(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            const storageArea = (chromeApi && chromeApi.storage)
+                ? (chromeApi.storage.session || chromeApi.storage.local || null)
+                : null;
+            if (!storageArea || typeof storageArea.set !== 'function') return;
+            if (this.#timerPersistirArvore) clearTimeout(this.#timerPersistirArvore);
+            this.#timerPersistirArvore = setTimeout(() => {
+                this.#timerPersistirArvore = null;
+                try {
+                    const payload = {
+                        arvore: [...this.#arvoreOpener.entries()].slice(-500),
+                        criacao: [...this.#criacaoPorAba.entries()].slice(-500),
+                        seq: this.#seqCriacao
+                    };
+                    storageArea.set({ jusgovArvoreOpenerEstado: payload }).catch(() => { });
+                } catch (_) { }
+            }, 150);
+        }
+
+        /**
+         * Registra relação genealógica Pai -> Filha (Seção 6.92 / BUG-68)
          * @param {number} tabId
          * @param {number} openerTabId
+         * @param {Object} [chromeApi]
          */
-        registrarRelacaoPaiFilha(tabId, openerTabId) {
+        registrarRelacaoPaiFilha(tabId, openerTabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (typeof tabId === 'number' && typeof openerTabId === 'number' && tabId !== openerTabId) {
+                this.registrarCriacaoAba(openerTabId);
+                this.registrarCriacaoAba(tabId);
                 this.#arvoreOpener.set(tabId, openerTabId);
+                this.#agendarPersistenciaArvore(chromeApi);
             }
         }
 
@@ -267,10 +392,12 @@
         /**
          * Remove aba da árvore de aberturas (e religa filhas ao avô caso não esteja em fechamento em cascata)
          * @param {number} tabId
+         * @param {Object} [chromeApi]
          */
-        removerDaArvore(tabId) {
+        removerDaArvore(tabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             const avoId = this.#arvoreOpener.get(tabId);
             this.#arvoreOpener.delete(tabId);
+            this.#criacaoPorAba.delete(tabId);
             for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
                 if (paiId === tabId) {
                     if (avoId !== undefined && avoId !== filhaId) {
@@ -280,6 +407,7 @@
                     }
                 }
             }
+            this.#agendarPersistenciaArvore(chromeApi);
         }
 
         marcarFechamentoCascata(ids = []) {
@@ -295,8 +423,12 @@
         }
 
         /**
-         * Ordena abas em formato de árvore genealógica DFS:
-         * Pai A -> Filha A.1 -> Subfilha A.1.1 -> Filha A.2 -> Pai B (Seção 6.92)
+         * Ordena abas em formato de árvore genealógica DFS contígua (Seção 6.92 / BUG-68):
+         * - Preserva subárvores inteiras juntas sem intercalar guias estranhas no meio.
+         * - No sentido 'esq_dir' (Novo-Antigo): nó filho mais novo fica imediatamente à direita do pai
+         *   (Pai -> Filha mais nova -> Subfilhas -> Filha anterior -> Raiz seguinte).
+         * - No sentido 'dir_esq' (Antigo-Novo): ordem cronológica crescente nas filhas e inversa nas raízes.
+         * - Preserva grupos nativos (Tab Groups) mantendo seus membros contíguos sem dissolver grupos.
          * @param {Array<Object>} abasAlvo
          * @param {string} [sentido]
          * @param {Map|null} [mapa]
@@ -305,7 +437,7 @@
         ordenarPorHierarquiaArvore(abasAlvo, sentido = 'esq_dir', mapa = null) {
             const conjuntoIds = new Set(abasAlvo.map(t => t.id));
             for (const t of abasAlvo) {
-                if (typeof t.openerTabId === 'number' && t.openerTabId !== t.id) {
+                if (typeof t.openerTabId === 'number' && t.openerTabId !== t.id && !this.#arvoreOpener.has(t.id)) {
                     this.#arvoreOpener.set(t.id, t.openerTabId);
                 }
             }
@@ -313,16 +445,11 @@
             const filhosPorPai = new Map();
             const raizes = [];
 
-            const obterTs = (tab) => {
-                const reg = mapa ? mapa.get(tab.id) : null;
-                if (reg && reg.criadaEm) return reg.criadaEm;
-                return tab.id || 0;
-            };
-
             for (const t of abasAlvo) {
-                const paiId = (typeof t.openerTabId === 'number' && conjuntoIds.has(t.openerTabId))
-                    ? t.openerTabId
-                    : this.#arvoreOpener.get(t.id);
+                const paiRegistrado = this.#arvoreOpener.get(t.id);
+                const paiId = (paiRegistrado !== undefined && conjuntoIds.has(paiRegistrado))
+                    ? paiRegistrado
+                    : ((typeof t.openerTabId === 'number' && conjuntoIds.has(t.openerTabId)) ? t.openerTabId : undefined);
                 if (paiId !== undefined && paiId !== t.id && conjuntoIds.has(paiId)) {
                     if (!filhosPorPai.has(paiId)) filhosPorPai.set(paiId, []);
                     filhosPorPai.get(paiId).push(t);
@@ -331,22 +458,20 @@
                 }
             }
 
-            const cmpCrono = (a, b) => {
-                const diff = obterTs(a) - obterTs(b);
-                return (diff !== 0) ? diff : ((a.index || 0) - (b.index || 0));
-            };
+            const cmpCrono = (a, b) => this.compararPorCriacaoCronologica(a, b, mapa);
 
             raizes.sort((a, b) => (sentido === 'dir_esq') ? -cmpCrono(a, b) : cmpCrono(a, b));
             for (const lista of filhosPorPai.values()) {
-                lista.sort(cmpCrono);
+                /* Opção A (Novo-Antigo): no sentido padrão esq_dir, filho mais novo fica colado logo à direita do pai */
+                lista.sort((a, b) => (sentido === 'dir_esq') ? cmpCrono(a, b) : -cmpCrono(a, b));
             }
 
-            const resultado = [];
+            const dfsBruto = [];
             const visitados = new Set();
             const visitar = (no) => {
                 if (!no || visitados.has(no.id)) return;
                 visitados.add(no.id);
-                resultado.push(no);
+                dfsBruto.push(no);
                 const filhos = filhosPorPai.get(no.id) || [];
                 for (const f of filhos) {
                     visitar(f);
@@ -359,7 +484,30 @@
             for (const t of abasAlvo) {
                 if (!visitados.has(t.id)) visitar(t);
             }
-            return resultado;
+
+            /* Compactar grupos nativos do Chrome sem intercalar guias externas dentro de um grupo ativo */
+            const porGrupo = new Map();
+            for (const t of dfsBruto) {
+                if (typeof t.groupId === 'number' && t.groupId > 0) {
+                    if (!porGrupo.has(t.groupId)) porGrupo.set(t.groupId, []);
+                    porGrupo.get(t.groupId).push(t);
+                }
+            }
+            if (porGrupo.size === 0) return dfsBruto;
+
+            const resultadoCompactado = [];
+            const gruposEmitidos = new Set();
+            for (const t of dfsBruto) {
+                if (typeof t.groupId === 'number' && t.groupId > 0) {
+                    if (!gruposEmitidos.has(t.groupId)) {
+                        gruposEmitidos.add(t.groupId);
+                        resultadoCompactado.push(...porGrupo.get(t.groupId));
+                    }
+                } else {
+                    resultadoCompactado.push(t);
+                }
+            }
+            return resultadoCompactado;
         }
 
         /**
@@ -395,6 +543,7 @@
             this.#estaOrdenandoGuias = true;
 
             try {
+                await this.garantirArvoreHidratada(chromeApi);
                 const sentido = config.sentidoOrdenacaoGuias || this.#sentido || 'esq_dir';
                 const ordenarFixadas = (config.ordenarGuiasFixadas !== undefined) ? Boolean(config.ordenarGuiasFixadas) : this.#ordenarGuiasFixadas;
 
@@ -405,25 +554,42 @@
 
                 if (!chromeApi || !chromeApi.tabs) return;
 
-                const abas = await chromeApi.tabs.query({ windowId: windowId });
+                let abas = await chromeApi.tabs.query({ windowId: windowId });
                 if (!abas || abas.length <= 1) return;
 
-                const abasAlvo = abas.filter(t => (ordenarFixadas ? true : !t.pinned));
+                let abasAlvo = abas.filter(t => (ordenarFixadas ? true : !t.pinned));
                 if (abasAlvo.length <= 1) return;
 
-                /* Dissolve grupos existentes para permitir a movimentação ordenada livre sem erros de Tab Groups do Chrome */
-                const temGrupos = abasAlvo.some(t => t.groupId !== undefined && t.groupId > 0);
-                if (temGrupos) {
-                    await this.desagruparTodas(windowId, chromeApi);
+                if (criterio === 'hierarquia_arvore') {
+                    /* Preserva Tab Groups existentes: se uma aba filha estiver fora do grupo da aba pai, associa ao mesmo grupo */
+                    const mapaPorId = new Map(abasAlvo.map(t => [t.id, t]));
+                    for (const t of abasAlvo) {
+                        const paiId = this.#arvoreOpener.get(t.id) ?? t.openerTabId;
+                        const paiTab = (paiId !== undefined) ? mapaPorId.get(paiId) : null;
+                        if (paiTab && typeof paiTab.groupId === 'number' && paiTab.groupId > 0 && (!t.groupId || t.groupId <= 0) && typeof chromeApi.tabs.group === 'function') {
+                            try {
+                                await chromeApi.tabs.group({ groupId: paiTab.groupId, tabIds: [t.id] });
+                                t.groupId = paiTab.groupId;
+                            } catch (_) { }
+                        }
+                    }
+                } else {
+                    /* Demais critérios dissolvem grupos existentes para permitir ordenação global livre */
+                    const temGrupos = abasAlvo.some(t => t.groupId !== undefined && t.groupId > 0);
+                    if (temGrupos) {
+                        await this.desagruparTodas(windowId, chromeApi);
+                        abas = await chromeApi.tabs.query({ windowId: windowId });
+                        abasAlvo = abas.filter(t => (ordenarFixadas ? true : !t.pinned));
+                    }
                 }
 
                 const abasOrdenadas = (criterio === 'hierarquia_arvore')
                     ? this.ordenarPorHierarquiaArvore(abasAlvo, sentido, mapaAbasUrls)
                     : [...abasAlvo].sort((a, b) => this.compararAbasParaOrdenacao(a, b, criterio, sentido, mapaAbasUrls));
 
-                const indexInicial = abasAlvo[0].index;
+                const indexInicial = Math.min(...abasAlvo.map(t => (typeof t.index === 'number' ? t.index : 0)));
 
-                /* Move as guias ordenadas uma a uma sequencialmente para os índices alvo exatos */
+                /* Move sequencialmente mantendo consistência de índices e grupos */
                 for (let i = 0; i < abasOrdenadas.length; i++) {
                     const t = abasOrdenadas[i];
                     const novoIdx = indexInicial + i;

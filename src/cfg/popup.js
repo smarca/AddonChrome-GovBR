@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarContadoresProdutividadePopup() {
         if (!rodapeProdutividadeOnline || typeof chrome === 'undefined') return;
-        const renderizar = (st) => {
+        const renderizar = (st, resumo = null) => {
             if (!st) return;
             const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
             const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0));
@@ -433,12 +433,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pausas !== 0) {
                 partes.push(`Pausas ${pausas}`);
             }
+            if (resumo && resumo.ativo) {
+                partes.push(`🍅 ${resumo.faseLabel} ${resumo.minutosNaFase}/${resumo.metaFaseMin}m (C${resumo.cicloAtual}/${resumo.ciclosMax})`);
+                if (resumo.descansoPendente) {
+                    const spBase = document.createElement('span');
+                    spBase.textContent = `${partes.join(' • ')} • `;
+                    const spPend = document.createElement('span');
+                    spPend.textContent = 'Descanso Pendente';
+                    spPend.style.color = '#dc2626';
+                    spPend.style.fontWeight = '700';
+                    rodapeProdutividadeOnline.replaceChildren(spBase, spPend);
+                    return;
+                }
+                if (resumo.descansoRealizado) {
+                    partes.push('Descanso Realizado');
+                }
+            }
             rodapeProdutividadeOnline.textContent = partes.join(' • ');
         };
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizar(resp.estado);
+                    renderizar(resp.estado, resp.resumoPomodoro || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
