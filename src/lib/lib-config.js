@@ -32,25 +32,59 @@
 }(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
 
-    const PADROES_DEFAULT_TURBO = Object.freeze([
-        '*://*.jus.br/*',
-        '*://*.gov.br/*',
-        '*://*.mp.br/*',
-        '*://*.def.br/*',
-        '*://gemini.google.com/*',
-        '*://serasa-judicial.serasaexperian.com.br/*'
-    ]);
+    const CHAVE_PERFIL_ATIVO = 'perfilAtivoId';
+    const CHAVE_LISTA_PERFIS = 'listaPerfis';
+    const PREFIXO_CHAVE_PERFIL_CFG = 'perfilCfg_';
 
-    const PADROES_DEFAULT_AMPULETAS = Object.freeze([
-        '*://*.jus.br/*',
-        '*://*.pje.jus.br/*',
-        '*://pje.jus.br/*',
-        '*://*pje*.jus.br/*',
-        '*://*pje*.*.jus.br/*'
-    ]);
+    function obterDefaultsModulo() {
+        if (typeof self !== 'undefined' && self.JusGovCfgDefaults) return self.JusGovCfgDefaults;
+        if (typeof window !== 'undefined' && window.JusGovCfgDefaults) return window.JusGovCfgDefaults;
+        if (typeof globalThis !== 'undefined' && globalThis.JusGovCfgDefaults) return globalThis.JusGovCfgDefaults;
+        if (typeof require === 'function') {
+            try { return require('../cfg/cfg-defaults.js'); } catch (_) { }
+        }
+        return null;
+    }
 
-    /* Regras de Mapeamento Manual Avancado de Elementos (XPath / CSS) Padroes de Fabrica (Secao 6.20) - Padrao vazio conforme Seção 6.85 */
-    const PADROES_DEFAULT_REGRAS_MAPEAMENTO = Object.freeze([]);
+    function clonarValorSimples(valor) {
+        if (Array.isArray(valor)) return [...valor];
+        if (valor && typeof valor === 'object') {
+            const out = {};
+            const ks = Object.keys(valor);
+            for (let i = 0; i < ks.length; i++) {
+                out[ks[i]] = clonarValorSimples(valor[ks[i]]);
+            }
+            return out;
+        }
+        return valor;
+    }
+
+    function valoresIguaisConfig(a, b) {
+        if (a === b) return true;
+        if (Array.isArray(a) || Array.isArray(b)) {
+            if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) return false;
+            }
+            return true;
+        }
+        if (a && b && typeof a === 'object' && typeof b === 'object') {
+            try {
+                return JSON.stringify(a) === JSON.stringify(b);
+            } catch (_) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    function normalizarTextoComparacao(str) {
+        return String(str || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
 
     class JusGovConfiguracoes {
         constructor(dependencias = {}) {
@@ -60,15 +94,593 @@
         }
 
         obterPadroesDefaultTurbo() {
-            return PADROES_DEFAULT_TURBO;
+            const def = obterDefaultsModulo();
+            return (def && def.PADROES_DEFAULT_TURBO) ? def.PADROES_DEFAULT_TURBO : Object.freeze([]);
         }
 
         obterPadroesDefaultAmpuletas() {
-            return PADROES_DEFAULT_AMPULETAS;
+            const def = obterDefaultsModulo();
+            return (def && def.PADROES_DEFAULT_AMPULETAS) ? def.PADROES_DEFAULT_AMPULETAS : Object.freeze([]);
         }
 
         obterPadroesDefaultRegrasMapeamento() {
-            return PADROES_DEFAULT_REGRAS_MAPEAMENTO;
+            const def = obterDefaultsModulo();
+            return (def && def.PADROES_DEFAULT_REGRAS_MAPEAMENTO) ? def.PADROES_DEFAULT_REGRAS_MAPEAMENTO : Object.freeze([]);
+        }
+
+        async carregarCatalogoPerfis(chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            const def = obterDefaultsModulo();
+            if (def && typeof def.carregarCatalogoPerfisJson === 'function') {
+                return await def.carregarCatalogoPerfisJson(apiChrome);
+            }
+            if (typeof fetch === 'function' && apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
+                try {
+                    const resp = await fetch(apiChrome.runtime.getURL('src/cfg/perfis.json'));
+                    if (resp && resp.ok) return await resp.json();
+                } catch (_) { }
+            }
+            return {
+                versaoEsquema: 1,
+                perfilPadraoId: 'padrao',
+                chavesGlobais: ['regrasMapeamentoElementos', 'perfilAtivoId', 'listaPerfis'],
+                configPadrao: {},
+                perfisPredefinidos: [
+                    { id: 'padrao', nome: 'Padrão', predefinido: true, sobrescritas: {} },
+                    { id: 'trabalho', nome: 'Trabalho', predefinido: true, sobrescritas: {} },
+                    { id: 'casa', nome: 'Casa', predefinido: true, sobrescritas: {} },
+                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true, sobrescritas: {} }
+                ]
+            };
+        }
+
+        chaveConfigPerfil(perfilId) {
+            return PREFIXO_CHAVE_PERFIL_CFG + String(perfilId || 'padrao').replace(/[^a-zA-Z0-9_-]/g, '_');
+        }
+
+        obterConfigPadraoBase(catalogo = null) {
+            const def = obterDefaultsModulo();
+            if (def && typeof def.obterConfigBasePadrao === 'function') {
+                return def.obterConfigBasePadrao(catalogo);
+            }
+            return clonarValorSimples((catalogo && catalogo.configPadrao) || {});
+        }
+
+        obterConfigPadraoParaPerfil(idOuNome, catalogo = null) {
+            const def = obterDefaultsModulo();
+            if (def && typeof def.obterConfigPadraoParaPerfil === 'function') {
+                return def.obterConfigPadraoParaPerfil(idOuNome, catalogo);
+            }
+            const base = this.obterConfigPadraoBase(catalogo);
+            const cat = catalogo || {};
+            const predefs = Array.isArray(cat.perfisPredefinidos) ? cat.perfisPredefinidos : [];
+            const alvo = normalizarTextoComparacao(idOuNome);
+            const encontrado = predefs.find(p =>
+                normalizarTextoComparacao(p.id) === alvo ||
+                normalizarTextoComparacao(p.nome) === alvo ||
+                (Array.isArray(p.aliases) && p.aliases.some(a => normalizarTextoComparacao(a) === alvo))
+            );
+            if (encontrado && encontrado.sobrescritas) {
+                Object.keys(encontrado.sobrescritas).forEach((k) => {
+                    base[k] = clonarValorSimples(encontrado.sobrescritas[k]);
+                });
+            }
+            return base;
+        }
+
+        obterChavesPorPerfil(catalogo = null) {
+            const base = this.obterConfigPadraoBase(catalogo);
+            const cat = catalogo || {};
+            const globais = new Set(Array.isArray(cat.chavesGlobais) ? cat.chavesGlobais : ['regrasMapeamentoElementos', CHAVE_PERFIL_ATIVO, CHAVE_LISTA_PERFIS]);
+            return Object.keys(base).filter(k => !globais.has(k) && !String(k).startsWith(PREFIXO_CHAVE_PERFIL_CFG));
+        }
+
+        extrairConfigPerfilDeObjeto(obj = {}, catalogo = null) {
+            const chaves = this.obterChavesPorPerfil(catalogo);
+            const resultado = {};
+            if (!obj || typeof obj !== 'object') return resultado;
+            for (let i = 0; i < chaves.length; i++) {
+                const k = chaves[i];
+                if (obj[k] !== undefined) {
+                    resultado[k] = clonarValorSimples(obj[k]);
+                }
+            }
+            return resultado;
+        }
+
+        calcularSobrescritasPerfil(configCompleta = {}, perfilId = 'padrao', catalogo = null) {
+            const basePerfil = this.obterConfigPadraoParaPerfil(perfilId, catalogo);
+            const chaves = this.obterChavesPorPerfil(catalogo);
+            const diff = {};
+            for (let i = 0; i < chaves.length; i++) {
+                const k = chaves[i];
+                if (configCompleta[k] === undefined) continue;
+                let valor = clonarValorSimples(configCompleta[k]);
+                if (k === 'urlsTurbo' && Array.isArray(valor)) {
+                    valor = valor.filter(u => u && u !== '<all_urls>');
+                }
+                if (!valoresIguaisConfig(valor, basePerfil[k])) {
+                    diff[k] = valor;
+                }
+            }
+            return diff;
+        }
+
+        resolverConfigEfetivaPerfil(perfilId = 'padrao', sobrescritasSalvas = {}, catalogo = null) {
+            const efetiva = this.obterConfigPadraoParaPerfil(perfilId, catalogo);
+            const chavesPermitidas = new Set(this.obterChavesPorPerfil(catalogo));
+            if (sobrescritasSalvas && typeof sobrescritasSalvas === 'object') {
+                const keys = Object.keys(sobrescritasSalvas);
+                for (let i = 0; i < keys.length; i++) {
+                    const k = keys[i];
+                    if (chavesPermitidas.has(k) && sobrescritasSalvas[k] !== undefined) {
+                        efetiva[k] = clonarValorSimples(sobrescritasSalvas[k]);
+                    }
+                }
+            }
+            if (Array.isArray(efetiva.urlsTurbo)) {
+                const limpa = efetiva.urlsTurbo.filter(u => u && u !== '<all_urls>');
+                efetiva.urlsTurbo = limpa.length > 0 ? limpa : [...this.obterPadroesDefaultTurbo()];
+            }
+            if (Array.isArray(efetiva.urlsAmpuletas) && efetiva.urlsAmpuletas.length === 0) {
+                efetiva.urlsAmpuletas = [...this.obterPadroesDefaultAmpuletas()];
+            }
+            if (efetiva.abaEmPrimeiroPlano !== undefined) {
+                efetiva.abaEmPrimeiroPlano = Boolean(efetiva.abaEmPrimeiroPlano);
+                efetiva.abaEmSegundoPlano = !efetiva.abaEmPrimeiroPlano;
+            }
+            if (typeof efetiva.tempoConferenciaDocumentosMs === 'number') {
+                efetiva.validacaoMatematicaAtiva = (efetiva.tempoConferenciaDocumentosMs !== 0);
+            }
+            if (typeof efetiva.modoPlaceholdersMinutasHtml === 'string') {
+                const ativo = (efetiva.modoPlaceholdersMinutasHtml !== 'desabilitado');
+                efetiva.placeholdersMinutasHtmlAtivo = ativo;
+                efetiva.selecaoEditavelAtiva = ativo;
+            }
+            return efetiva;
+        }
+
+        gerarIdPerfilCustom(nome, listaExistente = []) {
+            const baseSlug = normalizarTextoComparacao(nome).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'perfil';
+            const idsUsados = new Set((listaExistente || []).map(p => String(p.id)));
+            let candidato = `custom_${baseSlug}`;
+            let n = 2;
+            while (idsUsados.has(candidato)) {
+                candidato = `custom_${baseSlug}_${n}`;
+                n++;
+            }
+            return candidato;
+        }
+
+        garantirEstruturaPerfis(syncData = {}, catalogo = null) {
+            const cat = catalogo || {};
+            const predefs = Array.isArray(cat.perfisPredefinidos) && cat.perfisPredefinidos.length > 0
+                ? cat.perfisPredefinidos
+                : [
+                    { id: 'padrao', nome: 'Padrão', predefinido: true },
+                    { id: 'trabalho', nome: 'Trabalho', predefinido: true },
+                    { id: 'casa', nome: 'Casa', predefinido: true },
+                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true }
+                ];
+
+            const tinhaListaAnterior = Array.isArray(syncData[CHAVE_LISTA_PERFIS]) && syncData[CHAVE_LISTA_PERFIS].length > 0;
+            const listaBruta = tinhaListaAnterior ? syncData[CHAVE_LISTA_PERFIS] : [];
+            const mapaExistente = new Map();
+            for (let i = 0; i < listaBruta.length; i++) {
+                const item = listaBruta[i];
+                if (item && typeof item.id === 'string' && item.id.trim()) {
+                    mapaExistente.set(item.id.trim(), {
+                        id: item.id.trim(),
+                        nome: String(item.nome || item.id).trim().slice(0, 40),
+                        predefinido: Boolean(item.predefinido)
+                    });
+                }
+            }
+
+            const listaFinal = [];
+            const idsPredef = new Set();
+            for (let i = 0; i < predefs.length; i++) {
+                const p = predefs[i];
+                idsPredef.add(p.id);
+                listaFinal.push({
+                    id: p.id,
+                    nome: String(p.nome || p.id),
+                    predefinido: true
+                });
+            }
+            mapaExistente.forEach((item, id) => {
+                if (!idsPredef.has(id)) {
+                    listaFinal.push({
+                        id,
+                        nome: item.nome || id,
+                        predefinido: false
+                    });
+                }
+            });
+
+            let perfilAtivoId = typeof syncData[CHAVE_PERFIL_ATIVO] === 'string' ? syncData[CHAVE_PERFIL_ATIVO].trim() : '';
+            const perfilPadraoId = String(cat.perfilPadraoId || 'padrao');
+            if (!perfilAtivoId || !listaFinal.some(p => p.id === perfilAtivoId)) {
+                perfilAtivoId = perfilPadraoId;
+            }
+
+            const alteracoes = {};
+            if (!tinhaListaAnterior || JSON.stringify(syncData[CHAVE_LISTA_PERFIS]) !== JSON.stringify(listaFinal)) {
+                alteracoes[CHAVE_LISTA_PERFIS] = listaFinal;
+            }
+            if (syncData[CHAVE_PERFIL_ATIVO] !== perfilAtivoId) {
+                alteracoes[CHAVE_PERFIL_ATIVO] = perfilAtivoId;
+            }
+
+            for (let i = 0; i < listaFinal.length; i++) {
+                const p = listaFinal[i];
+                const chaveCfg = this.chaveConfigPerfil(p.id);
+                if (!syncData[chaveCfg] || typeof syncData[chaveCfg] !== 'object' || Array.isArray(syncData[chaveCfg])) {
+                    if (!tinhaListaAnterior && p.id === perfilAtivoId) {
+                        alteracoes[chaveCfg] = this.calcularSobrescritasPerfil(syncData, p.id, cat);
+                    } else {
+                        alteracoes[chaveCfg] = {};
+                    }
+                }
+            }
+
+            return { listaPerfis: listaFinal, perfilAtivoId, alteracoes };
+        }
+
+        async alternarPerfil(novoPerfilId, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncData = await apiChrome.storage.sync.get(null);
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+
+            const alvoNorm = normalizarTextoComparacao(novoPerfilId);
+            const destino = listaPerfis.find(p =>
+                p.id === novoPerfilId ||
+                normalizarTextoComparacao(p.id) === alvoNorm ||
+                normalizarTextoComparacao(p.nome) === alvoNorm ||
+                (p.id === 'estudo' && alvoNorm === 'estudar')
+            );
+            if (!destino) return { ok: false, motivo: 'perfil_nao_encontrado' };
+
+            const atualizacao = {
+                [CHAVE_LISTA_PERFIS]: listaPerfis,
+                [CHAVE_PERFIL_ATIVO]: destino.id
+            };
+
+            /* Passo P.1: Persistir snapshot das preferencias atuais no perfil que estava ativo */
+            const chaveAtual = this.chaveConfigPerfil(perfilAtivoId);
+            atualizacao[chaveAtual] = this.calcularSobrescritasPerfil(syncData, perfilAtivoId, cat);
+
+            /* Passo P.2: Carregar configuracoes efetivas do perfil destino (sem alterar regrasMapeamentoElementos globais) */
+            const chaveDestino = this.chaveConfigPerfil(destino.id);
+            const sobrescritasDestino = (destino.id === perfilAtivoId)
+                ? atualizacao[chaveAtual]
+                : ((syncData[chaveDestino] && typeof syncData[chaveDestino] === 'object') ? syncData[chaveDestino] : {});
+            atualizacao[chaveDestino] = sobrescritasDestino;
+
+            const configDestino = this.resolverConfigEfetivaPerfil(destino.id, sobrescritasDestino, cat);
+            Object.assign(atualizacao, configDestino);
+
+            await apiChrome.storage.sync.set(atualizacao);
+            return { ok: true, perfilAtivoId: destino.id, perfil: destino, listaPerfis, config: configDestino };
+        }
+
+        async criarPerfil(nomeBruto, opcoes = {}, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+
+            const nome = String(nomeBruto || '').trim().slice(0, 40);
+            if (!nome) return { ok: false, motivo: 'nome_invalido' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncData = await apiChrome.storage.sync.get(null);
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+
+            const nomeNorm = normalizarTextoComparacao(nome);
+            if (listaPerfis.some(p => normalizarTextoComparacao(p.nome) === nomeNorm) || nomeNorm === 'estudar') {
+                return { ok: false, motivo: 'nome_duplicado' };
+            }
+
+            const novoId = this.gerarIdPerfilCustom(nome, listaPerfis);
+            const novoPerfil = { id: novoId, nome, predefinido: false };
+            const novaLista = [...listaPerfis, novoPerfil];
+
+            const chaveAtual = this.chaveConfigPerfil(perfilAtivoId);
+            const snapshotAtual = this.calcularSobrescritasPerfil(syncData, perfilAtivoId, cat);
+            const origem = (opcoes && opcoes.origem) || 'padrao';
+            const sobrescritasNovo = (origem === 'copiar_atual')
+                ? this.calcularSobrescritasPerfil(syncData, novoId, cat)
+                : {};
+            const configNovo = this.resolverConfigEfetivaPerfil(novoId, sobrescritasNovo, cat);
+
+            const atualizacao = {
+                [CHAVE_LISTA_PERFIS]: novaLista,
+                [CHAVE_PERFIL_ATIVO]: novoId,
+                [chaveAtual]: snapshotAtual,
+                [this.chaveConfigPerfil(novoId)]: sobrescritasNovo,
+                ...configNovo
+            };
+
+            await apiChrome.storage.sync.set(atualizacao);
+            return { ok: true, perfil: novoPerfil, perfilAtivoId: novoId, listaPerfis: novaLista, config: configNovo };
+        }
+
+        async renomearPerfil(perfilId, novoNomeBruto, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+
+            const novoNome = String(novoNomeBruto || '').trim().slice(0, 40);
+            if (!novoNome) return { ok: false, motivo: 'nome_invalido' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncData = await apiChrome.storage.sync.get(null);
+            const { listaPerfis } = this.garantirEstruturaPerfis(syncData, cat);
+
+            const alvo = listaPerfis.find(p => p.id === perfilId);
+            if (!alvo || alvo.predefinido) return { ok: false, motivo: 'perfil_protegido' };
+
+            const norm = normalizarTextoComparacao(novoNome);
+            if (listaPerfis.some(p => p.id !== perfilId && normalizarTextoComparacao(p.nome) === norm) || norm === 'estudar') {
+                return { ok: false, motivo: 'nome_duplicado' };
+            }
+
+            const novaLista = listaPerfis.map(p => (p.id === perfilId ? { ...p, nome: novoNome } : p));
+            await apiChrome.storage.sync.set({ [CHAVE_LISTA_PERFIS]: novaLista });
+            return { ok: true, listaPerfis: novaLista };
+        }
+
+        async excluirPerfil(perfilId, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncData = await apiChrome.storage.sync.get(null);
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+
+            const alvo = listaPerfis.find(p => p.id === perfilId);
+            if (!alvo || alvo.predefinido) return { ok: false, motivo: 'perfil_protegido' };
+
+            const novaLista = listaPerfis.filter(p => p.id !== perfilId);
+            const chaveRemover = this.chaveConfigPerfil(perfilId);
+            const perfilPadraoId = String(cat.perfilPadraoId || 'padrao');
+
+            if (perfilAtivoId === perfilId) {
+                const sobrescritasPadrao = (syncData[this.chaveConfigPerfil(perfilPadraoId)] && typeof syncData[this.chaveConfigPerfil(perfilPadraoId)] === 'object')
+                    ? syncData[this.chaveConfigPerfil(perfilPadraoId)]
+                    : {};
+                const configPadraoAplicada = this.resolverConfigEfetivaPerfil(perfilPadraoId, sobrescritasPadrao, cat);
+                await apiChrome.storage.sync.set({
+                    [CHAVE_LISTA_PERFIS]: novaLista,
+                    [CHAVE_PERFIL_ATIVO]: perfilPadraoId,
+                    ...configPadraoAplicada
+                });
+            } else {
+                await apiChrome.storage.sync.set({ [CHAVE_LISTA_PERFIS]: novaLista });
+            }
+
+            if (typeof apiChrome.storage.sync.remove === 'function') {
+                await apiChrome.storage.sync.remove(chaveRemover);
+            }
+            return { ok: true, perfilAtivoId: (perfilAtivoId === perfilId ? perfilPadraoId : perfilAtivoId), listaPerfis: novaLista };
+        }
+
+        async resetarPerfis(escopo = 'atual', chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncData = await apiChrome.storage.sync.get(null);
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+
+            if (escopo === 'todos') {
+                const listaPredef = (Array.isArray(cat.perfisPredefinidos) ? cat.perfisPredefinidos : []).map(p => ({
+                    id: p.id,
+                    nome: String(p.nome || p.id),
+                    predefinido: true
+                }));
+                const novoAtivo = listaPredef.some(p => p.id === perfilAtivoId) ? perfilAtivoId : String(cat.perfilPadraoId || 'padrao');
+                const configAplicada = this.resolverConfigEfetivaPerfil(novoAtivo, {}, cat);
+
+                let regrasPadraoUsuario = [];
+                try {
+                    if (typeof fetch === 'function' && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
+                        const respInt = await fetch(apiChrome.runtime.getURL('src/cfg/interface.json'));
+                        if (respInt && respInt.ok) {
+                            const dadosInt = await respInt.json();
+                            if (Array.isArray(dadosInt)) {
+                                regrasPadraoUsuario = dadosInt
+                                    .filter(r => r && r.origem === 'usuario')
+                                    .map(({ origem, ...resto }) => ({ ...resto }));
+                            }
+                        }
+                    }
+                } catch (_) { }
+
+                const novoSync = {
+                    [CHAVE_LISTA_PERFIS]: listaPredef,
+                    [CHAVE_PERFIL_ATIVO]: novoAtivo,
+                    regrasMapeamentoElementos: regrasPadraoUsuario,
+                    ...configAplicada
+                };
+                for (let i = 0; i < listaPredef.length; i++) {
+                    novoSync[this.chaveConfigPerfil(listaPredef[i].id)] = {};
+                }
+
+                const chavesValidas = new Set(Object.keys(novoSync));
+                const chavesOrfas = Object.keys(syncData || {}).filter(k => !chavesValidas.has(k));
+
+                await apiChrome.storage.sync.set(novoSync);
+                if (chavesOrfas.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
+                    await apiChrome.storage.sync.remove(chavesOrfas);
+                }
+
+                if (apiChrome.storage.local) {
+                    try {
+                        const agora = new Date();
+                        const pad = (n) => String(n).padStart(2, '0');
+                        const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
+                        await apiChrome.storage.local.clear();
+                        await apiChrome.storage.local.set({ totalCopias: 0, totalAlertas: 0, dataInicioContadores: strData });
+                    } catch (_) { }
+                }
+                if (apiChrome.storage.session) {
+                    apiChrome.storage.session.clear().catch(() => { });
+                }
+
+                return {
+                    ok: true,
+                    escopo: 'todos',
+                    perfilAtivoId: novoAtivo,
+                    listaPerfis: listaPredef,
+                    config: configAplicada,
+                    regrasMapeamentoElementos: regrasPadraoUsuario
+                };
+            }
+
+            /* Escopo 'atual': Restaura apenas o perfil atualmente selecionado, preservando demais perfis e regras globais XPath/CSS */
+            const chaveAtual = this.chaveConfigPerfil(perfilAtivoId);
+            const configRestaurada = this.resolverConfigEfetivaPerfil(perfilAtivoId, {}, cat);
+            await apiChrome.storage.sync.set({
+                [CHAVE_LISTA_PERFIS]: listaPerfis,
+                [CHAVE_PERFIL_ATIVO]: perfilAtivoId,
+                [chaveAtual]: {},
+                ...configRestaurada
+            });
+
+            return {
+                ok: true,
+                escopo: 'atual',
+                perfilAtivoId,
+                listaPerfis,
+                config: configRestaurada
+            };
+        }
+
+        montarDadosExportacaoBackupTotal(syncData = {}, overridesAtuais = null, catalogo = null) {
+            const cat = catalogo || (obterDefaultsModulo() ? obterDefaultsModulo().obterCatalogoPerfis() : null);
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+            const perfisExportados = {};
+
+            for (let i = 0; i < listaPerfis.length; i++) {
+                const p = listaPerfis[i];
+                const chave = this.chaveConfigPerfil(p.id);
+                const savedDiff = (syncData[chave] && typeof syncData[chave] === 'object') ? syncData[chave] : {};
+                if (p.id === perfilAtivoId) {
+                    const baseResolvida = this.resolverConfigEfetivaPerfil(p.id, savedDiff, cat);
+                    const sobrescritaFonte = (overridesAtuais && typeof overridesAtuais === 'object')
+                        ? overridesAtuais
+                        : this.extrairConfigPerfilDeObjeto(syncData, cat);
+                    const diffAtivo = this.calcularSobrescritasPerfil({ ...baseResolvida, ...sobrescritaFonte }, p.id, cat);
+                    perfisExportados[p.id] = this.resolverConfigEfetivaPerfil(p.id, diffAtivo, cat);
+                } else {
+                    perfisExportados[p.id] = this.resolverConfigEfetivaPerfil(p.id, savedDiff, cat);
+                }
+            }
+
+            const regrasGlobais = (overridesAtuais && Array.isArray(overridesAtuais.regrasMapeamentoElementos))
+                ? overridesAtuais.regrasMapeamentoElementos
+                : (Array.isArray(syncData.regrasMapeamentoElementos) ? syncData.regrasMapeamentoElementos : []);
+
+            return {
+                projeto: 'JusGovBR',
+                versaoBackup: 2,
+                backupTotalPerfis: true,
+                dataExportacao: new Date().toISOString(),
+                perfilAtivoId,
+                listaPerfis,
+                perfis: perfisExportados,
+                regrasMapeamentoElementos: regrasGlobais
+            };
+        }
+
+        async importarBackupTotal(json = {}, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
+            if (!json || typeof json !== 'object' || Array.isArray(json)) return { ok: false, motivo: 'json_invalido' };
+
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const syncAtual = await apiChrome.storage.sync.get(null);
+            const { listaPerfis: listaAtual, perfilAtivoId: ativoAtual } = this.garantirEstruturaPerfis(syncAtual, cat);
+
+            if (json.perfis && typeof json.perfis === 'object' && !Array.isArray(json.perfis)) {
+                const predefs = (cat && Array.isArray(cat.perfisPredefinidos)) ? cat.perfisPredefinidos : [];
+                const listaImportadaBruta = Array.isArray(json.listaPerfis) ? json.listaPerfis : [];
+                const idsPredef = new Set(predefs.map(p => p.id));
+                const novaLista = predefs.map(p => ({ id: p.id, nome: String(p.nome || p.id), predefinido: true }));
+                const idsAdicionados = new Set(novaLista.map(p => p.id));
+
+                for (let i = 0; i < listaImportadaBruta.length; i++) {
+                    const item = listaImportadaBruta[i];
+                    if (item && typeof item.id === 'string' && item.id.trim() && !idsAdicionados.has(item.id.trim()) && !idsPredef.has(item.id.trim())) {
+                        novaLista.push({
+                            id: item.id.trim(),
+                            nome: String(item.nome || item.id).trim().slice(0, 40),
+                            predefinido: false
+                        });
+                        idsAdicionados.add(item.id.trim());
+                    }
+                }
+                Object.keys(json.perfis).forEach((pid) => {
+                    if (pid && !idsAdicionados.has(pid)) {
+                        novaLista.push({ id: pid, nome: pid, predefinido: idsPredef.has(pid) });
+                        idsAdicionados.add(pid);
+                    }
+                });
+
+                const novoAtivo = (typeof json.perfilAtivoId === 'string' && novaLista.some(p => p.id === json.perfilAtivoId))
+                    ? json.perfilAtivoId
+                    : String((cat && cat.perfilPadraoId) || 'padrao');
+
+                const gravacao = {
+                    [CHAVE_LISTA_PERFIS]: novaLista,
+                    [CHAVE_PERFIL_ATIVO]: novoAtivo
+                };
+
+                for (let i = 0; i < novaLista.length; i++) {
+                    const p = novaLista[i];
+                    const cfgImportada = (json.perfis[p.id] && typeof json.perfis[p.id] === 'object') ? json.perfis[p.id] : {};
+                    const extraida = this.extrairConfigPerfilDeObjeto(cfgImportada, cat);
+                    const resolvida = this.resolverConfigEfetivaPerfil(p.id, extraida, cat);
+                    gravacao[this.chaveConfigPerfil(p.id)] = this.calcularSobrescritasPerfil(resolvida, p.id, cat);
+                    if (p.id === novoAtivo) {
+                        Object.assign(gravacao, resolvida);
+                    }
+                }
+
+                if (Array.isArray(json.regrasMapeamentoElementos)) {
+                    gravacao.regrasMapeamentoElementos = json.regrasMapeamentoElementos;
+                }
+
+                const chavesPerfilEsperadas = new Set(novaLista.map(p => this.chaveConfigPerfil(p.id)));
+                const chavesRemover = Object.keys(syncAtual || {}).filter(k =>
+                    k.startsWith(PREFIXO_CHAVE_PERFIL_CFG) && !chavesPerfilEsperadas.has(k)
+                );
+
+                await apiChrome.storage.sync.set(gravacao);
+                if (chavesRemover.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
+                    await apiChrome.storage.sync.remove(chavesRemover);
+                }
+
+                return { ok: true, backupTotal: true, perfilAtivoId: novoAtivo, listaPerfis: novaLista };
+            }
+
+            /* Retrocompatibilidade v1: importa configuracoes isoladas no perfil ativo atual */
+            const extraidaV1 = this.extrairConfigPerfilDeObjeto(json, cat);
+            const baseMerged = { ...syncAtual, ...extraidaV1 };
+            const resolvidaV1 = this.resolverConfigEfetivaPerfil(ativoAtual, baseMerged, cat);
+            const gravacaoV1 = {
+                [CHAVE_LISTA_PERFIS]: listaAtual,
+                [CHAVE_PERFIL_ATIVO]: ativoAtual,
+                [this.chaveConfigPerfil(ativoAtual)]: this.calcularSobrescritasPerfil(resolvidaV1, ativoAtual, cat),
+                ...resolvidaV1
+            };
+            if (Array.isArray(json.regrasMapeamentoElementos)) {
+                gravacaoV1.regrasMapeamentoElementos = json.regrasMapeamentoElementos;
+            }
+            await apiChrome.storage.sync.set(gravacaoV1);
+            return { ok: true, backupTotal: false, perfilAtivoId: ativoAtual, listaPerfis: listaAtual };
         }
 
         /*
@@ -99,10 +711,10 @@
         /*
          * FUNCAO / MÉTODO: sincronizarEstado
          * OBJETIVO DE RECONSTRUCAO: Ler as configuracoes da nuvem (chrome.storage.sync),
-         * preencher padroes de fabrica caso seja a primeira execucao (incluindo a opcao
-         * manterFormatacaoBasica = false por padrao, ou seja, "Remover Formatacoes / Somente Texto"),
-         * gravar cache em RAM (chrome.storage.session), atualizar o registro de scripts
-         * e sincronizar todas as abas abertas em tempo real.
+         * aplicar o catalogo de perfis e valores padrao de src/cfg/perfis.json caso alguma
+         * chave esteja ausente, espelhar alteracoes ativas no perfil ativo, gravar cache
+         * em RAM (chrome.storage.session), atualizar o registro de scripts e sincronizar
+         * todas as abas abertas em tempo real.
          */
         async sincronizarEstado(chromeApi = null, dependencias = {}) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
@@ -112,64 +724,79 @@
             const navegadorUtil = dependencias.navegador || this.navegador;
             const urlsUtil = dependencias.urls || this.urls;
 
+            /* Passo 4.0: Carregar catalogo externo de perfis e personalizacoes (src/cfg/perfis.json) */
+            const cat = await this.carregarCatalogoPerfis(apiChrome);
+
             /* Passo 4.1: Ler todas as chaves de configuracao no chrome.storage.sync */
             const config = await apiChrome.storage.sync.get(null);
 
-            let precisaSalvar = false;
+            const { listaPerfis, perfilAtivoId, alteracoes: alteracoesPerfis } = this.garantirEstruturaPerfis(config, cat);
+            Object.assign(config, alteracoesPerfis);
+            let precisaSalvar = Object.keys(alteracoesPerfis).length > 0;
 
-            /* Passo 4.2: Aplicar valores padrao de fabrica se alguma chave estiver ausente e remover '<all_urls>' legado da lista */
+            const padraoPerfil = this.obterConfigPadraoParaPerfil(perfilAtivoId, cat);
+            const padraoAmpuletas = this.obterPadroesDefaultAmpuletas();
+            const padraoTurbo = this.obterPadroesDefaultTurbo();
+
+            /* Passo 4.2: Aplicar valores padrao do perfil ativo (perfis.json) para chaves ausentes ou invalidas */
             if (Array.isArray(config.urlsTurbo) && config.urlsTurbo.includes('<all_urls>')) {
                 config.urlsTurbo = config.urlsTurbo.filter(u => u && u !== '<all_urls>');
                 precisaSalvar = true;
             }
             if (!Array.isArray(config.urlsTurbo) || config.urlsTurbo.length === 0) {
-                config.urlsTurbo = [...PADROES_DEFAULT_TURBO];
+                config.urlsTurbo = Array.isArray(padraoPerfil.urlsTurbo) && padraoPerfil.urlsTurbo.length > 0
+                    ? [...padraoPerfil.urlsTurbo]
+                    : [...padraoTurbo];
                 precisaSalvar = true;
             }
             if (!Array.isArray(config.urlsAmpuletas) || config.urlsAmpuletas.length === 0) {
-                config.urlsAmpuletas = [...PADROES_DEFAULT_AMPULETAS];
+                config.urlsAmpuletas = Array.isArray(padraoPerfil.urlsAmpuletas) && padraoPerfil.urlsAmpuletas.length > 0
+                    ? [...padraoPerfil.urlsAmpuletas]
+                    : [...padraoAmpuletas];
                 precisaSalvar = true;
             } else {
+                const listaPjeBase = (Array.isArray(padraoPerfil.urlsAmpuletas) && padraoPerfil.urlsAmpuletas.length > 0)
+                    ? padraoPerfil.urlsAmpuletas
+                    : padraoAmpuletas;
                 let atualizouPje = false;
-                for (let p = 0; p < PADROES_DEFAULT_AMPULETAS.length; p++) {
-                    const padraoPje = PADROES_DEFAULT_AMPULETAS[p];
-                    if (!config.urlsAmpuletas.includes(padraoPje)) {
-                        config.urlsAmpuletas.push(padraoPje);
+                for (let p = 0; p < listaPjeBase.length; p++) {
+                    if (!config.urlsAmpuletas.includes(listaPjeBase[p])) {
+                        config.urlsAmpuletas.push(listaPjeBase[p]);
                         atualizouPje = true;
                     }
                 }
-                if (atualizouPje) {
-                    precisaSalvar = true;
-                }
+                if (atualizouPje) precisaSalvar = true;
             }
-            if (!config.modoTurbo) {
-                config.modoTurbo = 'global';
+
+            if (!['global', 'url', 'desligado'].includes(config.modoTurbo)) {
+                config.modoTurbo = padraoPerfil.modoTurbo;
                 precisaSalvar = true;
             }
-            if (typeof config.comportamentoCliqueIcone !== 'string' || (config.comportamentoCliqueIcone !== 'acoes_rapidas' && config.comportamentoCliqueIcone !== 'popup')) {
-                config.comportamentoCliqueIcone = 'popup';
+            if (typeof config.comportamentoCliqueIcone !== 'string' || !['acoes_rapidas', 'popup'].includes(config.comportamentoCliqueIcone)) {
+                config.comportamentoCliqueIcone = padraoPerfil.comportamentoCliqueIcone;
                 precisaSalvar = true;
             }
             if (config.ativoAmpuletas === undefined) {
-                config.ativoAmpuletas = true;
+                config.ativoAmpuletas = padraoPerfil.ativoAmpuletas;
                 precisaSalvar = true;
             }
-            /* Por padrao, manterFormatacaoBasica e true ("Remover Formatacoes / Somente Texto" desmarcado) */
             if (config.manterFormatacaoBasica === undefined) {
-                config.manterFormatacaoBasica = true;
+                config.manterFormatacaoBasica = padraoPerfil.manterFormatacaoBasica;
                 precisaSalvar = true;
             }
             const niveisValidos = ['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido', 'extendido', 'sem_filtro'];
             if (typeof config.nivelFiltroFormatacao !== 'string' || !niveisValidos.includes(config.nivelFiltroFormatacao)) {
-                config.nivelFiltroFormatacao = 'basico';
+                config.nivelFiltroFormatacao = padraoPerfil.nivelFiltroFormatacao;
                 precisaSalvar = true;
             }
             if (!['total', 'total_exceto_arrasto', 'interface', 'nenhuma'].includes(config.modoRetirarSelecao)) {
-                config.modoRetirarSelecao = 'total';
+                config.modoRetirarSelecao = padraoPerfil.modoRetirarSelecao;
                 precisaSalvar = true;
             }
             if (config.modoPlaceholdersMinutasHtml === undefined) {
-                config.modoPlaceholdersMinutasHtml = (config.placeholdersMinutasHtmlAtivo === false || config.selecaoEditavelAtiva === false) ? 'desabilitado' : 'placeholders';
+                config.modoPlaceholdersMinutasHtml = (config.placeholdersMinutasHtmlAtivo === false || config.selecaoEditavelAtiva === false)
+                    ? 'desabilitado'
+                    : padraoPerfil.modoPlaceholdersMinutasHtml;
                 precisaSalvar = true;
             }
             if (config.placeholdersMinutasHtmlAtivo === undefined) {
@@ -181,86 +808,62 @@
                 precisaSalvar = true;
             }
             if (typeof config.tempoConferenciaDocumentosMs !== 'number' || (config.tempoConferenciaDocumentosMs !== -1 && (config.tempoConferenciaDocumentosMs < 0 || config.tempoConferenciaDocumentosMs > 5000))) {
-                config.tempoConferenciaDocumentosMs = (config.validacaoMatematicaAtiva === false) ? 0 : -1;
+                config.tempoConferenciaDocumentosMs = (config.validacaoMatematicaAtiva === false) ? 0 : padraoPerfil.tempoConferenciaDocumentosMs;
                 precisaSalvar = true;
             }
             if (config.validacaoMatematicaAtiva === undefined || config.validacaoMatematicaAtiva !== (config.tempoConferenciaDocumentosMs !== 0)) {
                 config.validacaoMatematicaAtiva = (config.tempoConferenciaDocumentosMs !== 0);
                 precisaSalvar = true;
             }
-            if (!config.modoExibicaoValidacao) {
-                config.modoExibicaoValidacao = 'sempre';
+            if (!['sempre', 'apenas_erros'].includes(config.modoExibicaoValidacao)) {
+                config.modoExibicaoValidacao = padraoPerfil.modoExibicaoValidacao;
                 precisaSalvar = true;
             }
-            if (!config.posicaoAvisosValidacao || !['abaixo', 'acima'].includes(config.posicaoAvisosValidacao)) {
-                config.posicaoAvisosValidacao = 'abaixo';
+            if (!['abaixo', 'acima'].includes(config.posicaoAvisosValidacao)) {
+                config.posicaoAvisosValidacao = padraoPerfil.posicaoAvisosValidacao;
                 precisaSalvar = true;
             }
             if (typeof config.tempoFlashBorderMs !== 'number' || (config.tempoFlashBorderMs !== -1 && (config.tempoFlashBorderMs < 0 || config.tempoFlashBorderMs > 5250))) {
-                config.tempoFlashBorderMs = -1;
+                config.tempoFlashBorderMs = padraoPerfil.tempoFlashBorderMs;
                 precisaSalvar = true;
             }
             if (typeof config.corFlashBorder !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(config.corFlashBorder.trim())) {
-                config.corFlashBorder = '#0d9488';
+                config.corFlashBorder = padraoPerfil.corFlashBorder;
                 precisaSalvar = true;
             }
             if (config.marcadorConteudoColadoAtivo === undefined) {
-                config.marcadorConteudoColadoAtivo = true;
+                config.marcadorConteudoColadoAtivo = padraoPerfil.marcadorConteudoColadoAtivo;
                 precisaSalvar = true;
             }
             if (typeof config.presetMarcadorColado !== 'string' || !config.presetMarcadorColado.trim()) {
-                config.presetMarcadorColado = 'verde_forense';
+                config.presetMarcadorColado = padraoPerfil.presetMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.corContornoMarcadorColado !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(config.corContornoMarcadorColado.trim())) {
-                config.corContornoMarcadorColado = '#0d9488';
+                config.corContornoMarcadorColado = padraoPerfil.corContornoMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.corFundoMarcadorColado !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(config.corFundoMarcadorColado.trim())) {
-                config.corFundoMarcadorColado = '#ccfbf1';
+                config.corFundoMarcadorColado = padraoPerfil.corFundoMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.opacidadeFundoMarcadorColado !== 'number' || !Number.isFinite(config.opacidadeFundoMarcadorColado)) {
-                config.opacidadeFundoMarcadorColado = 0.24;
+                config.opacidadeFundoMarcadorColado = padraoPerfil.opacidadeFundoMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.estiloBadgeMarcadorColado !== 'string' || !['sobrescrito', 'circular', 'sem_etiqueta', 'translucido', 'sobrescrito_retangular', 'retangular_translucido', 'retangular_compacto'].includes(config.estiloBadgeMarcadorColado)) {
-                config.estiloBadgeMarcadorColado = 'sobrescrito';
+                config.estiloBadgeMarcadorColado = padraoPerfil.estiloBadgeMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.tipoContornoMarcadorColado !== 'string' || !['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(config.tipoContornoMarcadorColado)) {
-                config.tipoContornoMarcadorColado = 'solido';
+                config.tipoContornoMarcadorColado = padraoPerfil.tipoContornoMarcadorColado;
                 precisaSalvar = true;
             }
             if (typeof config.minimoCaracteresInterface !== 'number' || ![0, 1, 2, 3, 4, 5, 10].includes(config.minimoCaracteresInterface)) {
-                config.minimoCaracteresInterface = 5;
+                config.minimoCaracteresInterface = padraoPerfil.minimoCaracteresInterface;
                 precisaSalvar = true;
             }
-            if (config.converterCabecalhoPjeAtivo === undefined) {
-                config.converterCabecalhoPjeAtivo = true;
-                precisaSalvar = true;
-            }
-            if (config.atalhoF1GeminiAtivo === undefined) {
-                config.atalhoF1GeminiAtivo = true;
-                precisaSalvar = true;
-            }
-            if (typeof config.modoShiftCnj !== 'string' || (config.modoShiftCnj !== '20digitos' && config.modoShiftCnj !== 'semZeros')) {
-                config.modoShiftCnj = '20digitos';
-                precisaSalvar = true;
-            }
-            if (config.incluirSeparadorFinalAcumulador === undefined) {
-                config.incluirSeparadorFinalAcumulador = true;
-                precisaSalvar = true;
-            }
-            if (typeof config.separadorTabelas !== 'string' || ![';', '\t', ' | '].includes(config.separadorTabelas)) {
-                config.separadorTabelas = ';';
-                precisaSalvar = true;
-            }
-            if (typeof config.promptF1Gemini !== 'string' || config.promptF1Gemini.trim().length === 0) {
-                config.promptF1Gemini = "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
-                precisaSalvar = true;
-            }
-            if (typeof config.tempoExibicaoAlertaMs !== 'number' || (config.tempoExibicaoAlertaMs !== -1 && config.tempoExibicaoAlertaMs !== 0 && (config.tempoExibicaoAlertaMs < 1000 || config.tempoExibicaoAlertaMs > 10000))) {
+            if (config.tempoExibicaoAlertaMs !== -1) {
                 config.tempoExibicaoAlertaMs = -1;
                 precisaSalvar = true;
             }
@@ -268,150 +871,81 @@
                 config.separadorAcumulador.trim().length === 0 ||
                 /[0-9\p{L}]/u.test(config.separadorAcumulador) ||
                 !/[!-\/:-@\[-`{-~|\u00A7\u00B0\u00BA\u00AA\p{P}\p{S}]/u.test(config.separadorAcumulador)) {
-                config.separadorAcumulador = ';';
+                config.separadorAcumulador = padraoPerfil.separadorAcumulador;
                 precisaSalvar = true;
             } else if (config.separadorAcumulador.length > 5) {
                 config.separadorAcumulador = config.separadorAcumulador.slice(0, 5);
                 precisaSalvar = true;
             }
-            if (typeof config.autoLimpezaCacheCookiesAtiva !== 'boolean') {
-                config.autoLimpezaCacheCookiesAtiva = true;
+            if (typeof config.promptF1Gemini !== 'string' || config.promptF1Gemini.trim().length === 0) {
+                config.promptF1Gemini = padraoPerfil.promptF1Gemini;
                 precisaSalvar = true;
             }
-            if (typeof config.autoLimpezaIdade !== 'string' || !['12h', '1d', '3d', '7d', '15d', '30d'].includes(config.autoLimpezaIdade)) {
-                config.autoLimpezaIdade = '7d';
+            if (!['20digitos', 'semZeros'].includes(config.modoShiftCnj)) {
+                config.modoShiftCnj = padraoPerfil.modoShiftCnj;
                 precisaSalvar = true;
             }
-            if (typeof config.tempoTrabalhoCorridoAtivo !== 'boolean') {
-                config.tempoTrabalhoCorridoAtivo = false;
+            if (![';', '\t', ' | '].includes(config.separadorTabelas)) {
+                config.separadorTabelas = padraoPerfil.separadorTabelas;
+                precisaSalvar = true;
+            }
+            if (!['12h', '1d', '3d', '7d', '15d', '30d'].includes(config.autoLimpezaIdade)) {
+                config.autoLimpezaIdade = padraoPerfil.autoLimpezaIdade;
                 precisaSalvar = true;
             }
             if (typeof config.tempoTrabalhoCorridoHoras !== 'number' || config.tempoTrabalhoCorridoHoras < 1 || config.tempoTrabalhoCorridoHoras > 12) {
-                config.tempoTrabalhoCorridoHoras = 7;
-                precisaSalvar = true;
-            }
-            if (typeof config.tempoTrabalhoAtivoAtivo !== 'boolean') {
-                config.tempoTrabalhoAtivoAtivo = false;
+                config.tempoTrabalhoCorridoHoras = padraoPerfil.tempoTrabalhoCorridoHoras;
                 precisaSalvar = true;
             }
             if (typeof config.tempoTrabalhoAtivoHoras !== 'number' || config.tempoTrabalhoAtivoHoras < 1 || config.tempoTrabalhoAtivoHoras > 12) {
-                config.tempoTrabalhoAtivoHoras = 6;
-                precisaSalvar = true;
-            }
-            if (typeof config.pomodoroAtivo !== 'boolean') {
-                config.pomodoroAtivo = false;
+                config.tempoTrabalhoAtivoHoras = padraoPerfil.tempoTrabalhoAtivoHoras;
                 precisaSalvar = true;
             }
             if (typeof config.pomodoroProporcao !== 'number' || ![5, 4.5, 4, 3.5, 3].includes(config.pomodoroProporcao)) {
-                config.pomodoroProporcao = 4.5;
+                config.pomodoroProporcao = padraoPerfil.pomodoroProporcao;
                 precisaSalvar = true;
             }
             if (typeof config.pomodoroFocoMinutos !== 'number' || config.pomodoroFocoMinutos < 25 || config.pomodoroFocoMinutos > 90 || config.pomodoroFocoMinutos % 5 !== 0) {
-                config.pomodoroFocoMinutos = 25;
+                config.pomodoroFocoMinutos = padraoPerfil.pomodoroFocoMinutos;
                 precisaSalvar = true;
             }
             if (typeof config.pomodoroCiclos !== 'number' || !Number.isInteger(config.pomodoroCiclos) || config.pomodoroCiclos < 2 || config.pomodoroCiclos > 10) {
-                config.pomodoroCiclos = 4;
+                config.pomodoroCiclos = padraoPerfil.pomodoroCiclos;
                 precisaSalvar = true;
             }
 
-            /* Validacao e defaults para modulo MOUSE e modulo NAVEGADOR */
-            if (config.colagemBotaoDireitoAtiva === undefined) {
-                config.colagemBotaoDireitoAtiva = false;
-                precisaSalvar = true;
+            /* Normalizar demais booleanos e seletores simples a partir do perfil ativo de perfis.json */
+            const chavesPadraoKeys = Object.keys(padraoPerfil);
+            for (let i = 0; i < chavesPadraoKeys.length; i++) {
+                const k = chavesPadraoKeys[i];
+                if (config[k] === undefined) {
+                    config[k] = clonarValorSimples(padraoPerfil[k]);
+                    precisaSalvar = true;
+                }
             }
-            if (config.alternarAbasRecentesCtrlTabAtiva === undefined) {
-                config.alternarAbasRecentesCtrlTabAtiva = true;
-                precisaSalvar = true;
-            }
-            if (config.capturaBotoesMouse4e5Ativa === undefined) {
-                config.capturaBotoesMouse4e5Ativa = true;
-                precisaSalvar = true;
-            }
-            if (config.colarBotaoMeioAtivo === undefined) {
-                config.colarBotaoMeioAtivo = true;
-                precisaSalvar = true;
-            }
-            if (config.navegacaoTecladoCamposAtiva === undefined) {
-                config.navegacaoTecladoCamposAtiva = true;
-                precisaSalvar = true;
-            }
-            if (config.caixaEntradaRapidaAtiva === undefined) {
-                config.caixaEntradaRapidaAtiva = true;
-                precisaSalvar = true;
-            }
-            if (config.bloquearNovasJanelas === undefined) {
-                config.bloquearNovasJanelas = true;
-                precisaSalvar = true;
-            }
-            if (config.preservarJanelasAutenticacao === undefined) {
-                config.preservarJanelasAutenticacao = true;
-                precisaSalvar = true;
-            }
-            if (config.abaEmPrimeiroPlano === undefined) {
-                config.abaEmPrimeiroPlano = (config.abaEmSegundoPlano !== undefined) ? (config.abaEmSegundoPlano === false) : true;
-                precisaSalvar = true;
-            }
-            if (config.abaEmSegundoPlano === undefined) {
-                config.abaEmSegundoPlano = !config.abaEmPrimeiroPlano;
-                precisaSalvar = true;
-            }
-            if (config.reutilizarAbasAbertas === undefined) {
-                config.reutilizarAbasAbertas = true;
-                precisaSalvar = true;
-            }
-            if (config.reutilizarAbasFocoPrimeiroPlano === undefined) {
-                config.reutilizarAbasFocoPrimeiroPlano = true;
-                precisaSalvar = true;
-            }
-            if (config.protegerGuiasModificadas === undefined) {
-                config.protegerGuiasModificadas = true;
-                precisaSalvar = true;
-            }
-            if (typeof config.reutilizarAbasAcaoConteudo !== 'string' || !['manter', 'recarregar', 'recarregar_se_modificada', 'recarregar_se_nao_modificada'].includes(config.reutilizarAbasAcaoConteudo)) {
-                config.reutilizarAbasAcaoConteudo = 'manter';
-                precisaSalvar = true;
-            }
-            if (config.monitorarUrlOriginalAbertura === undefined) {
-                config.monitorarUrlOriginalAbertura = false;
-                precisaSalvar = true;
-            }
-            if (config.monitorarUrlAtualPagina === undefined) {
-                config.monitorarUrlAtualPagina = true;
-                precisaSalvar = true;
-            }
+
+            config.colagemBotaoDireitoAtiva = false;
+            config.descarteGuiasInativasAtivo = false;
+            config.abaEmPrimeiroPlano = Boolean(config.abaEmPrimeiroPlano);
+            config.abaEmSegundoPlano = !config.abaEmPrimeiroPlano;
             if (!config.monitorarUrlOriginalAbertura && !config.monitorarUrlAtualPagina) {
                 config.monitorarUrlAtualPagina = true;
                 precisaSalvar = true;
             }
-            if (typeof config.criterioOrdenacaoGuias !== 'string' || !['nenhum', 'hierarquia_arvore', 'url', 'dominio', 'dominio_titulo', 'dominio_criacao', 'dominio_acesso', 'titulo', 'tempo_acesso', 'ordem_criacao', 'agrupar_dominio'].includes(config.criterioOrdenacaoGuias)) {
-                config.criterioOrdenacaoGuias = 'hierarquia_arvore';
+            const criteriosValidos = ['nenhum', 'hierarquia_arvore', 'url', 'dominio', 'dominio_titulo', 'dominio_criacao', 'dominio_acesso', 'titulo', 'tempo_acesso', 'ordem_criacao', 'agrupar_dominio'];
+            if (!criteriosValidos.includes(config.criterioOrdenacaoGuias)) {
+                config.criterioOrdenacaoGuias = padraoPerfil.criterioOrdenacaoGuias;
                 precisaSalvar = true;
             }
-            if (typeof config.sentidoOrdenacaoGuias !== 'string' || !['esq_dir', 'dir_esq'].includes(config.sentidoOrdenacaoGuias)) {
-                config.sentidoOrdenacaoGuias = 'esq_dir';
+            if (!['esq_dir', 'dir_esq'].includes(config.sentidoOrdenacaoGuias)) {
+                config.sentidoOrdenacaoGuias = padraoPerfil.sentidoOrdenacaoGuias;
                 precisaSalvar = true;
             }
-            if (config.ordenarGuiasFixadas === undefined) {
-                config.ordenarGuiasFixadas = false;
+            if (!['manter', 'recarregar', 'recarregar_se_modificada', 'recarregar_se_nao_modificada'].includes(config.reutilizarAbasAcaoConteudo)) {
+                config.reutilizarAbasAcaoConteudo = padraoPerfil.reutilizarAbasAcaoConteudo;
                 precisaSalvar = true;
             }
-            if (config.fecharHierarquiaEmCascata === undefined) {
-                config.fecharHierarquiaEmCascata = false;
-                precisaSalvar = true;
-            }
-            if (config.modoBarraFavoritosSuperior === undefined) {
-                config.modoBarraFavoritosSuperior = false;
-                precisaSalvar = true;
-            }
-            if (config.descarteGuiasInativasAtivo === undefined || config.descarteGuiasInativasAtivo === true) {
-                config.descarteGuiasInativasAtivo = false;
-                precisaSalvar = true;
-            }
-            if (config.tempoInatividadeDescarteMinutos === undefined) {
-                config.tempoInatividadeDescarteMinutos = 20;
-                precisaSalvar = true;
-            }
+
             if (!Array.isArray(config.regrasMapeamentoElementos)) {
                 let padraoUsuario = [];
                 try {
@@ -431,74 +965,24 @@
                 precisaSalvar = true;
             }
 
+            /* Passo 4.2.0: Manter snapshot de sobrescritas do perfil ativo sempre sincronizado caso uma chave tenha sido alterada (ex: Popup ou Esc+Esc) */
+            const chaveCfgAtivo = this.chaveConfigPerfil(perfilAtivoId);
+            const diffAtivoCalculado = this.calcularSobrescritasPerfil(config, perfilAtivoId, cat);
+            if (!valoresIguaisConfig(config[chaveCfgAtivo], diffAtivoCalculado)) {
+                config[chaveCfgAtivo] = diffAtivoCalculado;
+                alteracoesPerfis[chaveCfgAtivo] = diffAtivoCalculado;
+                precisaSalvar = true;
+            }
+
             if (precisaSalvar) {
-                await apiChrome.storage.sync.set({
-                    urlsTurbo: config.urlsTurbo,
-                    urlsAmpuletas: config.urlsAmpuletas,
+                const payloadSalvar = {
+                    ...this.extrairConfigPerfilDeObjeto(config, cat),
                     regrasMapeamentoElementos: config.regrasMapeamentoElementos,
-                    modoTurbo: config.modoTurbo,
-                    comportamentoCliqueIcone: config.comportamentoCliqueIcone,
-                    ativoAmpuletas: config.ativoAmpuletas,
-                    manterFormatacaoBasica: config.manterFormatacaoBasica,
-                    nivelFiltroFormatacao: config.nivelFiltroFormatacao,
-                    modoRetirarSelecao: config.modoRetirarSelecao,
-                    selecaoEditavelAtiva: config.selecaoEditavelAtiva,
-                    modoPlaceholdersMinutasHtml: config.modoPlaceholdersMinutasHtml,
-                    placeholdersMinutasHtmlAtivo: config.placeholdersMinutasHtmlAtivo,
-                    colagemBotaoDireitoAtiva: false,
-                    alternarAbasRecentesCtrlTabAtiva: config.alternarAbasRecentesCtrlTabAtiva !== false,
-                    capturaBotoesMouse4e5Ativa: config.capturaBotoesMouse4e5Ativa,
-                    colarBotaoMeioAtivo: config.colarBotaoMeioAtivo !== false,
-                    navegacaoTecladoCamposAtiva: config.navegacaoTecladoCamposAtiva,
-                    caixaEntradaRapidaAtiva: config.caixaEntradaRapidaAtiva !== false,
-                    bloquearNovasJanelas: config.bloquearNovasJanelas,
-                    preservarJanelasAutenticacao: config.preservarJanelasAutenticacao,
-                    abaEmPrimeiroPlano: Boolean(config.abaEmPrimeiroPlano),
-                    abaEmSegundoPlano: (config.abaEmPrimeiroPlano !== undefined) ? !config.abaEmPrimeiroPlano : Boolean(config.abaEmSegundoPlano),
-                    reutilizarAbasAbertas: (config.reutilizarAbasAbertas !== false),
-                    reutilizarAbasFocoPrimeiroPlano: (config.reutilizarAbasFocoPrimeiroPlano !== false),
-                    protegerGuiasModificadas: (config.protegerGuiasModificadas !== false),
-                    reutilizarAbasAcaoConteudo: config.reutilizarAbasAcaoConteudo || 'manter',
-                    monitorarUrlOriginalAbertura: Boolean(config.monitorarUrlOriginalAbertura),
-                    monitorarUrlAtualPagina: (config.monitorarUrlAtualPagina !== false),
-                    criterioOrdenacaoGuias: config.criterioOrdenacaoGuias,
-                    sentidoOrdenacaoGuias: config.sentidoOrdenacaoGuias || 'esq_dir',
-                    ordenarGuiasFixadas: config.ordenarGuiasFixadas,
-                    descarteGuiasInativasAtivo: false,
-                    tempoInatividadeDescarteMinutos: Number(config.tempoInatividadeDescarteMinutos) || 20,
-                    validacaoMatematicaAtiva: config.validacaoMatematicaAtiva,
-                    tempoConferenciaDocumentosMs: config.tempoConferenciaDocumentosMs,
-                    modoExibicaoValidacao: config.modoExibicaoValidacao || 'sempre',
-                    posicaoAvisosValidacao: config.posicaoAvisosValidacao || 'abaixo',
-                    tempoFlashBorderMs: config.tempoFlashBorderMs,
-                    corFlashBorder: config.corFlashBorder,
-                    marcadorConteudoColadoAtivo: config.marcadorConteudoColadoAtivo !== false,
-                    presetMarcadorColado: config.presetMarcadorColado || 'verde_forense',
-                    corContornoMarcadorColado: config.corContornoMarcadorColado || '#0d9488',
-                    corFundoMarcadorColado: config.corFundoMarcadorColado || '#ccfbf1',
-                    opacidadeFundoMarcadorColado: typeof config.opacidadeFundoMarcadorColado === 'number' ? config.opacidadeFundoMarcadorColado : 0.24,
-                    estiloBadgeMarcadorColado: config.estiloBadgeMarcadorColado || 'sobrescrito',
-                    tipoContornoMarcadorColado: config.tipoContornoMarcadorColado || 'solido',
-                    minimoCaracteresInterface: config.minimoCaracteresInterface,
-                    converterCabecalhoPjeAtivo: config.converterCabecalhoPjeAtivo,
-                    atalhoF1GeminiAtivo: config.atalhoF1GeminiAtivo,
-                    modoShiftCnj: config.modoShiftCnj,
-                    incluirSeparadorFinalAcumulador: config.incluirSeparadorFinalAcumulador,
-                    separadorTabelas: config.separadorTabelas,
-                    promptF1Gemini: config.promptF1Gemini,
-                    tempoExibicaoAlertaMs: config.tempoExibicaoAlertaMs,
-                    separadorAcumulador: config.separadorAcumulador,
-                    autoLimpezaCacheCookiesAtiva: config.autoLimpezaCacheCookiesAtiva,
-                    autoLimpezaIdade: config.autoLimpezaIdade,
-                    tempoTrabalhoCorridoAtivo: config.tempoTrabalhoCorridoAtivo,
-                    tempoTrabalhoCorridoHoras: config.tempoTrabalhoCorridoHoras,
-                    tempoTrabalhoAtivoAtivo: config.tempoTrabalhoAtivoAtivo,
-                    tempoTrabalhoAtivoHoras: config.tempoTrabalhoAtivoHoras,
-                    pomodoroAtivo: config.pomodoroAtivo,
-                    pomodoroProporcao: config.pomodoroProporcao,
-                    pomodoroFocoMinutos: config.pomodoroFocoMinutos,
-                    pomodoroCiclos: config.pomodoroCiclos
-                });
+                    [CHAVE_LISTA_PERFIS]: listaPerfis,
+                    [CHAVE_PERFIL_ATIVO]: perfilAtivoId,
+                    ...alteracoesPerfis
+                };
+                await apiChrome.storage.sync.set(payloadSalvar);
             }
 
             /* Passo 4.2.1: Limpar variaveis estatisticas e chaves redundantes do storage.sync para manter a nuvem limpa */

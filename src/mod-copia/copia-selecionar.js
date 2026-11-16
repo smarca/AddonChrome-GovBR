@@ -530,20 +530,11 @@
             adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resFrase.inicio, resFrase.fim));
         }
 
-        /* Degrau 4: Parágrafo Localizado */
-        const resParagrafo = resolverSelecaoTriploClique(mapa, idxCursor);
+        /* Degrau 4: Parágrafo Localizado (teto máximo permitido para seleção por cliques — veda seleção da página inteira) */
+        const resParagrafo = delimitarParagrafoLocalizado(mapa.texto, idxCursor, true)
+            || resolverSelecaoTriploClique(mapa, idxCursor);
         if (resParagrafo) {
             adicionarDegrau(criarRangeDOMAPartirDeIndices(mapa, resParagrafo.inicio, resParagrafo.fim));
-        }
-
-        /* Degrau 5: Bloco Ancestral Contextual */
-        const blocoAncestral = obterBlocoAncestralContextual(elAlvoEfetivo);
-        if (blocoAncestral && blocoAncestral !== document.body && blocoAncestral !== document.documentElement) {
-            try {
-                const rBloco = document.createRange();
-                rBloco.selectNodeContents(blocoAncestral);
-                adicionarDegrau(rBloco);
-            } catch (_) { }
         }
 
         degraus.sort((a, b) => a.texto.length - b.texto.length);
@@ -5249,15 +5240,6 @@
 
         const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
         if (!mapa) {
-            if (e.detail >= 3) {
-                const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
-                if (bloco && bloco !== document.body) {
-                    const rangeBloco = document.createRange();
-                    rangeBloco.selectNodeContents(bloco);
-                    await aplicarSelecaoECopiar(rangeBloco, modoAcumulador, null, { temModificador: temModificadorTeclado });
-                    return;
-                }
-            }
             await tentarFallbackAltElementoSemTexto(elAlvoEfetivo);
             return;
         }
@@ -5270,30 +5252,31 @@
             e.detail >= 1
         );
 
-        /* Passo 9.7.2: 3 Cliques (e.detail >= 3): tendencia a minorar em blocos compostos ("12.016/2009" -> "12.016" ou "2009")
-         * e selecao estritamente localizada ao clicar 3 vezes no inicio de um paragrafo (sem invadir paragrafos vizinhos). */
+        /* Passo 9.7.2: 3+ Cliques (e.detail >= 3): tendencia a minorar em blocos compostos ("12.016/2009" -> "12.016" ou "2009")
+         * e selecao estritamente limitada no maximo ao paragrafo localizado (vedada selecao de pagina inteira ou conteiner pai). */
         if (e.detail >= 3 && !ehAltIsoladoEmInterface) {
             const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
+            const resParagrafo = delimitarParagrafoLocalizado(mapa.texto, idxCursor, true);
+            let rangeEscolhidoTriplo = null;
+
             if (resTriplo) {
                 const rangeTriplo = criarRangeDOMAPartirDeIndices(mapa, resTriplo.inicio, resTriplo.fim);
                 if (rangeTriplo) {
                     const txtTriplo = (extrairTextoPuroSanitizado(rangeTriplo) || rangeTriplo.toString()).trim();
                     if (!ultimoTextoSelecionadoLimpo || txtTriplo !== ultimoTextoSelecionadoLimpo.trim()) {
-                        await aplicarSelecaoECopiar(rangeTriplo, modoAcumulador, null, { temModificador: temModificadorTeclado });
-                        return;
+                        rangeEscolhidoTriplo = rangeTriplo;
+                    } else if (resParagrafo && (resParagrafo.fim - resParagrafo.inicio) > (resTriplo.fim - resTriplo.inicio)) {
+                        rangeEscolhidoTriplo = criarRangeDOMAPartirDeIndices(mapa, resParagrafo.inicio, resParagrafo.fim);
+                    } else {
+                        rangeEscolhidoTriplo = rangeTriplo;
                     }
                 }
             }
-            const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
-            if (bloco && bloco !== document.body) {
-                let rangeBloco = document.createRange();
-                rangeBloco.selectNodeContents(bloco);
-                const txtBloco = (extrairTextoPuroSanitizado(rangeBloco) || rangeBloco.toString()).trim();
-                if (ultimoTextoSelecionadoLimpo && txtBloco === ultimoTextoSelecionadoLimpo.trim() && bloco.parentElement && bloco.parentElement !== document.body) {
-                    rangeBloco = document.createRange();
-                    rangeBloco.selectNodeContents(bloco.parentElement);
-                }
-                await aplicarSelecaoECopiar(rangeBloco, modoAcumulador, null, { temModificador: temModificadorTeclado });
+            if (!rangeEscolhidoTriplo && resParagrafo) {
+                rangeEscolhidoTriplo = criarRangeDOMAPartirDeIndices(mapa, resParagrafo.inicio, resParagrafo.fim);
+            }
+            if (rangeEscolhidoTriplo) {
+                await aplicarSelecaoECopiar(rangeEscolhidoTriplo, modoAcumulador, null, { temModificador: temModificadorTeclado });
             }
             return;
         }
@@ -5392,16 +5375,15 @@
 
         if (!rangeFinal) {
             if (ehDuploClique && blocoCompostoPrevio && (!resultadoIndices || texto.slice(resultadoIndices.inicio, resultadoIndices.fim).trim().length <= blocoCompostoPrevio.texto.length)) {
-                const blocoFora = obterBlocoAncestralContextual(elAlvoEfetivo);
-                if (blocoFora && blocoFora !== document.body) {
-                    const rangeFora = document.createRange();
-                    rangeFora.selectNodeContents(blocoFora);
+                const resParagrafoDuplo = delimitarParagrafoLocalizado(mapa.texto, idxCursor, true);
+                const rangeParagrafoDuplo = resParagrafoDuplo ? criarRangeDOMAPartirDeIndices(mapa, resParagrafoDuplo.inicio, resParagrafoDuplo.fim) : null;
+                if (rangeParagrafoDuplo) {
                     ultimoBlocoCompostoAtivo = null;
                     estadoCicloSelecao = {
                         direcao: 1,
-                        textoAtual: (extrairTextoPuroSanitizado(rangeFora) || rangeFora.toString()).trim()
+                        textoAtual: (extrairTextoPuroSanitizado(rangeParagrafoDuplo) || rangeParagrafoDuplo.toString()).trim()
                     };
-                    await aplicarSelecaoECopiar(rangeFora, modoAcumulador, null, { temModificador: temModificadorTeclado });
+                    await aplicarSelecaoECopiar(rangeParagrafoDuplo, modoAcumulador, null, { temModificador: temModificadorTeclado });
                     return;
                 }
             }
@@ -5436,14 +5418,15 @@
                     }
                 }
                 if (textoCandidato.trim() === ultimoTextoSelecionadoLimpo.trim()) {
-                    const bloco = obterBlocoAncestralContextual(elAlvoEfetivo);
-                    if (bloco && bloco !== document.body) {
-                        const rBloco = document.createRange();
-                        rBloco.selectNodeContents(bloco);
-                        const txtBloco = (extrairTextoPuroSanitizado(rBloco) || rBloco.toString()).trim();
-                        if (txtBloco && txtBloco !== ultimoTextoSelecionadoLimpo.trim()) {
-                            rangeFinal = rBloco;
-                            textoCandidato = txtBloco;
+                    const resParagrafo = delimitarParagrafoLocalizado(mapa.texto, idxCursor, true);
+                    if (resParagrafo) {
+                        const rParagrafo = criarRangeDOMAPartirDeIndices(mapa, resParagrafo.inicio, resParagrafo.fim);
+                        if (rParagrafo) {
+                            const txtPar = (extrairTextoPuroSanitizado(rParagrafo) || rParagrafo.toString()).trim();
+                            if (txtPar && txtPar !== ultimoTextoSelecionadoLimpo.trim()) {
+                                rangeFinal = rParagrafo;
+                                textoCandidato = txtPar;
+                            }
                         }
                     }
                 }
@@ -7446,6 +7429,12 @@
                         executarDeselecaoUniversal(true);
                         return;
                     }
+                    if (msg && msg.acao === 'exibirMiniTipGlobal') {
+                        if (window === window.top && validador && typeof validador.projetarMiniTipGlobal === 'function') {
+                            validador.projetarMiniTipGlobal(String(msg.mensagem || ''), String(msg.corBorda || '#2563eb'));
+                        }
+                        return;
+                    }
                     if (msg && msg.acao === 'atualizarEstadoModulo') {
                         if (msg.modoTurbo) modoExecucao = msg.modoTurbo;
                         if (Array.isArray(msg.urlsTurbo)) listaUrlsPermitidas = msg.urlsTurbo;
@@ -7972,6 +7961,7 @@
             if (typeof opcoes.tipoContorno === 'string') tipoContornoMarcadorColado = opcoes.tipoContorno;
             sincronizarConfiguracaoMarcadorVisual();
         },
+        construirDegrausCicloSelecao,
         salvarClipboardInternoComBackup,
         gravarNaAreaDeTransferencia
     });

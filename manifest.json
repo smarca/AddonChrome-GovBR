@@ -74,7 +74,8 @@
     "storage",
     "webNavigation",
     "alarms",
-    "browsingData"
+    "browsingData",
+    "cookies"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -98,7 +99,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/cfg/interface.json"],
+      "resources": ["src/cfg/interface.json", "src/cfg/perfis.json"],
       "matches": ["<all_urls>"]
     }
   ]

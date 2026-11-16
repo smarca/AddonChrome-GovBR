@@ -477,6 +477,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     if (instanciaModuloNavegador && typeof instanciaModuloNavegador.inicializarSessaoAbas === 'function') {
         try { await instanciaModuloNavegador.inicializarSessaoAbas(); } catch (_) { }
     }
+    if (instanciaModuloManutencao && typeof instanciaModuloManutencao.inicializarRastreamentoCookies === 'function') {
+        try { await instanciaModuloManutencao.inicializarRastreamentoCookies(); } catch (_) { }
+    }
     /* Passo 6.1.1: Criar menus de contexto na ordem exata solicitada (exige permissao no manifest) */
     if (chrome.contextMenus) {
         const config = await chrome.storage.sync.get(['comportamentoCliqueIcone']);
@@ -490,7 +493,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     }
 });
 
-/* Passo 6.2: Ao iniciar o perfil do navegador, garantir sincronizacao e icone */
+/* Passo 6.2: Ao iniciar o perfil do navegador, garantir sincronizacao, rastreamento de cookies e agendamento (+5 min) */
 chrome.runtime.onStartup.addListener(async () => {
     await sincronizarEstado();
     if (instanciaModuloNavegador && typeof instanciaModuloNavegador.inicializarSessaoAbas === 'function') {
@@ -500,12 +503,13 @@ chrome.runtime.onStartup.addListener(async () => {
         if (instanciaModuloProdutividade) {
             await instanciaModuloProdutividade.registrarAtividadeTrabalho();
         }
-        if (instanciaModuloManutencao) {
-            await instanciaModuloManutencao.executarAutoLimpezaCacheECookies(false, true, obterConfiguracoesGerais);
+        if (instanciaModuloManutencao && typeof instanciaModuloManutencao.inicializarRastreamentoCookies === 'function') {
+            await instanciaModuloManutencao.inicializarRastreamentoCookies();
         }
         if (typeof chrome !== 'undefined' && chrome.alarms) {
-            chrome.alarms.create('JUSGOV_AUTO_LIMPEZA_1M', { delayInMinutes: 1 });
-            chrome.alarms.create('JUSGOV_AUTO_LIMPEZA_15M', { delayInMinutes: 15 });
+            try { await chrome.alarms.clear('JUSGOV_AUTO_LIMPEZA_1M'); } catch (_) { }
+            try { await chrome.alarms.clear('JUSGOV_AUTO_LIMPEZA_15M'); } catch (_) { }
+            chrome.alarms.create(NOME_ALARME_AUTO_LIMPEZA_5M, { delayInMinutes: 5 });
         }
     } catch (_) { }
 });
@@ -514,6 +518,9 @@ chrome.runtime.onStartup.addListener(async () => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const url = (tab && tab.url) || (changeInfo && changeInfo.url) || '';
     if (!url) return;
+    if (instanciaModuloManutencao && (changeInfo.url || changeInfo.status === 'complete')) {
+        instanciaModuloManutencao.registrarAcessoUrl(url).catch(() => { });
+    }
     try {
         if (/^(?:chrome|edge|devtools|view-source|chrome-extension):/i.test(url) || (/^about:/i.test(url) && url !== 'about:blank')) return;
         const config = await obterConfiguracoesGerais();
@@ -676,7 +683,9 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             'pomodoroAtivo',
             'pomodoroProporcao',
             'pomodoroFocoMinutos',
-            'pomodoroCiclos'
+            'pomodoroCiclos',
+            'perfilAtivoId',
+            'listaPerfis'
         ];
         const mudouConfiguracao = chavesConfig.some(chave => Object.prototype.hasOwnProperty.call(changes, chave));
         if (mudouConfiguracao) {
@@ -744,6 +753,126 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         instanciaModuloProdutividade.resetarEstadoTrabalhoHoje()
             .then((estado) => sendResponse({ ok: true, estado }))
             .catch(() => sendResponse({ ok: false }));
+        return true;
+    }
+
+    if (msg.acao === 'OBTER_PERFIS') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false, erro: 'Configurador indisponível.' });
+            return false;
+        }
+        (async () => {
+            try {
+                const catalogo = await instanciaConfig.carregarCatalogoPerfis(chrome);
+                const syncData = await chrome.storage.sync.get(['listaPerfis', 'perfilAtivoId']);
+                const estrutura = instanciaConfig.garantirEstruturaPerfis(syncData || {}, catalogo);
+                if (estrutura.alteracoes) {
+                    await chrome.storage.sync.set(estrutura.alteracoes);
+                }
+                sendResponse({
+                    ok: true,
+                    listaPerfis: estrutura.listaPerfis,
+                    perfilAtivoId: estrutura.perfilAtivoId
+                });
+            } catch (err) {
+                sendResponse({ ok: false, erro: err ? err.message : 'Erro ao carregar perfis.' });
+            }
+        })();
+        return true;
+    }
+
+    if (msg.acao === 'ALTERNAR_PERFIL') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaConfig.alternarPerfil(msg.perfilId, chrome)
+            .then(async (res) => {
+                let miniTipExibidoNaAba = false;
+                if (res && res.ok) {
+                    await sincronizarEstado();
+                    const nomePerfil = (res.perfil && res.perfil.nome) ? res.perfil.nome : res.perfilAtivoId;
+                    try {
+                        if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                            chrome.runtime.sendMessage({
+                                acao: 'PERFIL_ALTERADO',
+                                perfilId: res.perfilAtivoId,
+                                nomePerfil
+                            }).catch(() => { });
+                        }
+                    } catch (_) { }
+                    if (msg.exibirMiniTip !== false && chrome.tabs && typeof chrome.tabs.query === 'function') {
+                        try {
+                            const abas = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+                            const abaAtiva = Array.isArray(abas) ? abas[0] : null;
+                            if (abaAtiva && abaAtiva.id) {
+                                await chrome.tabs.sendMessage(abaAtiva.id, {
+                                    acao: 'exibirMiniTipGlobal',
+                                    mensagem: `Perfil de Uso:\n${nomePerfil}`,
+                                    corBorda: '#2563eb'
+                                }, { frameId: 0 });
+                                miniTipExibidoNaAba = true;
+                            }
+                        } catch (_) { }
+                    }
+                }
+                sendResponse(res ? { ...res, miniTipExibidoNaAba } : { ok: false });
+            })
+            .catch((err) => sendResponse({ ok: false, erro: err ? err.message : 'Erro ao alternar perfil.' }));
+        return true;
+    }
+
+    if (msg.acao === 'CRIAR_PERFIL') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaConfig.criarPerfil(msg.nome, { origem: msg.origem || 'padrao', ativar: msg.ativar !== false }, chrome)
+            .then(async (res) => {
+                if (res && res.ok) {
+                    await sincronizarEstado();
+                }
+                sendResponse(res || { ok: false });
+            })
+            .catch((err) => sendResponse({ ok: false, erro: err ? err.message : 'Erro ao criar perfil.' }));
+        return true;
+    }
+
+    if (msg.acao === 'RENOMEAR_PERFIL') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaConfig.renomearPerfil(msg.perfilId, msg.novoNome, chrome)
+            .then((res) => sendResponse(res || { ok: false }))
+            .catch((err) => sendResponse({ ok: false, erro: err ? err.message : 'Erro ao renomear perfil.' }));
+        return true;
+    }
+
+    if (msg.acao === 'EXCLUIR_PERFIL') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaConfig.excluirPerfil(msg.perfilId, chrome)
+            .then((res) => sendResponse(res || { ok: false }))
+            .catch((err) => sendResponse({ ok: false, erro: err ? err.message : 'Erro ao excluir perfil.' }));
+        return true;
+    }
+
+    if (msg.acao === 'RESETAR_PERFIS') {
+        if (!instanciaConfig) {
+            sendResponse({ ok: false });
+            return false;
+        }
+        instanciaConfig.resetarPerfis(msg.escopo || 'atual', chrome)
+            .then(async (res) => {
+                if (res && res.ok) {
+                    await sincronizarEstado();
+                }
+                sendResponse(res || { ok: false });
+            })
+            .catch((err) => sendResponse({ ok: false, erro: err ? err.message : 'Erro ao restaurar perfis.' }));
         return true;
     }
 
@@ -1298,13 +1427,40 @@ async function executarSincronizacaoNuvemEfetiva() {
     } catch (_) { }
 }
 
-const NOME_ALARME_AUTO_LIMPEZA_1M = 'JUSGOV_AUTO_LIMPEZA_1M';
-const NOME_ALARME_AUTO_LIMPEZA_15M = 'JUSGOV_AUTO_LIMPEZA_15M';
+const NOME_ALARME_AUTO_LIMPEZA_5M = 'JUSGOV_AUTO_LIMPEZA_5M';
 const NOME_ALARME_TRABALHO_TICK = 'JUSGOV_TICK_TRABALHO';
 
+if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged) {
+    chrome.cookies.onChanged.addListener((changeInfo) => {
+        if (instanciaModuloManutencao && typeof instanciaModuloManutencao.tratarCookieAlterado === 'function') {
+            instanciaModuloManutencao.tratarCookieAlterado(changeInfo).catch(() => { });
+        }
+    });
+}
+
+if (typeof chrome !== 'undefined' && chrome.windows && chrome.windows.onRemoved) {
+    chrome.windows.onRemoved.addListener(async () => {
+        try {
+            if (!instanciaModuloManutencao || !chrome.windows || typeof chrome.windows.getAll !== 'function') return;
+            const janelas = await chrome.windows.getAll({});
+            if (Array.isArray(janelas) && janelas.length === 0) {
+                await instanciaModuloManutencao.executarAutoLimpezaCacheECookies(false, false, obterConfiguracoesGerais);
+            }
+        } catch (_) { }
+    });
+}
+
 if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated) {
-    chrome.tabs.onActivated.addListener(() => {
+    chrome.tabs.onActivated.addListener((activeInfo) => {
         if (instanciaModuloProdutividade) instanciaModuloProdutividade.registrarAtividadeTrabalho();
+        if (instanciaModuloManutencao && activeInfo && activeInfo.tabId && chrome.tabs.get) {
+            chrome.tabs.get(activeInfo.tabId, (tab) => {
+                if (chrome.runtime && chrome.runtime.lastError) return;
+                if (tab && tab.url) {
+                    instanciaModuloManutencao.registrarAcessoUrl(tab.url).catch(() => { });
+                }
+            });
+        }
     });
 }
 if (typeof chrome !== 'undefined' && chrome.windows && chrome.windows.onFocusChanged) {
@@ -1331,7 +1487,7 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
                 try {
                     await executarSincronizacaoNuvemEfetiva();
                 } catch (_) { }
-            } else if (alarme.name === NOME_ALARME_AUTO_LIMPEZA_1M || alarme.name === NOME_ALARME_AUTO_LIMPEZA_15M) {
+            } else if (alarme.name === NOME_ALARME_AUTO_LIMPEZA_5M) {
                 try {
                     if (instanciaModuloManutencao) {
                         await instanciaModuloManutencao.executarAutoLimpezaCacheECookies(false, false, obterConfiguracoesGerais);

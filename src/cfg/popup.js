@@ -109,6 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAbrirOpcoes = document.getElementById('btnAbrirOpcoes') || document.getElementById('btnOptions');
     const btnBugsOnline = document.getElementById('btnBugsOnline');
     const rodapeProdutividadeOnline = document.getElementById('rodapeProdutividadeOnline');
+    const selectPerfilPopup = document.getElementById('selectPerfilPopup');
+    const avisoMiniTipPopup = document.getElementById('avisoMiniTipPopup');
 
     /* Mapear elementos do icone SVG para alterar cor dinamicamente */
     const iconeBg = document.getElementById('iconeBg');
@@ -359,6 +361,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function renderizarSeletorPerfisPopup(listaPerfis, perfilAtivoId) {
+        if (!selectPerfilPopup || !Array.isArray(listaPerfis) || listaPerfis.length === 0) return;
+        const atual = String(perfilAtivoId || 'padrao');
+        selectPerfilPopup.innerHTML = '';
+        listaPerfis.forEach((perfil) => {
+            if (!perfil || !perfil.id) return;
+            const opt = document.createElement('option');
+            opt.value = perfil.id;
+            opt.textContent = perfil.nome || perfil.id;
+            selectPerfilPopup.appendChild(opt);
+        });
+        selectPerfilPopup.value = atual;
+        if (selectPerfilPopup.value !== atual && selectPerfilPopup.options.length > 0) {
+            selectPerfilPopup.selectedIndex = 0;
+        }
+    }
+
     /*
      * FUNCAO: carregarEstadoInicial
      * OBJETIVO DE RECONSTRUCAO: Ler configuracoes do chrome.storage.sync e
@@ -373,11 +392,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 'ativoAmpuletas',
                 'manterFormatacaoBasica',
                 'nivelFiltroFormatacao',
-                'comportamentoCliqueIcone'
+                'comportamentoCliqueIcone',
+                'listaPerfis',
+                'perfilAtivoId'
             ], (config) => {
                 const cfg = config || {};
                 const modo = cfg.modoTurbo || 'global';
                 cacheUrlsTurbo = Array.isArray(cfg.urlsTurbo) ? cfg.urlsTurbo : [];
+
+                if (Array.isArray(cfg.listaPerfis) && cfg.listaPerfis.length > 0) {
+                    renderizarSeletorPerfisPopup(cfg.listaPerfis, cfg.perfilAtivoId || 'padrao');
+                } else if (chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ acao: 'OBTER_PERFIS' }, (resp) => {
+                        if (chrome.runtime.lastError) return;
+                        if (resp && resp.ok && Array.isArray(resp.listaPerfis)) {
+                            renderizarSeletorPerfisPopup(resp.listaPerfis, resp.perfilAtivoId);
+                        }
+                    });
+                }
 
                 atualizarInterfaceModo(modo);
                 atualizarInterfaceFormatacao(Boolean(cfg.manterFormatacaoBasica));
@@ -557,6 +589,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'sync') {
+                if (changes.listaPerfis || changes.perfilAtivoId) {
+                    carregarEstadoInicial();
+                    return;
+                }
                 if (changes.modoTurbo) atualizarInterfaceModo(changes.modoTurbo.newValue);
                 if (changes.manterFormatacaoBasica !== undefined) {
                     atualizarInterfaceFormatacao(Boolean(changes.manterFormatacaoBasica.newValue));
@@ -577,6 +613,28 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (area === 'local' && changes.jusgovTrabalhoEstado) {
                 atualizarContadoresProdutividadePopup();
             }
+        });
+    }
+
+    if (selectPerfilPopup) {
+        selectPerfilPopup.addEventListener('change', () => {
+            const novoPerfilId = selectPerfilPopup.value;
+            if (!novoPerfilId || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+            selectPerfilPopup.disabled = true;
+            chrome.runtime.sendMessage({ acao: 'ALTERNAR_PERFIL', perfilId: novoPerfilId }, (resp) => {
+                selectPerfilPopup.disabled = false;
+                if (chrome.runtime.lastError) return;
+                if (resp && resp.ok) {
+                    carregarEstadoInicial();
+                    if (!resp.miniTipExibidoNaAba && avisoMiniTipPopup) {
+                        const nomeSel = (resp.perfil && resp.perfil.nome) ? resp.perfil.nome : novoPerfilId;
+                        avisoMiniTipPopup.textContent = `Perfil de Uso:\n${nomeSel}`;
+                        avisoMiniTipPopup.style.display = 'block';
+                    } else if (avisoMiniTipPopup) {
+                        avisoMiniTipPopup.style.display = 'none';
+                    }
+                }
+            });
         });
     }
 

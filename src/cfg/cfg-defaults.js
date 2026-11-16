@@ -59,31 +59,188 @@
         LIMITE_MAXIMO_CONTADOR_OPERACIONAL: 900000000
     });
 
-    /* Passo 1.2: Listas de padrões de URLs de fábrica para o Cópia Inteligente e Anti-Ampulhetas */
-    const PADROES_DEFAULT_TURBO = Object.freeze([
-        '*://*.jus.br/*',
-        '*://*.gov.br/*',
-        '*://*.mp.br/*',
-        '*://*.def.br/*',
-        '*://gemini.google.com/*',
-        '*://serasa-judicial.serasaexperian.com.br/*'
-    ]);
-
-    const PADROES_DEFAULT_AMPULETAS = Object.freeze([
-        '*://*.jus.br/*',
-        '*://*.pje.jus.br/*',
-        '*://pje.jus.br/*',
-        '*://*pje*.jus.br/*',
-        '*://*pje*.*.jus.br/*'
-    ]);
-
+    /* Passo 1.2: Leitura desacoplada das personalizações padrão e perfis a partir de src/cfg/perfis.json
+     * Mantém apenas constantes estruturais vazias caso o JSON ainda esteja em carregamento assíncrono. */
     const PADROES_DEFAULT_REGRAS_MAPEAMENTO = Object.freeze([]);
+
+    const CATALOGO_PERFIS_MINIMO = Object.freeze({
+        versaoEsquema: 1,
+        perfilPadraoId: 'padrao',
+        chavesGlobais: Object.freeze(['regrasMapeamentoElementos', 'perfilAtivoId', 'listaPerfis']),
+        configPadrao: Object.freeze({}),
+        perfisPredefinidos: Object.freeze([
+            Object.freeze({ id: 'padrao', nome: 'Padrão', predefinido: true, sobrescritas: Object.freeze({}) }),
+            Object.freeze({ id: 'trabalho', nome: 'Trabalho', predefinido: true, sobrescritas: Object.freeze({}) }),
+            Object.freeze({ id: 'casa', nome: 'Casa', predefinido: true, sobrescritas: Object.freeze({}) }),
+            Object.freeze({ id: 'estudo', nome: 'Estudo', aliases: Object.freeze(['estudar']), predefinido: true, sobrescritas: Object.freeze({}) })
+        ])
+    });
+
+    function clonarValorConfig(valor) {
+        if (Array.isArray(valor)) return [...valor];
+        if (valor && typeof valor === 'object') {
+            const out = {};
+            const keys = Object.keys(valor);
+            for (let i = 0; i < keys.length; i++) {
+                out[keys[i]] = clonarValorConfig(valor[keys[i]]);
+            }
+            return out;
+        }
+        return valor;
+    }
+
+    function congelarCatalogoPerfis(bruto) {
+        const origem = (bruto && typeof bruto === 'object') ? bruto : CATALOGO_PERFIS_MINIMO;
+        const cfgObj = (origem.configPadrao && typeof origem.configPadrao === 'object') ? origem.configPadrao : {};
+        const cfgClone = {};
+        const cfgKeys = Object.keys(cfgObj);
+        for (let i = 0; i < cfgKeys.length; i++) {
+            const k = cfgKeys[i];
+            const v = cfgObj[k];
+            cfgClone[k] = Array.isArray(v) ? Object.freeze([...v]) : v;
+        }
+        const configPadrao = Object.freeze(cfgClone);
+
+        const listaBruta = Array.isArray(origem.perfisPredefinidos) && origem.perfisPredefinidos.length > 0
+            ? origem.perfisPredefinidos
+            : CATALOGO_PERFIS_MINIMO.perfisPredefinidos;
+        const perfisPredefinidos = Object.freeze(listaBruta.map((p) => Object.freeze({
+            id: String(p.id || 'padrao'),
+            nome: String(p.nome || p.id || 'Padrão'),
+            aliases: Object.freeze(Array.isArray(p.aliases) ? [...p.aliases] : []),
+            predefinido: p.predefinido !== false,
+            sobrescritas: Object.freeze(clonarValorConfig(p.sobrescritas || {}))
+        })));
+
+        const chavesGlobais = Object.freeze(
+            Array.isArray(origem.chavesGlobais) && origem.chavesGlobais.length > 0
+                ? [...origem.chavesGlobais]
+                : ['regrasMapeamentoElementos', 'perfilAtivoId', 'listaPerfis']
+        );
+
+        return Object.freeze({
+            versaoEsquema: Number(origem.versaoEsquema || 1),
+            perfilPadraoId: String(origem.perfilPadraoId || 'padrao'),
+            chavesGlobais,
+            configPadrao,
+            perfisPredefinidos
+        });
+    }
+
+    let catalogoPerfisAtivo = (() => {
+        try {
+            const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+            if (g && g.__JUSGOV_PERFIS_JSON__) {
+                return congelarCatalogoPerfis(g.__JUSGOV_PERFIS_JSON__);
+            }
+        } catch (_) { }
+        try {
+            if (typeof module === 'object' && module.exports && typeof require === 'function') {
+                return congelarCatalogoPerfis(require('./perfis.json'));
+            }
+        } catch (_) { }
+        return null;
+    })();
+
+    let promessaCarregamentoPerfis = null;
+
+    async function carregarCatalogoPerfisJson(chromeApi = null) {
+        if (catalogoPerfisAtivo) return catalogoPerfisAtivo;
+        if (promessaCarregamentoPerfis) return promessaCarregamentoPerfis;
+
+        promessaCarregamentoPerfis = (async () => {
+            try {
+                const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+                if (g && g.__JUSGOV_PERFIS_JSON__) {
+                    catalogoPerfisAtivo = congelarCatalogoPerfis(g.__JUSGOV_PERFIS_JSON__);
+                    return catalogoPerfisAtivo;
+                }
+                if (typeof fetch === 'function') {
+                    const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+                    const urlsCandidatas = [];
+                    if (apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
+                        urlsCandidatas.push(apiChrome.runtime.getURL('src/cfg/perfis.json'));
+                    }
+                    urlsCandidatas.push('perfis.json', './src/cfg/perfis.json', '../cfg/perfis.json');
+                    for (let i = 0; i < urlsCandidatas.length; i++) {
+                        try {
+                            const resp = await fetch(urlsCandidatas[i]);
+                            if (resp && resp.ok) {
+                                const json = await resp.json();
+                                if (json && typeof json === 'object') {
+                                    catalogoPerfisAtivo = congelarCatalogoPerfis(json);
+                                    if (g) g.__JUSGOV_PERFIS_JSON__ = json;
+                                    return catalogoPerfisAtivo;
+                                }
+                            }
+                        } catch (_) { }
+                    }
+                }
+            } catch (_) { }
+            return catalogoPerfisAtivo || CATALOGO_PERFIS_MINIMO;
+        })();
+
+        try {
+            return await promessaCarregamentoPerfis;
+        } finally {
+            promessaCarregamentoPerfis = null;
+        }
+    }
+
+    function obterCatalogoPerfis(catalogoOpcional = null) {
+        if (catalogoOpcional && typeof catalogoOpcional === 'object' && catalogoOpcional.configPadrao) {
+            return congelarCatalogoPerfis(catalogoOpcional);
+        }
+        return catalogoPerfisAtivo || CATALOGO_PERFIS_MINIMO;
+    }
+
+    function normalizarChaveAliasPerfil(valor) {
+        return String(valor || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function obterDefinicaoPerfilPredefinido(idOuNome, catalogoOpcional = null) {
+        const cat = obterCatalogoPerfis(catalogoOpcional);
+        const alvo = normalizarChaveAliasPerfil(idOuNome);
+        if (!alvo) return null;
+        for (let i = 0; i < cat.perfisPredefinidos.length; i++) {
+            const p = cat.perfisPredefinidos[i];
+            if (normalizarChaveAliasPerfil(p.id) === alvo || normalizarChaveAliasPerfil(p.nome) === alvo) {
+                return p;
+            }
+            if (Array.isArray(p.aliases) && p.aliases.some(a => normalizarChaveAliasPerfil(a) === alvo)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    function obterConfigBasePadrao(catalogoOpcional = null) {
+        const cat = obterCatalogoPerfis(catalogoOpcional);
+        return clonarValorConfig(cat.configPadrao || {});
+    }
+
+    function obterConfigPadraoParaPerfil(idOuNome, catalogoOpcional = null) {
+        const cat = obterCatalogoPerfis(catalogoOpcional);
+        const base = obterConfigBasePadrao(cat);
+        const def = obterDefinicaoPerfilPredefinido(idOuNome, cat);
+        if (def && def.sobrescritas) {
+            const keys = Object.keys(def.sobrescritas);
+            for (let i = 0; i < keys.length; i++) {
+                base[keys[i]] = clonarValorConfig(def.sobrescritas[keys[i]]);
+            }
+        }
+        return base;
+    }
 
     /* Passo 1.3: Catálogo de pré-definições visuais para Marcadores Permanentes de Conteúdo Colado (Seção 6.105 / FEAT-21) */
     const PRESETS_MARCADOR_COLADO = Object.freeze({
         verde_forense: Object.freeze({
             id: 'verde_forense',
-            nome: 'Verde Forense Suave (Padrão)',
+            nome: 'Verde Forense Suave',
             corContorno: '#0d9488',
             corFundo: '#14b8a6',
             opacidadeFundo: 0.14,
@@ -123,73 +280,29 @@
         })
     });
 
-    const PROMPT_F1_GEMINI_PADRAO = "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;";
-
-    /* Passo 1.4: Dicionário canônico de valores padrão de fábrica para o storage */
-    const PADROES_DEFAULT_STORAGE = Object.freeze({
-        modoTurbo: 'global',
-        estadoAmpuletas: true,
-        comportamentoCliqueIcone: 'popup',
-        manterFormatacaoBasica: true,
-        nivelFiltroFormatacao: 'basico',
-        abaEmPrimeiroPlano: true,
-        abaEmSegundoPlano: false,
-        selecaoEditavelAtiva: true,
-        placeholdersMinutasHtmlAtivo: true,
-        modoPlaceholdersMinutasHtml: 'placeholders',
-        colagemBotaoDireitoAtiva: false,
-        capturaBotoesMouse4e5Ativa: true,
-        colarBotaoMeioAtivo: true,
-        navegacaoTecladoCamposAtiva: true,
-        alternarAbasRecentesCtrlTabAtiva: true,
-        caixaEntradaRapidaAtiva: true,
-        validacaoMatematicaAtiva: true,
-        tempoConferenciaDocumentosMs: -1,
-        modoExibicaoValidacao: 'ambos',
-        posicaoAvisosValidacao: 'acima',
-        tempoAvisoMs: -1,
-        tempoFlashBorderMs: -1,
-        corFlashBorder: '#0d9488',
-        marcadorConteudoColadoAtivo: true,
-        presetMarcadorColado: 'verde_forense',
-        corContornoMarcadorColado: '#0d9488',
-        corFundoMarcadorColado: '#14b8a6',
-        opacidadeFundoMarcadorColado: 0.14,
-        estiloBadgeMarcadorColado: 'sobrescrito',
-        tipoContornoMarcadorColado: 'solido',
-        minimoCaracteresInterface: 5,
-        modoRetirarSelecao: 'total',
-        separadorAcumulador: ';',
-        incluirSeparadorFinalAcumulador: true,
-        separadorTabelas: ';',
-        modoShiftCnj: '20digitos',
-        converterCabecalhoPjeAtivo: true,
-        atalhoF1GeminiAtivo: true,
-        promptF1Gemini: PROMPT_F1_GEMINI_PADRAO,
-        autoLimpezaCacheCookiesAtiva: true,
-        autoLimpezaIdade: '7d',
-        criterioOrdenacaoGuias: 'hierarquia_arvore',
-        sentidoOrdenacaoGuias: 'esq_dir',
-        ordenarGuiasFixadas: false,
-        fecharHierarquiaEmCascata: false,
-        modoBarraFavoritosSuperior: false,
-        tempoTrabalhoCorridoAtivo: false,
-        tempoTrabalhoCorridoHoras: 7,
-        tempoTrabalhoAtivoAtivo: false,
-        tempoTrabalhoAtivoHoras: 6,
-        pomodoroAtivo: false,
-        pomodoroProporcao: 4.5,
-        pomodoroFocoMinutos: 25,
-        pomodoroCiclos: 4
-    });
-
+    /* Passo 1.4: Namespace dinâmico de defaults resolvido a partir de src/cfg/perfis.json */
     return Object.freeze({
         CONFIGURACAO_MOTOR,
-        PADROES_DEFAULT_TURBO,
-        PADROES_DEFAULT_AMPULETAS,
+        get PADROES_DEFAULT_TURBO() {
+            const urls = obterCatalogoPerfis().configPadrao.urlsTurbo;
+            return Array.isArray(urls) ? urls : Object.freeze([]);
+        },
+        get PADROES_DEFAULT_AMPULETAS() {
+            const urls = obterCatalogoPerfis().configPadrao.urlsAmpuletas;
+            return Array.isArray(urls) ? urls : Object.freeze([]);
+        },
         PADROES_DEFAULT_REGRAS_MAPEAMENTO,
         PRESETS_MARCADOR_COLADO,
-        PROMPT_F1_GEMINI_PADRAO,
-        PADROES_DEFAULT_STORAGE
+        get PROMPT_F1_GEMINI_PADRAO() {
+            return obterCatalogoPerfis().configPadrao.promptF1Gemini || '';
+        },
+        get PADROES_DEFAULT_STORAGE() {
+            return obterCatalogoPerfis().configPadrao;
+        },
+        carregarCatalogoPerfisJson,
+        obterCatalogoPerfis,
+        obterDefinicaoPerfilPredefinido,
+        obterConfigBasePadrao,
+        obterConfigPadraoParaPerfil
     });
 }));

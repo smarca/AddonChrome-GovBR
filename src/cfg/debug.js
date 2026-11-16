@@ -2941,35 +2941,33 @@
                 }
             );
 
-            /* Sub-modulo: Cascata de Validacao Matematica (FEAT-23 / Seção 6.112: Tempo de Exibição dos Avisos é independente) */
+            /* Sub-modulo: Cascata de Validacao Matematica (FEAT-23 + padrão global "Até a interação") */
             const optValMat = document.getElementById('optValidacaoMatematicaAtiva');
             const optTempoAviso = document.getElementById('optTempoExibicaoAlerta');
             const optModoVal = document.getElementById('optModoExibicaoValidacao');
             const optPosVal = document.getElementById('optPosicaoAvisosValidacao');
-            let cascataValidacaoOk = true;
-            if (optValMat && optTempoAviso) {
+            let cascataValidacaoOk = (optTempoAviso === null);
+            if (optValMat && cascataValidacaoOk) {
                 const estOrigVal = optValMat.checked;
                 optValMat.checked = false;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
-                const offTempoIndep = (optTempoAviso.disabled === false);
                 const offModo = !optModoVal || (optModoVal.disabled === true);
                 const offPos = !optPosVal || (optPosVal.disabled === true);
 
                 optValMat.checked = true;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
-                const onTempo = (optTempoAviso.disabled === false);
                 const onModo = !optModoVal || (optModoVal.disabled === false);
                 const onPos = !optPosVal || (optPosVal.disabled === false);
 
                 optValMat.checked = estOrigVal;
                 optValMat.dispatchEvent(new Event('change', { bubbles: true }));
 
-                cascataValidacaoOk = Boolean(offTempoIndep && onTempo && offModo && onModo && offPos && onPos);
+                cascataValidacaoOk = Boolean(offModo && onModo && offPos && onPos);
             }
             registrar(
                 cascataValidacaoOk,
                 'VALIDACAO_MATEMATICA_CASCATA_TEMPO_ALERTA',
-                'Cascata Validacao (FEAT-23 / Seção 6.112): desativar conferencia desabilita Exibição/Posição mantendo Tempo de Avisos independente',
+                'Cascata Validacao (FEAT-23): desativar conferencia desabilita Exibição/Posição; Tempo de Avisos removido com "Até a interação" global',
                 {
                     textoTestado: 'Comportamento Reativo de optValidacaoMatematicaAtiva',
                     idxCursor: 0,
@@ -11523,6 +11521,215 @@
                 'PRODUTIVIDADE_SERAO_MADRUGADA_E_DESCANSO_3H',
                 'Dia lógico vira às 04:00, reiniciando quem inicia após descanso >= 3h e mantendo no dia anterior quem segue em serão direto.',
                 { detalhe: detalheSerao }
+            );
+
+            // Teste: Perfis de Uso (perfis.json), separação código/dados, Trabalho/Estudo, Mapeamento Global e Backup Total (FEAT-35)
+            let perfisJsonOk = false;
+            let detalhePerfisJson = '';
+            try {
+                const defs = window.JusGovCfgDefaults;
+                const CfgCls = window.JusGovConfiguracoes;
+                if (defs && typeof defs.obterCatalogoPerfis === 'function' && typeof CfgCls === 'function') {
+                    const cat = defs.obterCatalogoPerfis();
+                    const cfgMgr = new CfgCls();
+                    const estrutura = cfgMgr.garantirEstruturaPerfis({}, cat);
+                    const idsBuiltIn = estrutura.listaPerfis.map(p => p.id);
+                    const idsOk = JSON.stringify(idsBuiltIn) === JSON.stringify(['padrao', 'trabalho', 'casa', 'estudo']);
+
+                    const defEstudar = defs.obterDefinicaoPerfilPredefinido('estudar', cat);
+                    const aliasEstudarOk = Boolean(defEstudar && defEstudar.id === 'estudo');
+
+                    const cfgTrabalho = cfgMgr.resolverConfigEfetivaPerfil('trabalho', {}, cat);
+                    const trabalhoOk = (
+                        cfgTrabalho.tempoTrabalhoCorridoAtivo === true &&
+                        cfgTrabalho.tempoTrabalhoAtivoAtivo === true &&
+                        cfgTrabalho.pomodoroAtivo === true
+                    );
+
+                    const cfgEstudo = cfgMgr.resolverConfigEfetivaPerfil('estudo', {}, cat);
+                    const estudoOk = (
+                        cfgEstudo.pomodoroAtivo === true &&
+                        cfgEstudo.tempoConferenciaDocumentosMs === 0 &&
+                        cfgEstudo.validacaoMatematicaAtiva === false
+                    );
+
+                    const chavesGlobais = Array.isArray(cat && cat.chavesGlobais) ? cat.chavesGlobais : [];
+                    const chavesPerfil = cfgMgr.obterChavesPorPerfil(cat);
+                    const escopoGlobalOk = chavesGlobais.includes('regrasMapeamentoElementos') && !chavesPerfil.includes('regrasMapeamentoElementos');
+
+                    const regraGlobalTeste = [{ id: 'g1', tipoSeletor: 'CSS (Simples)', expressao: '.regra-global' }];
+                    const diffTrab = cfgMgr.calcularSobrescritasPerfil(
+                        { ...cfgTrabalho, pomodoroAtivo: false, regrasMapeamentoElementos: regraGlobalTeste },
+                        'trabalho',
+                        cat
+                    );
+                    const diffOk = (diffTrab.pomodoroAtivo === false && diffTrab.regrasMapeamentoElementos === undefined);
+
+                    const syncSimulado = {
+                        listaPerfis: [
+                            ...estrutura.listaPerfis,
+                            { id: 'custom_1', nome: 'Plantão', predefinido: false }
+                        ],
+                        perfilAtivoId: 'trabalho',
+                        perfilCfg_trabalho: diffTrab,
+                        perfilCfg_custom_1: { modoTurbo: 'url', pomodoroCiclos: 8 },
+                        regrasMapeamentoElementos: regraGlobalTeste
+                    };
+                    const backupTotal = cfgMgr.montarDadosExportacaoBackupTotal(syncSimulado, null, cat);
+                    const backupOk = (
+                        backupTotal.backupTotalPerfis === true &&
+                        backupTotal.versaoBackup === 2 &&
+                        backupTotal.perfilAtivoId === 'trabalho' &&
+                        Boolean(backupTotal.perfis && backupTotal.perfis.padrao && backupTotal.perfis.trabalho && backupTotal.perfis.casa && backupTotal.perfis.estudo && backupTotal.perfis.custom_1) &&
+                        backupTotal.perfis.trabalho.pomodoroAtivo === false &&
+                        backupTotal.perfis.estudo.tempoConferenciaDocumentosMs === 0 &&
+                        backupTotal.perfis.custom_1.pomodoroCiclos === 8 &&
+                        Array.isArray(backupTotal.regrasMapeamentoElementos) &&
+                        backupTotal.regrasMapeamentoElementos.length === 1
+                    );
+
+                    perfisJsonOk = idsOk && aliasEstudarOk && trabalhoOk && estudoOk && escopoGlobalOk && diffOk && backupOk;
+                    detalhePerfisJson = `ids=${idsOk}, alias=${aliasEstudarOk}, trab=${trabalhoOk}, est=${estudoOk}, global=${escopoGlobalOk}, diff=${diffOk}, bkp=${backupOk}`;
+                } else {
+                    detalhePerfisJson = 'JusGovCfgDefaults/JusGovConfiguracoes ausentes';
+                }
+            } catch (ePerf) {
+                detalhePerfisJson = ePerf.message || String(ePerf);
+            }
+            registrar(
+                perfisJsonOk,
+                'PERFIS_JSON_BACKUP_TOTAL_E_ESCOPO_GLOBAL',
+                'perfis.json carrega Padrão/Trabalho/Casa/Estudo com overrides separados, Mapeamento global e Backup Total multiperfil.',
+                { detalhe: detalhePerfisJson }
+            );
+
+            // Teste: Teto estrito no parágrafo para seleção via cliques (triplo clique não seleciona página inteira)
+            let tetoParagrafoOk = false;
+            let detalheTeto = '';
+            try {
+                const containerTeste = document.createElement('div');
+                containerTeste.id = 'jusgov-teste-teto-paragrafo';
+                containerTeste.innerHTML = '<div class="secao-teste"><p id="p-teste-1">Primeiro parágrafo isolado para seleção forense. Segunda frase do mesmo parágrafo.</p><p id="p-teste-2">Segundo parágrafo distinto que jamais deve ser capturado por cliques.</p></div>';
+                document.body.appendChild(containerTeste);
+
+                const elP1 = containerTeste.querySelector('#p-teste-1');
+                const geom = (typeof window.JusGovGeometriaDOM === 'function') ? new window.JusGovGeometriaDOM() : null;
+                const estagio5 = (typeof window.JusGovEstagioParagrafos === 'function') ? new window.JusGovEstagioParagrafos() : null;
+                const motor = window.JusGovMotorSelecaoTeste;
+
+                const mapaP1 = geom ? geom.construirMapaTextoBlocoComJanela(elP1.firstChild, 0) : null;
+                let degrausOk = false;
+                if (motor && typeof motor.construirDegrausCicloSelecao === 'function' && mapaP1) {
+                    const degraus = motor.construirDegrausCicloSelecao(mapaP1, mapaP1.idxCursor || 0, elP1);
+                    const ultimo = degraus[degraus.length - 1];
+                    degrausOk = Boolean(
+                        Array.isArray(degraus) &&
+                        degraus.length > 0 &&
+                        ultimo &&
+                        ultimo.range &&
+                        elP1.contains(ultimo.range.startContainer) &&
+                        elP1.contains(ultimo.range.endContainer) &&
+                        !String(ultimo.texto || '').includes('Segundo parágrafo') &&
+                        ultimo.texto.length <= elP1.textContent.trim().length
+                    );
+                }
+
+                let triploEstagio5Ok = false;
+                if (estagio5 && typeof estagio5.resolverSelecaoTriploClique === 'function') {
+                    const textoDoisParagrafos = 'Primeiro parágrafo isolado para seleção forense. Segunda frase do mesmo parágrafo.\nSegundo parágrafo distinto que jamais deve ser capturado por cliques.';
+                    const resTriplo = estagio5.resolverSelecaoTriploClique({ texto: textoDoisParagrafos }, 0);
+                    const trechoTriplo = resTriplo ? textoDoisParagrafos.substring(resTriplo.inicio, resTriplo.fim) : '';
+                    triploEstagio5Ok = Boolean(
+                        resTriplo &&
+                        trechoTriplo.includes('Primeiro parágrafo') &&
+                        !trechoTriplo.includes('Segundo parágrafo')
+                    );
+                }
+
+                tetoParagrafoOk = degrausOk && triploEstagio5Ok;
+                detalheTeto = `degrausOk=${degrausOk}, triploEstagio5Ok=${triploEstagio5Ok}`;
+                containerTeste.remove();
+            } catch (eTeto) {
+                detalheTeto = eTeto.message || String(eTeto);
+                const leftover = document.getElementById('jusgov-teste-teto-paragrafo');
+                if (leftover) leftover.remove();
+            }
+            registrar(
+                tetoParagrafoOk,
+                'SELECAO_CLIQUES_TETO_ESTRITO_PARAGRAFO',
+                'Cliques múltiplos (inclusive triplo clique e ciclo) param estritamente no parágrafo e não escalam para a página inteira.',
+                { detalhe: detalheTeto }
+            );
+
+            // Teste: Auto-Limpeza Seletiva de Cookies Antigos (preserva logins/tokens recentes < X dias e apaga só inativos >= X dias)
+            let manutOk = false;
+            let detalheManut = '';
+            try {
+                const ManutCls = window.JusGovModuloManutencao;
+                if (typeof ManutCls === 'function') {
+                    const m = new ManutCls();
+                    const agora = 1800000000000;
+                    const seteDiasMs = m.obterMsIdadeLimpeza('7d');
+                    const umDiaMs = 24 * 3600 * 1000;
+
+                    const cTokenRecente = { storeId: '0', domain: '.pje.jus.br', path: '/', name: 'AUTH_TOKEN', secure: true };
+                    const cSemHistorico = { storeId: '0', domain: 'sso.cloud.pje.jus.br', path: '/', name: 'KC_SESSION', secure: true, hostOnly: true };
+                    const cAbaAberta = { storeId: '0', domain: '.gov.br', path: '/', name: 'GOV_SSO', secure: true };
+                    const cObsoleto = { storeId: '0', domain: '.portal-antigo.example.org', path: '/app', name: 'OLD_TRACKER', secure: false };
+
+                    const mapaInicial = {};
+                    mapaInicial[m.gerarChaveCookie(cTokenRecente)] = agora - (2 * umDiaMs); // acessado/alterado há 2 dias (< 7d) -> PRESERVAR
+                    mapaInicial[m.gerarChaveCookie(cAbaAberta)] = agora - (10 * umDiaMs);   // antigo, mas aba aberta agora -> PRESERVAR
+                    mapaInicial[m.gerarChaveCookie(cObsoleto)] = agora - (8 * umDiaMs);     // sem acesso há 8 dias (>= 7d) -> REMOVER
+                    mapaInicial['0|.inexistente.test|/|GHOST'] = agora - umDiaMs;          // cookie não existe mais -> podar do mapa
+
+                    const resAval = m.avaliarCookiesParaLimpeza(
+                        [cTokenRecente, cSemHistorico, cAbaAberta, cObsoleto],
+                        mapaInicial,
+                        agora,
+                        seteDiasMs,
+                        { hostsAtivos: new Set(['acesso.gov.br']) }
+                    );
+
+                    const apenasObsoletoRemovido = (
+                        resAval.remover.length === 1 &&
+                        resAval.remover[0].name === 'OLD_TRACKER'
+                    );
+                    const preservouRecentesEAtivos = (
+                        resAval.preservar.length === 3 &&
+                        resAval.preservar.some(c => c.name === 'AUTH_TOKEN') &&
+                        resAval.preservar.some(c => c.name === 'KC_SESSION') &&
+                        resAval.preservar.some(c => c.name === 'GOV_SSO')
+                    );
+                    const mapaLimpoESemeadoOk = (
+                        resAval.mapaAtualizado[m.gerarChaveCookie(cSemHistorico)] === agora &&
+                        resAval.mapaAtualizado[m.gerarChaveCookie(cAbaAberta)] === agora &&
+                        resAval.mapaAtualizado[m.gerarChaveCookie(cObsoleto)] === undefined &&
+                        resAval.mapaAtualizado['0|.inexistente.test|/|GHOST'] === undefined
+                    );
+                    const urlRemocaoOk = (
+                        m.construirUrlCookie(cObsoleto) === 'http://portal-antigo.example.org/app' &&
+                        m.construirUrlCookie(cTokenRecente) === 'https://pje.jus.br/'
+                    );
+                    const hostMatchOk = (
+                        m.cookieCorrespondeAoHost(cSemHistorico, 'sso.cloud.pje.jus.br') === true &&
+                        m.cookieCorrespondeAoHost(cSemHistorico, 'sub.sso.cloud.pje.jus.br') === false &&
+                        m.cookieCorrespondeAoHost(cAbaAberta, 'acesso.gov.br') === true
+                    );
+
+                    manutOk = Boolean(apenasObsoletoRemovido && preservouRecentesEAtivos && mapaLimpoESemeadoOk && urlRemocaoOk && hostMatchOk);
+                    detalheManut = `rem=${apenasObsoletoRemovido}, pres=${preservouRecentesEAtivos}, mapa=${mapaLimpoESemeadoOk}, url=${urlRemocaoOk}, host=${hostMatchOk}`;
+                } else {
+                    detalheManut = 'JusGovModuloManutencao ausente';
+                }
+            } catch (eManut) {
+                detalheManut = eManut.message || String(eManut);
+            }
+            registrar(
+                manutOk,
+                'MANUTENCAO_COOKIES_SELETIVA_PRESERVA_AUTENTICACAO',
+                'Auto-Limpeza remove apenas cookies sem acesso/alteração >= X dias, preservando tokens recentes, sessões ativas e cookies sem histórico.',
+                { detalhe: detalheManut }
             );
         }
 

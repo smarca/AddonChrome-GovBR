@@ -368,6 +368,19 @@
     </header>
 
     <main>
+        <section class="cartao" id="cartaoPerfilPopup">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <label for="selectPerfilPopup" style="font-size: 12px; font-weight: 700; color: var(--texto-forte); white-space: nowrap;">Perfil de Uso</label>
+                <select id="selectPerfilPopup" class="seletor-acao" aria-label="Perfil de Uso Ativo" style="flex: 1; max-width: 215px; font-size: 12px; padding: 5px 8px;">
+                    <option value="padrao">Padrão</option>
+                    <option value="trabalho">Trabalho</option>
+                    <option value="casa">Casa</option>
+                    <option value="estudo">Estudo</option>
+                </select>
+            </div>
+        </section>
+        <div id="avisoMiniTipPopup" role="status" aria-live="polite" style="display: none; background: rgba(15, 23, 42, 0.94); color: #f8fafc; border: 2px solid #2563eb; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; text-align: center; white-space: pre-line; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);"></div>
+
         <section class="cartao">
             <div class="cartao-titulo">
                 <span>Modo do Motor de Cópia</span>

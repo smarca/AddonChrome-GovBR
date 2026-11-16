@@ -99,16 +99,6 @@ const PADROES_FABRICA_AMPULETAS = Object.freeze([
 const PADROES_FABRICA_REGRAS_MAPEAMENTO = Object.freeze([]);
 
 /* Passo 1.1.1: Escalas dos controles deslizantes (sliders) e limite anti-overflow de contadores */
-const ESCALA_TEMPO_ALERTA_MS = Object.freeze([0, 2000, 3500, 5000, 7500, 10000, -1]);
-const ROTULOS_TEMPO_ALERTA_HTML = Object.freeze([
-    '0 (Desabilitado)',
-    '2s (Rápido)',
-    '3,5s',
-    '5s (Lento)',
-    '7,5s (Super lento)',
-    '10s (Ultra lento)',
-    'Até Interação'
-]);
 const ESCALA_TEMPO_CONFERENCIA_DOCUMENTOS_MS = Object.freeze([0, 1000, 2000, 3000, 4000, 5000, -1]);
 const ROTULOS_TEMPO_CONFERENCIA_DOCUMENTOS_HTML = Object.freeze([
     '0 (Desabilitado)',
@@ -235,8 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const containerPosicaoAvisosValidacao = document.getElementById('containerPosicaoAvisosValidacao');
     const checkOpcaoAmpuletas = document.getElementById('checkOpcaoAmpuletas') || document.getElementById('optAntiAmpulhetaPjeAtivo');
     const optConverterCabecalhoPje = document.getElementById('optConverterCabecalhoPje');
-    const optTempoExibicaoAlerta = document.getElementById('optTempoExibicaoAlerta');
-    const lblValorTempoAlerta = document.getElementById('lblValorTempoAlerta');
     const optTempoFlashMs = document.getElementById('optTempoFlashMs');
     const optCorFlashBorder = document.getElementById('optCorFlashBorder');
     const previewFlashBorderExemplo = document.getElementById('previewFlashBorderExemplo');
@@ -258,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestaurarPromptF1Padrao = document.getElementById('btnRestaurarPromptF1Padrao');
     const containerSubOpcaoJanelaUnica = document.getElementById('containerSubOpcaoJanelaUnica');
     const containerSubOpcaoF1Gemini = document.getElementById('containerSubOpcaoF1Gemini');
-    const containerTempoExibicaoAlerta = document.getElementById('containerTempoExibicaoAlerta');
     const containerSubControlesOrdenacao = document.getElementById('containerSubControlesOrdenacao');
     const lblTotalCopias = document.getElementById('lblTotalCopias');
     const lblTotalAlertas = document.getElementById('lblTotalAlertas');
@@ -290,6 +277,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportarJson = document.getElementById('btnExportarJson');
     const btnImportarJson = document.getElementById('btnImportarJson');
     const inputImportarArquivo = document.getElementById('inputImportarArquivo');
+
+    /* Perfis de Uso e Modais de Confirmacao / Gerenciamento (FEAT-35) */
+    const configuradorPerfis = (typeof JusGovConfiguracoes === 'function') ? new JusGovConfiguracoes() : null;
+    const selectPerfilAtivo = document.getElementById('selectPerfilAtivo');
+    const btnNovoPerfil = document.getElementById('btnNovoPerfil');
+    const btnRenomearPerfil = document.getElementById('btnRenomearPerfil');
+    const btnExcluirPerfil = document.getElementById('btnExcluirPerfil');
+    const modalConfirmarResetPerfis = document.getElementById('modalConfirmarResetPerfis');
+    const lblNomePerfilModalReset = document.getElementById('lblNomePerfilModalReset');
+    const btnResetPerfilAtual = document.getElementById('btnResetPerfilAtual');
+    const btnResetTodosPerfis = document.getElementById('btnResetTodosPerfis');
+    const btnResetCancelar = document.getElementById('btnResetCancelar');
+    const modalGerenciarPerfil = document.getElementById('modalGerenciarPerfil');
+    const tituloModalGerenciarPerfil = document.getElementById('tituloModalGerenciarPerfil');
+    const inputNomePerfilModal = document.getElementById('inputNomePerfilModal');
+    const containerOrigemNovoPerfil = document.getElementById('containerOrigemNovoPerfil');
+    const selectOrigemNovoPerfil = document.getElementById('selectOrigemNovoPerfil');
+    const btnConfirmarGerenciarPerfil = document.getElementById('btnConfirmarGerenciarPerfil');
+    const btnCancelarGerenciarPerfil = document.getElementById('btnCancelarGerenciarPerfil');
+    let cacheListaPerfis = [];
+    let cachePerfilAtivoId = 'padrao';
+    let modoModalGerenciarPerfil = 'criar';
+
+    function obterNomePerfilAtivo() {
+        const encontrado = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
+        return (encontrado && encontrado.nome) ? encontrado.nome : 'Padrão';
+    }
+
+    function atualizarBarraPerfisUI(listaPerfis, perfilAtivoId) {
+        if (Array.isArray(listaPerfis) && listaPerfis.length > 0) {
+            cacheListaPerfis = listaPerfis;
+        }
+        cachePerfilAtivoId = String(perfilAtivoId || cachePerfilAtivoId || 'padrao');
+        if (selectPerfilAtivo && cacheListaPerfis.length > 0) {
+            selectPerfilAtivo.innerHTML = '';
+            cacheListaPerfis.forEach((perfil) => {
+                if (!perfil || !perfil.id) return;
+                const opt = document.createElement('option');
+                opt.value = perfil.id;
+                opt.textContent = perfil.nome || perfil.id;
+                selectPerfilAtivo.appendChild(opt);
+            });
+            selectPerfilAtivo.value = cachePerfilAtivoId;
+            if (selectPerfilAtivo.value !== cachePerfilAtivoId && selectPerfilAtivo.options.length > 0) {
+                selectPerfilAtivo.selectedIndex = 0;
+                cachePerfilAtivoId = selectPerfilAtivo.value;
+            }
+        }
+        const perfilSelecionado = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
+        const ehPredefinido = !perfilSelecionado || perfilSelecionado.predefinido === true;
+        if (btnRenomearPerfil) {
+            btnRenomearPerfil.disabled = ehPredefinido;
+            btnRenomearPerfil.style.display = ehPredefinido ? 'none' : '';
+            btnRenomearPerfil.title = ehPredefinido ? '' : 'Renomear perfil atual';
+        }
+        if (btnExcluirPerfil) {
+            btnExcluirPerfil.disabled = ehPredefinido;
+            btnExcluirPerfil.style.display = ehPredefinido ? 'none' : '';
+            btnExcluirPerfil.title = ehPredefinido ? '' : 'Excluir perfil atual';
+        }
+    }
 
     /* Mapeamento Manual Avançado de Elementos (XPath / CSS) (Seção 6.20 e Seção 6.85) */
     const detalhesMapeamentoXPath = document.getElementById('detalhesMapeamentoXPath');
@@ -873,41 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function converterMsParaIndiceSliderAlerta(msBruto) {
-        const valor = Number(msBruto);
-        if (!Number.isFinite(valor)) return 6;
-        if (valor === -1) return 6;
-        const idxExato = ESCALA_TEMPO_ALERTA_MS.indexOf(valor);
-        if (idxExato !== -1) return idxExato;
-        let melhorIdx = 6;
-        let menorDif = Infinity;
-        for (let i = 0; i < ESCALA_TEMPO_ALERTA_MS.length; i++) {
-            if (ESCALA_TEMPO_ALERTA_MS[i] === -1) continue;
-            const dif = Math.abs(ESCALA_TEMPO_ALERTA_MS[i] - valor);
-            if (dif < menorDif) {
-                menorDif = dif;
-                melhorIdx = i;
-            }
-        }
-        return melhorIdx;
-    }
-
-    function obterTempoAlertaMsDoSlider() {
-        if (!optTempoExibicaoAlerta) return -1;
-        const idx = parseInt(optTempoExibicaoAlerta.value, 10);
-        if (Number.isInteger(idx) && idx >= 0 && idx < ESCALA_TEMPO_ALERTA_MS.length) {
-            return ESCALA_TEMPO_ALERTA_MS[idx];
-        }
-        return -1;
-    }
-
-    function atualizarRotuloSliderAlerta() {
-        if (!lblValorTempoAlerta || !optTempoExibicaoAlerta) return;
-        const idx = parseInt(optTempoExibicaoAlerta.value, 10);
-        const idxSeguro = (Number.isInteger(idx) && idx >= 0 && idx < ROTULOS_TEMPO_ALERTA_HTML.length) ? idx : 6;
-        lblValorTempoAlerta.innerHTML = ROTULOS_TEMPO_ALERTA_HTML[idxSeguro];
-    }
-
     function converterMsParaIndiceSliderConferencia(msBruto) {
         const valor = Number(msBruto);
         if (!Number.isFinite(valor)) return 6;
@@ -1303,12 +1316,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const msConferencia = obterTempoConferenciaMsDoSlider();
         const ativo = msConferencia !== 0;
         if (optValidacaoMatematicaAtiva) optValidacaoMatematicaAtiva.checked = ativo;
-        /* FEAT-23 (Seção 6.112): Tempo de Exibição dos Avisos na Tela é independente da Conferência de Documentos */
-        if (optTempoExibicaoAlerta) optTempoExibicaoAlerta.disabled = false;
-        if (containerTempoExibicaoAlerta) {
-            containerTempoExibicaoAlerta.style.opacity = '1';
-            containerTempoExibicaoAlerta.style.pointerEvents = 'auto';
-        }
         if (optModoExibicaoValidacao) optModoExibicaoValidacao.disabled = !ativo;
         if (containerModoExibicaoValidacao) {
             containerModoExibicaoValidacao.style.opacity = ativo ? '1' : '0.45';
@@ -1360,9 +1367,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function carregarConfiguracoesDoStorage() {
         /* Passo 3.1: Consultar chaves no storage sincronizado */
         if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+            if (configuradorPerfis) {
+                const estrutura = configuradorPerfis.garantirEstruturaPerfis({});
+                atualizarBarraPerfisUI(estrutura.listaPerfis, estrutura.perfilAtivoId);
+            }
             if (textoUrlsTurbo) textoUrlsTurbo.value = PADROES_FABRICA_TURBO.join('\n');
             renderizarListaRegrasMapeamento(PADROES_FABRICA_REGRAS_MAPEAMENTO);
-            atualizarRotuloSliderAlerta();
             atualizarRotuloSliderConferencia();
             atualizarRotuloSliderFlash();
             atualizarRotuloNivelFiltro();
@@ -1372,6 +1382,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chrome.storage.sync.get(null, (cfg) => {
             const dados = cfg || {};
+            if (configuradorPerfis) {
+                const estrutura = configuradorPerfis.garantirEstruturaPerfis(dados);
+                atualizarBarraPerfisUI(estrutura.listaPerfis, estrutura.perfilAtivoId);
+                if (estrutura.alteracoes) {
+                    chrome.storage.sync.set(estrutura.alteracoes).catch(() => { });
+                }
+            }
             const modoAtual = dados.modoTurbo || 'global';
             if (selectModoTurbo) selectModoTurbo.value = modoAtual;
             const compIcone = dados.comportamentoCliqueIcone || 'popup';
@@ -1473,12 +1490,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? dados.promptF1Gemini
                     : PROMPT_F1_GEMINI_PADRAO;
                 ajustarELimitarLinhasPromptIA();
-            }
-
-            if (optTempoExibicaoAlerta) {
-                const tempoSalvo = dados.tempoExibicaoAlertaMs !== undefined ? Number(dados.tempoExibicaoAlertaMs) : -1;
-                optTempoExibicaoAlerta.value = String(converterMsParaIndiceSliderAlerta(tempoSalvo));
-                atualizarRotuloSliderAlerta();
             }
 
             if (optTempoFlashMs) {
@@ -1646,14 +1657,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * de URLs no chrome.storage.sync para sincronizacao na nuvem da Conta Google
      * em todos os navegadores e propagacao imediata pelo Service Worker.
      */
-    function salvarConfiguracoes() {
-        if (timerDebounceSalvarConfig) {
-            clearTimeout(timerDebounceSalvarConfig);
-            timerDebounceSalvarConfig = null;
-        }
-        /* Passo 4.1: Coletar valores da UI e persistir no chrome.storage.sync (Nuvem Google) */
+    function coletarPayloadConfiguracoesUI() {
+        /* Passo 4.1: Coletar valores atuais da UI em formato canônico */
         const novasUrlsTurbo = extrairLinhasLimpas(textoUrlsTurbo ? textoUrlsTurbo.value : '');
-        const nivelIndice = optNivelFiltroEstilos ? Number(optNivelFiltroEstilos.value) : 1;
         const manterBasica = checkOpcaoRemoverFormatacoes ? !checkOpcaoRemoverFormatacoes.checked : false;
         const sepValor = optAcumuladorSeparador
             ? normalizarSeparadorAcumulador(optAcumuladorSeparador.value)
@@ -1661,7 +1667,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optAcumuladorSeparador && optAcumuladorSeparador.value !== sepValor) {
             optAcumuladorSeparador.value = sepValor;
         }
-        const tempoAlertaMs = obterTempoAlertaMsDoSlider();
         const tempoConferenciaMs = obterTempoConferenciaMsDoSlider();
         const validacaoAtivaEfetiva = tempoConferenciaMs !== 0;
         if (optValidacaoMatematicaAtiva) optValidacaoMatematicaAtiva.checked = validacaoAtivaEfetiva;
@@ -1674,11 +1679,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const corFundoMarcador = optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : COR_PADRAO_FUNDO_MARCADOR;
         const estiloBadgeMarcador = optEstiloBadgeMarcadorColado ? normalizarEstiloBadgeMarcadorColado(optEstiloBadgeMarcadorColado.value) : 'sobrescrito';
 
-        atualizarRotuloSliderAlerta();
         atualizarRotuloSliderConferencia();
         atualizarRotuloSliderFlash();
 
-        const payload = {
+        return {
             modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'global',
             comportamentoCliqueIcone: selectComportamentoIcone ? selectComportamentoIcone.value : 'popup',
             manterFormatacaoBasica: manterBasica,
@@ -1725,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', () => {
             converterCabecalhoPjeAtivo: optConverterCabecalhoPje ? optConverterCabecalhoPje.checked : true,
             atalhoF1GeminiAtivo: optAtalhoF1GeminiAtivo ? optAtalhoF1GeminiAtivo.checked : true,
             promptF1Gemini: (optPromptF1Gemini && optPromptF1Gemini.value.trim().length > 0) ? optPromptF1Gemini.value.trim() : PROMPT_F1_GEMINI_PADRAO,
-            tempoExibicaoAlertaMs: tempoAlertaMs,
+            tempoExibicaoAlertaMs: -1,
             tempoFlashBorderMs: tempoFlashMs,
             corFlashBorder: corFlash,
             marcadorConteudoColadoAtivo: marcadorColadoAtivo,
@@ -1750,6 +1754,18 @@ document.addEventListener('DOMContentLoaded', () => {
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
             regrasMapeamentoElementos: Array.isArray(regrasMapeamentoAtuais) ? regrasMapeamentoAtuais : [...PADROES_FABRICA_REGRAS_MAPEAMENTO]
         };
+    }
+
+    function salvarConfiguracoes() {
+        if (timerDebounceSalvarConfig) {
+            clearTimeout(timerDebounceSalvarConfig);
+            timerDebounceSalvarConfig = null;
+        }
+        const payload = coletarPayloadConfiguracoesUI();
+        if (configuradorPerfis) {
+            const perfilId = cachePerfilAtivoId || 'padrao';
+            payload[configuradorPerfis.chaveConfigPerfil(perfilId)] = configuradorPerfis.calcularSobrescritasPerfil(payload, perfilId);
+        }
         atualizarIconeModoOptions(payload.modoTurbo);
 
         if (textoUrlsTurbo) textoUrlsTurbo.value = payload.urlsTurbo.join('\n');
@@ -2083,11 +2099,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     adicionarOuvinteSeguro(optModoExibicaoValidacao, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optPosicaoAvisosValidacao, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(optTempoExibicaoAlerta, 'input', () => {
-        atualizarRotuloSliderAlerta();
-        salvarConfiguracoesDebounced(250);
-    });
-    adicionarOuvinteSeguro(optTempoExibicaoAlerta, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optTempoFlashMs, 'input', () => {
         atualizarRotuloSliderFlash();
         atualizarVisibilidadeSubOpcoesFlash();
@@ -2300,271 +2311,196 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* Passo 4.3: Restaurar Padroes de Fabrica, zerando contadores locais e dados extras */
-    adicionarOuvinteSeguro(btnRestaurarPadroes, 'click', async () => {
-        /* O prompt 'confirm' do SO nao renderiza HTML Entities, entao a string deve ser ASCII puro e legivel */
-        if (window.confirm('Deseja restaurar todas as configuracoes para os padroes originais de fabrica e apagar contadores e dados extras?')) {
-            if (selectModoTurbo) selectModoTurbo.value = 'global';
-            if (selectComportamentoIcone) selectComportamentoIcone.value = 'popup';
-            if (checkOpcaoRemoverFormatacoes) checkOpcaoRemoverFormatacoes.checked = false;
-            if (optNivelFiltroEstilos) optNivelFiltroEstilos.value = '1';
-            atualizarRotuloNivelFiltro();
-            atualizarEstadoOfuscamentoNivelFiltro();
-            if (checkOpcaoAmpuletas) checkOpcaoAmpuletas.checked = true;
-            if (optConverterCabecalhoPje) optConverterCabecalhoPje.checked = true;
-            if (selectModoPlaceholdersMinutasHtml) selectModoPlaceholdersMinutasHtml.value = 'placeholders';
-            if (optColagemBotaoDireito) optColagemBotaoDireito.checked = false;
-            if (optAlternarAbasRecentesCtrlTab) optAlternarAbasRecentesCtrlTab.checked = true;
-            if (optCapturaBotoesMouse4e5) optCapturaBotoesMouse4e5.checked = true;
-            if (optColarBotaoMeio) optColarBotaoMeio.checked = true;
-            obterEstadoPermissaoClipboard().then((perm) => {
-                atualizarVisualAtencaoSwitches(perm);
-            });
-            if (optNavegacaoTecladoCampos) optNavegacaoTecladoCampos.checked = true;
-            if (optCaixaEntradaRapida) optCaixaEntradaRapida.checked = true;
-            if (optBloquearNovasJanelas) optBloquearNovasJanelas.checked = true;
-            if (optPreservarJanelasAutenticacao) optPreservarJanelasAutenticacao.checked = true;
-            if (optAbaEmPrimeiroPlano) optAbaEmPrimeiroPlano.checked = true;
-            if (optReutilizarAbasAbertas) optReutilizarAbasAbertas.checked = true;
-            if (optReutilizarFocoPrimeiroPlano) optReutilizarFocoPrimeiroPlano.checked = true;
-            if (optProtegerGuiasModificadas) optProtegerGuiasModificadas.checked = true;
-            if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.value = 'manter';
-            if (optReutilizarAcaoManter) optReutilizarAcaoManter.checked = true;
-            if (optMonitorarUrlOriginal) optMonitorarUrlOriginal.checked = false;
-            if (optMonitorarUrlAtual) optMonitorarUrlAtual.checked = true;
-            atualizarVisibilidadeSubOpcoesReutilizar();
-            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = 'hierarquia_arvore';
-            if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = 'esq_dir';
-            if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = true;
-            if (lblSentidoOrdenacaoGuias) lblSentidoOrdenacaoGuias.textContent = 'Da Esquerda para a Direita (A-Z)';
-            if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = false;
-            if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = false;
-            if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = false;
-            atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
-            if (optDescarteGuiasInativas) optDescarteGuiasInativas.checked = false;
-            if (optValidacaoMatematicaAtiva) optValidacaoMatematicaAtiva.checked = true;
-            if (optTempoConferenciaDocumentos) {
-                optTempoConferenciaDocumentos.value = '6';
-                atualizarRotuloSliderConferencia();
-            }
-            if (optModoExibicaoValidacao) optModoExibicaoValidacao.value = 'sempre';
-            if (optPosicaoAvisosValidacao) optPosicaoAvisosValidacao.value = 'abaixo';
-            atualizarVisibilidadeSubOpcoesValidacao();
-            if (optTempoExibicaoAlerta) {
-                optTempoExibicaoAlerta.value = '6';
-                atualizarRotuloSliderAlerta();
-            }
-            if (optTempoFlashMs) {
-                optTempoFlashMs.value = '5250';
-                atualizarRotuloSliderFlash();
-            }
-            if (optMinimoCaracteresInterface) optMinimoCaracteresInterface.value = '5';
-            if (optCorFlashBorder) optCorFlashBorder.value = COR_PADRAO_FLASH_BORDER;
-            if (optMarcadorConteudoColadoAtivo) optMarcadorConteudoColadoAtivo.checked = true;
-            if (optPresetMarcadorColado) optPresetMarcadorColado.value = 'verde_forense';
-            if (optTipoContornoMarcadorColado) optTipoContornoMarcadorColado.value = 'solido';
-            if (optCorContornoMarcadorColado) optCorContornoMarcadorColado.value = COR_PADRAO_FLASH_BORDER;
-            if (optCorFundoMarcadorColado) optCorFundoMarcadorColado.value = COR_PADRAO_FUNDO_MARCADOR;
-            if (optEstiloBadgeMarcadorColado) optEstiloBadgeMarcadorColado.value = 'sobrescrito';
-            if (optModoRetirarSelecao) optModoRetirarSelecao.value = 'total';
-            if (optAcumuladorSeparador) optAcumuladorSeparador.value = ';';
-            if (optAtalhoF1GeminiAtivo) optAtalhoF1GeminiAtivo.checked = true;
-            if (optPromptF1Gemini) optPromptF1Gemini.value = PROMPT_F1_GEMINI_PADRAO;
-            if (optAutoLimpezaCacheCookiesAtiva) optAutoLimpezaCacheCookiesAtiva.checked = true;
-            if (optAutoLimpezaIdade) optAutoLimpezaIdade.value = '7d';
-            if (optTempoTrabalhoCorridoAtivo) optTempoTrabalhoCorridoAtivo.checked = false;
-            if (optTempoTrabalhoCorridoHoras) optTempoTrabalhoCorridoHoras.value = '7';
-            if (optTempoTrabalhoAtivoAtivo) optTempoTrabalhoAtivoAtivo.checked = false;
-            if (optTempoTrabalhoAtivoHoras) optTempoTrabalhoAtivoHoras.value = '6';
-            if (optPomodoroAtivo) optPomodoroAtivo.checked = false;
-            if (optPomodoroProporcao) optPomodoroProporcao.value = '4.5';
-            if (optPomodoroFocoMinutos) optPomodoroFocoMinutos.value = '25';
-            if (optPomodoroCiclos) optPomodoroCiclos.value = '4';
-            atualizarCalculoPomodoroUI();
-            if (textoUrlsTurbo) textoUrlsTurbo.value = PADROES_FABRICA_TURBO.join('\n');
-            if (lblTotalCopias) lblTotalCopias.textContent = '0';
-            if (lblTotalAlertas) lblTotalAlertas.textContent = '0';
-            atualizarTodasVisibilidadesCascata();
+    /* Passo 4.2.5: Gerenciamento de Perfis (Selecionar, Criar, Renomear, Excluir) */
+    function fecharModalGerenciarPerfil() {
+        if (modalGerenciarPerfil) modalGerenciarPerfil.classList.remove('aberto');
+    }
 
-            let regrasPadraoUsuario = [];
-            try {
-                const respInt = await fetch(chrome.runtime.getURL('src/cfg/interface.json'));
-                const dadosInt = await respInt.json();
-                if (Array.isArray(dadosInt)) {
-                    regrasPadraoUsuario = dadosInt
-                        .filter(r => r && r.origem === 'usuario')
-                        .map(({ origem, ...resto }) => ({ ...resto }));
-                }
-            } catch (_) { }
+    function fecharModalResetPerfis() {
+        if (modalConfirmarResetPerfis) modalConfirmarResetPerfis.classList.remove('aberto');
+    }
 
-            const padroesFabricaCompletos = {
-                modoTurbo: 'global',
-                comportamentoCliqueIcone: 'popup',
-                manterFormatacaoBasica: true,
-                nivelFiltroFormatacao: 'basico',
-                ativoAmpuletas: true,
-                converterCabecalhoPjeAtivo: true,
-                selecaoEditavelAtiva: true,
-                modoPlaceholdersMinutasHtml: 'placeholders',
-                placeholdersMinutasHtmlAtivo: true,
-                colagemBotaoDireitoAtiva: false,
-                capturaBotoesMouse4e5Ativa: true,
-                colarBotaoMeioAtivo: true,
-                navegacaoTecladoCamposAtiva: true,
-                bloquearNovasJanelas: true,
-                preservarJanelasAutenticacao: true,
-                abaEmPrimeiroPlano: true,
-                abaEmSegundoPlano: false,
-                reutilizarAbasAbertas: true,
-                reutilizarAbasFocoPrimeiroPlano: true,
-                protegerGuiasModificadas: true,
-                reutilizarAbasAcaoConteudo: 'manter',
-                monitorarUrlOriginalAbertura: false,
-                monitorarUrlAtualPagina: true,
-                criterioOrdenacaoGuias: 'nenhum',
-                sentidoOrdenacaoGuias: 'esq_dir',
-                ordenarGuiasFixadas: false,
-                descarteGuiasInativasAtivo: false,
-                validacaoMatematicaAtiva: true,
-                tempoConferenciaDocumentosMs: -1,
-                tempoExibicaoAlertaMs: -1,
-                tempoFlashBorderMs: -1,
-                corFlashBorder: COR_PADRAO_FLASH_BORDER,
-                marcadorConteudoColadoAtivo: true,
-                presetMarcadorColado: 'verde_forense',
-                tipoContornoMarcadorColado: 'solido',
-                corContornoMarcadorColado: COR_PADRAO_FLASH_BORDER,
-                corFundoMarcadorColado: COR_PADRAO_FUNDO_MARCADOR,
-                estiloBadgeMarcadorColado: 'sobrescrito',
-                modoRetirarSelecao: 'total',
-                minimoCaracteresInterface: 5,
-                separadorAcumulador: ';',
-                atalhoF1GeminiAtivo: true,
-                promptF1Gemini: PROMPT_F1_GEMINI_PADRAO,
-                autoLimpezaCacheCookiesAtiva: true,
-                autoLimpezaIdade: '7d',
-                tempoTrabalhoCorridoAtivo: false,
-                tempoTrabalhoCorridoHoras: 7,
-                tempoTrabalhoAtivoAtivo: false,
-                tempoTrabalhoAtivoHoras: 6,
-                pomodoroAtivo: false,
-                pomodoroProporcao: 4.5,
-                pomodoroFocoMinutos: 25,
-                pomodoroCiclos: 4,
-                urlsTurbo: [...PADROES_FABRICA_TURBO],
-                urlsAmpuletas: [...PADROES_FABRICA_AMPULETAS],
-                regrasMapeamentoElementos: regrasPadraoUsuario
-            };
-            regrasMapeamentoAtuais = [...regrasPadraoUsuario];
-            renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-            marcarAlteracoesPendentesMapeamento(false);
-            atualizarIconeModoOptions('global');
+    function abrirModalGerenciarPerfil(modo) {
+        if (!modalGerenciarPerfil || !inputNomePerfilModal) return;
+        modoModalGerenciarPerfil = modo === 'renomear' ? 'renomear' : 'criar';
+        if (tituloModalGerenciarPerfil) {
+            tituloModalGerenciarPerfil.textContent = (modoModalGerenciarPerfil === 'renomear')
+                ? 'Renomear Perfil'
+                : 'Novo Perfil de Uso';
+        }
+        if (containerOrigemNovoPerfil) {
+            containerOrigemNovoPerfil.style.display = (modoModalGerenciarPerfil === 'renomear') ? 'none' : 'block';
+        }
+        inputNomePerfilModal.value = (modoModalGerenciarPerfil === 'renomear') ? obterNomePerfilAtivo() : '';
+        modalGerenciarPerfil.classList.add('aberto');
+        inputNomePerfilModal.focus();
+        inputNomePerfilModal.select();
+    }
 
-            /* Limpar storage local e de sessao para zerar contadores operacionais e dados residuais */
-            if (typeof chrome !== 'undefined' && chrome.storage) {
-                if (chrome.storage.local) {
-                    const agora = new Date();
-                    const pad = (n) => String(n).padStart(2, '0');
-                    const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
-                    chrome.storage.local.clear(() => {
-                        chrome.storage.local.set({ totalCopias: 0, totalAlertas: 0, dataInicioContadores: strData });
-                        if (lblDataInicioContadores) lblDataInicioContadores.textContent = strData;
-                    });
+    adicionarOuvinteSeguro(selectPerfilAtivo, 'change', async () => {
+        if (!configuradorPerfis || !selectPerfilAtivo) return;
+        const novoId = selectPerfilAtivo.value;
+        if (!novoId || novoId === cachePerfilAtivoId) return;
+        selectPerfilAtivo.disabled = true;
+        try {
+            const res = await configuradorPerfis.alternarPerfil(novoId, typeof chrome !== 'undefined' ? chrome : null);
+            if (res && res.ok) {
+                carregarConfiguracoesDoStorage();
+                if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
                 }
-                if (chrome.storage.session) {
-                    chrome.storage.session.clear().catch(() => { });
-                }
-                /* Gravar os padroes completos atomicamente primeiro e remover apenas chaves orfas (evita race condition com background.js) */
-                if (chrome.storage.sync) {
-                    const chavesPadrao = new Set(Object.keys(padroesFabricaCompletos));
-                    chrome.storage.sync.set(padroesFabricaCompletos, () => {
-                        chrome.storage.sync.get(null, (todasChaves) => {
-                            const chavesOrfas = Object.keys(todasChaves || {}).filter(k => !chavesPadrao.has(k));
-                            const finalizar = () => {
-                                if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
-                                }
-                                exibirToast('Padrões de fábrica restaurados e dados extras apagados com sucesso!');
-                            };
-                            if (chavesOrfas.length > 0) {
-                                chrome.storage.sync.remove(chavesOrfas, finalizar);
-                            } else {
-                                finalizar();
-                            }
-                        });
-                    });
-                    return;
+                const nomeAtivado = (res.perfil && res.perfil.nome) || novoId;
+                if (window.top && window.top.__JUSGOV_MOTOR_SELECAO_API__ && typeof window.top.__JUSGOV_MOTOR_SELECAO_API__.projetarMiniTipGlobalNoTop === 'function') {
+                    window.top.__JUSGOV_MOTOR_SELECAO_API__.projetarMiniTipGlobalNoTop(`Perfil de Uso:\n${nomeAtivado}`, '#2563eb');
+                } else {
+                    exibirToast(`Perfil "${nomeAtivado}" ativado!`);
                 }
             }
-            exibirToast('Padrões originais de fábrica restaurados!');
+        } finally {
+            selectPerfilAtivo.disabled = false;
         }
     });
 
+    adicionarOuvinteSeguro(btnNovoPerfil, 'click', () => abrirModalGerenciarPerfil('criar'));
+    adicionarOuvinteSeguro(btnRenomearPerfil, 'click', () => {
+        const atual = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
+        if (!atual || atual.predefinido) return;
+        abrirModalGerenciarPerfil('renomear');
+    });
+
+    adicionarOuvinteSeguro(btnExcluirPerfil, 'click', async () => {
+        if (!configuradorPerfis) return;
+        const atual = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
+        if (!atual || atual.predefinido) return;
+        if (!window.confirm(`Deseja excluir o perfil "${atual.nome}"? Suas preferências serão removidas.`)) return;
+        const res = await configuradorPerfis.excluirPerfil(atual.id, typeof chrome !== 'undefined' ? chrome : null);
+        if (res && res.ok) {
+            carregarConfiguracoesDoStorage();
+            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+            }
+            exibirToast(`Perfil "${atual.nome}" excluído.`);
+        } else {
+            exibirToast('Não foi possível excluir este perfil.');
+        }
+    });
+
+    adicionarOuvinteSeguro(btnCancelarGerenciarPerfil, 'click', fecharModalGerenciarPerfil);
+    adicionarOuvinteSeguro(modalGerenciarPerfil, 'click', (e) => {
+        if (e.target === modalGerenciarPerfil) fecharModalGerenciarPerfil();
+    });
+
+    adicionarOuvinteSeguro(btnConfirmarGerenciarPerfil, 'click', async () => {
+        if (!configuradorPerfis || !inputNomePerfilModal) return;
+        const nome = String(inputNomePerfilModal.value || '').trim();
+        if (!nome) {
+            exibirToast('Informe um nome válido para o perfil.');
+            inputNomePerfilModal.focus();
+            return;
+        }
+        if (modoModalGerenciarPerfil === 'renomear') {
+            const res = await configuradorPerfis.renomearPerfil(cachePerfilAtivoId, nome, typeof chrome !== 'undefined' ? chrome : null);
+            if (res && res.ok) {
+                fecharModalGerenciarPerfil();
+                carregarConfiguracoesDoStorage();
+                exibirToast(`Perfil renomeado para "${nome}".`);
+            } else {
+                exibirToast('Não foi possível renomear o perfil.');
+            }
+        } else {
+            const origem = selectOrigemNovoPerfil ? selectOrigemNovoPerfil.value : 'padrao';
+            const res = await configuradorPerfis.criarPerfil(nome, { origem, ativar: true }, typeof chrome !== 'undefined' ? chrome : null);
+            if (res && res.ok) {
+                fecharModalGerenciarPerfil();
+                carregarConfiguracoesDoStorage();
+                if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                }
+                exibirToast(`Perfil "${res.perfil.nome}" criado e ativado!`);
+            } else {
+                exibirToast('Já existe um perfil com este nome ou nome inválido.');
+            }
+        }
+    });
+
+    /* Passo 4.3: Restaurar Configuracoes com opcoes: "Apenas este Perfil (Nome)" (padrao), "Todos" ou "Cancelar" */
+    adicionarOuvinteSeguro(btnRestaurarPadroes, 'click', () => {
+        if (lblNomePerfilModalReset) {
+            lblNomePerfilModalReset.textContent = obterNomePerfilAtivo();
+        }
+        if (modalConfirmarResetPerfis) {
+            modalConfirmarResetPerfis.classList.add('aberto');
+            if (btnResetPerfilAtual) btnResetPerfilAtual.focus();
+        }
+    });
+
+    adicionarOuvinteSeguro(btnResetCancelar, 'click', fecharModalResetPerfis);
+    adicionarOuvinteSeguro(modalConfirmarResetPerfis, 'click', (e) => {
+        if (e.target === modalConfirmarResetPerfis) fecharModalResetPerfis();
+    });
+
+    adicionarOuvinteSeguro(btnResetPerfilAtual, 'click', async () => {
+        fecharModalResetPerfis();
+        const nomeAtual = obterNomePerfilAtivo();
+        if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            const res = await configuradorPerfis.resetarPerfis('atual', chrome);
+            if (res && res.ok) {
+                carregarConfiguracoesDoStorage();
+                if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                }
+                exibirToast(`Perfil "${nomeAtual}" restaurado para as configurações iniciais!`);
+                return;
+            }
+        }
+        exibirToast(`Perfil "${nomeAtual}" restaurado!`);
+    });
+
+    adicionarOuvinteSeguro(btnResetTodosPerfis, 'click', async () => {
+        fecharModalResetPerfis();
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            if (chrome.storage.local) {
+                const agora = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
+                chrome.storage.local.clear(() => {
+                    chrome.storage.local.set({ totalCopias: 0, totalAlertas: 0, dataInicioContadores: strData });
+                    if (lblDataInicioContadores) lblDataInicioContadores.textContent = strData;
+                    if (lblTotalCopias) lblTotalCopias.textContent = '0';
+                    if (lblTotalAlertas) lblTotalAlertas.textContent = '0';
+                });
+            }
+            if (chrome.storage.session) {
+                chrome.storage.session.clear().catch(() => { });
+            }
+        }
+        if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            const res = await configuradorPerfis.resetarPerfis('todos', chrome);
+            if (res && res.ok) {
+                marcarAlteracoesPendentesMapeamento(false);
+                carregarConfiguracoesDoStorage();
+                if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                }
+                exibirToast('Todos os perfis foram restaurados e dados extras apagados com sucesso!');
+                return;
+            }
+        }
+        exibirToast('Todos os perfis restaurados!');
+    });
+
     /* Passo 4.4: Exportar todas as configuracoes em arquivo JSON global */
-    adicionarOuvinteSeguro(btnExportarJson, 'click', () => {
-        const tempoFlashMsExport = optTempoFlashMs ? normalizarTempoFlashMs(optTempoFlashMs.value) : 0;
-        const dadosExportacao = {
-            projeto: 'JusGovBR',
-            modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'global',
-            comportamentoCliqueIcone: selectComportamentoIcone ? selectComportamentoIcone.value : 'popup',
-            manterFormatacaoBasica: checkOpcaoRemoverFormatacoes ? !checkOpcaoRemoverFormatacoes.checked : false,
-            nivelFiltroFormatacao: optNivelFiltroEstilos ? converterIndiceParaNivelFiltro(optNivelFiltroEstilos.value) : 'basico',
-            ativoAmpuletas: checkOpcaoAmpuletas ? checkOpcaoAmpuletas.checked : true,
-            converterCabecalhoPjeAtivo: optConverterCabecalhoPje ? optConverterCabecalhoPje.checked : true,
-            selecaoEditavelAtiva: selectModoPlaceholdersMinutasHtml ? (selectModoPlaceholdersMinutasHtml.value !== 'desabilitado') : true,
-            modoPlaceholdersMinutasHtml: selectModoPlaceholdersMinutasHtml ? selectModoPlaceholdersMinutasHtml.value : 'placeholders',
-            placeholdersMinutasHtmlAtivo: selectModoPlaceholdersMinutasHtml ? (selectModoPlaceholdersMinutasHtml.value !== 'desabilitado') : true,
-            colagemBotaoDireitoAtiva: false,
-            alternarAbasRecentesCtrlTabAtiva: optAlternarAbasRecentesCtrlTab ? optAlternarAbasRecentesCtrlTab.checked : true,
-            capturaBotoesMouse4e5Ativa: optCapturaBotoesMouse4e5 ? optCapturaBotoesMouse4e5.checked : true,
-            colarBotaoMeioAtivo: optColarBotaoMeio ? optColarBotaoMeio.checked : true,
-            navegacaoTecladoCamposAtiva: optNavegacaoTecladoCampos ? optNavegacaoTecladoCampos.checked : true,
-            caixaEntradaRapidaAtiva: optCaixaEntradaRapida ? optCaixaEntradaRapida.checked : true,
-            bloquearNovasJanelas: optBloquearNovasJanelas ? optBloquearNovasJanelas.checked : true,
-            preservarJanelasAutenticacao: optPreservarJanelasAutenticacao ? optPreservarJanelasAutenticacao.checked : true,
-            abaEmPrimeiroPlano: optAbaEmPrimeiroPlano ? optAbaEmPrimeiroPlano.checked : false,
-            abaEmSegundoPlano: optAbaEmPrimeiroPlano ? !optAbaEmPrimeiroPlano.checked : true,
-            reutilizarAbasAbertas: optReutilizarAbasAbertas ? optReutilizarAbasAbertas.checked : true,
-            reutilizarAbasFocoPrimeiroPlano: optReutilizarFocoPrimeiroPlano ? optReutilizarFocoPrimeiroPlano.checked : true,
-            protegerGuiasModificadas: optProtegerGuiasModificadas ? optProtegerGuiasModificadas.checked : true,
-            reutilizarAbasAcaoConteudo: selectReutilizarAcaoConteudo
-                ? selectReutilizarAcaoConteudo.value
-                : ((optReutilizarAcaoRecarregar && optReutilizarAcaoRecarregar.checked)
-                    ? 'recarregar'
-                    : ((optReutilizarAcaoRecarregarSeModificada && optReutilizarAcaoRecarregarSeModificada.checked)
-                        ? 'recarregar_se_modificada'
-                        : ((optReutilizarAcaoRecarregarSeNaoModificada && optReutilizarAcaoRecarregarSeNaoModificada.checked)
-                            ? 'recarregar_se_nao_modificada'
-                            : 'manter'))),
-            monitorarUrlOriginalAbertura: optMonitorarUrlOriginal ? optMonitorarUrlOriginal.checked : false,
-            monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
-            criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
-            sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
-            ordenarGuiasFixadas: optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false,
-            fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
-            modoBarraFavoritosSuperior: optModoBarraFavoritosSuperior ? optModoBarraFavoritosSuperior.checked : false,
-            descarteGuiasInativasAtivo: false,
-            tempoInatividadeDescarteMinutos: optTempoInatividadeDescarteMinutos ? Number(optTempoInatividadeDescarteMinutos.value) : 20,
-            validacaoMatematicaAtiva: obterTempoConferenciaMsDoSlider() !== 0,
-            tempoConferenciaDocumentosMs: obterTempoConferenciaMsDoSlider(),
-            modoExibicaoValidacao: optModoExibicaoValidacao ? optModoExibicaoValidacao.value : 'sempre',
-            posicaoAvisosValidacao: optPosicaoAvisosValidacao ? optPosicaoAvisosValidacao.value : 'abaixo',
-            tempoExibicaoAlertaMs: obterTempoAlertaMsDoSlider(),
-            tempoFlashBorderMs: tempoFlashMsExport,
-            corFlashBorder: optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : COR_PADRAO_FLASH_BORDER,
-            marcadorConteudoColadoAtivo: optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true,
-            presetMarcadorColado: optPresetMarcadorColado ? normalizarPresetMarcadorColado(optPresetMarcadorColado.value) : 'verde_forense',
-            tipoContornoMarcadorColado: optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido',
-            corContornoMarcadorColado: optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : COR_PADRAO_FLASH_BORDER,
-            corFundoMarcadorColado: optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : COR_PADRAO_FUNDO_MARCADOR,
-            estiloBadgeMarcadorColado: optEstiloBadgeMarcadorColado ? normalizarEstiloBadgeMarcadorColado(optEstiloBadgeMarcadorColado.value) : 'sobrescrito',
-            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total',
-            minimoCaracteresInterface: optMinimoCaracteresInterface ? (parseInt(optMinimoCaracteresInterface.value, 10) || 0) : 5,
-            separadorAcumulador: optAcumuladorSeparador ? normalizarSeparadorAcumulador(optAcumuladorSeparador.value) : ';',
-            atalhoF1GeminiAtivo: optAtalhoF1GeminiAtivo ? optAtalhoF1GeminiAtivo.checked : true,
-            promptF1Gemini: optPromptF1Gemini ? optPromptF1Gemini.value : PROMPT_F1_GEMINI_PADRAO,
-            urlsTurbo: extrairLinhasLimpas(textoUrlsTurbo ? textoUrlsTurbo.value : ''),
-            regrasMapeamentoElementos: Array.isArray(regrasMapeamentoAtuais) ? regrasMapeamentoAtuais : [...PADROES_FABRICA_REGRAS_MAPEAMENTO]
-        };
+    adicionarOuvinteSeguro(btnExportarJson, 'click', async () => {
+        const overridesAtuais = coletarPayloadConfiguracoesUI();
+        let syncData = {};
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            try {
+                syncData = await chrome.storage.sync.get(null);
+            } catch (_) { }
+        }
+        const dadosExportacao = configuradorPerfis
+            ? configuradorPerfis.montarDadosExportacaoBackupTotal(syncData || {}, overridesAtuais)
+            : { projeto: 'JusGovBR', ...overridesAtuais };
 
         const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -2575,7 +2511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        exibirToast('Arquivo JSON com todas as configurações exportado!');
+        exibirToast('Backup total (todos os perfis) exportado em JSON!');
     });
 
     /* Passo 4.5: Importar todas as configuracoes de arquivo JSON global */
@@ -2589,182 +2525,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!arquivo) return;
 
             const leitor = new FileReader();
-            leitor.onload = (ev) => {
+            leitor.onload = async (ev) => {
                 try {
                     const json = JSON.parse(String(ev.target.result || '{}'));
-                    if (json.modoTurbo && selectModoTurbo) selectModoTurbo.value = json.modoTurbo;
-                    if (json.comportamentoCliqueIcone && selectComportamentoIcone) selectComportamentoIcone.value = json.comportamentoCliqueIcone;
-                    if (typeof json.manterFormatacaoBasica === 'boolean' && checkOpcaoRemoverFormatacoes) {
-                        checkOpcaoRemoverFormatacoes.checked = !json.manterFormatacaoBasica;
-                    }
-                    if (json.nivelFiltroFormatacao && optNivelFiltroEstilos) {
-                        optNivelFiltroEstilos.value = String(converterNivelFiltroParaIndice(json.nivelFiltroFormatacao));
-                        atualizarRotuloNivelFiltro();
-                    }
-                    atualizarEstadoOfuscamentoNivelFiltro();
-                    if (typeof json.ativoAmpuletas === 'boolean' && checkOpcaoAmpuletas) {
-                        checkOpcaoAmpuletas.checked = json.ativoAmpuletas;
-                    }
-                    if (typeof json.converterCabecalhoPjeAtivo === 'boolean' && optConverterCabecalhoPje) {
-                        optConverterCabecalhoPje.checked = json.converterCabecalhoPjeAtivo;
-                    }
-                    if (selectModoPlaceholdersMinutasHtml) {
-                        if (typeof json.modoPlaceholdersMinutasHtml === 'string' && ['desabilitado', 'placeholders', 'ctrl_avancado', 'avancado'].includes(json.modoPlaceholdersMinutasHtml)) {
-                            selectModoPlaceholdersMinutasHtml.value = json.modoPlaceholdersMinutasHtml;
-                        } else if (typeof json.placeholdersMinutasHtmlAtivo === 'boolean') {
-                            selectModoPlaceholdersMinutasHtml.value = json.placeholdersMinutasHtmlAtivo ? 'placeholders' : 'desabilitado';
-                        } else if (typeof json.selecaoEditavelAtiva === 'boolean') {
-                            selectModoPlaceholdersMinutasHtml.value = json.selecaoEditavelAtiva ? 'placeholders' : 'desabilitado';
+                    if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                        const resImp = await configuradorPerfis.importarBackupTotal(json, chrome);
+                        if (resImp && resImp.ok) {
+                            carregarConfiguracoesDoStorage();
+                            if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                                chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                            }
+                            exibirToast(resImp.backupTotal
+                                ? 'Backup total (todos os perfis) importado e sincronizado na nuvem!'
+                                : 'Backup JSON importado para o perfil ativo e sincronizado!');
+                            return;
                         }
                     }
-                    if (typeof json.colagemBotaoDireitoAtiva === 'boolean' && optColagemBotaoDireito) {
-                        optColagemBotaoDireito.checked = json.colagemBotaoDireitoAtiva;
-                    }
-                    if (typeof json.alternarAbasRecentesCtrlTabAtiva === 'boolean' && optAlternarAbasRecentesCtrlTab) {
-                        optAlternarAbasRecentesCtrlTab.checked = json.alternarAbasRecentesCtrlTabAtiva;
-                    }
-                    if (typeof json.capturaBotoesMouse4e5Ativa === 'boolean' && optCapturaBotoesMouse4e5) {
-                        optCapturaBotoesMouse4e5.checked = json.capturaBotoesMouse4e5Ativa;
-                    }
-                    if (typeof json.colarBotaoMeioAtivo === 'boolean' && optColarBotaoMeio) {
-                        optColarBotaoMeio.checked = json.colarBotaoMeioAtivo;
-                    }
-                    if (typeof json.navegacaoTecladoCamposAtiva === 'boolean' && optNavegacaoTecladoCampos) {
-                        optNavegacaoTecladoCampos.checked = json.navegacaoTecladoCamposAtiva;
-                    }
-                    if (typeof json.caixaEntradaRapidaAtiva === 'boolean' && optCaixaEntradaRapida) {
-                        optCaixaEntradaRapida.checked = json.caixaEntradaRapidaAtiva;
-                    }
-                    if (typeof json.bloquearNovasJanelas === 'boolean' && optBloquearNovasJanelas) {
-                        optBloquearNovasJanelas.checked = json.bloquearNovasJanelas;
-                    }
-                    if (typeof json.preservarJanelasAutenticacao === 'boolean' && optPreservarJanelasAutenticacao) {
-                        optPreservarJanelasAutenticacao.checked = json.preservarJanelasAutenticacao;
-                    }
-                    if (optAbaEmPrimeiroPlano) {
-                        if (typeof json.abaEmPrimeiroPlano === 'boolean') {
-                            optAbaEmPrimeiroPlano.checked = json.abaEmPrimeiroPlano;
-                        } else if (typeof json.abaEmSegundoPlano === 'boolean') {
-                            optAbaEmPrimeiroPlano.checked = !json.abaEmSegundoPlano;
-                        }
-                    }
-                    if (typeof json.reutilizarAbasAbertas === 'boolean' && optReutilizarAbasAbertas) {
-                        optReutilizarAbasAbertas.checked = json.reutilizarAbasAbertas;
-                    }
-                    if (typeof json.reutilizarAbasFocoPrimeiroPlano === 'boolean' && optReutilizarFocoPrimeiroPlano) {
-                        optReutilizarFocoPrimeiroPlano.checked = json.reutilizarAbasFocoPrimeiroPlano;
-                    }
-                    if (typeof json.protegerGuiasModificadas === 'boolean' && optProtegerGuiasModificadas) {
-                        optProtegerGuiasModificadas.checked = json.protegerGuiasModificadas;
-                    }
-                    if (typeof json.reutilizarAbasAcaoConteudo === 'string') {
-                        if (selectReutilizarAcaoConteudo) selectReutilizarAcaoConteudo.value = json.reutilizarAbasAcaoConteudo;
-                        if (optReutilizarAcaoRecarregar && json.reutilizarAbasAcaoConteudo === 'recarregar') {
-                            optReutilizarAcaoRecarregar.checked = true;
-                        } else if (optReutilizarAcaoRecarregarSeModificada && json.reutilizarAbasAcaoConteudo === 'recarregar_se_modificada') {
-                            optReutilizarAcaoRecarregarSeModificada.checked = true;
-                        } else if (optReutilizarAcaoRecarregarSeNaoModificada && json.reutilizarAbasAcaoConteudo === 'recarregar_se_nao_modificada') {
-                            optReutilizarAcaoRecarregarSeNaoModificada.checked = true;
-                        } else if (optReutilizarAcaoManter) {
-                            optReutilizarAcaoManter.checked = true;
-                        }
-                    }
-                    atualizarVisibilidadeSubOpcoesReutilizar();
-                    if (typeof json.monitorarUrlOriginalAbertura === 'boolean' && optMonitorarUrlOriginal) {
-                        optMonitorarUrlOriginal.checked = json.monitorarUrlOriginalAbertura;
-                    }
-                    if (typeof json.monitorarUrlAtualPagina === 'boolean' && optMonitorarUrlAtual) {
-                        optMonitorarUrlAtual.checked = json.monitorarUrlAtualPagina;
-                    }
-                    if (typeof json.criterioOrdenacaoGuias === 'string' && optCriterioOrdenacaoGuias) {
-                        optCriterioOrdenacaoGuias.value = json.criterioOrdenacaoGuias;
-                    }
-                    if (typeof json.sentidoOrdenacaoGuias === 'string' && optSentidoOrdenacaoGuias) {
-                        optSentidoOrdenacaoGuias.value = json.sentidoOrdenacaoGuias;
-                        if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (json.sentidoOrdenacaoGuias === 'esq_dir');
-                        if (lblSentidoOrdenacaoGuias) {
-                            lblSentidoOrdenacaoGuias.textContent = (json.sentidoOrdenacaoGuias === 'esq_dir')
-                                ? 'Da Esquerda para a Direita (A-Z)'
-                                : 'Da Direita para a Esquerda (Z-A)';
-                        }
-                    }
-                    if (typeof json.ordenarGuiasFixadas === 'boolean' && optOrdenarGuiasFixadas) {
-                        optOrdenarGuiasFixadas.checked = json.ordenarGuiasFixadas;
-                    }
-                    if (typeof json.descarteGuiasInativasAtivo === 'boolean' && optDescarteGuiasInativas) {
-                        optDescarteGuiasInativas.checked = json.descarteGuiasInativasAtivo;
-                    }
-                    if (json.tempoConferenciaDocumentosMs !== undefined && optTempoConferenciaDocumentos) {
-                        optTempoConferenciaDocumentos.value = String(converterMsParaIndiceSliderConferencia(json.tempoConferenciaDocumentosMs));
-                        atualizarRotuloSliderConferencia();
-                    } else if (typeof json.validacaoMatematicaAtiva === 'boolean' && optTempoConferenciaDocumentos) {
-                        optTempoConferenciaDocumentos.value = json.validacaoMatematicaAtiva ? '6' : '0';
-                        atualizarRotuloSliderConferencia();
-                    }
-                    if (typeof json.validacaoMatematicaAtiva === 'boolean' && optValidacaoMatematicaAtiva) {
-                        optValidacaoMatematicaAtiva.checked = json.validacaoMatematicaAtiva;
-                    } else if (optValidacaoMatematicaAtiva) {
-                        optValidacaoMatematicaAtiva.checked = (obterTempoConferenciaMsDoSlider() !== 0);
-                    }
-                    if (json.tempoExibicaoAlertaMs !== undefined && optTempoExibicaoAlerta) {
-                        optTempoExibicaoAlerta.value = String(converterMsParaIndiceSliderAlerta(json.tempoExibicaoAlertaMs));
-                        atualizarRotuloSliderAlerta();
-                    }
-                    if (optTempoFlashMs) {
-                        if (json.tempoFlashBorderMs !== undefined) {
-                            const normFlashImp = normalizarTempoFlashMs(json.tempoFlashBorderMs);
-                            optTempoFlashMs.value = normFlashImp === -1 ? '5250' : String(normFlashImp);
-                        } else if (typeof json.flashBorderAtivo === 'boolean') {
-                            optTempoFlashMs.value = json.flashBorderAtivo ? '500' : '0';
-                        }
-                        atualizarRotuloSliderFlash();
-                    }
-                    if (typeof json.corFlashBorder === 'string' && optCorFlashBorder) {
-                        optCorFlashBorder.value = normalizarCorHex(json.corFlashBorder);
-                    }
-                    if (typeof json.marcadorConteudoColadoAtivo === 'boolean' && optMarcadorConteudoColadoAtivo) {
-                        optMarcadorConteudoColadoAtivo.checked = json.marcadorConteudoColadoAtivo;
-                    }
-                    if (typeof json.presetMarcadorColado === 'string' && optPresetMarcadorColado) {
-                        optPresetMarcadorColado.value = normalizarPresetMarcadorColado(json.presetMarcadorColado);
-                    }
-                    if (typeof json.tipoContornoMarcadorColado === 'string' && optTipoContornoMarcadorColado) {
-                        optTipoContornoMarcadorColado.value = normalizarTipoContornoMarcadorColado(json.tipoContornoMarcadorColado);
-                    }
-                    if (typeof json.corContornoMarcadorColado === 'string' && optCorContornoMarcadorColado) {
-                        optCorContornoMarcadorColado.value = normalizarCorHex(json.corContornoMarcadorColado);
-                    }
-                    if (typeof json.corFundoMarcadorColado === 'string' && optCorFundoMarcadorColado) {
-                        optCorFundoMarcadorColado.value = normalizarCorHexFundoMarcador(json.corFundoMarcadorColado);
-                    }
-                    if (typeof json.estiloBadgeMarcadorColado === 'string' && optEstiloBadgeMarcadorColado) {
-                        optEstiloBadgeMarcadorColado.value = normalizarEstiloBadgeMarcadorColado(json.estiloBadgeMarcadorColado);
-                    }
-                    if (json.modoRetirarSelecao !== undefined && optModoRetirarSelecao) {
-                        optModoRetirarSelecao.value = normalizarModoRetirarSelecao(json.modoRetirarSelecao);
-                    }
-                    if (json.minimoCaracteresInterface !== undefined && optMinimoCaracteresInterface) {
-                        const minImp = parseInt(json.minimoCaracteresInterface, 10);
-                        optMinimoCaracteresInterface.value = [0, 1, 2, 3, 4, 5, 10].includes(minImp) ? String(minImp) : '5';
-                    }
-                    if (typeof json.separadorAcumulador === 'string' && optAcumuladorSeparador) {
-                        optAcumuladorSeparador.value = normalizarSeparadorAcumulador(json.separadorAcumulador);
-                    }
-                    if (typeof json.atalhoF1GeminiAtivo === 'boolean' && optAtalhoF1GeminiAtivo) {
-                        optAtalhoF1GeminiAtivo.checked = json.atalhoF1GeminiAtivo;
-                    }
-                    if (typeof json.promptF1Gemini === 'string' && optPromptF1Gemini) {
-                        optPromptF1Gemini.value = json.promptF1Gemini.trim() || PROMPT_F1_GEMINI_PADRAO;
-                    }
-                    if (Array.isArray(json.urlsTurbo) && textoUrlsTurbo) {
-                        textoUrlsTurbo.value = json.urlsTurbo.filter(u => u && u !== '<all_urls>').join('\n');
-                    }
-                    if (Array.isArray(json.regrasMapeamentoElementos)) {
-                        regrasMapeamentoAtuais = json.regrasMapeamentoElementos;
-                        renderizarListaRegrasMapeamento(regrasMapeamentoAtuais);
-                    }
-                    salvarConfiguracoes();
-                    exibirToast('Backup JSON importado e sincronizado na nuvem!');
+                    exibirToast('Erro: Não foi possível importar o arquivo JSON.');
                 } catch (_) {
                     exibirToast('Erro: Arquivo JSON inválido.');
                 }
@@ -2779,6 +2556,8 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.runtime.onMessage.addListener((msg) => {
             if (msg && msg.acao === 'regrasMapeamentoAtualizadas' && Array.isArray(msg.regrasMapeamentoElementos)) {
                 renderizarListaRegrasMapeamento(msg.regrasMapeamentoElementos);
+            } else if (msg && msg.acao === 'PERFIL_ALTERADO') {
+                carregarConfiguracoesDoStorage();
             }
         });
     }
@@ -3297,6 +3076,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'sync') {
+                if (changes.perfilAtivoId || changes.listaPerfis) {
+                    carregarConfiguracoesDoStorage();
+                    return;
+                }
                 if (changes.modoTurbo) {
                     if (selectModoTurbo) selectModoTurbo.value = changes.modoTurbo.newValue;
                     atualizarIconeModoOptions(changes.modoTurbo.newValue);
@@ -3481,11 +3264,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? changes.promptF1Gemini.newValue
                         : PROMPT_F1_GEMINI_PADRAO;
                 }
-                if (changes.tempoExibicaoAlertaMs !== undefined && optTempoExibicaoAlerta) {
-                    const novoTempo = changes.tempoExibicaoAlertaMs.newValue !== undefined ? Number(changes.tempoExibicaoAlertaMs.newValue) : -1;
-                    optTempoExibicaoAlerta.value = String(converterMsParaIndiceSliderAlerta(novoTempo));
-                    atualizarRotuloSliderAlerta();
-                }
                 if (changes.urlsTurbo !== undefined && textoUrlsTurbo && Array.isArray(changes.urlsTurbo.newValue)) {
                     const listaLimpa = changes.urlsTurbo.newValue.filter(u => u && u !== '<all_urls>');
                     textoUrlsTurbo.value = (listaLimpa.length > 0 ? listaLimpa : PADROES_FABRICA_TURBO).join('\n');
@@ -3533,9 +3311,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    configurarNavegacaoAbas();
-    carregarConfiguracoesDoStorage();
-    inicializarMonitorPermissaoClipboard();
+    (async () => {
+        if (window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.carregarCatalogoPerfisJson === 'function') {
+            await window.JusGovCfgDefaults.carregarCatalogoPerfisJson(typeof chrome !== 'undefined' ? chrome : null);
+        }
+        configurarNavegacaoAbas();
+        carregarConfiguracoesDoStorage();
+        inicializarMonitorPermissaoClipboard();
+    })();
 
     try {
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {

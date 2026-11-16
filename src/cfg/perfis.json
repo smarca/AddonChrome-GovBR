@@ -1,0 +1,127 @@
+{
+  "versaoEsquema": 1,
+  "perfilPadraoId": "padrao",
+  "chavesGlobais": [
+    "regrasMapeamentoElementos",
+    "perfilAtivoId",
+    "listaPerfis"
+  ],
+  "configPadrao": {
+    "modoTurbo": "global",
+    "comportamentoCliqueIcone": "popup",
+    "manterFormatacaoBasica": true,
+    "nivelFiltroFormatacao": "basico",
+    "ativoAmpuletas": true,
+    "converterCabecalhoPjeAtivo": true,
+    "selecaoEditavelAtiva": true,
+    "modoPlaceholdersMinutasHtml": "placeholders",
+    "placeholdersMinutasHtmlAtivo": true,
+    "colagemBotaoDireitoAtiva": false,
+    "capturaBotoesMouse4e5Ativa": true,
+    "colarBotaoMeioAtivo": true,
+    "navegacaoTecladoCamposAtiva": true,
+    "alternarAbasRecentesCtrlTabAtiva": true,
+    "caixaEntradaRapidaAtiva": true,
+    "bloquearNovasJanelas": true,
+    "preservarJanelasAutenticacao": true,
+    "abaEmPrimeiroPlano": true,
+    "abaEmSegundoPlano": false,
+    "reutilizarAbasAbertas": true,
+    "reutilizarAbasFocoPrimeiroPlano": true,
+    "protegerGuiasModificadas": true,
+    "reutilizarAbasAcaoConteudo": "manter",
+    "monitorarUrlOriginalAbertura": false,
+    "monitorarUrlAtualPagina": true,
+    "criterioOrdenacaoGuias": "hierarquia_arvore",
+    "sentidoOrdenacaoGuias": "esq_dir",
+    "ordenarGuiasFixadas": false,
+    "fecharHierarquiaEmCascata": false,
+    "modoBarraFavoritosSuperior": false,
+    "descarteGuiasInativasAtivo": false,
+    "tempoInatividadeDescarteMinutos": 20,
+    "validacaoMatematicaAtiva": true,
+    "tempoConferenciaDocumentosMs": -1,
+    "modoExibicaoValidacao": "sempre",
+    "posicaoAvisosValidacao": "abaixo",
+    "tempoExibicaoAlertaMs": -1,
+    "tempoFlashBorderMs": -1,
+    "corFlashBorder": "#0d9488",
+    "marcadorConteudoColadoAtivo": true,
+    "presetMarcadorColado": "verde_forense",
+    "corContornoMarcadorColado": "#0d9488",
+    "corFundoMarcadorColado": "#ccfbf1",
+    "opacidadeFundoMarcadorColado": 0.24,
+    "estiloBadgeMarcadorColado": "sobrescrito",
+    "tipoContornoMarcadorColado": "solido",
+    "minimoCaracteresInterface": 5,
+    "modoRetirarSelecao": "total",
+    "separadorAcumulador": ";",
+    "incluirSeparadorFinalAcumulador": true,
+    "separadorTabelas": ";",
+    "modoShiftCnj": "20digitos",
+    "atalhoF1GeminiAtivo": true,
+    "promptF1Gemini": "'{{TEXTO}}' :  [SE_NORMATIVO] Transcrever os normativos aplicaveis; [SE_TEXTO_COMUM] Identificar e transcrever de forma condensada as leis aplicaveis ao caso e aplica-las a frase; Explicar de forma sucinta e bem condensada; Apontar jurisprudencias superiores a respeito;",
+    "autoLimpezaCacheCookiesAtiva": true,
+    "autoLimpezaIdade": "7d",
+    "tempoTrabalhoCorridoAtivo": false,
+    "tempoTrabalhoCorridoHoras": 7,
+    "tempoTrabalhoAtivoAtivo": false,
+    "tempoTrabalhoAtivoHoras": 6,
+    "pomodoroAtivo": false,
+    "pomodoroProporcao": 4.5,
+    "pomodoroFocoMinutos": 25,
+    "pomodoroCiclos": 4,
+    "urlsTurbo": [
+      "*://*.jus.br/*",
+      "*://*.gov.br/*",
+      "*://*.mp.br/*",
+      "*://*.def.br/*",
+      "*://gemini.google.com/*",
+      "*://serasa-judicial.serasaexperian.com.br/*"
+    ],
+    "urlsAmpuletas": [
+      "*://*.jus.br/*",
+      "*://*.pje.jus.br/*",
+      "*://pje.jus.br/*",
+      "*://*pje*.jus.br/*",
+      "*://*pje*.*.jus.br/*"
+    ]
+  },
+  "perfisPredefinidos": [
+    {
+      "id": "padrao",
+      "nome": "Padrão",
+      "predefinido": true,
+      "sobrescritas": {}
+    },
+    {
+      "id": "trabalho",
+      "nome": "Trabalho",
+      "predefinido": true,
+      "sobrescritas": {
+        "tempoTrabalhoCorridoAtivo": true,
+        "tempoTrabalhoAtivoAtivo": true,
+        "pomodoroAtivo": true
+      }
+    },
+    {
+      "id": "casa",
+      "nome": "Casa",
+      "predefinido": true,
+      "sobrescritas": {}
+    },
+    {
+      "id": "estudo",
+      "nome": "Estudo",
+      "aliases": [
+        "estudar"
+      ],
+      "predefinido": true,
+      "sobrescritas": {
+        "pomodoroAtivo": true,
+        "tempoConferenciaDocumentosMs": 0,
+        "validacaoMatematicaAtiva": false
+      }
+    }
+  ]
+}
