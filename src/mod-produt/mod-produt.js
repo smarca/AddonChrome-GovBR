@@ -99,9 +99,20 @@
                 pomodoroDescansoMinCumprido: false,
                 pomodoroUltimoDescansoTipo: '',
                 pomodoroUltimoDescansoFimTs: 0,
+                pomodoroBadgeVerdeAteTs: 0,
+                pomodoroDescansoAcumuladoMs: 0,
+                pomodoroDescansoSyncTs: 0,
+                pomodoroDescansoAtividadeAteTs: 0,
+                pomodoroDescansoCliquesPenalidade: 0,
+                pomodoroDescansoUltimoCliqueTs: 0,
+                pomodoroDescansoUltimoTipoInteracao: '',
                 pomodoroBarraOcultadaChave: '',
+                pomodoroModalDescansoChave: '',
+                pomodoroModalExibidoChave: '',
                 pomodoroPularProximoPopupFoco: false,
                 pomodoroFaseInicioTs: agora,
+                pomodoroFocoPausadoMs: 0,
+                pomodoroPausaInicioTs: 0,
                 _ultimoIdleAutoCreditadoTs: 0,
                 _nivelAutoCreditado: ''
             };
@@ -150,35 +161,437 @@
         }
 
         /**
-         * Reinicia os contadores diários e o estado do Pomodoro para o momento atual.
+         * Mescla estado local com metadados da nuvem em uma única fonte canônica (evita divergência entre Tooltip, Badge, Popup, Opções e Minipopup).
+         * @param {Object} [estado]
+         * @param {Object|null} [nuvemMeta]
+         * @param {number} [agora]
+         * @returns {{ stEfetivo: Object, meta: Object|null, inicioCombinado: number, corridoTotalMin: number, ativoTotalMin: number, pausasTotais: number }}
+         */
+        mesclarEstadoComNuvemMeta(estado = {}, nuvemMeta = null, agora = Date.now()) {
+            const st = (estado && typeof estado === 'object') ? estado : {};
+            const meta = (nuvemMeta && typeof nuvemMeta === 'object')
+                ? nuvemMeta
+                : ((st._nuvemMeta && typeof st._nuvemMeta === 'object') ? st._nuvemMeta : null);
+            const stEfetivo = { ...st };
+            if (meta && Number(meta.outrosUltimoDescFimTs || 0) > Number(st.pomodoroUltimoDescansoFimTs || 0)) {
+                stEfetivo.pomodoroUltimoDescansoFimTs = Number(meta.outrosUltimoDescFimTs);
+                if (meta.outrosUltimoDescTipo === 'alivio' || meta.outrosUltimoDescTipo === 'pausa_maior') {
+                    stEfetivo.pomodoroUltimoDescansoTipo = meta.outrosUltimoDescTipo;
+                }
+            }
+            const inicioLocal = Number(st.inicioTs || 0);
+            const inicioOutros = Number(meta && meta.outrosInicioTs || 0);
+            const candidatosInicio = [inicioLocal, inicioOutros].filter(n => Number.isFinite(n) && n > 0);
+            const inicioCombinado = candidatosInicio.length > 0 ? Math.min(...candidatosInicio) : agora;
+            const corridoTotalMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0))
+                + Math.max(0, Math.floor(Number(meta && meta.outrosCorridoMin) || 0));
+            const ativoTotalMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0))
+                + Math.max(0, Math.floor(Number(meta && meta.outrosAtivoMin) || 0));
+            const pausasTotais = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0))
+                + Math.max(0, Math.floor(Number(meta && meta.outrosPausasConf) || 0));
+            return { stEfetivo, meta, inicioCombinado, corridoTotalMin, ativoTotalMin, pausasTotais };
+        }
+
+        /**
+         * Reinicia os contadores diários e o estado do Pomodoro para o momento atual,
+         * limpando também metadados em cache para manter Opções, Popup, Tooltip, Badge e Minipopup sincronizados.
          * @returns {Promise<Object>}
          */
         async resetarEstadoTrabalhoHoje() {
             const agora = Date.now();
-            const novo = this.criarEstadoTrabalhoZerado(this.obterDataLocalChaveHoje(agora), agora);
+            const chaveHoje = this.obterDataLocalChaveHoje(agora);
+            const novo = this.criarEstadoTrabalhoZerado(chaveHoje, agora);
             await chrome.storage.local.set({ jusgovTrabalhoEstado: novo });
+            try {
+                if (chrome.storage.local && typeof chrome.storage.local.remove === 'function') {
+                    await chrome.storage.local.remove(['jusgovProdNuvemMeta']);
+                }
+                if (chrome.storage.sync && typeof chrome.storage.sync.get === 'function') {
+                    const [loc, syn] = await Promise.all([
+                        chrome.storage.local.get(['jusgovDispositivoId']).catch(() => ({})),
+                        chrome.storage.sync.get(['jusgovProdResumoSync']).catch(() => ({}))
+                    ]);
+                    const devId = (loc && loc.jusgovDispositivoId) || null;
+                    const snap = (syn && syn.jusgovProdResumoSync && typeof syn.jusgovProdResumoSync === 'object')
+                        ? { ...syn.jusgovProdResumoSync } : null;
+                    if (snap && snap.dispositivos && devId) {
+                        const devs = { ...snap.dispositivos };
+                        devs[devId] = {
+                            corridoMin: 0,
+                            ativoMin: 0,
+                            pausasMin: 0,
+                            pausasConf: 0,
+                            inicioTs: agora,
+                            entradaTs: agora,
+                            atualizadoEm: agora,
+                            encerradoLimpo: false
+                        };
+                        snap.dispositivos = devs;
+                        snap.data = chaveHoje;
+                        await chrome.storage.sync.set({ jusgovProdResumoSync: snap });
+                    }
+                }
+            } catch (_) { }
             return novo;
         }
 
         /**
          * Registra o carimbo de tempo da última atividade detectada do usuário.
-         * Durante Alívio/Descanso Maior:
-         * - Se tipoInteracao === 'click_ou_tecla' e o descanso mínimo já foi cumprido (FEAT-38), inicia o novo Foco.
-         * - Caso contrário e haja clique/tecla durante descanso pendente, reinicia a contagem da pausa.
-         * - Movimento de mouse ('movimento') mantém Workrave ativo sem fechar o popup nem dispensar Foco.
          * @param {number} [agora]
          * @param {string} [tipoInteracao] 'click_ou_tecla' | 'movimento'
-         * @returns {Promise<{ resetouDescanso: boolean, iniciouFocoPosDescanso: boolean }>}
+         * @param {Object|null} [configOpcional]
+         * @returns {Promise<{ resetouDescanso: boolean, iniciouFocoPosDescanso: boolean, iniciouBadgeVerde: boolean, ocultouBadgeVerde: boolean, alterouDescanso: boolean }>}
          */
-        async registrarAtividadeTrabalho(agora = Date.now(), tipoInteracao = 'click_ou_tecla') {
+        async registrarAtividadeTrabalho(agora = Date.now(), tipoInteracao = 'click_ou_tecla', configOpcional = null) {
             try {
                 const estado = await this.obterOuIniciarEstadoTrabalhoHoje();
-                const res = this.aplicarAtividadeEmEstadoTrabalho(estado, agora, tipoInteracao);
+                let config = configOpcional;
+                if (!config && typeof this._obterConfig === 'function') {
+                    try { config = await this._obterConfig(); } catch (_) { config = {}; }
+                }
+                const res = this.aplicarAtividadeEmEstadoTrabalho(estado, agora, tipoInteracao, config || {});
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
                 return res;
             } catch (_) {
-                return { resetouDescanso: false, iniciouFocoPosDescanso: false };
+                return { resetouDescanso: false, iniciouFocoPosDescanso: false, iniciouBadgeVerde: false, ocultouBadgeVerde: false, alterouDescanso: false };
             }
+        }
+
+        /**
+         * Resolve o estágio de proteção do descanso e a mensagem de advertência dourada (FEAT-51).
+         * - 0 (0..25%): zera e reinicia em qualquer interação.
+         * - 1 (>25..50%): "Descanso Necessário!" (regride tempo enquanto ativo).
+         * - 2 (>50..75%): "Descanso em Andamento?" (trava valor enquanto ativo).
+         * - 3 (>75%): "Finalizando Descanso..." (movimento/1 clique não trava nem interrompe).
+         * Cada 3 cliques/teclas rebaixa 1 estágio.
+         * @param {number} [pct]
+         * @param {number} [cliquesPenalidade]
+         * @returns {{ estagioNatural: number, rebaixamentos: number, estagioEfetivo: number, mensagemAviso: string }}
+         */
+        resolverEstagioDescanso(pct = 0, cliquesPenalidade = 0) {
+            const estagioNatural = (pct > 0.75) ? 3 : ((pct > 0.50) ? 2 : ((pct > 0.25) ? 1 : 0));
+            const rebaixamentos = Math.floor(Math.max(0, Number(cliquesPenalidade || 0)) / 3);
+            const estagioEfetivo = Math.max(0, estagioNatural - rebaixamentos);
+            const MENSAGENS_ESTAGIO = {
+                1: 'Descanso Necessário!',
+                2: 'Em andamento?',
+                3: 'Finalizando Descanso...'
+            };
+            return {
+                estagioNatural,
+                rebaixamentos,
+                estagioEfetivo,
+                mensagemAviso: MENSAGENS_ESTAGIO[estagioEfetivo] || ''
+            };
+        }
+
+        /**
+         * Resolve parâmetros do beep periódico após concluir o tempo de descanso.
+         * @param {Object} [config]
+         * @returns {{ ativo: boolean, intensidade: 'suave'|'moderado'|'grave', intervaloMs: number }}
+         */
+        resolverParametrosBeepPomodoro(config = {}) {
+            const ativo = (config && config.pomodoroBeepConclusaoAtivo !== false);
+            const raw = String((config && config.pomodoroBeepIntensidade) || 'suave').trim().toLowerCase();
+            const intensidade = ['suave', 'moderado', 'grave'].includes(raw) ? raw : 'suave';
+            const mapaMs = { suave: 15000, moderado: 10000, grave: 5000 };
+            return {
+                ativo,
+                intensidade,
+                intervaloMs: mapaMs[intensidade] || 15000
+            };
+        }
+
+        /**
+         * Resolve o estado visual unificado do minipopup e da tela fosca/screensaver em Alívio/Descanso (FEAT-61).
+         * @param {Object} [dadosResumo]
+         * @param {number} [agora]
+         * @returns {{ estadoVisual: string, textoStatus: string, corBorda: string, bgStatus: string, corStatus: string, fontWeightStatus: string, usarTelaEmbaccada: boolean, usarScreensaver: boolean, descansoConcluidoAoVivo: boolean }}
+         */
+        resolverEstadoVisualMinipopupDescanso(dadosResumo = {}, agora = Date.now()) {
+            const d = (dadosResumo && typeof dadosResumo === 'object') ? dadosResumo : {};
+            const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
+            const concluidoAoVivo = Boolean(d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
+            const emIdleDescanso = Boolean(
+                d.emDescanso &&
+                !d.aguardandoOciosidade &&
+                !d.descansoEmAviso &&
+                (concluidoAoVivo || agora >= Number(d.descansoAtividadeAteTs || 0))
+            );
+            if (d.emDescanso && !concluidoAoVivo && d.descansoEmAviso && d.descansoAvisoTexto) {
+                const ehMovimentoApenas = (d.descansoUltimoTipoInteracao === 'movimento');
+                return {
+                    estadoVisual: 'aviso',
+                    textoStatus: d.descansoAvisoTexto,
+                    corBorda: '#eab308',
+                    bgStatus: '#f59e0b',
+                    corStatus: '#111827',
+                    fontWeightStatus: '700',
+                    usarTelaEmbaccada: ehMovimentoApenas,
+                    usarScreensaver: false,
+                    descansoConcluidoAoVivo: false
+                };
+            }
+            if (concluidoAoVivo) {
+                return {
+                    estadoVisual: 'concluido',
+                    textoStatus: 'Concluído!',
+                    corBorda: '#16a34a',
+                    bgStatus: '#16a34a',
+                    corStatus: '#ffffff',
+                    fontWeightStatus: '700',
+                    usarTelaEmbaccada: emIdleDescanso,
+                    usarScreensaver: emIdleDescanso,
+                    descansoConcluidoAoVivo: true
+                };
+            }
+            if (d.emDescanso && !d.aguardandoOciosidade && !d.descansoPendente) {
+                return {
+                    estadoVisual: 'em_andamento',
+                    textoStatus: 'Em andamento...',
+                    corBorda: '#0284c7',
+                    bgStatus: 'rgba(2, 132, 199, 0.2)',
+                    corStatus: '#bae6fd',
+                    fontWeightStatus: '600',
+                    usarTelaEmbaccada: emIdleDescanso,
+                    usarScreensaver: emIdleDescanso,
+                    descansoConcluidoAoVivo: false
+                };
+            }
+            if (d.emDescanso && !d.aguardandoOciosidade) {
+                return {
+                    estadoVisual: 'em_andamento',
+                    textoStatus: 'Em andamento...',
+                    corBorda: '#0284c7',
+                    bgStatus: 'rgba(2, 132, 199, 0.2)',
+                    corStatus: '#bae6fd',
+                    fontWeightStatus: '600',
+                    usarTelaEmbaccada: emIdleDescanso,
+                    usarScreensaver: emIdleDescanso,
+                    descansoConcluidoAoVivo: false
+                };
+            }
+            if (d.descansoPendente || (d.emDescanso && d.aguardandoOciosidade)) {
+                return {
+                    estadoVisual: 'pendente',
+                    textoStatus: 'Pendente...',
+                    corBorda: '#dc2626',
+                    bgStatus: '#dc2626',
+                    corStatus: '#ffffff',
+                    fontWeightStatus: '700',
+                    usarTelaEmbaccada: false,
+                    usarScreensaver: false,
+                    descansoConcluidoAoVivo: false
+                };
+            }
+            return {
+                estadoVisual: 'ativo',
+                textoStatus: '',
+                corBorda: '#0d9488',
+                bgStatus: 'transparent',
+                corStatus: '#cbd5e1',
+                fontWeightStatus: '500',
+                usarTelaEmbaccada: false,
+                usarScreensaver: false,
+                descansoConcluidoAoVivo: false
+            };
+        }
+
+        /**
+         * Calcula (e opcionalmente persiste) o progresso contínuo do Alívio/Descanso em milissegundos,
+         * aplicando carência de 10s, proteção em 25%/50%/75%, escalada por 3 cliques e recuperação de +5% (FEAT-50 / FEAT-51).
+         * @param {Object} estado
+         * @param {number} [agora]
+         * @param {Object} [config]
+         * @param {{ mutar?: boolean, registrarTipo?: string }} [opcoes]
+         * @returns {Object}
+         */
+        calcularProgressoDescanso(estado = {}, agora = Date.now(), config = {}, opcoes = {}) {
+            const fase = ['foco', 'alivio', 'pausa_maior'].includes(estado.pomodoroFase) ? estado.pomodoroFase : 'foco';
+            const emDescanso = (fase === 'alivio' || fase === 'pausa_maior');
+            const focoMin = Math.max(25, Number(config && config.pomodoroFocoMinutos || 25));
+            const proporcao = Number(config && config.pomodoroProporcao || 4.5);
+            const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
+            const ciclosMax = Math.max(2, Number(config && config.pomodoroCiclos || 4));
+            const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
+            const metaFaseMin = fase === 'pausa_maior' ? pausaMaiorMin : (fase === 'alivio' ? alivioMin : focoMin);
+            const metaFaseMs = metaFaseMin * 60000;
+
+            if (!emDescanso) {
+                return {
+                    emDescanso: false,
+                    metaFaseMin,
+                    metaFaseMs,
+                    acumuladoMs: 0,
+                    syncTs: 0,
+                    atividadeAteTs: 0,
+                    emAtividade: false,
+                    cliquesPenalidade: 0,
+                    ultimoCliqueTs: 0,
+                    estagioNatural: 0,
+                    rebaixamentos: 0,
+                    estagioEfetivo: 0,
+                    mensagemAviso: '',
+                    emAviso: false,
+                    ultimoTipoInteracao: '',
+                    aguardandoOciosidade: false,
+                    restanteMs: metaFaseMs,
+                    segRestantes: metaFaseMin * 60,
+                    terminaEmTs: agora + metaFaseMs,
+                    passo5PctMs: Math.max(1000, Math.round(metaFaseMs * 0.05)),
+                    resetouDescanso: false
+                };
+            }
+
+            let syncTs = Number(estado.pomodoroDescansoSyncTs || 0);
+            let atividadeAteTs = Number(estado.pomodoroDescansoAtividadeAteTs || 0);
+            let cliques = Math.max(0, Math.floor(Number(estado.pomodoroDescansoCliquesPenalidade || 0)));
+            let ultimoCliqueTs = Number(estado.pomodoroDescansoUltimoCliqueTs || 0);
+            let ultimoTipoInteracao = String(estado.pomodoroDescansoUltimoTipoInteracao || '');
+            const minNaFaseIni = Math.max(0, Math.floor(Number(estado.pomodoroMinutosNaFase || 0)));
+            let acumulado;
+            let tPrev;
+
+            if (!syncTs) {
+                const msDesdeAtiv = Math.max(0, agora - Number(estado.ultimaAtividadeTs || agora));
+                acumulado = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), minNaFaseIni * 60000, msDesdeAtiv);
+                tPrev = agora;
+            } else {
+                acumulado = Math.max(0, Number(estado.pomodoroDescansoAcumuladoMs || 0));
+                tPrev = Math.min(agora, syncTs);
+            }
+
+            if (syncTs > 0 && agora > tPrev) {
+                const tFimAtiv = Math.min(agora, atividadeAteTs);
+                const dtAtivo = Math.max(0, tFimAtiv - tPrev);
+                const dtOcioso = Math.max(0, agora - Math.max(tPrev, tFimAtiv));
+
+                if (dtAtivo > 0) {
+                    const pctAtiv = metaFaseMs > 0 ? (acumulado / metaFaseMs) : 0;
+                    const estAtiv = this.resolverEstagioDescanso(pctAtiv, cliques);
+                    if (estAtiv.estagioEfetivo === 3) {
+                        acumulado += dtAtivo;
+                    } else if (estAtiv.estagioEfetivo === 2) {
+                        /* Trava o valor no estágio 2 (>= 50%) */
+                    } else if (estAtiv.estagioEfetivo === 1) {
+                        acumulado = Math.max(0, acumulado - dtAtivo);
+                    } else {
+                        acumulado = 0;
+                        cliques = 0;
+                        ultimoCliqueTs = 0;
+                        atividadeAteTs = 0;
+                    }
+                }
+
+                if (cliques > 0 && ultimoCliqueTs > 0 && !estado.pomodoroDescansoMinCumprido) {
+                    const semCliqueMs = Math.max(0, agora - ultimoCliqueTs);
+                    const restanteRecMs = Math.max(0, metaFaseMs - acumulado);
+                    const passoRecMs = Math.max(1000, Math.round(restanteRecMs * 0.05));
+                    if (semCliqueMs >= passoRecMs) {
+                        if (cliques >= 3) {
+                            const rec = Math.floor(semCliqueMs / passoRecMs);
+                            cliques = Math.max(0, cliques - rec * 3);
+                            ultimoCliqueTs = cliques > 0 ? (ultimoCliqueTs + rec * passoRecMs) : 0;
+                        } else {
+                            cliques = 0;
+                            ultimoCliqueTs = 0;
+                        }
+                    }
+                }
+
+                if (dtOcioso > 0) {
+                    acumulado += dtOcioso;
+                }
+            }
+
+            const registrarTipo = (opcoes && typeof opcoes.registrarTipo === 'string') ? opcoes.registrarTipo : '';
+            let resetouDescanso = false;
+            if ((registrarTipo === 'movimento' || registrarTipo === 'click_ou_tecla') && !estado.pomodoroDescansoMinCumprido) {
+                if (registrarTipo === 'click_ou_tecla') {
+                    cliques += 1;
+                    ultimoCliqueTs = agora;
+                    ultimoTipoInteracao = 'click_ou_tecla';
+                } else {
+                    const pctMovPre = metaFaseMs > 0 ? (acumulado / metaFaseMs) : 0;
+                    const estMovPre = this.resolverEstagioDescanso(pctMovPre, cliques);
+                    if (!(agora < atividadeAteTs && ultimoTipoInteracao === 'click_ou_tecla') && estMovPre.rebaixamentos === 0) {
+                        ultimoTipoInteracao = 'movimento';
+                    }
+                }
+                const pctAgora = metaFaseMs > 0 ? (acumulado / metaFaseMs) : 0;
+                const estAgora = this.resolverEstagioDescanso(pctAgora, cliques);
+                if (estAgora.estagioEfetivo === 0) {
+                    acumulado = 0;
+                    cliques = 0;
+                    ultimoCliqueTs = 0;
+                    atividadeAteTs = 0;
+                    syncTs = 0;
+                    ultimoTipoInteracao = '';
+                    resetouDescanso = true;
+                } else {
+                    atividadeAteTs = agora + 2500;
+                    syncTs = agora;
+                }
+            } else if (opcoes && opcoes.mutar && !resetouDescanso && (syncTs > 0 || atividadeAteTs > 0 || cliques > 0)) {
+                syncTs = agora;
+            }
+
+            const pctFinal = metaFaseMs > 0 ? (acumulado / metaFaseMs) : 0;
+            const estFinal = this.resolverEstagioDescanso(pctFinal, cliques);
+            const emAtividade = Boolean(agora < atividadeAteTs);
+            const emAviso = Boolean(!estado.pomodoroDescansoMinCumprido && (emAtividade || estFinal.rebaixamentos > 0) && estFinal.estagioEfetivo >= 1);
+            if (!emAtividade && estFinal.rebaixamentos === 0) {
+                ultimoTipoInteracao = '';
+            }
+            const mensagemAviso = emAviso ? estFinal.mensagemAviso : '';
+            const minutosCalc = Math.floor(acumulado / 60000);
+            const aguardandoOciosidade = Boolean(acumulado < 10000 && minutosCalc === 0 && (syncTs > 0 ? true : minNaFaseIni === 0));
+            const restanteMs = aguardandoOciosidade ? metaFaseMs : Math.max(0, metaFaseMs - acumulado);
+            const segRestantes = aguardandoOciosidade ? (metaFaseMin * 60) : Math.max(0, Math.ceil(restanteMs / 1000));
+            const terminaEmTs = agora + restanteMs;
+            const passo5PctMs = Math.max(1000, Math.round(Math.max(0, metaFaseMs - acumulado) * 0.05));
+
+            if (opcoes && opcoes.mutar) {
+                estado.pomodoroDescansoAcumuladoMs = acumulado;
+                estado.pomodoroDescansoSyncTs = resetouDescanso ? 0 : syncTs;
+                estado.pomodoroDescansoAtividadeAteTs = atividadeAteTs;
+                estado.pomodoroDescansoCliquesPenalidade = cliques;
+                estado.pomodoroDescansoUltimoCliqueTs = ultimoCliqueTs;
+                estado.pomodoroDescansoUltimoTipoInteracao = resetouDescanso ? '' : ultimoTipoInteracao;
+                if (resetouDescanso) {
+                    estado.pomodoroMinutosNaFase = 0;
+                    estado.pomodoroFaseInicioTs = agora;
+                    estado.pomodoroDescansoMinCumprido = false;
+                    estado.pomodoroDescansoRealizadoNoCiclo = false;
+                    estado.pomodoroDescansoPendente = true;
+                } else if (syncTs > 0 && !estado.pomodoroDescansoMinCumprido) {
+                    estado.pomodoroMinutosNaFase = minutosCalc;
+                }
+            }
+
+            return {
+                emDescanso: true,
+                metaFaseMin,
+                metaFaseMs,
+                acumuladoMs: acumulado,
+                syncTs,
+                atividadeAteTs,
+                emAtividade,
+                cliquesPenalidade: cliques,
+                ultimoCliqueTs,
+                estagioNatural: estFinal.estagioNatural,
+                rebaixamentos: estFinal.rebaixamentos,
+                estagioEfetivo: estFinal.estagioEfetivo,
+                mensagemAviso,
+                emAviso,
+                ultimoTipoInteracao: (emAviso || emAtividade) ? ultimoTipoInteracao : '',
+                aguardandoOciosidade,
+                restanteMs,
+                segRestantes,
+                terminaEmTs,
+                passo5PctMs,
+                resetouDescanso
+            };
         }
 
         /**
@@ -186,46 +599,103 @@
          * @param {Object} estado
          * @param {number} [agora]
          * @param {string} [tipoInteracao] 'click_ou_tecla' | 'movimento'
-         * @returns {{ resetouDescanso: boolean, iniciouFocoPosDescanso: boolean }}
+         * @param {Object} [config]
+         * @returns {{ resetouDescanso: boolean, iniciouFocoPosDescanso: boolean, iniciouBadgeVerde: boolean, ocultouBadgeVerde: boolean, alterouDescanso: boolean, estagioEfetivo?: number, mensagemAviso?: string }}
          */
-        aplicarAtividadeEmEstadoTrabalho(estado, agora = Date.now(), tipoInteracao = 'click_ou_tecla') {
+        aplicarAtividadeEmEstadoTrabalho(estado, agora = Date.now(), tipoInteracao = 'click_ou_tecla', config = {}) {
             if (!estado || typeof estado !== 'object') {
-                return { resetouDescanso: false, iniciouFocoPosDescanso: false };
+                return { resetouDescanso: false, iniciouFocoPosDescanso: false, iniciouBadgeVerde: false, ocultouBadgeVerde: false, alterouDescanso: false };
+            }
+            const descPendenteAntes = Boolean(
+                (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') &&
+                !estado.pomodoroDescansoMinCumprido
+            );
+            /* Se o acumulado ocioso ja cumpriu a meta antes do alarme de 1min, promove descanso para cumprido antes de processar a interacao */
+            if (descPendenteAntes) {
+                const checkCumprido = this.calcularProgressoDescanso(estado, agora, config, { mutar: false });
+                if (checkCumprido && checkCumprido.acumuladoMs >= checkCumprido.metaFaseMs) {
+                    estado.pomodoroDescansoMinCumprido = true;
+                    estado.pomodoroDescansoRealizadoNoCiclo = true;
+                    estado.pomodoroDescansoPendente = false;
+                    estado.pomodoroUltimoDescansoTipo = estado.pomodoroFase;
+                    estado.pomodoroUltimoDescansoFimTs = Math.min(agora, Number(checkCumprido.terminaEmTs || agora));
+                }
+            }
+            const aindaPendenteAntes = Boolean(
+                (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') &&
+                !estado.pomodoroDescansoMinCumprido
+            );
+            const progAntes = aindaPendenteAntes
+                ? this.calcularProgressoDescanso(estado, agora, config, { mutar: true, registrarTipo: tipoInteracao })
+                : null;
+            if (estado.emPausa && estado.pomodoroFase === 'foco' && Number(estado.pomodoroPausaInicioTs || 0) > 0) {
+                estado.pomodoroFocoPausadoMs = Number(estado.pomodoroFocoPausadoMs || 0) + Math.max(0, agora - Number(estado.pomodoroPausaInicioTs));
+                estado.pomodoroPausaInicioTs = 0;
             }
             estado.ultimaAtividadeTs = agora;
             estado.emPausa = false;
             estado.minutosInativosPendentes = 0;
             estado._nivelAutoCreditado = '';
+            let iniciouBadgeVerde = false;
+            let ocultouBadgeVerde = false;
 
             if (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') {
-                if (tipoInteracao === 'click_ou_tecla' && estado.pomodoroDescansoMinCumprido) {
-                    /* Usuário voltou de pausa cumprida (ou prolongada) pressionando tecla/clique -> inicia novo Foco */
+                if (estado.pomodoroDescansoMinCumprido) {
+                    /* Qualquer interacao sensivel (mouse move, click ou tecla) apos concluir o descanso inicia o Foco, dispensando tempo extra */
+                    const ehMovimento = (tipoInteracao === 'movimento');
                     estado.pomodoroUltimoDescansoTipo = estado.pomodoroFase;
                     estado.pomodoroUltimoDescansoFimTs = agora;
+                    estado.pomodoroBadgeVerdeAteTs = ehMovimento ? (agora + 15000) : 1;
+                    iniciouBadgeVerde = ehMovimento;
+                    ocultouBadgeVerde = !ehMovimento;
                     estado.pomodoroFase = 'foco';
                     estado.pomodoroMinutosNaFase = 0;
                     estado.pomodoroFaseInicioTs = agora;
+                    estado.pomodoroFocoPausadoMs = 0;
+                    estado.pomodoroPausaInicioTs = 0;
                     estado.pomodoroDescansoMinCumprido = false;
                     estado.pomodoroDescansoRealizadoNoCiclo = true;
                     estado.pomodoroDescansoPendente = false;
+                    estado.pomodoroDescansoAcumuladoMs = 0;
+                    estado.pomodoroDescansoSyncTs = 0;
+                    estado.pomodoroDescansoAtividadeAteTs = 0;
+                    estado.pomodoroDescansoCliquesPenalidade = 0;
+                    estado.pomodoroDescansoUltimoCliqueTs = 0;
+                    estado.pomodoroDescansoUltimoTipoInteracao = '';
+                    estado.pomodoroModalDescansoChave = '';
                     if (estado.pomodoroPularProximoPopupFoco) {
                         estado.pomodoroPularProximoPopupFoco = false;
                         estado.pomodoroBarraOcultadaChave = `foco:${(estado.pomodoroCicloAtual || 0) + 1}:${agora}`;
                     } else {
                         estado.pomodoroBarraOcultadaChave = '';
                     }
-                    return { resetouDescanso: true, iniciouFocoPosDescanso: true };
+                    return { resetouDescanso: true, iniciouFocoPosDescanso: true, iniciouBadgeVerde, ocultouBadgeVerde, alterouDescanso: true };
                 }
+
+                /* FEAT-51: aplica progressão escalonada (<=25% zera, >25% regride, >50% trava, >75% não quebra + 3 cliques por estágio) */
+                return {
+                    resetouDescanso: progAntes.resetouDescanso,
+                    iniciouFocoPosDescanso: false,
+                    iniciouBadgeVerde: false,
+                    ocultouBadgeVerde: false,
+                    alterouDescanso: true,
+                    estagioEfetivo: progAntes.estagioEfetivo,
+                    mensagemAviso: progAntes.mensagemAviso
+                };
+            }
+
+            if (Number(estado.pomodoroUltimoDescansoFimTs || 0) > 0) {
                 if (tipoInteracao === 'click_ou_tecla') {
-                    estado.pomodoroMinutosNaFase = 0;
-                    estado.pomodoroFaseInicioTs = agora;
-                    estado.pomodoroDescansoMinCumprido = false;
-                    estado.pomodoroDescansoRealizadoNoCiclo = false;
-                    estado.pomodoroDescansoPendente = true;
-                    return { resetouDescanso: true, iniciouFocoPosDescanso: false };
+                    if (Number(estado.pomodoroBadgeVerdeAteTs || 0) !== 1) {
+                        estado.pomodoroBadgeVerdeAteTs = 1;
+                        ocultouBadgeVerde = true;
+                    }
+                } else if (!Number(estado.pomodoroBadgeVerdeAteTs || 0)) {
+                    estado.pomodoroBadgeVerdeAteTs = agora + 15000;
+                    iniciouBadgeVerde = true;
                 }
             }
-            return { resetouDescanso: false, iniciouFocoPosDescanso: false };
+            return { resetouDescanso: false, iniciouFocoPosDescanso: false, iniciouBadgeVerde, ocultouBadgeVerde, alterouDescanso: (iniciouBadgeVerde || ocultouBadgeVerde) };
         }
 
         /**
@@ -254,47 +724,156 @@
         }
 
         /**
-         * Alterna ciclicamente os 3 estados do botão Fixar: 0 (desfixado) -> 1 (fixado) -> 2 (fixado + posição travada) -> 0.
+         * Alterna ciclicamente os 4 estados do botão Fixar:
+         * 0 (desfixado) -> 1 (fixado) -> 2 (fixado + posição travada) -> 3 (minimalista miniaturizado) -> 0.
          * @param {number} [modoAtual]
-         * @returns {0|1|2}
+         * @returns {0|1|2|3}
          */
         avancarModoFixacaoBarra(modoAtual = 0) {
             const n = Math.floor(Number(modoAtual) || 0);
+            if (n === 0) return 1;
+            if (n === 1) return 2;
+            if (n === 2) return 3;
+            return 0;
+        }
+
+        /**
+         * Alterna ciclicamente os níveis de detalhe visual do minipopup no duplo clique:
+         * 0 (minimalista: só contador) -> 1 (semicompleto: fase + contador) -> 2 (completo: fase + contador + último descanso) -> 0.
+         * @param {number} [nivelAtual]
+         * @returns {0|1|2}
+         */
+        avancarNivelDetalheBarra(nivelAtual = 0) {
+            const n = Math.floor(Number(nivelAtual) || 0);
             if (n === 0) return 1;
             if (n === 1) return 2;
             return 0;
         }
 
         /**
+         * Encaixa coordenadas livres na mais próxima das 6 posições de borda permitidas:
+         * (superior|inferior) x (esquerda|centro|direita).
+         * @param {number} centerX
+         * @param {number} centerY
+         * @param {number} [larguraTela=1280]
+         * @param {number} [alturaTela=720]
+         * @returns {{ posicaoVertical: 'superior'|'inferior', alinhamento: 'esquerda'|'centro'|'direita' }}
+         */
+        calcularPosicao6Bordas(centerX, centerY, larguraTela = 1280, alturaTela = 720) {
+            const w = Math.max(320, Number(larguraTela) || 1280);
+            const h = Math.max(200, Number(alturaTela) || 720);
+            const rx = Math.max(0, Math.min(1, (Number(centerX) || 0) / w));
+            const ry = Math.max(0, Math.min(1, (Number(centerY) || 0) / h));
+            const posicaoVertical = (ry < 0.5) ? 'superior' : 'inferior';
+            const alinhamento = (rx < 0.33) ? 'esquerda' : (rx > 0.66 ? 'direita' : 'centro');
+            return { posicaoVertical, alinhamento };
+        }
+
+        /**
          * Normaliza o estado global compartilhado da barra Pomodoro para todas as guias.
+         * Padrão inicial: modoFixacao=1 (Cadeado Amarelo: fixo com retorno), nivelDetalhe=0 (minimalista), superior/esquerda.
          * @param {Object} [bruto]
-         * @returns {{ modoFixacao: 0|1|2, topPx: number, alinhamento: 'esquerda'|'centro'|'direita'|'livre', leftPx: number|null, topAncoradoPx: number, alinhamentoAncorado: 'esquerda'|'centro'|'direita'|'livre', leftAncoradoPx: number|null }}
+         * @returns {{ modoFixacao: 0|1|2|3, nivelDetalhe: 0|1|2, posicaoVertical: 'superior'|'inferior', posicaoVerticalAncorada: 'superior'|'inferior', topPx: number, alinhamento: 'esquerda'|'centro'|'direita'|'livre', leftPx: number|null, topAncoradoPx: number, alinhamentoAncorado: 'esquerda'|'centro'|'direita'|'livre', leftAncoradoPx: number|null }}
          */
         normalizarEstadoGlobalBarraPomodoro(bruto = {}) {
             const b = (bruto && typeof bruto === 'object') ? bruto : {};
-            const modoNum = Math.floor(Number(b.modoFixacao) || 0);
-            const modoFixacao = (modoNum === 1 || modoNum === 2) ? modoNum : 0;
-            const alinhValido = (v) => (v === 'esquerda' || v === 'direita' || v === 'centro' || v === 'livre') ? v : 'centro';
-            const topPx = Math.max(8, Math.round(Number(b.topPx) || 8));
+            const modoInformado = (b.modoFixacao !== undefined && b.modoFixacao !== null);
+            const modoNum = modoInformado ? Math.floor(Number(b.modoFixacao) || 0) : 1;
+            const modoFixacao = (modoNum === 0 || modoNum === 1 || modoNum === 2 || modoNum === 3) ? modoNum : 1;
+            const nivelNum = Math.floor(Number(b.nivelDetalhe) || 0);
+            const nivelDetalhe = (nivelNum === 1 || nivelNum === 2) ? nivelNum : 0;
+            const alinhValido = (v) => (v === 'esquerda' || v === 'direita' || v === 'centro' || v === 'livre') ? v : 'esquerda';
+            const topPx = Math.max(0, Math.round(Number(b.topPx ?? 0) || 0));
+            const posicaoVertical = (b.posicaoVertical === 'inferior' || (b.posicaoVertical === undefined && topPx >= 240))
+                ? 'inferior'
+                : 'superior';
             const leftBruto = (b.leftPx !== undefined && b.leftPx !== null && Number.isFinite(Number(b.leftPx)))
-                ? Math.max(8, Math.round(Number(b.leftPx))) : null;
+                ? Math.max(0, Math.round(Number(b.leftPx))) : null;
             let alinhamento = alinhValido(b.alinhamento);
-            if (alinhamento === 'livre' && leftBruto === null) alinhamento = 'centro';
+            if (alinhamento === 'livre' && leftBruto === null) alinhamento = 'esquerda';
 
-            const topAncoradoPx = Math.max(8, Math.round(Number(b.topAncoradoPx) || topPx));
+            const topAncoradoPx = Math.max(0, Math.round(Number(b.topAncoradoPx ?? topPx) || 0));
+            const posicaoVerticalAncorada = (b.posicaoVerticalAncorada === 'inferior' || (b.posicaoVerticalAncorada === undefined && (posicaoVertical === 'inferior' || topAncoradoPx >= 240)))
+                ? 'inferior'
+                : 'superior';
             const leftAncBruto = (b.leftAncoradoPx !== undefined && b.leftAncoradoPx !== null && Number.isFinite(Number(b.leftAncoradoPx)))
-                ? Math.max(8, Math.round(Number(b.leftAncoradoPx))) : ((alinhamento === 'livre') ? leftBruto : null);
+                ? Math.max(0, Math.round(Number(b.leftAncoradoPx))) : ((alinhamento === 'livre') ? leftBruto : null);
             let alinhamentoAncorado = b.alinhamentoAncorado ? alinhValido(b.alinhamentoAncorado) : alinhamento;
-            if (alinhamentoAncorado === 'livre' && leftAncBruto === null) alinhamentoAncorado = 'centro';
+            if (alinhamentoAncorado === 'livre' && leftAncBruto === null) alinhamentoAncorado = 'esquerda';
 
             return {
                 modoFixacao,
+                nivelDetalhe,
+                posicaoVertical,
+                posicaoVerticalAncorada,
                 topPx,
                 alinhamento,
                 leftPx: leftBruto,
                 topAncoradoPx,
                 alinhamentoAncorado,
                 leftAncoradoPx: leftAncBruto
+            };
+        }
+
+        /**
+         * Resolve a posição efetiva do minipopup considerando modo idle em Alívio/Descanso (centro da tela),
+         * modo aviso durante Alívio/Descanso (superior central tipo Cadeado Amarelo) e posição ancorada do usuário.
+         * @param {Object} [dadosResumo]
+         * @param {Object} [estadoBarra]
+         * @param {number} [agora]
+         * @returns {{ modoEspecial: 'idle_centro_tela'|'aviso_topo_centro'|'padrao', posicaoVertical: string, alinhamento: string, centroTela: boolean, forcarRetornoAmarelo: boolean }}
+         */
+        resolverPosicaoEfetivaBarraPomodoro(dadosResumo = {}, estadoBarra = {}, agora = Date.now()) {
+            const d = (dadosResumo && typeof dadosResumo === 'object') ? dadosResumo : {};
+            const est = this.normalizarEstadoGlobalBarraPomodoro(estadoBarra);
+            const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
+            const concluido = Boolean(d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
+            if (d.emDescanso && (concluido || !d.descansoRealizado)) {
+                if (!concluido && d.descansoEmAviso) {
+                    if (d.descansoUltimoTipoInteracao === 'movimento') {
+                        return {
+                            modoEspecial: 'aviso_movimento_centro_blur',
+                            posicaoVertical: 'centro_tela',
+                            alinhamento: 'centro',
+                            centroTela: true,
+                            forcarRetornoAmarelo: false,
+                            screensaverSaltitando: false,
+                            telaEmbaccada: true
+                        };
+                    }
+                    return {
+                        modoEspecial: 'aviso_topo_centro',
+                        posicaoVertical: 'superior',
+                        alinhamento: 'centro',
+                        centroTela: false,
+                        forcarRetornoAmarelo: true,
+                        screensaverSaltitando: false,
+                        telaEmbaccada: false
+                    };
+                }
+                const ativAte = Number(d.descansoAtividadeAteTs || 0);
+                if (!d.aguardandoOciosidade && (concluido || agora >= ativAte)) {
+                    return {
+                        modoEspecial: 'idle_centro_tela',
+                        posicaoVertical: 'centro_tela',
+                        alinhamento: 'centro',
+                        centroTela: true,
+                        forcarRetornoAmarelo: false,
+                        screensaverSaltitando: true,
+                        telaEmbaccada: true
+                    };
+                }
+            }
+            const pv = (Number(est.modoFixacao) === 1) ? est.posicaoVerticalAncorada : est.posicaoVertical;
+            const al = (Number(est.modoFixacao) === 1) ? est.alinhamentoAncorado : est.alinhamento;
+            return {
+                modoEspecial: 'padrao',
+                posicaoVertical: pv,
+                alinhamento: al,
+                centroTela: false,
+                forcarRetornoAmarelo: (Number(est.modoFixacao) === 1),
+                screensaverSaltitando: false,
+                telaEmbaccada: false
             };
         }
 
@@ -317,45 +896,82 @@
         }
 
         /**
-         * Calcula parâmetros e resumo legível da máquina Pomodoro atual.
+         * Verifica se já decorreu o tempo mínimo de permanência do mouse (1s) antes de disparar a esquiva do minipopup (BUG-74).
+         * @param {number} hoverInicioTs
+         * @param {number} [agora]
+         * @param {number} [atrasoMs]
+         * @returns {boolean}
+         */
+        podeDispararEsquivaBarra(hoverInicioTs = 0, agora = Date.now(), atrasoMs = 1000) {
+            const ini = Number(hoverInicioTs || 0);
+            if (!ini || !Number.isFinite(ini) || ini <= 0) return false;
+            return (Number(agora || Date.now()) - ini) >= Math.max(0, Number(atrasoMs || 0));
+        }
+
+        /**
+         * Calcula parâmetros e resumo legível da máquina Pomodoro atual (fonte única para Badge, Tooltip, Minipopup, Popup e Opções).
          * @param {Object} estado
          * @param {Object} [config]
          * @param {number} [agora]
+         * @param {Object|null} [nuvemMeta]
          * @returns {Object}
          */
-        calcularResumoPomodoro(estado = {}, config = {}, agora = Date.now()) {
+        calcularResumoPomodoro(estado = {}, config = {}, agora = Date.now(), nuvemMeta = null) {
+            const { stEfetivo } = this.mesclarEstadoComNuvemMeta(estado, nuvemMeta, agora);
             const ativo = Boolean(config && config.pomodoroAtivo);
             const focoMin = Math.max(25, Number(config && config.pomodoroFocoMinutos || 25));
             const proporcao = Number(config && config.pomodoroProporcao || 4.5);
             const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
             const ciclosMax = Math.max(2, Number(config && config.pomodoroCiclos || 4));
             const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
-            const fase = ['foco', 'alivio', 'pausa_maior'].includes(estado.pomodoroFase) ? estado.pomodoroFase : 'foco';
-            const minutosNaFase = Math.max(0, Math.floor(Number(estado.pomodoroMinutosNaFase || 0)));
+            const fase = ['foco', 'alivio', 'pausa_maior'].includes(stEfetivo.pomodoroFase) ? stEfetivo.pomodoroFase : 'foco';
+            const minutosBase = Math.max(0, Math.floor(Number(stEfetivo.pomodoroMinutosNaFase || 0)));
             const metaFaseMin = fase === 'pausa_maior' ? pausaMaiorMin : (fase === 'alivio' ? alivioMin : focoMin);
-            const minutosRestantes = Math.max(0, metaFaseMin - minutosNaFase);
-            const cicloConcluido = Math.max(0, Math.floor(Number(estado.pomodoroCicloAtual || 0)));
+            const cicloConcluido = Math.max(0, Math.floor(Number(stEfetivo.pomodoroCicloAtual || 0)));
             const cicloAtual = fase === 'foco' ? Math.min(ciclosMax, cicloConcluido + 1) : Math.max(1, Math.min(ciclosMax, cicloConcluido));
-            const ultimaAtivTs = Number(estado.ultimaAtividadeTs || agora);
-            const msInativo = Math.max(0, agora - ultimaAtivTs);
+            const ultimaAtivTs = Number(stEfetivo.ultimaAtividadeTs || agora);
             const emDescanso = (fase === 'alivio' || fase === 'pausa_maior');
-            const aguardandoOciosidade = Boolean(emDescanso && msInativo < 60000 && minutosNaFase === 0);
-            const inicioFaseTs = Number(estado.pomodoroFaseInicioTs || estado.inicioTs || agora);
-            const terminaEmTs = aguardandoOciosidade
-                ? (agora + metaFaseMin * 60000)
-                : (emDescanso ? (ultimaAtivTs + metaFaseMin * 60000) : (inicioFaseTs + metaFaseMin * 60000));
-            const segRestantes = aguardandoOciosidade
-                ? (metaFaseMin * 60)
-                : Math.max(0, Math.ceil((terminaEmTs - agora) / 1000));
-            const descansoPendente = Boolean(estado.pomodoroDescansoPendente || (emDescanso && !estado.pomodoroDescansoRealizadoNoCiclo));
-            const ultimoDescansoTipo = (estado.pomodoroUltimoDescansoTipo === 'alivio' || estado.pomodoroUltimoDescansoTipo === 'pausa_maior')
-                ? estado.pomodoroUltimoDescansoTipo : '';
-            const ultimoDescansoFimTs = Number(estado.pomodoroUltimoDescansoFimTs || 0);
+            const emPausa = Boolean(stEfetivo.emPausa);
+            const inicioFaseTs = Number(stEfetivo.pomodoroFaseInicioTs || stEfetivo.inicioTs || agora);
+            const progDescanso = emDescanso ? this.calcularProgressoDescanso(stEfetivo, agora, config, { mutar: false }) : null;
+            const aguardandoOciosidade = Boolean(emDescanso && progDescanso && progDescanso.aguardandoOciosidade);
+            const terminaEmTs = emDescanso
+                ? progDescanso.terminaEmTs
+                : (inicioFaseTs + metaFaseMin * 60000);
+            const minBaseSeg = minutosBase * 60;
+            const focoPausadoMs = Number(stEfetivo.pomodoroFocoPausadoMs || 0);
+            const pausaIniTs = Number(stEfetivo.pomodoroPausaInicioTs || 0);
+            const temAncoraPausaExata = (focoPausadoMs > 0 || pausaIniTs > 0);
+            const diffIniSeg = Math.max(0, Math.floor((agora - (inicioFaseTs + focoPausadoMs)) / 1000));
+            const tevePausaRegistrada = Number(stEfetivo.pausasMinutos || 0) > 0;
+            const segDecorridos = emDescanso
+                ? Math.floor(progDescanso.acumuladoMs / 1000)
+                : (emPausa
+                    ? (pausaIniTs > 0 ? Math.max(minBaseSeg, Math.floor((pausaIniTs - (inicioFaseTs + focoPausadoMs)) / 1000)) : minBaseSeg)
+                    : ((temAncoraPausaExata || !tevePausaRegistrada || Math.abs(diffIniSeg - minBaseSeg) <= 90)
+                        ? diffIniSeg
+                        : (minBaseSeg + (diffIniSeg % 60))));
+            const segRestantes = emDescanso
+                ? progDescanso.segRestantes
+                : Math.max(0, (metaFaseMin * 60) - segDecorridos);
+            const minutosNaFase = emPausa
+                ? minutosBase
+                : Math.max(minutosBase, Math.floor(segDecorridos / 60));
+            const minutosRestantes = emDescanso
+                ? Math.max(0, Math.ceil(segRestantes / 60))
+                : Math.max(0, metaFaseMin - minutosNaFase);
+            const focoAnchorTs = emDescanso ? inicioFaseTs : (agora - segDecorridos * 1000);
+            const descansoMinCumprido = Boolean(emDescanso && (stEfetivo.pomodoroDescansoMinCumprido || (progDescanso && progDescanso.acumuladoMs >= progDescanso.metaFaseMs)));
+            const descansoPendente = Boolean(!descansoMinCumprido && (stEfetivo.pomodoroDescansoPendente || (emDescanso && !stEfetivo.pomodoroDescansoRealizadoNoCiclo)));
+            const ultimoDescansoTipo = (stEfetivo.pomodoroUltimoDescansoTipo === 'alivio' || stEfetivo.pomodoroUltimoDescansoTipo === 'pausa_maior')
+                ? stEfetivo.pomodoroUltimoDescansoTipo
+                : (descansoMinCumprido ? fase : '');
+            const ultimoDescansoFimTs = Number(stEfetivo.pomodoroUltimoDescansoFimTs || 0) || (descansoMinCumprido && progDescanso ? Number(progDescanso.terminaEmTs || agora) : 0);
             const horaFimDescanso = ultimoDescansoFimTs > 0 ? this.formatarHoraHHMM(ultimoDescansoFimTs) : '';
             const ultimoDescansoTexto = (ultimoDescansoTipo && horaFimDescanso)
-                ? `${ultimoDescansoTipo === 'pausa_maior' ? 'Descanso Realizado' : 'Alívio Realizado'} em ${horaFimDescanso}`
+                ? `${ultimoDescansoTipo === 'pausa_maior' ? 'Descanso' : 'Alívio'} realizado às ${horaFimDescanso}hs`
                 : '';
-            const descansoRealizado = Boolean(ultimoDescansoTexto && !descansoPendente);
+            const descansoRealizado = Boolean((ultimoDescansoTexto || descansoMinCumprido) && !descansoPendente);
             const faseLabel = fase === 'pausa_maior' ? 'Descanso Maior' : (fase === 'alivio' ? 'Alívio' : 'Foco');
 
             return {
@@ -372,16 +988,39 @@
                 metaFaseMin,
                 minutosRestantes,
                 segundosRestantes: segRestantes,
+                segundosDecorridos: segDecorridos,
+                emPausa,
+                focoAnchorTs,
                 faseInicioTs: inicioFaseTs,
                 faseTerminaEmTs: terminaEmTs,
                 emDescanso,
                 aguardandoOciosidade,
+                descansoMinCumprido,
                 descansoPendente,
                 descansoRealizado,
                 ultimoDescansoTipo,
                 ultimoDescansoFimTs,
-                ultimoDescansoTexto
+                ultimoDescansoTexto,
+                ultimaAtividadeTs: ultimaAtivTs,
+                badgeVerdeAteTs: Number(estado.pomodoroBadgeVerdeAteTs || 0),
+                descansoAcumuladoMs: progDescanso ? progDescanso.acumuladoMs : 0,
+                descansoSyncTs: progDescanso ? progDescanso.syncTs : 0,
+                descansoAtividadeAteTs: progDescanso ? progDescanso.atividadeAteTs : 0,
+                descansoCliquesPenalidade: progDescanso ? progDescanso.cliquesPenalidade : 0,
+                descansoUltimoCliqueTs: progDescanso ? progDescanso.ultimoCliqueTs : 0,
+                descansoEstagioEfetivo: progDescanso ? progDescanso.estagioEfetivo : 0,
+                descansoAvisoTexto: progDescanso ? progDescanso.mensagemAviso : '',
+                descansoEmAviso: progDescanso ? progDescanso.emAviso : false,
+                descansoUltimoTipoInteracao: progDescanso ? progDescanso.ultimoTipoInteracao : ''
             };
+        }
+
+        /**
+         * Removida exibição automática de badge verde pós-descanso no minipopup (mantido apenas status Expandido/tooltip).
+         * @returns {boolean}
+         */
+        deveExibirBadgeVerdeMinipopup() {
+            return false;
         }
 
         /**
@@ -396,24 +1035,17 @@
          * @returns {{ dataBR: string, horaInicio: string, linhaDataInicio: string, linhaTempos: string, linhaPomodoro: string, segmentosPomodoro: Array<{texto: string, destaque: string}>, alertaMultiplosComputadores: string, tooltipTitle: string }}
          */
         formatarResumoProdutividadeTexto(estado = {}, config = {}, agora = Date.now(), nuvemMeta = null) {
-            const st = (estado && typeof estado === 'object') ? estado : {};
-            const meta = (nuvemMeta && typeof nuvemMeta === 'object')
-                ? nuvemMeta
-                : ((st._nuvemMeta && typeof st._nuvemMeta === 'object') ? st._nuvemMeta : null);
+            const { stEfetivo, meta, inicioCombinado, corridoTotalMin, ativoTotalMin, pausasTotais } = this.mesclarEstadoComNuvemMeta(estado, nuvemMeta, agora);
 
             let dataBR = '';
-            if (typeof st.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(st.data)) {
-                const [ano, mes, dia] = st.data.split('-');
+            if (typeof stEfetivo.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(stEfetivo.data)) {
+                const [ano, mes, dia] = stEfetivo.data.split('-');
                 dataBR = `${dia}/${mes}/${ano}`;
             } else {
                 const d = new Date(agora);
                 dataBR = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
             }
 
-            const inicioLocal = Number(st.inicioTs || 0);
-            const inicioOutros = Number(meta && meta.outrosInicioTs || 0);
-            const candidatosInicio = [inicioLocal, inicioOutros].filter(n => Number.isFinite(n) && n > 0);
-            const inicioCombinado = candidatosInicio.length > 0 ? Math.min(...candidatosInicio) : agora;
             const horaInicio = this.formatarHoraHHMM(inicioCombinado);
             const linhaDataInicio = `🕒 Ligado ${dataBR}${horaInicio ? ` desde ${horaInicio}hs` : ''}`;
 
@@ -421,28 +1053,14 @@
                 const m = Math.max(0, Math.floor(Number(min) || 0));
                 return `${String(Math.floor(m / 60)).padStart(2, '0')}h:${String(m % 60).padStart(2, '0')}m`;
             };
-            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0))
-                + Math.max(0, Math.floor(Number(meta && meta.outrosCorridoMin) || 0));
-            const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0))
-                + Math.max(0, Math.floor(Number(meta && meta.outrosAtivoMin) || 0));
-            const pausas = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0))
-                + Math.max(0, Math.floor(Number(meta && meta.outrosPausasConf) || 0));
 
             const partesTempo = [];
-            if (corridoMin > 0) partesTempo.push(`Corrido ${fmtHM(corridoMin)}`);
-            if (ativoMin > 0 && ativoMin !== corridoMin) partesTempo.push(`Ativo ${fmtHM(ativoMin)}`);
-            if (pausas > 0) partesTempo.push(`Pausas ${pausas}`);
+            if (corridoTotalMin > 0) partesTempo.push(`Corrido ${fmtHM(corridoTotalMin)}`);
+            if (ativoTotalMin > 0 && ativoTotalMin !== corridoTotalMin) partesTempo.push(`Ativo ${fmtHM(ativoTotalMin)}`);
+            if (pausasTotais > 0) partesTempo.push(`Pausas ${pausasTotais}`);
             const linhaTempos = partesTempo.length > 0 ? `👉 ${partesTempo.join(' • ')}` : '';
 
-            const stEfetivo = { ...st };
-            if (meta && Number(meta.outrosUltimoDescFimTs || 0) > Number(st.pomodoroUltimoDescansoFimTs || 0)) {
-                stEfetivo.pomodoroUltimoDescansoFimTs = Number(meta.outrosUltimoDescFimTs);
-                if (meta.outrosUltimoDescTipo === 'alivio' || meta.outrosUltimoDescTipo === 'pausa_maior') {
-                    stEfetivo.pomodoroUltimoDescansoTipo = meta.outrosUltimoDescTipo;
-                }
-            }
-
-            const resumo = this.calcularResumoPomodoro(stEfetivo, config, agora);
+            const resumo = this.calcularResumoPomodoro(stEfetivo, config, agora, meta);
             const segmentosPomodoro = [];
             let linhaPomodoro = '';
             if (resumo.ativo) {
@@ -457,7 +1075,7 @@
                 if (resumo.descansoPendente) {
                     segmentosPomodoro.push({ texto: 'Descanso do ciclo: Pendente', destaque: 'pendente' });
                 } else if (resumo.ultimoDescansoTexto) {
-                    segmentosPomodoro.push({ texto: `${resumo.ultimoDescansoTexto}hs`, destaque: 'realizado' });
+                    segmentosPomodoro.push({ texto: `${resumo.ultimoDescansoTexto}`, destaque: 'realizado' });
                 }
                 linhaPomodoro = segmentosPomodoro.map(s => s.texto).join(' • ');
             }
@@ -929,6 +1547,7 @@
                 estado.pomodoroDescansoMinCumprido = true;
                 estado.pomodoroUltimoDescansoTipo = 'pausa_maior';
                 estado.pomodoroUltimoDescansoFimTs = agora;
+                estado.pomodoroBadgeVerdeAteTs = 0;
                 estado.pomodoroPularProximoPopupFoco = false;
                 estado.pomodoroBarraOcultadaChave = '';
                 estado.pomodoroFaseInicioTs = ultimaAtivTs;
@@ -946,6 +1565,7 @@
                 estado.pomodoroDescansoMinCumprido = true;
                 estado.pomodoroUltimoDescansoTipo = 'alivio';
                 estado.pomodoroUltimoDescansoFimTs = agora;
+                estado.pomodoroBadgeVerdeAteTs = 0;
                 estado.pomodoroPularProximoPopupFoco = false;
                 estado.pomodoroBarraOcultadaChave = '';
                 estado.pomodoroFaseInicioTs = ultimaAtivTs;
@@ -964,11 +1584,53 @@
          * @param {string} [subtitulo]
          * @returns {Promise<void>}
          */
-        async projetarModalProdutividadeEmTodasJanelas(titulo, mensagem, subtitulo) {
+        /**
+         * Monta os textos do modal de pausa/alívio a partir do resumo e configuração atuais.
+         * @param {Object} [resumo]
+         * @param {Object} [config]
+         * @returns {{ titulo: string, mensagem: string, subtitulo: string }|null}
+         */
+        obterDadosModalDescanso(resumo = {}, config = {}) {
+            if (!resumo || !resumo.emDescanso) return null;
+            const focoMin = Math.max(25, Number((config && config.pomodoroFocoMinutos) || resumo.focoMin || 25));
+            const proporcao = Number((config && config.pomodoroProporcao) || 4.5);
+            const alivioMin = Math.max(1, Math.round(focoMin / proporcao));
+            const ciclosMax = Math.max(2, Number((config && config.pomodoroCiclos) || resumo.ciclosMax || 4));
+            const pausaMaiorMin = Math.max(1, Math.round(alivioMin * ciclosMax));
+            if (resumo.fase === 'pausa_maior') {
+                return {
+                    titulo: 'Pomodoro: Hora da Pausa Maior!',
+                    mensagem: `Você concluiu ${ciclosMax} ciclos de foco (${focoMin} min cada). Descanse por ${pausaMaiorMin} minutos.`,
+                    subtitulo: `Proporção ${proporcao}:1 • Pausa Maior de ${pausaMaiorMin} min`
+                };
+            }
+            return {
+                titulo: 'Pomodoro: Hora do Alívio!',
+                mensagem: `Ciclo ${resumo.cicloAtual || 1}/${ciclosMax} concluído (${focoMin} min). Faça uma pausa de ${alivioMin} minutos.`,
+                subtitulo: `Proporção ${proporcao}:1 • Alívio de ${alivioMin} min`
+            };
+        }
+
+        /**
+         * Injeta um modal informativo nas abas ativas HTTP/HTTPS de todas as janelas abertas.
+         * (As demais guias da mesma janela exibem sob demanda ao serem ativadas).
+         * @param {string} titulo
+         * @param {string} mensagem
+         * @param {string} [subtitulo]
+         * @param {number|null} [tabIdEspecifica]
+         * @returns {Promise<void>}
+         */
+        async projetarModalProdutividadeEmTodasJanelas(titulo, mensagem, subtitulo, tabIdEspecifica = null) {
             try {
                 if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.scripting) return;
-                const abasAtivas = await chrome.tabs.query({ active: true });
-                for (const aba of abasAtivas) {
+                let abasAlvo = [];
+                if (typeof tabIdEspecifica === 'number' && tabIdEspecifica > 0) {
+                    const aba = await chrome.tabs.get(tabIdEspecifica).catch(() => null);
+                    if (aba) abasAlvo = [aba];
+                } else {
+                    abasAlvo = await chrome.tabs.query({ active: true }).catch(() => []);
+                }
+                for (const aba of abasAlvo) {
                     if (!aba || !aba.id || !aba.url || !/^https?:\/\//i.test(aba.url)) continue;
                     chrome.scripting.executeScript({
                         target: { tabId: aba.id },
@@ -996,15 +1658,22 @@
                             btn.type = 'button';
                             btn.textContent = 'Entendi / Fechar';
                             btn.style.cssText = 'background:#0d9488;color:#ffffff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;';
-                            const fechar = () => {
+                            const fechar = (propagarGlobal = true) => {
                                 overlay.remove();
                                 document.removeEventListener('keydown', onEsc, true);
+                                if (propagarGlobal) {
+                                    try {
+                                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                            chrome.runtime.sendMessage({ acao: 'FECHAR_MODAL_PRODUTIVIDADE_GLOBAL' }).catch(() => { });
+                                        }
+                                    } catch (_) { }
+                                }
                             };
                             const onEsc = (e) => {
-                                if (e.key === 'Escape') fechar();
+                                if (e.key === 'Escape') fechar(true);
                             };
-                            btn.addEventListener('click', fechar);
-                            overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+                            btn.addEventListener('click', () => fechar(true));
+                            overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(true); });
                             document.addEventListener('keydown', onEsc, true);
                             card.appendChild(h2);
                             card.appendChild(p);
@@ -1015,6 +1684,27 @@
                             btn.focus();
                         },
                         args: [titulo, mensagem, subtitulo]
+                    }).catch(() => { });
+                }
+            } catch (_) { }
+        }
+
+        /**
+         * Remove o modal de produtividade nas abas visíveis/abertas ao iniciar o descanso real ou ao fechar manualmente.
+         * @returns {Promise<void>}
+         */
+        async fecharModalProdutividadeEmTodasJanelas() {
+            try {
+                if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.scripting) return;
+                const abas = await chrome.tabs.query({}).catch(() => []);
+                for (const aba of abas) {
+                    if (!aba || !aba.id || !aba.url || !/^https?:\/\//i.test(aba.url)) continue;
+                    chrome.scripting.executeScript({
+                        target: { tabId: aba.id },
+                        func: () => {
+                            const modal = document.getElementById('jusgov-modal-produtividade-trabalho');
+                            if (modal) modal.remove();
+                        }
                     }).catch(() => { });
                 }
             } catch (_) { }
@@ -1051,6 +1741,7 @@
                 estado.pausasMinutos = Number(estado.pausasMinutos || 0) + pendentes + 1;
                 estado.pausasConfirmadas = Number(estado.pausasConfirmadas || 0) + 1;
                 estado.emPausa = true;
+                estado.pomodoroPausaInicioTs = agora;
                 estado.minutosInativosPendentes = 0;
             } else {
                 estado.pausasMinutos = Number(estado.pausasMinutos || 0) + 1;
@@ -1087,6 +1778,166 @@
          * @param {Object} [config]
          * @returns {{ evento: string|null, descansouNoPeriodo: boolean, ciclosMax: number, focoMin: number, alivioMin: number, pausaMaiorMin: number, proporcao: number }}
          */
+        /**
+         * Inicia fase de descanso (Alívio ou Pausa Maior) de forma unificada entre alarme e reconciliação ao vivo.
+         * @param {Object} estado
+         * @param {number} agora
+         * @param {Object} config
+         * @returns {'inicio_alivio'|'inicio_pausa_maior'}
+         */
+        iniciarFaseDescansoPomodoro(estado, agora = Date.now(), config = {}) {
+            const ciclosMax = Math.max(2, Number((config && config.pomodoroCiclos) || 4));
+            const inicioFaseAnt = Number(estado.pomodoroFaseInicioTs || agora);
+            const ultAtivBruto = Number(estado.ultimaAtividadeTs || agora);
+            const ultAtivCont = Math.min(agora, Math.max(inicioFaseAnt, ultAtivBruto));
+            const idlePrevioMs = Math.max(0, agora - ultAtivCont);
+            estado.pomodoroCicloAtual = Number(estado.pomodoroCicloAtual || 0) + 1;
+            estado.pomodoroMinutosNaFase = Math.floor(idlePrevioMs / 60000);
+            estado.pomodoroFaseInicioTs = agora;
+            estado.pomodoroFocoPausadoMs = 0;
+            estado.pomodoroPausaInicioTs = 0;
+            estado.pomodoroDescansoMinCumprido = false;
+            estado.pomodoroDescansoRealizadoNoCiclo = false;
+            estado.pomodoroDescansoPendente = true;
+            estado.pomodoroBarraOcultadaChave = '';
+            estado.pomodoroDescansoAcumuladoMs = idlePrevioMs;
+            estado.pomodoroDescansoSyncTs = agora;
+            estado.pomodoroDescansoAtividadeAteTs = 0;
+            estado.pomodoroDescansoCliquesPenalidade = 0;
+            estado.pomodoroDescansoUltimoCliqueTs = 0;
+            estado.pomodoroDescansoUltimoTipoInteracao = '';
+            if (estado.pomodoroCicloAtual >= ciclosMax) {
+                estado.pomodoroFase = 'pausa_maior';
+                return 'inicio_pausa_maior';
+            }
+            estado.pomodoroFase = 'alivio';
+            return 'inicio_alivio';
+        }
+
+        /**
+         * Reconcilia no Service Worker marcos temporais ao vivo (transição 25:00 -> Alívio, 10s idle -> fecha modal,
+         * conclusão do descanso -> Concluído! e recuperação de cliques), eliminando descompasso entre guias e alarmes.
+         * @param {Object} estado
+         * @param {number} [agora]
+         * @param {Object} [config]
+         * @returns {{ alterouEstado: boolean, iniciouDescansoReal: boolean, concluiuDescanso: boolean, eventoModal: string|null, modalDados: Object|null }}
+         */
+        reconciliarEstadoPomodoroAoVivo(estado, agora = Date.now(), config = {}) {
+            if (!estado || typeof estado !== 'object' || !config || !config.pomodoroAtivo) {
+                return { alterouEstado: false, iniciouDescansoReal: false, concluiuDescanso: false, eventoModal: null, modalDados: null };
+            }
+            let alterouEstado = false;
+            let iniciouDescansoReal = false;
+            let concluiuDescanso = false;
+            let eventoModal = null;
+            let modalDados = null;
+            const prefs = this.resolverPreferenciasAvisoPomodoro(config);
+
+            if (estado.pomodoroFase === 'foco' && !estado.emPausa) {
+                const resumoFoco = this.calcularResumoPomodoro(estado, config, agora, null);
+                if (resumoFoco.segundosDecorridos >= (resumoFoco.focoMin * 60)) {
+                    const inicioTransTs = Number(estado.pomodoroFaseInicioTs || agora) + Number(estado.pomodoroFocoPausadoMs || 0) + (resumoFoco.focoMin * 60000);
+                    const tsTrans = Math.min(agora, Math.max(Number(estado.pomodoroFaseInicioTs || agora), inicioTransTs));
+                    const ev = this.iniciarFaseDescansoPomodoro(estado, tsTrans, config);
+                    const resumoNovo = this.calcularResumoPomodoro(estado, config, agora, null);
+                    const chaveNova = `${resumoNovo.fase}:${resumoNovo.cicloAtual}:${resumoNovo.faseInicioTs}`;
+                    alterouEstado = true;
+                    if (prefs.usarModal && resumoNovo.aguardandoOciosidade) {
+                        estado.pomodoroModalDescansoChave = chaveNova;
+                        eventoModal = ev;
+                        modalDados = this.obterDadosModalDescanso(resumoNovo, config);
+                    } else if (!resumoNovo.aguardandoOciosidade) {
+                        estado.pomodoroModalExibidoChave = chaveNova;
+                        estado.pomodoroModalDescansoChave = '';
+                        iniciouDescansoReal = true;
+                    }
+                }
+            }
+
+            if (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') {
+                const prog = this.calcularProgressoDescanso(estado, agora, config, { mutar: false });
+                const resumoAtual = this.calcularResumoPomodoro(estado, config, agora, null);
+                const chaveFase = `${resumoAtual.fase}:${resumoAtual.cicloAtual}:${resumoAtual.faseInicioTs}`;
+
+                if (prog.aguardandoOciosidade && prefs.usarModal && !estado.pomodoroDescansoMinCumprido && estado.pomodoroModalExibidoChave !== chaveFase && estado.pomodoroModalDescansoChave !== chaveFase) {
+                    estado.pomodoroModalDescansoChave = chaveFase;
+                    alterouEstado = true;
+                }
+                if (!prog.aguardandoOciosidade && estado.pomodoroModalDescansoChave) {
+                    estado.pomodoroModalExibidoChave = chaveFase;
+                    estado.pomodoroModalDescansoChave = '';
+                    alterouEstado = true;
+                    iniciouDescansoReal = true;
+                }
+                if (!estado.pomodoroDescansoMinCumprido && prog.acumuladoMs >= prog.metaFaseMs) {
+                    estado.pomodoroDescansoMinCumprido = true;
+                    estado.pomodoroDescansoRealizadoNoCiclo = true;
+                    estado.pomodoroDescansoPendente = false;
+                    estado.pomodoroUltimoDescansoTipo = estado.pomodoroFase;
+                    estado.pomodoroUltimoDescansoFimTs = Math.min(agora, Number(prog.terminaEmTs || agora));
+                    estado.pomodoroModalExibidoChave = chaveFase;
+                    estado.pomodoroModalDescansoChave = '';
+                    alterouEstado = true;
+                    concluiuDescanso = true;
+                } else if (!estado.pomodoroDescansoMinCumprido && Number(estado.pomodoroDescansoCliquesPenalidade || 0) !== Number(prog.cliquesPenalidade || 0)) {
+                    estado.pomodoroDescansoCliquesPenalidade = prog.cliquesPenalidade;
+                    estado.pomodoroDescansoUltimoCliqueTs = prog.ultimoCliqueTs;
+                    estado.pomodoroDescansoAcumuladoMs = prog.acumuladoMs;
+                    estado.pomodoroDescansoSyncTs = agora;
+                    alterouEstado = true;
+                }
+            }
+
+            return { alterouEstado, iniciouDescansoReal, concluiuDescanso, eventoModal, modalDados };
+        }
+
+        /**
+         * Constrói o pacote externo único e canônico compartilhado por todas as guias, Popup, Opções, Badge e Tooltip.
+         */
+        construirSnapshotExternoPomodoro(estado, cfg = {}, nuvemMeta = null, estadoBarraGlobal = {}, agoraSync = Date.now(), permitirBeep = false) {
+            const resumo = this.calcularResumoPomodoro(estado, cfg, agoraSync, nuvemMeta);
+            const infoTooltip = this.formatarResumoProdutividadeTexto(estado, cfg, agoraSync, nuvemMeta);
+            const prefs = this.resolverPreferenciasAvisoPomodoro(cfg);
+            const paramsBeep = this.resolverParametrosBeepPomodoro(cfg);
+            const chaveFaseAtual = `${resumo.fase}:${resumo.cicloAtual}:${resumo.faseInicioTs}`;
+            const focoOcultadoGlobal = (resumo.fase === 'foco' && estado.pomodoroBarraOcultadaChave === chaveFaseAtual);
+            const ativoPorConfig = Boolean(resumo.ativo && prefs.modoBarra !== 'nunca');
+            const deveMostrarBarraBase = Boolean(
+                ativoPorConfig &&
+                !focoOcultadoGlobal &&
+                (prefs.modoBarra === 'sempre' || (prefs.modoBarra === 'descanso' && (resumo.emDescanso || resumo.descansoPendente)))
+            );
+            const modalAtivoAgora = Boolean(
+                resumo.ativo &&
+                prefs.usarModal &&
+                resumo.emDescanso &&
+                resumo.aguardandoOciosidade &&
+                !resumo.descansoMinCumprido &&
+                estado.pomodoroModalExibidoChave !== chaveFaseAtual &&
+                estado.pomodoroModalDescansoChave === chaveFaseAtual
+            );
+            const modalDados = modalAtivoAgora ? this.obterDadosModalDescanso(resumo, cfg) : null;
+            const nivelCfgFallback = (cfg && cfg.pomodoroEstiloMinipopup === 'normal') ? 1 : ((cfg && cfg.pomodoroEstiloMinipopup === 'expandido') ? 2 : 0);
+            const estadoBarraEfetivo = (estadoBarraGlobal && typeof estadoBarraGlobal === 'object' && estadoBarraGlobal.nivelDetalhe === undefined)
+                ? { ...estadoBarraGlobal, nivelDetalhe: nivelCfgFallback }
+                : estadoBarraGlobal;
+            const cfgExib = {
+                ativoPorConfig,
+                deveExibirNormal: deveMostrarBarraBase,
+                focoOcultadoGlobal,
+                modoBarra: prefs.modoBarra,
+                beepAtivo: paramsBeep.ativo,
+                beepIntensidade: paramsBeep.intensidade,
+                beepIntervaloMs: paramsBeep.intervaloMs,
+                permitirBeep: Boolean(paramsBeep.ativo && permitirBeep),
+                deveExibirModalDescanso: modalAtivoAgora,
+                modalDados,
+                tooltipTexto: infoTooltip.tooltipTitle || '',
+                agoraServidor: agoraSync
+            };
+            return { agoraServidor: agoraSync, resumoPomodoro: resumo, prefs, paramsBeep, cfgExib, estadoBarra: estadoBarraEfetivo };
+        }
+
         avancarMinutoPomodoro(estado, agora = Date.now(), config = {}) {
             const focoMin = Math.max(25, Number(config.pomodoroFocoMinutos || 25));
             const proporcao = Number(config.pomodoroProporcao || 4.5);
@@ -1103,19 +1954,32 @@
             const minInativo = Math.floor(msInativo / 60000);
 
             if (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') {
-                if (minInativo < 1) {
-                    /* BUG-70: Usuário continuou trabalhando -> aguarda idle e reinicia contagem do descanso */
+                if (estado.pomodoroDescansoMinCumprido) {
+                    estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
+                } else if (Number(estado.pomodoroDescansoSyncTs || 0) > 0) {
+                    this.calcularProgressoDescanso(estado, agora, config, { mutar: true });
+                    estado.pomodoroMinutosNaFase = Math.floor(Number(estado.pomodoroDescansoAcumuladoMs || 0) / 60000);
+                } else if (minInativo < 1) {
+                    /* BUG-70: Usuário continuou trabalhando antes de 25% -> aguarda idle e reinicia contagem do descanso */
                     estado.pomodoroMinutosNaFase = 0;
                     estado.pomodoroFaseInicioTs = agora;
                     estado.pomodoroDescansoMinCumprido = false;
                     estado.pomodoroDescansoRealizadoNoCiclo = false;
                     estado.pomodoroDescansoPendente = true;
+                    estado.pomodoroDescansoAcumuladoMs = 0;
+                    estado.pomodoroDescansoSyncTs = 0;
+                    estado.pomodoroDescansoAtividadeAteTs = 0;
+                    estado.pomodoroDescansoCliquesPenalidade = 0;
+                    estado.pomodoroDescansoUltimoCliqueTs = 0;
                     return { evento: 'aguardando_idle', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
+                } else {
+                    estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
+                    estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), estado.pomodoroMinutosNaFase * 60000);
                 }
-                estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
                 if (estado.pomodoroFase === 'alivio') {
                     if (estado.pomodoroMinutosNaFase >= pausaMaiorMin) {
                         /* Alívio prolongado virou Descanso Maior e segue contando indefinidamente até o usuário voltar a interagir */
+                        const acabouDeCumprir = !estado.pomodoroDescansoMinCumprido;
                         estado.pomodoroFase = 'pausa_maior';
                         estado.pomodoroCicloAtual = 0;
                         estado.pomodoroDescansoMinCumprido = true;
@@ -1123,6 +1987,7 @@
                         estado.pomodoroDescansoPendente = false;
                         estado.pomodoroUltimoDescansoTipo = 'pausa_maior';
                         estado.pomodoroUltimoDescansoFimTs = agora;
+                        if (acabouDeCumprir) estado.pomodoroBadgeVerdeAteTs = 0;
                         return { evento: 'promovido_pausa_maior', descansouNoPeriodo: true, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                     }
                     if (estado.pomodoroMinutosNaFase >= alivioMin) {
@@ -1132,6 +1997,7 @@
                         estado.pomodoroDescansoPendente = false;
                         estado.pomodoroUltimoDescansoTipo = 'alivio';
                         estado.pomodoroUltimoDescansoFimTs = agora;
+                        if (acabouDeCumprir) estado.pomodoroBadgeVerdeAteTs = 0;
                         return { evento: acabouDeCumprir ? 'alivio_cumprido_continuo' : null, descansouNoPeriodo: true, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                     }
                     return { evento: null, descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
@@ -1146,6 +2012,7 @@
                     estado.pomodoroDescansoPendente = false;
                     estado.pomodoroUltimoDescansoTipo = 'pausa_maior';
                     estado.pomodoroUltimoDescansoFimTs = agora;
+                    if (acabouDeCumprir) estado.pomodoroBadgeVerdeAteTs = 0;
                     return { evento: acabouDeCumprir ? 'pausa_maior_cumprida_continua' : null, descansouNoPeriodo: true, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                 }
                 return { evento: null, descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
@@ -1156,19 +2023,8 @@
                 estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
             }
             if (estado.pomodoroFase === 'foco' && estado.pomodoroMinutosNaFase >= focoMin) {
-                estado.pomodoroCicloAtual = Number(estado.pomodoroCicloAtual || 0) + 1;
-                estado.pomodoroMinutosNaFase = 0;
-                estado.pomodoroFaseInicioTs = agora;
-                estado.pomodoroDescansoMinCumprido = false;
-                estado.pomodoroDescansoRealizadoNoCiclo = false;
-                estado.pomodoroDescansoPendente = true;
-                estado.pomodoroBarraOcultadaChave = '';
-                if (estado.pomodoroCicloAtual >= ciclosMax) {
-                    estado.pomodoroFase = 'pausa_maior';
-                    return { evento: 'inicio_pausa_maior', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
-                }
-                estado.pomodoroFase = 'alivio';
-                return { evento: 'inicio_alivio', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
+                const evento = this.iniciarFaseDescansoPomodoro(estado, agora, config);
+                return { evento, descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
             }
             return { evento: null, descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
         }
@@ -1211,14 +2067,18 @@
 
                 /* Sempre avança contadores internos de foco/pausa/último descanso mesmo com alertas Pomodoro desativados */
                 const evPom = this.avancarMinutoPomodoro(estado, agora, config);
+                const resumoTick = this.calcularResumoPomodoro(estado, config, agora, null);
+                const chaveFaseTick = `${resumoTick.fase}:${resumoTick.cicloAtual}:${resumoTick.faseInicioTs}`;
                 if (pomodoroAtivo && prefsAviso.usarModal) {
                     if (evPom.evento === 'inicio_pausa_maior') {
+                        estado.pomodoroModalDescansoChave = chaveFaseTick;
                         await this.projetarModalProdutividadeEmTodasJanelas(
                             'Pomodoro: Hora da Pausa Maior!',
                             `Você concluiu ${evPom.ciclosMax} ciclos de foco (${evPom.focoMin} min cada). Descanse por ${evPom.pausaMaiorMin} minutos.`,
                             `Proporção ${evPom.proporcao}:1 • Pausa Maior de ${evPom.pausaMaiorMin} min`
                         );
                     } else if (evPom.evento === 'inicio_alivio') {
+                        estado.pomodoroModalDescansoChave = chaveFaseTick;
                         await this.projetarModalProdutividadeEmTodasJanelas(
                             'Pomodoro: Hora do Alívio!',
                             `Ciclo ${estado.pomodoroCicloAtual}/${evPom.ciclosMax} concluído (${evPom.focoMin} min). Faça uma pausa de ${evPom.alivioMin} minutos.`,
@@ -1237,6 +2097,12 @@
                             'Descanso completo realizado!'
                         );
                     }
+                }
+                /* Se o descanso realmente já iniciou (não aguarda mais 10s idle), encerra o modal de todas as guias e não exibe mais neste ciclo */
+                if (resumoTick.emDescanso && !resumoTick.aguardandoOciosidade && estado.pomodoroModalDescansoChave) {
+                    estado.pomodoroModalExibidoChave = chaveFaseTick;
+                    estado.pomodoroModalDescansoChave = '';
+                    await this.fecharModalProdutividadeEmTodasJanelas();
                 }
 
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: estado });
@@ -1259,28 +2125,30 @@
             let alinhamento = 'centro';
             if (ratio < 0.33) alinhamento = 'esquerda';
             else if (ratio > 0.66) alinhamento = 'direita';
-            const topPx = Math.max(8, Math.min(h - 48, Math.round(Number(yTop) || 8)));
+            const topPx = Math.max(0, Math.min(h - 24, Math.round(Number(yTop) || 0)));
             return { alinhamento, topPx };
         }
 
         /**
-         * Clamp seguro de posição livre (Modo 2 / 🔒) dentro dos limites da viewport (FEAT-46).
+         * Clamp seguro de posição livre (Modo 2 / 🔒) encostando nas bordas da viewport (FEAT-46).
          * @param {number} leftPx
          * @param {number} topPx
          * @param {number} [larguraPill]
          * @param {number} [larguraTela]
          * @param {number} [alturaTela]
+         * @param {number} [alturaPill]
          * @returns {{ leftPx: number, topPx: number }}
          */
-        calcularPosicaoLivreClamp(leftPx, topPx, larguraPill = 240, larguraTela = 1280, alturaTela = 720) {
+        calcularPosicaoLivreClamp(leftPx, topPx, larguraPill = 240, larguraTela = 1280, alturaTela = 720, alturaPill = 24) {
             const w = Math.max(320, Number(larguraTela || 1280));
             const h = Math.max(200, Number(alturaTela || 720));
-            const pillW = Math.max(80, Math.min(w - 16, Number(larguraPill || 240)));
-            const maxLeft = Math.max(8, w - pillW - 8);
-            const maxTop = Math.max(24, h - 48);
+            const pillW = Math.max(40, Math.min(w, Number(larguraPill || 240)));
+            const pillH = Math.max(16, Math.min(h, Number(alturaPill || 24)));
+            const maxLeft = Math.max(0, w - pillW);
+            const maxTop = Math.max(0, h - pillH);
             return {
-                leftPx: Math.max(8, Math.min(maxLeft, Math.round(Number(leftPx) || 8))),
-                topPx: Math.max(8, Math.min(maxTop, Math.round(Number(topPx) || 8)))
+                leftPx: Math.max(0, Math.min(maxLeft, Math.round(Number(leftPx) || 0))),
+                topPx: Math.max(0, Math.min(maxTop, Math.round(Number(topPx) || 0)))
             };
         }
 
@@ -1382,11 +2250,16 @@
             const atual = await this.obterEstadoGlobalBarraPomodoro();
             const proximo = { ...atual };
             if (patch.topPx !== undefined) {
-                proximo.topPx = Math.max(8, Math.round(Number(patch.topPx) || 8));
+                proximo.topPx = Math.max(0, Math.round(Number(patch.topPx) || 0));
+            }
+            if (patch.posicaoVertical === 'superior' || patch.posicaoVertical === 'inferior') {
+                proximo.posicaoVertical = patch.posicaoVertical;
+            } else if (patch.topPx !== undefined) {
+                proximo.posicaoVertical = (proximo.topPx >= 240) ? 'inferior' : 'superior';
             }
             if (patch.leftPx !== undefined) {
                 proximo.leftPx = (patch.leftPx !== null && Number.isFinite(Number(patch.leftPx)))
-                    ? Math.max(8, Math.round(Number(patch.leftPx))) : null;
+                    ? Math.max(0, Math.round(Number(patch.leftPx))) : null;
             }
             if (['esquerda', 'centro', 'direita', 'livre'].includes(patch.alinhamento)) {
                 proximo.alinhamento = patch.alinhamento;
@@ -1396,18 +2269,24 @@
             }
             if (patch.modoFixacao !== undefined) {
                 const mf = Math.floor(Number(patch.modoFixacao) || 0);
-                proximo.modoFixacao = (mf === 1 || mf === 2) ? mf : 0;
+                proximo.modoFixacao = (mf === 0 || mf === 1 || mf === 2 || mf === 3) ? mf : 1;
             }
-            if (patch.ancorar === true || (proximo.modoFixacao === 2 && patch.modoFixacao === 2)) {
+            if (patch.nivelDetalhe !== undefined) {
+                const nd = Math.floor(Number(patch.nivelDetalhe) || 0);
+                proximo.nivelDetalhe = (nd === 1 || nd === 2) ? nd : 0;
+            }
+            if (patch.ancorar === true || (proximo.modoFixacao === 1 && patch.modoFixacao === 1)) {
                 proximo.topAncoradoPx = proximo.topPx;
+                proximo.posicaoVerticalAncorada = proximo.posicaoVertical;
                 proximo.alinhamentoAncorado = proximo.alinhamento;
                 proximo.leftAncoradoPx = proximo.leftPx;
-            } else if (patch.topAncoradoPx !== undefined || patch.alinhamentoAncorado !== undefined || patch.leftAncoradoPx !== undefined) {
-                if (patch.topAncoradoPx !== undefined) proximo.topAncoradoPx = Math.max(8, Math.round(Number(patch.topAncoradoPx) || 8));
+            } else if (patch.topAncoradoPx !== undefined || patch.posicaoVerticalAncorada !== undefined || patch.alinhamentoAncorado !== undefined || patch.leftAncoradoPx !== undefined) {
+                if (patch.topAncoradoPx !== undefined) proximo.topAncoradoPx = Math.max(0, Math.round(Number(patch.topAncoradoPx) || 0));
+                if (patch.posicaoVerticalAncorada === 'superior' || patch.posicaoVerticalAncorada === 'inferior') proximo.posicaoVerticalAncorada = patch.posicaoVerticalAncorada;
                 if (['esquerda', 'centro', 'direita', 'livre'].includes(patch.alinhamentoAncorado)) proximo.alinhamentoAncorado = patch.alinhamentoAncorado;
                 if (patch.leftAncoradoPx !== undefined) {
                     proximo.leftAncoradoPx = (patch.leftAncoradoPx !== null && Number.isFinite(Number(patch.leftAncoradoPx)))
-                        ? Math.max(8, Math.round(Number(patch.leftAncoradoPx))) : null;
+                        ? Math.max(0, Math.round(Number(patch.leftAncoradoPx))) : null;
                 }
             }
             const normalizado = this.normalizarEstadoGlobalBarraPomodoro(proximo);
@@ -1420,78 +2299,165 @@
         }
 
         /**
-         * Atualiza o badge do ícone no Chrome e projeta/remove a faixa flutuante global nas abas abertas.
-         * @param {Object} [config]
-         * @param {Object} [estadoParam]
-         * @param {number|string|null} [tabIdEspecifica] número de tabId, 'todas' para todas as abas HTTP(S), ou null para abas ativas
+         * Resolve cor de fundo/texto do badge do ícone da extensão no Pomodoro.
+         * Nos últimos 60s (<= 1 min) antes do descanso em Foco, muda de verde para amarelo.
+         * @param {Object} [resumo]
+         * @returns {{ cor: string, corTexto: string, preDescansoAmarelo: boolean }}
          */
-        async sincronizarIndicadoresGlobaisPomodoro(config = null, estadoParam = null, tabIdEspecifica = null) {
-            try {
-                if (typeof chrome === 'undefined') return;
-                const cfg = config || (this._obterConfig ? await this._obterConfig() : {});
-                const estado = estadoParam || await this.obterOuIniciarEstadoTrabalhoHoje();
-                let nuvemMeta = null;
-                try {
-                    if (chrome.storage && chrome.storage.local) {
-                        const metaRes = await chrome.storage.local.get(['jusgovProdNuvemMeta']);
-                        if (metaRes && metaRes.jusgovProdNuvemMeta) nuvemMeta = metaRes.jusgovProdNuvemMeta;
-                    }
-                } catch (_) { }
-                const agoraSync = Date.now();
-                const resumo = this.calcularResumoPomodoro(estado, cfg, agoraSync);
-                const infoTooltip = this.formatarResumoProdutividadeTexto(estado, cfg, agoraSync, nuvemMeta);
-                const prefs = this.resolverPreferenciasAvisoPomodoro(cfg);
+        resolverEstiloBadgePomodoro(resumo = {}) {
+            const r = (resumo && typeof resumo === 'object') ? resumo : {};
+            if (r.emDescanso && r.descansoMinCumprido) {
+                return { cor: '#16a34a', corTexto: '#ffffff', preDescansoAmarelo: false };
+            }
+            if (r.descansoPendente && (r.aguardandoOciosidade || !r.emDescanso || r.descansoEmAviso)) {
+                return { cor: '#dc2626', corTexto: '#ffffff', preDescansoAmarelo: false };
+            }
+            if (r.emDescanso) {
+                return { cor: '#0284c7', corTexto: '#ffffff', preDescansoAmarelo: false };
+            }
+            const segRest = Number(r.segundosRestantes || 0);
+            const minRest = Number(r.minutosRestantes ?? 999);
+            const emUltimoMinuto = (!r.emPausa) && (minRest <= 1 || (segRest > 0 && segRest <= 60));
+            if (emUltimoMinuto) {
+                return { cor: '#eab308', corTexto: '#111827', preDescansoAmarelo: true };
+            }
+            return { cor: '#0d9488', corTexto: '#ffffff', preDescansoAmarelo: false };
+        }
 
-                if (chrome.action && chrome.action.setBadgeText) {
-                    if (resumo.ativo && prefs.usarBadge) {
-                        const txtMin = `${Math.max(0, resumo.minutosRestantes)}m`;
-                        const txtBadge = resumo.descansoPendente && !resumo.emDescanso ? `!${txtMin}` : txtMin;
-                        const cor = resumo.descansoPendente ? '#dc2626' : (resumo.emDescanso ? '#0284c7' : '#0d9488');
-                        chrome.action.setBadgeText({ text: txtBadge }).catch(() => { });
-                        if (chrome.action.setBadgeBackgroundColor) {
-                            chrome.action.setBadgeBackgroundColor({ color: cor }).catch(() => { });
-                        }
-                    } else {
-                        chrome.action.setBadgeText({ text: '' }).catch(() => { });
+        /**
+         * Indica se o cronômetro do minipopup deve piscar em amarelo (últimos 30s antes do descanso).
+         * @param {number} segRestantesFoco
+         * @param {boolean} [emDescanso=false]
+         * @param {boolean} [descansoPendente=false]
+         * @param {boolean} [emPausa=false]
+         * @returns {boolean}
+         */
+        isCronometroFocoEmAlertaPreDescanso(segRestantesFoco, emDescanso = false, descansoPendente = false, emPausa = false) {
+            const seg = Number(segRestantesFoco || 0);
+            return Boolean(!emDescanso && !descansoPendente && !emPausa && seg > 0 && seg <= 30);
+        }
+
+        /**
+         * Atualiza imediatamente badge e tooltip do ícone da extensão com os mesmos dados canônicos de Popup/Opções/Minipopup.
+         */
+        aplicarIndicadoresChromeAction(cfg = {}, estado = {}, nuvemMeta = null, agoraSync = Date.now()) {
+            const resumo = this.calcularResumoPomodoro(estado, cfg, agoraSync, nuvemMeta);
+            const infoTooltip = this.formatarResumoProdutividadeTexto(estado, cfg, agoraSync, nuvemMeta);
+            const prefs = this.resolverPreferenciasAvisoPomodoro(cfg);
+            const txtBadge = (resumo.ativo && prefs.usarBadge)
+                ? `${(resumo.descansoPendente && !resumo.emDescanso) ? '!' : ''}${Math.max(0, resumo.minutosRestantes)}m`
+                : '';
+            const badgeEst = this.resolverEstiloBadgePomodoro(resumo);
+            const assinatura = `${txtBadge}|${badgeEst.cor}|${badgeEst.corTexto}|${infoTooltip.tooltipTitle}`;
+
+            if (typeof chrome !== 'undefined' && chrome.action && this._ultimaAssinaturaAction !== assinatura) {
+                this._ultimaAssinaturaAction = assinatura;
+                if (chrome.action.setBadgeText) {
+                    chrome.action.setBadgeText({ text: txtBadge }).catch(() => { });
+                    if (txtBadge && chrome.action.setBadgeBackgroundColor) {
+                        chrome.action.setBadgeBackgroundColor({ color: badgeEst.cor }).catch(() => { });
                     }
-                    if (chrome.action.setTitle) {
-                        chrome.action.setTitle({
-                            title: infoTooltip.tooltipTitle || 'JusGovBR — Seleção/Cópia Inteligente'
-                        }).catch(() => { });
+                    if (txtBadge && chrome.action.setBadgeTextColor) {
+                        chrome.action.setBadgeTextColor({ color: badgeEst.corTexto }).catch(() => { });
                     }
                 }
-
-                if (!chrome.tabs || !chrome.scripting) return;
-                const chaveFaseAtual = `${resumo.fase}:${resumo.cicloAtual}:${resumo.faseInicioTs}`;
-                const focoOcultadoGlobal = (resumo.fase === 'foco' && estado.pomodoroBarraOcultadaChave === chaveFaseAtual);
-                const ativoPorConfig = Boolean(resumo.ativo && prefs.modoBarra !== 'nunca');
-                const deveMostrarBarraBase = Boolean(
-                    ativoPorConfig &&
-                    !focoOcultadoGlobal &&
-                    (prefs.modoBarra === 'sempre' || (prefs.modoBarra === 'descanso' && (resumo.emDescanso || resumo.descansoPendente)))
-                );
-
-                const estadoBarraGlobal = await this.obterEstadoGlobalBarraPomodoro();
-
-                let abas = [];
-                if (tabIdEspecifica === 'todas') {
-                    abas = await chrome.tabs.query({}).catch(() => []);
-                } else if (typeof tabIdEspecifica === 'number' && tabIdEspecifica > 0) {
-                    const abaUnica = await chrome.tabs.get(tabIdEspecifica).catch(() => null);
-                    if (abaUnica) abas = [abaUnica];
-                } else {
-                    abas = await chrome.tabs.query({ active: true }).catch(() => []);
+                if (chrome.action.setTitle) {
+                    chrome.action.setTitle({
+                        title: infoTooltip.tooltipTitle || 'JusGovBR — Seleção/Cópia Inteligente'
+                    }).catch(() => { });
                 }
+            }
+            return { resumo, infoTooltip, prefs };
+        }
 
-                for (const aba of abas) {
-                    if (!aba || !aba.id || !aba.url || !/^https?:\/\//i.test(aba.url)) continue;
-
-                    chrome.scripting.executeScript({
-                        target: { tabId: aba.id },
-                        func: (cfgExib, dadosResumo, estadoBarra) => {
+        /**
+         * Retorna a funcao autocontida serializavel para `chrome.scripting.executeScript` do minipopup Pomodoro (BUG-78).
+         * @returns {Function}
+         */
+        obterFuncaoInjecaoBarraPomodoro() {
+            return (cfgExib, dadosResumo, estadoBarra) => {
                             const idHost = 'jusgov-pomodoro-barra-global';
+                            const idBackdrop = 'jusgov-pomodoro-backdrop-global';
+                            const idModal = 'jusgov-modal-produtividade-trabalho';
+
+                            const removerBackdropBlur = () => {
+                                const bd = document.getElementById(idBackdrop);
+                                if (bd) bd.remove();
+                            };
+                            const garantirBackdropBlur = () => {
+                                if (document.hidden) {
+                                    removerBackdropBlur();
+                                    return;
+                                }
+                                let bd = document.getElementById(idBackdrop);
+                                if (!bd) {
+                                    bd = document.createElement('div');
+                                    bd.id = idBackdrop;
+                                    bd.setAttribute('data-jusgov-ignore', 'true');
+                                    bd.style.cssText = 'position:fixed !important;inset:0 !important;z-index:2147483646 !important;background:rgba(15,23,42,0.72) !important;backdrop-filter:blur(4px) !important;pointer-events:none !important;margin:0 !important;padding:0 !important;';
+                                    (document.body || document.documentElement).appendChild(bd);
+                                }
+                            };
+
+                            const gerenciarModalDescanso = (exibir, dadosM) => {
+                                const existente = document.getElementById(idModal);
+                                if (!exibir || !dadosM) {
+                                    if (existente) existente.remove();
+                                    return;
+                                }
+                                if (existente) return;
+                                const overlay = document.createElement('div');
+                                overlay.id = idModal;
+                                overlay.setAttribute('role', 'dialog');
+                                overlay.setAttribute('aria-modal', 'true');
+                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;';
+                                const card = document.createElement('div');
+                                card.style.cssText = 'background:#ffffff;color:#0f172a;border-radius:14px;padding:24px 28px;max-width:440px;width:90%;box-shadow:0 24px 48px rgba(0,0,0,0.35);border:2px solid #0d9488;text-align:center;';
+                                const h2 = document.createElement('h2');
+                                h2.textContent = dadosM.titulo || '';
+                                h2.style.cssText = 'margin:0 0 10px 0;font-size:20px;font-weight:700;color:#0d9488;';
+                                const p = document.createElement('p');
+                                p.textContent = dadosM.mensagem || '';
+                                p.style.cssText = 'margin:0 0 10px 0;font-size:15px;line-height:1.5;color:#1e293b;';
+                                const sub = document.createElement('p');
+                                sub.textContent = dadosM.subtitulo || '';
+                                sub.style.cssText = 'margin:0 0 18px 0;font-size:12px;color:#64748b;';
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.textContent = 'Entendi / Fechar';
+                                btn.style.cssText = 'background:#0d9488;color:#ffffff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;';
+                                const onEscModal = (evM) => {
+                                    if (evM.key === 'Escape') fecharModalLocal(true);
+                                };
+                                const fecharModalLocal = (propagarGlobal = true) => {
+                                    overlay.remove();
+                                    document.removeEventListener('keydown', onEscModal, true);
+                                    if (propagarGlobal) {
+                                        try {
+                                            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                                chrome.runtime.sendMessage({ acao: 'FECHAR_MODAL_PRODUTIVIDADE_GLOBAL' }).catch(() => { });
+                                            }
+                                        } catch (_) { }
+                                    }
+                                };
+                                btn.addEventListener('click', () => fecharModalLocal(true));
+                                overlay.addEventListener('click', (evM) => { if (evM.target === overlay) fecharModalLocal(true); });
+                                document.addEventListener('keydown', onEscModal, true);
+                                card.appendChild(h2);
+                                card.appendChild(p);
+                                if (dadosM.subtitulo) card.appendChild(sub);
+                                card.appendChild(btn);
+                                overlay.appendChild(card);
+                                (document.body || document.documentElement).appendChild(overlay);
+                            };
+
                             const destruirHost = (h) => {
+                                removerBackdropBlur();
                                 if (!h) return;
+                                if (h.__jusgovScreensaverRaf) {
+                                    cancelAnimationFrame(h.__jusgovScreensaverRaf);
+                                    h.__jusgovScreensaverRaf = 0;
+                                }
                                 if (h.__jusgovTimerInterval) clearInterval(h.__jusgovTimerInterval);
                                 if (h.__jusgovTimerRetorno) clearTimeout(h.__jusgovTimerRetorno);
                                 if (typeof h.__jusgovCleanupListeners === 'function') {
@@ -1499,6 +2465,8 @@
                                 }
                                 h.remove();
                             };
+
+                            gerenciarModalDescanso(Boolean(cfgExib && cfgExib.deveExibirModalDescanso), cfgExib && cfgExib.modalDados);
 
                             /* FEAT-39: Singleton estrito (apenas 1 minipopup por guia, podando eventuais duplicatas de corrida) */
                             const existentes = Array.from(document.querySelectorAll('#jusgov-pomodoro-barra-global, [data-jusgov-pomodoro-bar="true"]'));
@@ -1510,93 +2478,158 @@
                             /* Remove eventual legado por guia para que todas as guias reflitam o estado global unificado */
                             try { sessionStorage.removeItem('jusgovPomodoroBarraFixadaTab'); } catch (_) { }
 
-                            const estadoNorm = {
-                                modoFixacao: (estadoBarra && (estadoBarra.modoFixacao === 1 || estadoBarra.modoFixacao === 2)) ? estadoBarra.modoFixacao : 0,
-                                topPx: Math.max(8, Math.round(Number(estadoBarra && estadoBarra.topPx) || 8)),
-                                alinhamento: (estadoBarra && (estadoBarra.alinhamento === 'esquerda' || estadoBarra.alinhamento === 'direita' || estadoBarra.alinhamento === 'livre')) ? estadoBarra.alinhamento : 'centro',
-                                leftPx: (estadoBarra && estadoBarra.leftPx !== undefined && estadoBarra.leftPx !== null && Number.isFinite(Number(estadoBarra.leftPx)))
-                                    ? Math.max(8, Math.round(Number(estadoBarra.leftPx))) : null,
-                                topAncoradoPx: Math.max(8, Math.round(Number(estadoBarra && estadoBarra.topAncoradoPx) || (estadoBarra && estadoBarra.topPx) || 8)),
-                                alinhamentoAncorado: (estadoBarra && (estadoBarra.alinhamentoAncorado === 'esquerda' || estadoBarra.alinhamentoAncorado === 'direita' || estadoBarra.alinhamentoAncorado === 'livre'))
-                                    ? estadoBarra.alinhamentoAncorado
-                                    : ((estadoBarra && (estadoBarra.alinhamento === 'esquerda' || estadoBarra.alinhamento === 'direita' || estadoBarra.alinhamento === 'livre')) ? estadoBarra.alinhamento : 'centro'),
-                                leftAncoradoPx: (estadoBarra && estadoBarra.leftAncoradoPx !== undefined && estadoBarra.leftAncoradoPx !== null && Number.isFinite(Number(estadoBarra.leftAncoradoPx)))
-                                    ? Math.max(8, Math.round(Number(estadoBarra.leftAncoradoPx)))
-                                    : ((estadoBarra && estadoBarra.alinhamento === 'livre' && estadoBarra.leftPx !== undefined && estadoBarra.leftPx !== null) ? Math.max(8, Math.round(Number(estadoBarra.leftPx))) : null)
+                            const normalizarEstadoBarra = (eb) => ({
+                                modoFixacao: (eb && (eb.modoFixacao === 1 || eb.modoFixacao === 2)) ? eb.modoFixacao : 1,
+                                nivelDetalhe: (eb && (eb.nivelDetalhe === 1 || eb.nivelDetalhe === 2)) ? eb.nivelDetalhe : 0,
+                                posicaoVertical: (eb && eb.posicaoVertical === 'inferior') ? 'inferior' : 'superior',
+                                posicaoVerticalAncorada: (eb && eb.posicaoVerticalAncorada === 'inferior')
+                                    ? 'inferior'
+                                    : ((eb && eb.posicaoVertical === 'inferior') ? 'inferior' : 'superior'),
+                                alinhamento: (eb && (eb.alinhamento === 'centro' || eb.alinhamento === 'direita')) ? eb.alinhamento : 'esquerda',
+                                alinhamentoAncorado: (eb && (eb.alinhamentoAncorado === 'esquerda' || eb.alinhamentoAncorado === 'direita' || eb.alinhamentoAncorado === 'centro'))
+                                    ? eb.alinhamentoAncorado
+                                    : ((eb && (eb.alinhamento === 'centro' || eb.alinhamento === 'direita')) ? eb.alinhamento : 'esquerda')
+                            });
+
+                            const resolverPermissaoExibicao = (hRef, cExib, dRes) => {
+                                const chave = `${dRes.fase}:${dRes.cicloAtual}:${dRes.faseInicioTs}`;
+                                let fechadaNaGuia = false;
+                                try {
+                                    fechadaNaGuia = Boolean(dRes.emDescanso && sessionStorage.getItem('jusgovPomodoroBarraFechadaFaseTab') === chave);
+                                } catch (_) { }
+                                const deveExibir = Boolean(
+                                    cExib && cExib.ativoPorConfig &&
+                                    !fechadaNaGuia && cExib.deveExibirNormal
+                                );
+                                return { deveExibir, chave };
                             };
 
-                            const chaveFase = `${dadosResumo.fase}:${dadosResumo.cicloAtual}:${dadosResumo.faseInicioTs}`;
-                            let fechadaNestaGuia = false;
-                            try {
-                                fechadaNestaGuia = Boolean(dadosResumo.emDescanso && sessionStorage.getItem('jusgovPomodoroBarraFechadaFaseTab') === chaveFase);
-                            } catch (_) { }
+                            const obterModoPosicaoEspecial = (d, agoraNow = Date.now()) => {
+                                if (d && d.emDescanso) {
+                                    const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
+                                    const concluido = Boolean(d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs);
+                                    if (!concluido && d.descansoEmAviso) {
+                                        return (d.descansoUltimoTipoInteracao === 'movimento') ? 'aviso_movimento_centro_blur' : 'aviso_topo_centro';
+                                    }
+                                    const ativAte = Number(d.descansoAtividadeAteTs || 0);
+                                    if (!d.aguardandoOciosidade && (concluido || (!d.descansoRealizado && agoraNow >= ativAte))) return 'idle_centro_tela';
+                                }
+                                return 'padrao';
+                            };
 
-                            const deveExibirAqui = Boolean(
-                                cfgExib && cfgExib.ativoPorConfig &&
-                                (estadoNorm.modoFixacao > 0 || (!fechadaNestaGuia && cfgExib.deveExibirNormal))
-                            );
-                            if (!deveExibirAqui) {
+                            const exibInicial = resolverPermissaoExibicao(host, cfgExib, dadosResumo);
+                            if (!exibInicial.deveExibir) {
                                 destruirHost(host);
                                 return;
                             }
 
-                            /* Posicionamento unificado por left + transform (inclui modo 'livre' XY para cadeado 🔒) */
-                            const aplicarPosicao = (h, topVal, alinhVal, leftVal = null) => {
+                            /* Posicionamento estrito em 6 posições coladas às bordas (0px sem espaços, usando top:0/bottom:0 e clientWidth/clientHeight) */
+                            const aplicarPosicao = (h, posVertVal, alinhVal, leftLivre = null, topLivre = null) => {
                                 if (!h) return;
-                                const wTela = Math.max(320, window.innerWidth || 1280);
-                                const hTela = Math.max(200, window.innerHeight || 720);
-                                const maxTop = Math.max(24, hTela - 48);
-                                const topSeguro = Math.max(8, Math.min(maxTop, Math.round(Number(topVal) || 8)));
-                                const alinh = (alinhVal === 'esquerda' || alinhVal === 'direita' || alinhVal === 'livre') ? alinhVal : 'centro';
-                                h.style.top = `${topSeguro}px`;
-                                h.style.right = 'auto';
-                                if (alinh === 'livre' && leftVal !== null && Number.isFinite(Number(leftVal))) {
+                                const docEl = document.documentElement;
+                                const wTela = Math.max(320, (docEl && docEl.clientWidth) || window.innerWidth || 1280);
+                                const hTela = Math.max(200, (docEl && docEl.clientHeight) || window.innerHeight || 720);
+                                if (leftLivre !== null && topLivre !== null && Number.isFinite(Number(leftLivre)) && Number.isFinite(Number(topLivre))) {
                                     const uiRef = h.__jusgovUI;
                                     const rectPill = (uiRef && uiRef.pill && typeof uiRef.pill.getBoundingClientRect === 'function')
                                         ? uiRef.pill.getBoundingClientRect() : null;
-                                    const largPill = (rectPill && rectPill.width > 60) ? rectPill.width : 240;
-                                    const maxLeft = Math.max(8, wTela - Math.min(wTela - 16, largPill) - 8);
-                                    const leftSeguro = Math.max(8, Math.min(maxLeft, Math.round(Number(leftVal))));
-                                    h.__jusgovPos = { topPx: topSeguro, alinhamento: 'livre', leftPx: leftSeguro };
-                                    h.style.left = `${leftSeguro}px`;
-                                    h.style.transform = 'translateX(0)';
-                                } else if (alinh === 'esquerda') {
-                                    h.__jusgovPos = { topPx: topSeguro, alinhamento: 'esquerda', leftPx: null };
-                                    h.style.left = '12px';
-                                    h.style.transform = 'translateX(0)';
-                                } else if (alinh === 'direita') {
-                                    h.__jusgovPos = { topPx: topSeguro, alinhamento: 'direita', leftPx: null };
-                                    h.style.left = 'calc(100% - 12px)';
-                                    h.style.transform = 'translateX(-100%)';
+                                    const alturaPill = (rectPill && rectPill.height > 8) ? Math.ceil(rectPill.height) : 20;
+                                    const largPill = (rectPill && rectPill.width > 20) ? Math.ceil(rectPill.width) : 80;
+                                    const maxTop = Math.max(0, hTela - alturaPill);
+                                    const maxLeft = Math.max(0, wTela - Math.min(wTela, largPill));
+                                    const leftSeguro = Math.max(0, Math.min(maxLeft, Math.round(Number(leftLivre))));
+                                    const topSeguro = Math.max(0, Math.min(maxTop, Math.round(Number(topLivre))));
+                                    h.style.setProperty('top', `${topSeguro}px`, 'important');
+                                    h.style.setProperty('bottom', 'auto', 'important');
+                                    h.style.setProperty('left', `${leftSeguro}px`, 'important');
+                                    h.style.setProperty('right', 'auto', 'important');
+                                    h.style.setProperty('transform', 'none', 'important');
+                                    return;
+                                }
+                                if (posVertVal === 'centro_tela') {
+                                    h.style.setProperty('top', '50%', 'important');
+                                    h.style.setProperty('bottom', 'auto', 'important');
+                                    h.style.setProperty('left', '50%', 'important');
+                                    h.style.setProperty('right', 'auto', 'important');
+                                    h.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+                                    h.__jusgovPos = { posicaoVertical: 'centro_tela', alinhamento: 'centro', topPx: Math.round(hTela / 2) };
+                                    return;
+                                }
+                                const posVert = (posVertVal === 'inferior') ? 'inferior' : 'superior';
+                                const alinh = (alinhVal === 'esquerda' || alinhVal === 'direita') ? alinhVal : 'centro';
+                                if (posVert === 'inferior') {
+                                    h.style.setProperty('top', 'auto', 'important');
+                                    h.style.setProperty('bottom', '0px', 'important');
                                 } else {
-                                    h.__jusgovPos = { topPx: topSeguro, alinhamento: 'centro', leftPx: null };
-                                    h.style.left = '50%';
-                                    h.style.transform = 'translateX(-50%)';
+                                    h.style.setProperty('top', '0px', 'important');
+                                    h.style.setProperty('bottom', 'auto', 'important');
+                                }
+                                h.__jusgovPos = { posicaoVertical: posVert, alinhamento: alinh, topPx: (posVert === 'inferior' ? Math.max(0, hTela - 20) : 0) };
+                                if (alinh === 'esquerda') {
+                                    h.style.setProperty('left', '0px', 'important');
+                                    h.style.setProperty('right', 'auto', 'important');
+                                    h.style.setProperty('transform', 'none', 'important');
+                                } else if (alinh === 'direita') {
+                                    h.style.setProperty('left', 'auto', 'important');
+                                    h.style.setProperty('right', '0px', 'important');
+                                    h.style.setProperty('transform', 'none', 'important');
+                                } else {
+                                    h.style.setProperty('left', '50%', 'important');
+                                    h.style.setProperty('right', 'auto', 'important');
+                                    h.style.setProperty('transform', 'translateX(-50%)', 'important');
                                 }
                             };
 
-                            const atualizarVisualBotaoFixar = (btn, modoFix) => {
-                                if (!btn) return;
-                                if (modoFix === 2) {
-                                    btn.textContent = '🔒';
-                                    btn.title = 'Posição Fixada em todas as guias (foge do mouse e volta para a mesma posição; 3º clique desafixa)';
-                                    btn.style.background = '#0284c7';
-                                    btn.style.color = '#ffffff';
-                                    btn.style.boxShadow = '0 0 0 1px #bae6fd';
-                                } else if (modoFix === 1) {
-                                    btn.textContent = '📌';
-                                    btn.title = 'Fixado em todas as guias (clique novamente para fixar também a posição)';
-                                    btn.style.background = '#0d9488';
-                                    btn.style.color = '#ffffff';
-                                    btn.style.boxShadow = 'none';
+                            const criarIconeSvgDiscreto = (tipo, cor) => {
+                                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                svg.setAttribute('width', '12');
+                                svg.setAttribute('height', '12');
+                                svg.setAttribute('viewBox', '0 0 16 16');
+                                svg.setAttribute('fill', 'none');
+                                svg.style.display = 'block';
+                                if (tipo === 'cadeado') {
+                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                    p.setAttribute('d', 'M5 7V5a3 3 0 0 1 6 0v2h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1zm1.5 0h3V5a1.5 1.5 0 0 0-3 0v2z');
+                                    p.setAttribute('fill', cor);
+                                    svg.appendChild(p);
+                                } else if (tipo === 'mini') {
+                                    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                                    c.setAttribute('cx', '8');
+                                    c.setAttribute('cy', '8');
+                                    c.setAttribute('r', '5.5');
+                                    c.setAttribute('stroke', cor);
+                                    c.setAttribute('stroke-width', '1.8');
+                                    const pt = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                    pt.setAttribute('d', 'M8 4.8V8l2.2 1.4');
+                                    pt.setAttribute('stroke', cor);
+                                    pt.setAttribute('stroke-width', '1.6');
+                                    pt.setAttribute('stroke-linecap', 'round');
+                                    svg.appendChild(c);
+                                    svg.appendChild(pt);
                                 } else {
-                                    btn.textContent = '📌';
-                                    btn.title = 'Fixar em todas as guias (1º clique: fixar | 2º clique: fixar + posição | 3º clique: desafixar)';
-                                    btn.style.background = 'transparent';
-                                    btn.style.color = '#94a3b8';
-                                    btn.style.boxShadow = 'none';
+                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                    p.setAttribute('d', 'M9.8 2.2 13.8 6.2l-1.1 1.1-1-.3-2.5 2.5.4 2.1-1.1 1.1-2.2-2.2-3.1 3.1-.8-.8 3.1-3.1-2.2-2.2 1.1-1.1 2.1.4 2.5-2.5-.3-1 1.1-1.1z');
+                                    p.setAttribute('fill', cor);
+                                    svg.appendChild(p);
                                 }
-                                btn.style.borderRadius = '4px';
+                                return svg;
+                            };
+
+                            const atualizarVisualBotaoFixar = (btn, modoFix, emModoDescansoConfig = false) => {
+                                if (!btn) return;
+                                btn.style.background = 'transparent';
+                                btn.style.boxShadow = 'none';
+                                btn.style.borderRadius = '3px';
+                                if (emModoDescansoConfig) {
+                                    btn.replaceChildren(criarIconeSvgDiscreto('pin', '#94a3b8'));
+                                    btn.title = 'Fixar também durante o período Ativo (volta para Cadeado Amarelo)';
+                                } else if (modoFix === 2) {
+                                    btn.replaceChildren(criarIconeSvgDiscreto('cadeado', '#94a3b8'));
+                                    btn.title = 'Posição Livre na Linha (ao desviar do mouse permanece no novo ponto; clique para fixar com retorno)';
+                                } else {
+                                    btn.replaceChildren(criarIconeSvgDiscreto('cadeado', '#facc15'));
+                                    btn.title = 'Posição Fixada com Retorno (retorna ao lugar quando o mouse sair; clique para deixar livre na linha)';
+                                }
                             };
 
                             const enviarEstadoGlobal = (patch) => {
@@ -1615,40 +2648,40 @@
                                 host.id = idHost;
                                 host.setAttribute('data-jusgov-pomodoro-bar', 'true');
                                 host.setAttribute('data-jusgov-ignore', 'true');
-                                host.style.cssText = 'position:fixed;top:8px;left:50%;right:auto;transform:translateX(-50%);z-index:2147483647;pointer-events:none;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;transition:top 0.14s ease,left 0.22s ease,transform 0.22s ease;';
+                                host.style.cssText = 'position:fixed !important;top:0px !important;bottom:auto !important;left:0px !important;right:auto !important;transform:none !important;margin:0 !important;padding:0 !important;border:0 !important;line-height:1 !important;width:auto !important;height:auto !important;z-index:2147483647 !important;pointer-events:none !important;font-family:"Segoe UI",system-ui,-apple-system,sans-serif !important;transition:left 0.16s ease,right 0.16s ease,top 0.16s ease !important;';
                                 const shadow = host.attachShadow({ mode: 'closed' });
+                                const styleAnim = document.createElement('style');
+                                styleAnim.textContent = '@keyframes jusgov-piscar-crono{0%,49%{opacity:1}50%,100%{opacity:0.22}}';
+                                shadow.appendChild(styleAnim);
                                 const pill = document.createElement('div');
-                                pill.style.cssText = 'pointer-events:auto;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:#0f172a;color:#f8fafc;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(15,23,42,0.32);border:1.5px solid #0d9488;white-space:nowrap;';
-                                const alcaMover = document.createElement('span');
-                                alcaMover.setAttribute('data-parte', 'mover');
-                                alcaMover.textContent = '⋮⋮';
-                                alcaMover.title = 'Arraste para mover verticalmente e alinhar à Esquerda, Centro ou Direita';
-                                alcaMover.style.cssText = 'cursor:grab;color:#94a3b8;font-size:13px;line-height:1;padding:0 3px;user-select:none;';
+                                pill.style.cssText = 'pointer-events:auto;display:inline-flex;flex-direction:column;align-items:stretch;gap:1px;padding:1px 6px;border-radius:7px;background:#0f172a;color:#f8fafc;font-size:11px;line-height:1.1;font-weight:600;box-shadow:0 4px 14px rgba(15,23,42,0.34);border:1px solid #0d9488;white-space:nowrap;cursor:grab;user-select:none;touch-action:none;margin:0;';
+                                const linhaPrincipal = document.createElement('div');
+                                linhaPrincipal.style.cssText = 'display:inline-flex;align-items:center;gap:5px;line-height:1.1;';
                                 const spanFase = document.createElement('span');
                                 spanFase.setAttribute('data-parte', 'fase');
+                                spanFase.style.cssText = 'font-size:11px;line-height:1.1;';
                                 const spanTempo = document.createElement('span');
                                 spanTempo.setAttribute('data-parte', 'tempo');
-                                spanTempo.style.cssText = 'font-variant-numeric:tabular-nums;font-weight:700;';
+                                spanTempo.style.cssText = 'font-variant-numeric:tabular-nums;font-weight:700;font-size:11px;line-height:1.1;';
                                 const spanStatus = document.createElement('span');
                                 spanStatus.setAttribute('data-parte', 'status');
-                                spanStatus.style.cssText = 'padding:2px 7px;border-radius:999px;font-size:11px;font-weight:700;display:none;';
+                                spanStatus.style.cssText = 'width:100%;box-sizing:border-box;text-align:center;padding:1px 5px;border-radius:4px;font-size:10px;line-height:1.15;font-weight:700;display:none;';
                                 const btnFixar = document.createElement('button');
                                 btnFixar.type = 'button';
-                                btnFixar.textContent = '📌';
-                                btnFixar.style.cssText = 'background:transparent;border:none;font-size:12px;line-height:1;cursor:pointer;padding:2px 5px;';
+                                btnFixar.style.cssText = 'background:transparent;border:none;line-height:1;cursor:pointer;padding:1px 2px;display:none;align-items:center;justify-content:center;';
                                 const btnFechar = document.createElement('button');
                                 btnFechar.type = 'button';
                                 btnFechar.textContent = '×';
-                                btnFechar.title = 'Desafixar e fechar';
-                                btnFechar.style.cssText = 'background:transparent;border:none;color:#cbd5e1;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;';
-                                pill.appendChild(alcaMover);
-                                pill.appendChild(spanFase);
-                                pill.appendChild(spanTempo);
+                                btnFechar.title = 'Ocultar durante o período Ativo (exibir só no Alívio/Descanso)';
+                                btnFechar.style.cssText = 'background:transparent;border:none;color:#cbd5e1;font-size:13px;line-height:1;cursor:pointer;padding:0 2px;display:none;';
+                                linhaPrincipal.appendChild(spanFase);
+                                linhaPrincipal.appendChild(spanTempo);
+                                linhaPrincipal.appendChild(btnFixar);
+                                linhaPrincipal.appendChild(btnFechar);
+                                pill.appendChild(linhaPrincipal);
                                 pill.appendChild(spanStatus);
-                                pill.appendChild(btnFixar);
-                                pill.appendChild(btnFechar);
                                 shadow.appendChild(pill);
-                                host.__jusgovUI = { pill, alcaMover, spanFase, spanTempo, spanStatus, btnFixar, btnFechar };
+                                host.__jusgovUI = { pill, linhaPrincipal, spanFase, spanTempo, spanStatus, btnFixar, btnFechar };
                                 host.__jusgovArrastando = false;
                                 host.__jusgovCooldownEsquiva = 0;
                                 host.__jusgovRetornoRect = null;
@@ -1657,199 +2690,248 @@
 
                                 const agendarRetornoPosicaoAncorada = () => {
                                     if (!host.__jusgovRetornoRect) return;
+                                    const dRet = host.__jusgovDados || dadosResumo;
+                                    const modoEspRet = obterModoPosicaoEspecial(dRet, Date.now());
                                     const est = host.__jusgovEstadoBarra;
-                                    if (!est || est.modoFixacao !== 2) {
+                                    if (modoEspRet !== 'aviso_topo_centro' && (!est || Number(est.modoFixacao) !== 1)) {
                                         host.__jusgovRetornoRect = null;
                                         return;
                                     }
                                     if (host.__jusgovTimerRetorno) clearTimeout(host.__jusgovTimerRetorno);
                                     host.__jusgovTimerRetorno = setTimeout(() => {
                                         host.__jusgovTimerRetorno = null;
+                                        const dAg = host.__jusgovDados || dadosResumo;
+                                        const modoEspAg = obterModoPosicaoEspecial(dAg, Date.now());
                                         const estAgora = host.__jusgovEstadoBarra;
-                                        if (!estAgora || estAgora.modoFixacao !== 2 || !host.__jusgovRetornoRect) return;
+                                        if (modoEspAg !== 'aviso_topo_centro' && (!estAgora || Number(estAgora.modoFixacao) !== 1)) return;
+                                        if (!host.__jusgovRetornoRect) return;
                                         const c = host.__jusgovUltimoCursor || { x: -9999, y: -9999 };
                                         const rOrig = host.__jusgovRetornoRect;
                                         const foraOrig = (c.x < rOrig.left - 14 || c.x > rOrig.right + 14 || c.y < rOrig.top - 14 || c.y > rOrig.bottom + 14);
                                         if (foraOrig) {
                                             host.__jusgovRetornoRect = null;
                                             host.__jusgovCooldownEsquiva = Date.now() + 260;
-                                            aplicarPosicao(host, estAgora.topAncoradoPx, estAgora.alinhamentoAncorado, estAgora.leftAncoradoPx);
+                                            if (modoEspAg === 'aviso_topo_centro') {
+                                                aplicarPosicao(host, 'superior', 'centro');
+                                            } else {
+                                                aplicarPosicao(host, estAgora.posicaoVerticalAncorada, estAgora.alinhamentoAncorado);
+                                            }
                                         }
-                                    }, 160);
+                                    }, 450);
                                 };
 
-                                /* Zona segura geométrica cobrindo padding/gap dos controles (⋮⋮, 📌/🔒, ×) para não disparar esquiva */
+                                /* Zona segura geométrica cobrindo padding/gap dos controles (cadeado/pin e ×) */
                                 const pontoEmControle = (x, y) => {
                                     const padSeg = 10;
                                     const rPill = pill.getBoundingClientRect();
-                                    const rMover = alcaMover.getBoundingClientRect();
                                     const rFixar = btnFixar.getBoundingClientRect();
                                     const rFechar = btnFechar.getBoundingClientRect();
                                     const dentroY = (rPill && rPill.width > 0) ? (y >= (rPill.top - 4) && y <= (rPill.bottom + 4)) : true;
-                                    if (rMover && rMover.width > 0 && dentroY && x <= (rMover.right + padSeg)) {
-                                        if (!rPill || x >= (rPill.left - 4)) return true;
-                                    }
                                     const dirs = [rFixar, rFechar].filter(r => r && r.width > 0);
                                     if (dirs.length > 0 && dentroY) {
                                         const minLeft = Math.min(...dirs.map(r => r.left));
                                         const maxRight = (rPill && rPill.width > 0) ? (rPill.right + 4) : (Math.max(...dirs.map(r => r.right)) + padSeg);
                                         if (x >= (minLeft - padSeg) && x <= maxRight) return true;
                                     }
-                                    return [rMover, rFixar, rFechar].some(r =>
+                                    return [rFixar, rFechar].some(r =>
                                         r && r.width > 0 &&
                                         x >= (r.left - padSeg) && x <= (r.right + padSeg) &&
                                         y >= (r.top - padSeg) && y <= (r.bottom + padSeg)
                                     );
                                 };
 
-                                const fecharPorInteracao = (origemClickBotaoX = false) => {
-                                    const estAtual = host.__jusgovEstadoBarra || estadoNorm;
-                                    if (!origemClickBotaoX && Number(estAtual.modoFixacao || 0) > 0) {
-                                        return;
-                                    }
-                                    if (origemClickBotaoX && Number(estAtual.modoFixacao || 0) > 0) {
-                                        /* Botão X sempre desafixa em todas as guias e fecha */
-                                        estAtual.modoFixacao = 0;
-                                        enviarEstadoGlobal({ modoFixacao: 0 });
-                                    }
-                                    const dadosAtuais = host.__jusgovDados || dadosResumo;
-                                    const chaveAtual = host.__jusgovChaveFase || chaveFase;
-                                    if (dadosAtuais.fase === 'foco') {
+                                btnFixar.addEventListener('click', (ev) => {
+                                    ev.stopPropagation();
+                                    const modoBarraAtual = host.__jusgovModoBarra || 'sempre';
+                                    if (modoBarraAtual === 'descanso') {
                                         try {
                                             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                                                 chrome.runtime.sendMessage({
-                                                    acao: 'FECHAR_BARRA_POMODORO_GLOBAL',
-                                                    tipo: 'foco',
-                                                    faseChave: chaveAtual
+                                                    acao: 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO',
+                                                    exibirNoAtivo: true
                                                 }).catch(() => { });
                                             }
                                         } catch (_) { }
-                                    } else {
-                                        try { sessionStorage.setItem('jusgovPomodoroBarraFechadaFaseTab', chaveAtual); } catch (_) { }
-                                        if (origemClickBotaoX) {
-                                            try {
-                                                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                                                    chrome.runtime.sendMessage({ acao: 'DISPENSAR_POMODORO_DESCANSO_CICLO' }).catch(() => { });
-                                                }
-                                            } catch (_) { }
-                                        }
+                                        return;
                                     }
-                                    destruirHost(host);
-                                };
-
-                                btnFixar.addEventListener('click', (ev) => {
-                                    ev.stopPropagation();
-                                    const estAtual = host.__jusgovEstadoBarra || estadoNorm;
-                                    const novoModo = (Number(estAtual.modoFixacao || 0) + 1) % 3;
-                                    const posAtual = host.__jusgovPos || { topPx: estAtual.topPx, alinhamento: estAtual.alinhamento, leftPx: estAtual.leftPx };
+                                    const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const novoModo = (Number(estAtual.modoFixacao) === 1) ? 2 : 1;
+                                    const posAtual = host.__jusgovPos || { posicaoVertical: estAtual.posicaoVertical, alinhamento: estAtual.alinhamento };
                                     estAtual.modoFixacao = novoModo;
-                                    if (novoModo !== 2) {
+                                    if (novoModo !== 1) {
                                         host.__jusgovRetornoRect = null;
                                         if (host.__jusgovTimerRetorno) { clearTimeout(host.__jusgovTimerRetorno); host.__jusgovTimerRetorno = null; }
                                     } else {
-                                        estAtual.topAncoradoPx = posAtual.topPx;
+                                        estAtual.posicaoVerticalAncorada = posAtual.posicaoVertical;
                                         estAtual.alinhamentoAncorado = posAtual.alinhamento;
-                                        estAtual.leftAncoradoPx = (posAtual.alinhamento === 'livre') ? posAtual.leftPx : null;
                                     }
-                                    atualizarVisualBotaoFixar(btnFixar, novoModo);
-                                    alcaMover.title = (novoModo === 2)
-                                        ? 'Arraste livremente para qualquer lugar da tela'
-                                        : 'Arraste para mover verticalmente e alinhar à Esquerda, Centro ou Direita';
+                                    atualizarVisualBotaoFixar(btnFixar, novoModo, false);
                                     enviarEstadoGlobal({
                                         modoFixacao: novoModo,
-                                        topPx: posAtual.topPx,
+                                        posicaoVertical: posAtual.posicaoVertical,
                                         alinhamento: posAtual.alinhamento,
-                                        leftPx: (posAtual.alinhamento === 'livre') ? posAtual.leftPx : null,
-                                        ancorar: (novoModo === 2)
+                                        topPx: (posAtual.posicaoVertical === 'inferior') ? 99999 : 0,
+                                        ancorar: (novoModo === 1)
                                     });
                                 });
 
                                 btnFechar.addEventListener('click', (ev) => {
                                     ev.stopPropagation();
-                                    fecharPorInteracao(true);
+                                    const dAtual = host.__jusgovDados || dadosResumo;
+                                    if (dAtual && (dAtual.emDescanso || dAtual.descansoPendente)) {
+                                        return;
+                                    }
+                                    try {
+                                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                            chrome.runtime.sendMessage({
+                                                acao: 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO',
+                                                exibirNoAtivo: false
+                                            }).catch(() => { });
+                                        }
+                                    } catch (_) { }
+                                    destruirHost(host);
                                 });
 
-                                /* Arraste: vertical + snap (Modos 0/1) ou livre em qualquer X/Y da tela quando Cadeado (Modo 2) */
-                                alcaMover.addEventListener('mousedown', (ev) => {
+                                /* Duplo clique em qualquer lugar do minipopup (exceto botões) comuta: Minimalista -> Semicompleto -> Completo -> Minimalista */
+                                pill.addEventListener('dblclick', (ev) => {
+                                    const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
+                                    if (ev.target === btnFixar || ev.target === btnFechar || path.includes(btnFixar) || path.includes(btnFechar)) {
+                                        return;
+                                    }
                                     ev.preventDefault();
                                     ev.stopPropagation();
-                                    host.__jusgovArrastando = true;
-                                    host.__jusgovRetornoRect = null;
-                                    alcaMover.style.cursor = 'grabbing';
-                                    host.style.transition = 'none';
-                                    const estDrag = host.__jusgovEstadoBarra || estadoNorm;
-                                    const modoDrag = Number(estDrag.modoFixacao || 0);
+                                    const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const atualDet = Math.floor(Number(estAtual.nivelDetalhe) || 0);
+                                    const proximoDet = (atualDet === 0) ? 1 : ((atualDet === 1) ? 2 : 0);
+                                    estAtual.nivelDetalhe = proximoDet;
+                                    if (typeof host.__jusgovAtualizarModoVisual === 'function') {
+                                        host.__jusgovAtualizarModoVisual();
+                                    }
+                                    enviarEstadoGlobal({ nivelDetalhe: proximoDet });
+                                });
+
+                                /* Arraste fluido via Pointer Events (setPointerCapture evita travar sobre iframes) com encaixe obrigatório nas 6 posições */
+                                pill.addEventListener('pointerdown', (ev) => {
+                                    if (ev.button !== 0) return;
+                                    const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
+                                    if (ev.target === btnFixar || ev.target === btnFechar || path.includes(btnFixar) || path.includes(btnFechar)) {
+                                        return;
+                                    }
+                                    ev.stopPropagation();
+                                    const pointerId = ev.pointerId;
                                     const startX = ev.clientX;
                                     const startY = ev.clientY;
                                     const startRect = pill.getBoundingClientRect();
-                                    const startTop = (host.__jusgovPos && typeof host.__jusgovPos.topPx === 'number')
-                                        ? host.__jusgovPos.topPx : (startRect ? Math.round(startRect.top) : 8);
-                                    const startLeft = (host.__jusgovPos && typeof host.__jusgovPos.leftPx === 'number')
-                                        ? host.__jusgovPos.leftPx : (startRect ? Math.round(startRect.left) : 12);
+                                    const startTop = startRect ? Math.round(startRect.top) : 0;
+                                    const startLeft = startRect ? Math.round(startRect.left) : 0;
+                                    const largPill = (startRect && startRect.width > 16) ? Math.ceil(startRect.width) : 64;
+                                    const altPill = (startRect && startRect.height > 8) ? Math.ceil(startRect.height) : 20;
+                                    const docEl = document.documentElement;
+                                    const wTela = Math.max(320, (docEl && docEl.clientWidth) || window.innerWidth || 1280);
+                                    const hTela = Math.max(200, (docEl && docEl.clientHeight) || window.innerHeight || 720);
+                                    const maxLeft = Math.max(0, wTela - largPill);
+                                    const maxTop = Math.max(0, hTela - altPill);
+                                    let iniciouArraste = false;
+                                    let ultimoCentroX = startLeft + (largPill / 2);
+                                    let ultimoCentroY = startTop + (altPill / 2);
+
                                     const onMove = (mev) => {
-                                        const novoTop = startTop + (mev.clientY - startY);
-                                        if (modoDrag === 2) {
-                                            const novoLeft = startLeft + (mev.clientX - startX);
-                                            aplicarPosicao(host, novoTop, 'livre', novoLeft);
-                                        } else {
-                                            const w = Math.max(320, window.innerWidth || 1280);
-                                            const r = Math.max(0, Math.min(1, mev.clientX / w));
-                                            const novoAlinh = (r < 0.33) ? 'esquerda' : (r > 0.66 ? 'direita' : 'centro');
-                                            aplicarPosicao(host, novoTop, novoAlinh);
+                                        const dx = mev.clientX - startX;
+                                        const dy = mev.clientY - startY;
+                                        if (!iniciouArraste && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+                                            iniciouArraste = true;
+                                            host.__jusgovArrastando = true;
+                                            host.__jusgovRetornoRect = null;
+                                            pill.style.cursor = 'grabbing';
+                                            host.style.setProperty('transition', 'none', 'important');
+                                            host.style.setProperty('bottom', 'auto', 'important');
+                                            host.style.setProperty('right', 'auto', 'important');
+                                            host.style.setProperty('transform', 'none', 'important');
+                                            try {
+                                                if (typeof pill.setPointerCapture === 'function') pill.setPointerCapture(pointerId);
+                                            } catch (_) { }
                                         }
+                                        if (!iniciouArraste) return;
+                                        const novoLeft = Math.max(0, Math.min(maxLeft, Math.round(startLeft + dx)));
+                                        const novoTop = Math.max(0, Math.min(maxTop, Math.round(startTop + dy)));
+                                        host.style.setProperty('left', `${novoLeft}px`, 'important');
+                                        host.style.setProperty('top', `${novoTop}px`, 'important');
+                                        ultimoCentroX = novoLeft + (largPill / 2);
+                                        ultimoCentroY = novoTop + (altPill / 2);
                                     };
-                                    const onUp = () => {
-                                        host.__jusgovArrastando = false;
-                                        alcaMover.style.cursor = 'grab';
-                                        host.style.transition = 'top 0.14s ease,left 0.22s ease,transform 0.22s ease';
+                                    const finalizarArraste = () => {
+                                        pill.removeEventListener('pointermove', onMove);
+                                        pill.removeEventListener('pointerup', finalizarArraste);
+                                        pill.removeEventListener('pointercancel', finalizarArraste);
                                         document.removeEventListener('mousemove', onMove, true);
-                                        document.removeEventListener('mouseup', onUp, true);
-                                        if (host.__jusgovPos) {
-                                            const estAtual = host.__jusgovEstadoBarra || estadoNorm;
-                                            const modoAtual = Number(estAtual.modoFixacao || 0);
-                                            if (modoAtual === 2) {
-                                                estAtual.topAncoradoPx = host.__jusgovPos.topPx;
-                                                estAtual.alinhamentoAncorado = host.__jusgovPos.alinhamento;
-                                                estAtual.leftAncoradoPx = host.__jusgovPos.leftPx ?? null;
+                                        document.removeEventListener('mouseup', finalizarArraste, true);
+                                        window.removeEventListener('blur', finalizarArraste);
+                                        try {
+                                            if (typeof pill.releasePointerCapture === 'function' && pill.hasPointerCapture(pointerId)) {
+                                                pill.releasePointerCapture(pointerId);
                                             }
-                                            enviarEstadoGlobal({
-                                                topPx: host.__jusgovPos.topPx,
-                                                alinhamento: host.__jusgovPos.alinhamento,
-                                                leftPx: host.__jusgovPos.alinhamento === 'livre' ? host.__jusgovPos.leftPx : null,
-                                                ancorar: (modoAtual === 2)
-                                            });
-                                        }
+                                        } catch (_) { }
+                                        if (!iniciouArraste) return;
+                                        host.__jusgovArrastando = false;
+                                        pill.style.cursor = 'grab';
+                                        host.style.setProperty('transition', 'left 0.16s ease,right 0.16s ease,top 0.16s ease', 'important');
+                                        const rx = Math.max(0, Math.min(1, ultimoCentroX / wTela));
+                                        const ry = Math.max(0, Math.min(1, ultimoCentroY / hTela));
+                                        const posVertFinal = (ry < 0.5) ? 'superior' : 'inferior';
+                                        const alinhFinal = (rx < 0.33) ? 'esquerda' : (rx > 0.66 ? 'direita' : 'centro');
+                                        aplicarPosicao(host, posVertFinal, alinhFinal);
+                                        const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                        estAtual.posicaoVertical = posVertFinal;
+                                        estAtual.alinhamento = alinhFinal;
+                                        estAtual.posicaoVerticalAncorada = posVertFinal;
+                                        estAtual.alinhamentoAncorado = alinhFinal;
+                                        enviarEstadoGlobal({
+                                            posicaoVertical: posVertFinal,
+                                            alinhamento: alinhFinal,
+                                            topPx: (posVertFinal === 'inferior') ? 99999 : 0,
+                                            ancorar: true
+                                        });
                                     };
+                                    pill.addEventListener('pointermove', onMove);
+                                    pill.addEventListener('pointerup', finalizarArraste);
+                                    pill.addEventListener('pointercancel', finalizarArraste);
                                     document.addEventListener('mousemove', onMove, true);
-                                    document.addEventListener('mouseup', onUp, true);
+                                    document.addEventListener('mouseup', finalizarArraste, true);
+                                    window.addEventListener('blur', finalizarArraste);
                                 });
 
-                                /* Esquiva inteligente passando pelo centro (respeitando zonas seguras dos botões) */
+                                /* Esquiva inteligente na mesma linha horizontal (com 1s de tolerância inicial e zonas seguras dos botões) */
                                 pill.addEventListener('mousemove', (ev) => {
-                                    if (host.__jusgovArrastando || Date.now() < (host.__jusgovCooldownEsquiva || 0)) return;
+                                    const agoraMov = Date.now();
+                                    if (!host.__jusgovHoverInicioTs) {
+                                        host.__jusgovHoverInicioTs = agoraMov;
+                                    }
+                                    if (host.__jusgovArrastando || agoraMov < (host.__jusgovCooldownEsquiva || 0)) return;
                                     const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
-                                    if (ev.target === btnFechar || ev.target === btnFixar || ev.target === alcaMover ||
-                                        path.includes(btnFechar) || path.includes(btnFixar) || path.includes(alcaMover) ||
+                                    if (ev.target === btnFechar || ev.target === btnFixar ||
+                                        path.includes(btnFechar) || path.includes(btnFixar) ||
                                         pontoEmControle(ev.clientX, ev.clientY)) {
+                                        host.__jusgovHoverInicioTs = agoraMov;
+                                        return;
+                                    }
+                                    if ((agoraMov - host.__jusgovHoverInicioTs) < 1000) {
                                         return;
                                     }
                                     const rect = pill.getBoundingClientRect();
                                     if (!rect || rect.width <= 0) return;
-                                    const posAtual = host.__jusgovPos || { topPx: 8, alinhamento: 'centro', leftPx: null };
-                                    const wTela = Math.max(320, window.innerWidth || 1280);
+                                    const posAtual = host.__jusgovPos || { posicaoVertical: 'superior', alinhamento: 'esquerda' };
+                                    if (posAtual.posicaoVertical === 'centro_tela') return;
                                     const centro = rect.left + (rect.width / 2);
                                     let ladoDestino = 'centro';
                                     if (posAtual.alinhamento === 'centro') {
                                         ladoDestino = (ev.clientX < centro) ? 'direita' : 'esquerda';
-                                    } else if (posAtual.alinhamento === 'livre') {
-                                        const ratio = centro / wTela;
-                                        ladoDestino = (ratio < 0.35 || ratio > 0.65)
-                                            ? 'centro'
-                                            : ((ev.clientX < centro) ? 'direita' : 'esquerda');
                                     }
                                     if (posAtual.alinhamento !== ladoDestino) {
-                                        const estAtual = host.__jusgovEstadoBarra || estadoNorm;
-                                        if (Number(estAtual.modoFixacao || 0) === 2 && !host.__jusgovRetornoRect) {
+                                        const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                        const dEsquiva = host.__jusgovDados || dadosResumo;
+                                        const modoEspEsq = obterModoPosicaoEspecial(dEsquiva, agoraMov);
+                                        const usaRetornoAmarelo = (modoEspEsq === 'aviso_topo_centro' || Number(estAtual.modoFixacao || 1) === 1);
+                                        if (usaRetornoAmarelo && !host.__jusgovRetornoRect) {
                                             host.__jusgovRetornoRect = {
                                                 left: rect.left,
                                                 right: rect.right,
@@ -1857,17 +2939,461 @@
                                                 bottom: rect.bottom
                                             };
                                         }
-                                        host.__jusgovCooldownEsquiva = Date.now() + 280;
-                                        aplicarPosicao(host, posAtual.topPx, ladoDestino);
-                                        if (Number(estAtual.modoFixacao || 0) !== 2) {
-                                            enviarEstadoGlobal({ topPx: posAtual.topPx, alinhamento: ladoDestino });
+                                        host.__jusgovCooldownEsquiva = agoraMov + 280;
+                                        host.__jusgovHoverInicioTs = 0;
+                                        aplicarPosicao(host, posAtual.posicaoVertical, ladoDestino);
+                                        if (!usaRetornoAmarelo) {
+                                            enviarEstadoGlobal({
+                                                posicaoVertical: posAtual.posicaoVertical,
+                                                alinhamento: ladoDestino,
+                                                topPx: (posAtual.posicaoVertical === 'inferior') ? 99999 : 0
+                                            });
                                         }
                                     }
                                 });
 
+                                pill.addEventListener('mouseenter', () => {
+                                    host.__jusgovHoverPill = true;
+                                    host.__jusgovHoverInicioTs = Date.now();
+                                    if (typeof host.__jusgovAtualizarModoVisual === 'function') {
+                                        host.__jusgovAtualizarModoVisual();
+                                    } else if (typeof host.__jusgovAtualizarBadgeStatus === 'function') {
+                                        host.__jusgovAtualizarBadgeStatus();
+                                    }
+                                });
+                                pill.addEventListener('mouseleave', () => {
+                                    host.__jusgovHoverPill = false;
+                                    host.__jusgovHoverInicioTs = 0;
+                                    if (typeof host.__jusgovAtualizarModoVisual === 'function') {
+                                        host.__jusgovAtualizarModoVisual();
+                                    } else if (typeof host.__jusgovAtualizarBadgeStatus === 'function') {
+                                        host.__jusgovAtualizarBadgeStatus();
+                                    }
+                                });
+
+                                const pararScreensaver = () => {
+                                    host.__jusgovScreensaverAtivo = false;
+                                    if (host.__jusgovScreensaverRaf) {
+                                        cancelAnimationFrame(host.__jusgovScreensaverRaf);
+                                        host.__jusgovScreensaverRaf = 0;
+                                    }
+                                    host.style.setProperty('transition', 'left 0.16s ease,right 0.16s ease,top 0.16s ease', 'important');
+                                };
+                                host.__jusgovPararScreensaver = pararScreensaver;
+
+                                const iniciarScreensaver = () => {
+                                    if (document.hidden || host.__jusgovArrastando) {
+                                        pararScreensaver();
+                                        return;
+                                    }
+                                    if (host.__jusgovScreensaverAtivo && host.__jusgovScreensaverRaf) return;
+                                    host.__jusgovScreensaverAtivo = true;
+                                    host.style.setProperty('transition', 'none', 'important');
+                                    host.style.setProperty('bottom', 'auto', 'important');
+                                    host.style.setProperty('right', 'auto', 'important');
+                                    host.style.setProperty('transform', 'none', 'important');
+
+                                    const docEl = document.documentElement;
+                                    const wInit = Math.max(320, (docEl && docEl.clientWidth) || window.innerWidth || 1280);
+                                    const hInit = Math.max(200, (docEl && docEl.clientHeight) || window.innerHeight || 720);
+                                    const rectIni = pill.getBoundingClientRect();
+                                    const pillWIni = (rectIni && rectIni.width > 20) ? Math.ceil(rectIni.width) : 140;
+                                    const pillHIni = (rectIni && rectIni.height > 10) ? Math.ceil(rectIni.height) : 34;
+                                    let sx = Math.max(0, Math.min(Math.max(0, wInit - pillWIni), Math.round((wInit - pillWIni) / 2)));
+                                    let sy = Math.max(0, Math.min(Math.max(0, hInit - pillHIni), Math.round((hInit - pillHIni) / 2)));
+                                    const angDegBases = [32, 52, 128, 148, 212, 232, 308, 328];
+                                    const angRad = (angDegBases[Math.floor(Math.random() * angDegBases.length)] + (Math.random() * 10 - 5)) * (Math.PI / 180);
+                                    const velBase = 120;
+                                    let vx = Math.cos(angRad) * velBase;
+                                    let vy = Math.sin(angRad) * velBase;
+                                    let ultimoTs = performance.now();
+
+                                    const passo = (tsNow) => {
+                                        if (!host.__jusgovScreensaverAtivo || !host.isConnected || document.hidden || host.__jusgovArrastando) {
+                                            pararScreensaver();
+                                            return;
+                                        }
+                                        const dt = Math.min(0.06, Math.max(0.005, (tsNow - ultimoTs) / 1000));
+                                        ultimoTs = tsNow;
+                                        const dEl = document.documentElement;
+                                        const wT = Math.max(320, (dEl && dEl.clientWidth) || window.innerWidth || 1280);
+                                        const hT = Math.max(200, (dEl && dEl.clientHeight) || window.innerHeight || 720);
+                                        const rP = pill.getBoundingClientRect();
+                                        const pW = (rP && rP.width > 20) ? Math.ceil(rP.width) : pillWIni;
+                                        const pH = (rP && rP.height > 10) ? Math.ceil(rP.height) : pillHIni;
+                                        const maxX = Math.max(0, wT - pW);
+                                        const maxY = Math.max(0, hT - pH);
+
+                                        sx += vx * dt;
+                                        sy += vy * dt;
+                                        let bateu = false;
+                                        if (sx <= 0) { sx = 0; vx = Math.abs(vx); bateu = true; }
+                                        else if (sx >= maxX) { sx = maxX; vx = -Math.abs(vx); bateu = true; }
+                                        if (sy <= 0) { sy = 0; vy = Math.abs(vy); bateu = true; }
+                                        else if (sy >= maxY) { sy = maxY; vy = -Math.abs(vy); bateu = true; }
+                                        if (bateu) {
+                                            const deltaAng = (Math.random() * 0.24) - 0.12;
+                                            const ca = Math.cos(deltaAng);
+                                            const sa = Math.sin(deltaAng);
+                                            const nvx = vx * ca - vy * sa;
+                                            const nvy = vx * sa + vy * ca;
+                                            if (Math.abs(nvx) > 35 && Math.abs(nvy) > 35) {
+                                                vx = nvx;
+                                                vy = nvy;
+                                            }
+                                        }
+                                        host.style.setProperty('left', `${Math.round(sx)}px`, 'important');
+                                        host.style.setProperty('top', `${Math.round(sy)}px`, 'important');
+                                        host.__jusgovScreensaverRaf = requestAnimationFrame(passo);
+                                    };
+                                    host.style.setProperty('left', `${sx}px`, 'important');
+                                    host.style.setProperty('top', `${sy}px`, 'important');
+                                    host.__jusgovScreensaverRaf = requestAnimationFrame(passo);
+                                };
+                                host.__jusgovIniciarScreensaver = iniciarScreensaver;
+
+                                const tocarBeepConclusao = (intensidade = 'suave') => {
+                                    try {
+                                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                                        if (!AudioCtx) return;
+                                        if (!host.__jusgovAudioCtx) {
+                                            host.__jusgovAudioCtx = new AudioCtx();
+                                        }
+                                        const ctx = host.__jusgovAudioCtx;
+                                        if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+                                            ctx.resume().catch(() => { });
+                                        }
+                                        const t0 = ctx.currentTime + 0.01;
+                                        const emitirNota = (freq, iniOffset, dur, ganhoMax, tipo = 'sine') => {
+                                            const osc = ctx.createOscillator();
+                                            const gain = ctx.createGain();
+                                            osc.type = tipo;
+                                            osc.frequency.setValueAtTime(freq, t0 + iniOffset);
+                                            gain.gain.setValueAtTime(0.0001, t0 + iniOffset);
+                                            gain.gain.exponentialRampToValueAtTime(ganhoMax, t0 + iniOffset + 0.02);
+                                            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + iniOffset + dur);
+                                            osc.connect(gain);
+                                            gain.connect(ctx.destination);
+                                            osc.start(t0 + iniOffset);
+                                            osc.stop(t0 + iniOffset + dur + 0.02);
+                                        };
+                                        if (intensidade === 'grave') {
+                                            emitirNota(987, 0, 0.11, 0.16, 'triangle');
+                                            emitirNota(740, 0.13, 0.13, 0.16, 'triangle');
+                                        } else if (intensidade === 'moderado') {
+                                            emitirNota(740, 0, 0.09, 0.11, 'sine');
+                                            emitirNota(880, 0.11, 0.11, 0.11, 'sine');
+                                        } else {
+                                            emitirNota(523.25, 0, 0.14, 0.06, 'sine');
+                                        }
+                                    } catch (_) { }
+                                };
+                                host.__jusgovTocarBeep = tocarBeepConclusao;
+
+                                host.__jusgovGarantirBackdropBlur = garantirBackdropBlur;
+                                host.__jusgovRemoverBackdropBlur = removerBackdropBlur;
+
+                                const atualizarPosicaoEfetivaPill = (agoraPos = Date.now()) => {
+                                    if (host.__jusgovArrastando || host.__jusgovRetornoRect) return;
+                                    const dPos = host.__jusgovDados || dadosResumo;
+                                    const estPos = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const modoEsp = obterModoPosicaoEspecial(dPos, agoraPos);
+                                    if (modoEsp === 'idle_centro_tela') {
+                                        garantirBackdropBlur();
+                                        iniciarScreensaver();
+                                        host.__jusgovPos = { posicaoVertical: 'centro_tela', alinhamento: 'centro', topPx: 0 };
+                                        return;
+                                    }
+                                    if (modoEsp === 'aviso_movimento_centro_blur') {
+                                        garantirBackdropBlur();
+                                        pararScreensaver();
+                                        if (!host.__jusgovPos || host.__jusgovPos.posicaoVertical !== 'centro_tela' || host.style.transform !== 'translate(-50%, -50%)') {
+                                            aplicarPosicao(host, 'centro_tela', 'centro');
+                                        }
+                                        return;
+                                    }
+                                    removerBackdropBlur();
+                                    pararScreensaver();
+                                    if (modoEsp === 'aviso_topo_centro') {
+                                        if (!host.__jusgovPos || host.__jusgovPos.posicaoVertical !== 'superior' || host.__jusgovPos.alinhamento !== 'centro') {
+                                            aplicarPosicao(host, 'superior', 'centro');
+                                        }
+                                        return;
+                                    }
+                                    const posVertAlvo = (Number(estPos.modoFixacao) === 1) ? estPos.posicaoVerticalAncorada : estPos.posicaoVertical;
+                                    const alinhAlvo = (Number(estPos.modoFixacao) === 1) ? estPos.alinhamentoAncorado : estPos.alinhamento;
+                                    if (!host.__jusgovPos || host.__jusgovPos.posicaoVertical !== posVertAlvo || host.__jusgovPos.alinhamento !== alinhAlvo) {
+                                        aplicarPosicao(host, posVertAlvo, alinhAlvo);
+                                    }
+                                };
+
+                                const atualizarBadgeStatus = () => {
+                                    const d = host.__jusgovDados || dadosResumo;
+                                    const agoraNow = (host.__jusgovSnapshotAgoraSrvMs && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage)
+                                        ? Number(host.__jusgovSnapshotAgoraSrvMs)
+                                        : (Date.now() + Number(host.__jusgovRelogioOffsetMs || 0));
+                                    const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const nivelDet = Math.floor(Number(estAtual.nivelDetalhe) || 0);
+                                    if (host.__jusgovArrastando) {
+                                        spanStatus.style.display = 'none';
+                                        return;
+                                    }
+                                    const metaMs = Math.max(1, Number((d && d.metaFaseMin) || 1)) * 60000;
+                                    const cumpridoAoVivo = Boolean(d && d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
+
+                                    if (d.emDescanso && !cumpridoAoVivo && d.descansoEmAviso && d.descansoAvisoTexto) {
+                                        pill.style.borderColor = '#eab308';
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = d.descansoAvisoTexto;
+                                        spanStatus.style.background = '#f59e0b';
+                                        spanStatus.style.color = '#111827';
+                                        spanStatus.style.fontWeight = '700';
+                                        return;
+                                    }
+                                    if (d.emDescanso && cumpridoAoVivo) {
+                                        pill.style.borderColor = '#16a34a';
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = 'Concluído!';
+                                        spanStatus.style.background = '#16a34a';
+                                        spanStatus.style.color = '#ffffff';
+                                        spanStatus.style.fontWeight = '700';
+                                        return;
+                                    }
+                                    if (d.emDescanso && !d.aguardandoOciosidade) {
+                                        pill.style.borderColor = '#0284c7';
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = 'Em andamento...';
+                                        spanStatus.style.background = 'rgba(2, 132, 199, 0.2)';
+                                        spanStatus.style.color = '#bae6fd';
+                                        spanStatus.style.fontWeight = '600';
+                                        return;
+                                    }
+                                    if (d.descansoPendente || (d.emDescanso && d.aguardandoOciosidade)) {
+                                        pill.style.borderColor = '#dc2626';
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = 'Pendente...';
+                                        spanStatus.style.background = '#dc2626';
+                                        spanStatus.style.color = '#ffffff';
+                                        spanStatus.style.fontWeight = '700';
+                                        return;
+                                    }
+                                    pill.style.borderColor = '#0d9488';
+                                    if (nivelDet === 2) {
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = d.ultimoDescansoTexto || 'Sem descansos anteriores';
+                                        spanStatus.style.background = 'transparent';
+                                        spanStatus.style.color = '#cbd5e1';
+                                        spanStatus.style.fontWeight = '500';
+                                        return;
+                                    }
+                                    spanStatus.style.display = 'none';
+                                    spanStatus.textContent = '';
+                                };
+                                host.__jusgovAtualizarBadgeStatus = atualizarBadgeStatus;
+
+                                const atualizarModoVisualPill = () => {
+                                    const d = host.__jusgovDados || dadosResumo;
+                                    const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const nivelDet = Math.floor(Number(estAtual.nivelDetalhe) || 0);
+                                    const temAvisoOuDescanso = Boolean(d && (d.emDescanso || d.descansoPendente || d.descansoEmAviso));
+                                    if (host.__jusgovArrastando) {
+                                        pill.style.padding = '1px 6px';
+                                        pill.style.borderRadius = '7px';
+                                        spanFase.style.display = 'none';
+                                        spanTempo.style.display = 'inline-block';
+                                        btnFixar.style.display = 'none';
+                                        btnFechar.style.display = 'none';
+                                        spanStatus.style.display = 'none';
+                                        return;
+                                    }
+                                    pill.style.padding = '1px 6px';
+                                    pill.style.borderRadius = '7px';
+                                    const faseCurtaAtual = (d && d.fase === 'pausa_maior') ? 'Descanso' : `${(d && d.faseLabel) || 'Foco'} ${(d && d.cicloAtual) || 1}/${(d && d.ciclosMax) || 4}`;
+                                    spanFase.textContent = `🍅 ${faseCurtaAtual}`;
+                                    spanFase.style.display = (temAvisoOuDescanso || nivelDet >= 1) ? 'inline-block' : 'none';
+                                    spanTempo.style.display = 'inline-block';
+                                    btnFixar.style.display = host.__jusgovHoverPill ? 'inline-flex' : 'none';
+                                    btnFechar.style.display = (host.__jusgovHoverPill && !d.emDescanso && !d.descansoPendente) ? 'inline-block' : 'none';
+                                    atualizarBadgeStatus();
+                                };
+                                host.__jusgovAtualizarModoVisual = atualizarModoVisualPill;
+
+                                /* Renderização pura a partir do snapshot externo compartilhado pelo Service Worker (sem contadores locais) */
+                                const atualizarRelogio = () => {
+                                    const d = host.__jusgovDados || dadosResumo;
+                                    if (!d) return;
+                                    const agoraNow = (host.__jusgovSnapshotAgoraSrvMs && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage)
+                                        ? Number(host.__jusgovSnapshotAgoraSrvMs)
+                                        : (Date.now() + Number(host.__jusgovRelogioOffsetMs || 0));
+
+                                    if (d.emDescanso) {
+                                        const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
+                                        const cumpridoAoVivo = Boolean(d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs);
+
+                                        if (d.aguardandoOciosidade) {
+                                            const mmParado = String(Math.max(0, Number(d.metaFaseMin || 0))).padStart(2, '0');
+                                            spanTempo.textContent = `-${mmParado}:00`;
+                                        } else {
+                                            const diffMs = metaMs - Number(d.descansoAcumuladoMs || 0);
+                                            if (diffMs > 0) {
+                                                const diffSeg = Math.ceil(diffMs / 1000);
+                                                const mm = String(Math.floor(diffSeg / 60)).padStart(2, '0');
+                                                const ss = String(diffSeg % 60).padStart(2, '0');
+                                                spanTempo.textContent = `-${mm}:${ss}`;
+                                            } else {
+                                                const extraSeg = Math.max(0, Math.floor(Math.abs(diffMs) / 1000));
+                                                const mm = String(Math.floor(extraSeg / 60)).padStart(2, '0');
+                                                const ss = String(extraSeg % 60).padStart(2, '0');
+                                                spanTempo.textContent = `+${mm}:${ss}`;
+                                            }
+                                        }
+
+                                        if (cumpridoAoVivo && !document.hidden) {
+                                            const cfgBeep = host.__jusgovConfigBeep || {};
+                                            if (cfgBeep.ativo && cfgBeep.permitirBeep) {
+                                                const ultimoBeep = Number(host.__jusgovUltimoBeepTs || 0);
+                                                if (ultimoBeep === 0 || (agoraNow - ultimoBeep) >= Math.max(5000, Number(cfgBeep.intervaloMs || 15000))) {
+                                                    host.__jusgovUltimoBeepTs = agoraNow;
+                                                    tocarBeepConclusao(cfgBeep.intensidade || 'suave');
+                                                }
+                                            }
+                                        } else if (!cumpridoAoVivo) {
+                                            host.__jusgovUltimoBeepTs = 0;
+                                        }
+
+                                        spanTempo.style.color = '';
+                                        spanTempo.style.animation = 'none';
+                                        atualizarPosicaoEfetivaPill(agoraNow);
+                                        atualizarModoVisualPill();
+                                        return;
+                                    }
+
+                                    host.__jusgovUltimoBeepTs = 0;
+                                    /* Contador de Ativo/Foco é progressivo (+00:00 -> +meta); nos últimos 30s antes do descanso pisca em amarelo */
+                                    const segFoco = (typeof d.segundosDecorridos === 'number' && Number.isFinite(d.segundosDecorridos))
+                                        ? Math.max(0, Math.floor(d.segundosDecorridos))
+                                        : (d.emPausa
+                                            ? Math.max(0, Number(d.minutosNaFase || 0) * 60)
+                                            : Math.max(0, Math.floor((agoraNow - Number(d.focoAnchorTs || d.faseInicioTs || agoraNow)) / 1000)));
+                                    const mm = String(Math.floor(segFoco / 60)).padStart(2, '0');
+                                    const ss = String(segFoco % 60).padStart(2, '0');
+                                    spanTempo.textContent = `+${mm}:${ss}`;
+                                    const metaFocoSeg = Math.max(1, Number(d.metaFaseMin || d.focoMin || 25)) * 60;
+                                    const segRestFoco = metaFocoSeg - segFoco;
+                                    const emAlerta30s = Boolean(!d.descansoPendente && !d.emPausa && segRestFoco > 0 && segRestFoco <= 30);
+                                    spanTempo.style.color = emAlerta30s ? '#facc15' : '';
+                                    spanTempo.style.animation = emAlerta30s ? 'jusgov-piscar-crono 1s steps(1,end) infinite' : 'none';
+                                    atualizarPosicaoEfetivaPill(agoraNow);
+                                    atualizarModoVisualPill();
+                                };
+                                host.__jusgovAtualizarRelogio = atualizarRelogio;
+
+                                const aplicarSnapshotExterno = (novaCfgExib, novoResumo, novoEstadoBarra) => {
+                                    gerenciarModalDescanso(Boolean(novaCfgExib && novaCfgExib.deveExibirModalDescanso), novaCfgExib && novaCfgExib.modalDados);
+                                    const exib = resolverPermissaoExibicao(host, novaCfgExib, novoResumo);
+                                    if (!exib.deveExibir) {
+                                        destruirHost(host);
+                                        return;
+                                    }
+                                    const estNorm = normalizarEstadoBarra(novoEstadoBarra);
+                                    const agoraLocal = Date.now();
+                                    const agoraSrv = (novaCfgExib && novaCfgExib.agoraServidor) ? Number(novaCfgExib.agoraServidor) : agoraLocal;
+                                    host.__jusgovChaveFase = exib.chave;
+                                    host.__jusgovDados = novoResumo;
+                                    host.__jusgovSnapshotAgoraSrvMs = agoraSrv;
+                                    host.__jusgovRelogioOffsetMs = (novaCfgExib && novaCfgExib.agoraServidor) ? (agoraSrv - agoraLocal) : 0;
+                                    const tooltipAtivo = (novaCfgExib && novaCfgExib.tooltipTexto) || (novoResumo && novoResumo.tooltipTexto) || '';
+                                    if (tooltipAtivo) {
+                                        pill.title = tooltipAtivo;
+                                    } else {
+                                        pill.removeAttribute('title');
+                                    }
+                                    host.__jusgovEstadoBarra = estNorm;
+                                    host.__jusgovModoBarra = (novaCfgExib && novaCfgExib.modoBarra) || 'sempre';
+                                    host.__jusgovConfigBeep = {
+                                        ativo: Boolean(novaCfgExib && novaCfgExib.beepAtivo),
+                                        intensidade: (novaCfgExib && novaCfgExib.beepIntensidade) || 'suave',
+                                        intervaloMs: Math.max(5000, Number((novaCfgExib && novaCfgExib.beepIntervaloMs) || 15000)),
+                                        permitirBeep: Boolean(novaCfgExib && novaCfgExib.permitirBeep)
+                                    };
+                                    if (Number(estNorm.modoFixacao) !== 1 && !(novoResumo && novoResumo.emDescanso && novoResumo.descansoEmAviso)) {
+                                        host.__jusgovRetornoRect = null;
+                                    }
+                                    atualizarVisualBotaoFixar(btnFixar, estNorm.modoFixacao, host.__jusgovModoBarra === 'descanso');
+                                    atualizarRelogio();
+                                    if (!document.hidden && !host.__jusgovTimerInterval) {
+                                        host.__jusgovTimerInterval = setInterval(solicitarSincronizacaoExterna, 1000);
+                                    }
+                                };
+                                host.__jusgovAplicarSnapshotExterno = aplicarSnapshotExterno;
+
+                                const solicitarSincronizacaoExterna = () => {
+                                    if (document.hidden || !host.isConnected || host.__jusgovSyncEmVoo) return;
+                                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                        host.__jusgovSyncEmVoo = true;
+                                        chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }).then((resp) => {
+                                            host.__jusgovSyncEmVoo = false;
+                                            if (resp && resp.ok && resp.resumoPomodoro && resp.cfgExib && host.isConnected) {
+                                                const cfgComTs = Object.assign({}, resp.cfgExib, { agoraServidor: resp.agoraServidor || Date.now() });
+                                                aplicarSnapshotExterno(cfgComTs, resp.resumoPomodoro, resp.estadoBarra || host.__jusgovEstadoBarra);
+                                            }
+                                        }).catch(() => {
+                                            host.__jusgovSyncEmVoo = false;
+                                        });
+                                        return;
+                                    }
+                                    atualizarRelogio();
+                                };
+
+                                const enviarInteracaoExterna = (tipoInteracao = 'movimento') => {
+                                    const d = host.__jusgovDados;
+                                    if (!d) return;
+                                    const agoraLoc = Date.now();
+                                    const precisaPingImediato = Boolean(tipoInteracao === 'click_ou_tecla');
+                                    if (d.emDescanso) {
+                                        const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
+                                        const cumpridoAgora = Boolean(d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs);
+                                        pararScreensaver();
+                                        if (cumpridoAgora || tipoInteracao === 'click_ou_tecla') {
+                                            removerBackdropBlur();
+                                        } else {
+                                            garantirBackdropBlur();
+                                            aplicarPosicao(host, 'centro_tela', 'centro');
+                                        }
+                                        if (tipoInteracao === 'movimento' && (agoraLoc - Number(host.__jusgovUltimoPingDescTs || 0)) < 150) {
+                                            return;
+                                        }
+                                        host.__jusgovUltimoPingDescTs = agoraLoc;
+                                    } else if (!precisaPingImediato) {
+                                        if ((agoraLoc - Number(host.__jusgovUltimoPingAtivTs || 0)) < 15000) {
+                                            return;
+                                        }
+                                        host.__jusgovUltimoPingAtivTs = agoraLoc;
+                                    }
+                                    try {
+                                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                            chrome.runtime.sendMessage({
+                                                acao: 'PING_ATIVIDADE_TRABALHO',
+                                                tipoInteracao,
+                                                retornarSnapshot: true
+                                            }).then((resp) => {
+                                                if (resp && resp.ok && resp.resumoPomodoro && resp.cfgExib && host.isConnected) {
+                                                    const cfgComTs = Object.assign({}, resp.cfgExib, { agoraServidor: resp.agoraServidor || Date.now() });
+                                                    aplicarSnapshotExterno(cfgComTs, resp.resumoPomodoro, resp.estadoBarra || host.__jusgovEstadoBarra);
+                                                }
+                                            }).catch(() => { });
+                                        }
+                                    } catch (_) { }
+                                };
+
                                 /* Retorno automático quando no modo 2 (posição fixada) o mouse sai da área original */
                                 const onDocMouseMovePos = (ev) => {
+                                    const ultimo = host.__jusgovUltimoCursor || { x: -9999, y: -9999 };
+                                    const moveuDeVerdade = ultimo.x !== -9999 && (Math.abs(ev.clientX - ultimo.x) > 1 || Math.abs(ev.clientY - ultimo.y) > 1);
                                     host.__jusgovUltimoCursor = { x: ev.clientX, y: ev.clientY };
+                                    if (moveuDeVerdade) {
+                                        enviarInteracaoExterna('movimento');
+                                    }
                                     if (!host.__jusgovRetornoRect) return;
                                     const rOrig = host.__jusgovRetornoRect;
                                     const foraOrig = (
@@ -1889,85 +3415,119 @@
                                         agendarRetornoPosicaoAncorada();
                                     }
                                 };
+                                const onDocWheelPos = () => {
+                                    enviarInteracaoExterna('movimento');
+                                };
 
-                                /* Auto-fechar ao pressionar tecla ou clicar com o mouse (apenas se modoFixacao === 0) */
+                                /* Interação do usuário: notifica estado externo */
                                 const onDocInteracao = (ev) => {
-                                    const estAtual = host.__jusgovEstadoBarra || estadoNorm;
-                                    if (host.__jusgovArrastando || Number(estAtual.modoFixacao || 0) > 0) return;
+                                    if (ev.type === 'keydown' && ev.repeat) return;
                                     const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
-                                    if (ev.target === host || path.includes(host) || path.includes(pill)) {
-                                        return;
+                                    const naPropriaBarra = (ev.target === host || path.includes(host) || path.includes(pill));
+                                    if (!naPropriaBarra) {
+                                        enviarInteracaoExterna('click_ou_tecla');
                                     }
-                                    fecharPorInteracao(false);
+                                };
+                                const onDocVisibilityChange = () => {
+                                    if (document.hidden) {
+                                        removerBackdropBlur();
+                                        pararScreensaver();
+                                        if (host.__jusgovTimerInterval) {
+                                            clearInterval(host.__jusgovTimerInterval);
+                                            host.__jusgovTimerInterval = 0;
+                                        }
+                                    } else {
+                                        solicitarSincronizacaoExterna();
+                                        if (!host.__jusgovTimerInterval) {
+                                            host.__jusgovTimerInterval = setInterval(solicitarSincronizacaoExterna, 1000);
+                                        }
+                                        try {
+                                            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                                chrome.runtime.sendMessage({ acao: 'SINCRONIZAR_GUIA_ATIVA_POMODORO' }).catch(() => { });
+                                            }
+                                        } catch (_) { }
+                                    }
                                 };
                                 document.addEventListener('keydown', onDocInteracao, { capture: true, passive: true });
                                 document.addEventListener('mousedown', onDocInteracao, { capture: true, passive: true });
                                 document.addEventListener('mousemove', onDocMouseMovePos, { capture: true, passive: true });
+                                document.addEventListener('wheel', onDocWheelPos, { capture: true, passive: true });
                                 document.addEventListener('mouseleave', onDocMouseLeavePos, { capture: false, passive: true });
+                                document.addEventListener('visibilitychange', onDocVisibilityChange, { capture: false, passive: true });
                                 host.__jusgovCleanupListeners = () => {
                                     document.removeEventListener('keydown', onDocInteracao, { capture: true });
                                     document.removeEventListener('mousedown', onDocInteracao, { capture: true });
                                     document.removeEventListener('mousemove', onDocMouseMovePos, { capture: true });
+                                    document.removeEventListener('wheel', onDocWheelPos, { capture: true });
                                     document.removeEventListener('mouseleave', onDocMouseLeavePos, { capture: false });
+                                    document.removeEventListener('visibilitychange', onDocVisibilityChange, { capture: false });
                                 };
 
                                 (document.body || document.documentElement).appendChild(host);
                             }
 
-                            host.__jusgovChaveFase = chaveFase;
-                            host.__jusgovDados = dadosResumo;
-                            host.__jusgovEstadoBarra = estadoNorm;
-                            if (estadoNorm.modoFixacao !== 2) {
-                                host.__jusgovRetornoRect = null;
+                            if (typeof host.__jusgovAplicarSnapshotExterno === 'function') {
+                                host.__jusgovAplicarSnapshotExterno(cfgExib, dadosResumo, estadoBarra);
                             }
-                            if (!host.__jusgovArrastando && !host.__jusgovRetornoRect) {
-                                const topAlvo = (estadoNorm.modoFixacao === 2) ? estadoNorm.topAncoradoPx : estadoNorm.topPx;
-                                const alinhAlvo = (estadoNorm.modoFixacao === 2) ? estadoNorm.alinhamentoAncorado : estadoNorm.alinhamento;
-                                const leftAlvo = (estadoNorm.modoFixacao === 2) ? estadoNorm.leftAncoradoPx : estadoNorm.leftPx;
-                                aplicarPosicao(host, topAlvo, alinhAlvo, leftAlvo);
-                            }
+            };
+        }
 
-                            const ui = host.__jusgovUI;
-                            if (!ui) return;
-                            ui.alcaMover.title = (estadoNorm.modoFixacao === 2)
-                                ? 'Arraste livremente para qualquer lugar da tela'
-                                : 'Arraste para mover verticalmente e alinhar à Esquerda, Centro ou Direita';
-                            atualizarVisualBotaoFixar(ui.btnFixar, estadoNorm.modoFixacao);
-                            const corBorda = dadosResumo.descansoPendente ? '#dc2626' : (dadosResumo.emDescanso ? '#0284c7' : '#0d9488');
-                            ui.pill.style.borderColor = corBorda;
-                            ui.spanFase.textContent = `🍅 ${dadosResumo.faseLabel} • Ciclo ${dadosResumo.cicloAtual}/${dadosResumo.ciclosMax}`;
-                            if (dadosResumo.descansoPendente) {
-                                ui.spanStatus.style.display = 'inline-block';
-                                ui.spanStatus.textContent = dadosResumo.aguardandoOciosidade ? 'Aguardando Pausa (Pendente)' : 'Descanso Pendente';
-                                ui.spanStatus.style.background = '#dc2626';
-                                ui.spanStatus.style.color = '#ffffff';
-                            } else if (dadosResumo.ultimoDescansoTexto) {
-                                ui.spanStatus.style.display = 'inline-block';
-                                ui.spanStatus.textContent = dadosResumo.ultimoDescansoTexto;
-                                ui.spanStatus.style.background = '#0d9488';
-                                ui.spanStatus.style.color = '#ffffff';
-                            } else {
-                                ui.spanStatus.style.display = 'none';
-                                ui.spanStatus.textContent = '';
-                            }
+        /**
+         * Atualiza o badge/tooltip do ícone no Chrome e projeta/remove a faixa flutuante global nas abas ativas de cada janela.
+         * @param {Object} [config]
+         * @param {Object} [estadoParam]
+         * @param {number|string|null} [tabIdEspecifica] número de tabId específica ou null para guias ativas das janelas abertas
+         */
+        async sincronizarIndicadoresGlobaisPomodoro(config = null, estadoParam = null, tabIdEspecifica = null) {
+            try {
+                if (typeof chrome === 'undefined') return;
+                const cfg = config || (this._obterConfig ? await this._obterConfig() : {});
+                const estado = estadoParam || await this.obterOuIniciarEstadoTrabalhoHoje();
+                let nuvemMeta = null;
+                try {
+                    if (chrome.storage && chrome.storage.local) {
+                        const metaRes = await chrome.storage.local.get(['jusgovProdNuvemMeta']);
+                        if (metaRes && metaRes.jusgovProdNuvemMeta) nuvemMeta = metaRes.jusgovProdNuvemMeta;
+                    }
+                } catch (_) { }
+                const agoraSync = Date.now();
+                const rec = this.reconciliarEstadoPomodoroAoVivo(estado, agoraSync, cfg);
+                if (rec && rec.alterouEstado && chrome.storage && chrome.storage.local) {
+                    await chrome.storage.local.set({ jusgovTrabalhoEstado: estado }).catch(() => { });
+                }
+                this.aplicarIndicadoresChromeAction(cfg, estado, nuvemMeta, agoraSync);
 
-                            const atualizarRelogio = () => {
-                                if (dadosResumo.aguardandoOciosidade) {
-                                    const mmParado = String(Math.max(0, Number(dadosResumo.metaFaseMin || 0))).padStart(2, '0');
-                                    ui.spanTempo.textContent = `${mmParado}:00`;
-                                    return;
-                                }
-                                const diffSeg = Math.floor((Number(dadosResumo.faseTerminaEmTs || 0) - Date.now()) / 1000);
-                                const absSeg = Math.max(0, Math.abs(diffSeg));
-                                const mm = String(Math.floor(absSeg / 60)).padStart(2, '0');
-                                const ss = String(absSeg % 60).padStart(2, '0');
-                                ui.spanTempo.textContent = diffSeg >= 0 ? `${mm}:${ss}` : `+${mm}:${ss}`;
-                            };
-                            atualizarRelogio();
-                            if (host.__jusgovTimerInterval) clearInterval(host.__jusgovTimerInterval);
-                            host.__jusgovTimerInterval = setInterval(atualizarRelogio, 1000);
-                        },
-                        args: [{ ativoPorConfig, deveExibirNormal: deveMostrarBarraBase, focoOcultadoGlobal }, resumo, estadoBarraGlobal]
+                if (!chrome.tabs || !chrome.scripting) return;
+                const estadoBarraGlobal = await this.obterEstadoGlobalBarraPomodoro();
+                const snapBase = this.construirSnapshotExternoPomodoro(estado, cfg, nuvemMeta, estadoBarraGlobal, agoraSync, false);
+
+                let abas = [];
+                if (typeof tabIdEspecifica === 'number' && tabIdEspecifica > 0) {
+                    const abaUnica = await chrome.tabs.get(tabIdEspecifica).catch(() => null);
+                    if (abaUnica) abas = [abaUnica];
+                } else if (tabIdEspecifica === 'todas') {
+                    abas = await chrome.tabs.query({}).catch(() => []);
+                } else {
+                    abas = await chrome.tabs.query({ active: true }).catch(() => []);
+                }
+
+                let focusedWinId = null;
+                if (chrome.windows && typeof chrome.windows.getLastFocused === 'function') {
+                    const winFoc = await chrome.windows.getLastFocused().catch(() => null);
+                    if (winFoc && winFoc.id) focusedWinId = winFoc.id;
+                }
+
+                const fnInjecao = this.obterFuncaoInjecaoBarraPomodoro();
+                for (let aIdx = 0; aIdx < abas.length; aIdx++) {
+                    const aba = abas[aIdx];
+                    if (!aba || !aba.id || !aba.url || !/^https?:\/\//i.test(aba.url)) continue;
+                    const permitirBeep = Boolean(snapBase.paramsBeep.ativo && aba.active !== false && (focusedWinId ? aba.windowId === focusedWinId : aIdx === 0));
+                    const cfgAba = Object.assign({}, snapBase.cfgExib, { permitirBeep });
+
+                    chrome.scripting.executeScript({
+                        target: { tabId: aba.id },
+                        func: fnInjecao,
+                        args: [cfgAba, snapBase.resumoPomodoro, snapBase.estadoBarra]
                     }).catch(() => { });
                 }
             } catch (_) { }

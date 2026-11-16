@@ -109,9 +109,27 @@ const sincronizarEstado = async () => {
         })
         : null;
     if (instanciaModuloProdutividade && cfg) {
-        instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg).catch(() => { });
+        if (!cfg.pomodoroAtivo) {
+            instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas().catch(() => { });
+        }
+        instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, 'todas').catch(() => { });
     }
     return cfg;
+};
+
+const garantirConfigModuloNavegador = async () => {
+    if (!instanciaModuloNavegador) return {};
+    if (instanciaModuloNavegador.configuracoes && Object.keys(instanciaModuloNavegador.configuracoes).length > 0) {
+        return instanciaModuloNavegador.configuracoes;
+    }
+    let cfg = await obterConfiguracoesGerais();
+    if (!cfg || Object.keys(cfg).length === 0) {
+        cfg = await sincronizarEstado();
+    }
+    if (cfg && typeof cfg === 'object' && Object.keys(cfg).length > 0) {
+        instanciaModuloNavegador.atualizarConfiguracoes(cfg);
+    }
+    return cfg || {};
 };
 
 // =====================================================================
@@ -141,7 +159,10 @@ async function obterJsonEstaticoDoPacote(nomeArquivo) {
         try {
             const resp = await fetch(chrome.runtime.getURL(caminhoRel));
             if (resp && resp.ok) {
-                const dados = await resp.json();
+                const txt = await resp.text();
+                const dados = (self.JusGovCfgDefaults && typeof self.JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                    ? self.JusGovCfgDefaults.parsearJsonComComentarios(txt)
+                    : JSON.parse(String(txt || '').replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim());
                 cacheJsonEstaticoSw.set(caminhoRel, dados);
                 return dados;
             }
@@ -300,13 +321,30 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             changes.tempoTrabalhoCorridoAtivo || changes.tempoTrabalhoCorridoHoras ||
             changes.tempoTrabalhoAtivoAtivo || changes.tempoTrabalhoAtivoHoras ||
             changes.pomodoroAtivo || changes.pomodoroProporcao || changes.pomodoroFocoMinutos ||
-            changes.pomodoroCiclos || changes.pomodoroPausasAutomaticas || changes.pomodoroModoAviso
+            changes.pomodoroCiclos || changes.pomodoroPausasAutomaticas || changes.pomodoroModoAviso ||
+            changes.pomodoroEstiloMinipopup || changes.pomodoroBeepConclusaoAtivo || changes.pomodoroBeepIntensidade
         )) {
-            obterConfiguracoesGerais().then((cfg) => instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg)).catch(() => { });
+            (async () => {
+                if (changes.pomodoroEstiloMinipopup) {
+                    const estNovo = changes.pomodoroEstiloMinipopup.newValue;
+                    const nivel = (estNovo === 'normal') ? 1 : ((estNovo === 'expandido') ? 2 : 0);
+                    await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({ nivelDetalhe: nivel });
+                }
+                const cfg = await obterConfiguracoesGerais();
+                if (!cfg || !cfg.pomodoroAtivo) {
+                    await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                }
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, 'todas');
+            })().catch(() => { });
         }
     } else if (namespace === 'local') {
-        if (changes.perfilAtivoId && instanciaModuloProdutividade) {
-            obterConfiguracoesGerais().then((cfg) => instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg)).catch(() => { });
+        if ((changes.perfilAtivoId || changes.jusgovConfigSyncPendente) && instanciaModuloProdutividade) {
+            obterConfiguracoesGerais().then(async (cfg) => {
+                if (!cfg || !cfg.pomodoroAtivo) {
+                    await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                }
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, 'todas');
+            }).catch(() => { });
         }
     }
 });
@@ -332,10 +370,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     if (acao === 'forcarSincronizacaoNuvem' || acao === 'AGENDAR_SYNC_NUVEM_DIFERIDO') {
         (async () => {
+            let cfgAtual = null;
             if (instanciaConfig && msg.payload && typeof msg.payload === 'object' && typeof instanciaConfig.aplicarConfigLocalEAgendarSync === 'function') {
-                await instanciaConfig.aplicarConfigLocalEAgendarSync(msg.payload, chrome, depsConfig);
-            } else if (msg.payload) {
-                await sincronizarEstado();
+                const resAplic = await instanciaConfig.aplicarConfigLocalEAgendarSync(msg.payload, chrome, depsConfig);
+                cfgAtual = (resAplic && resAplic.config) || await obterConfiguracoesGerais();
+            } else {
+                cfgAtual = await sincronizarEstado();
+            }
+            if (instanciaModuloProdutividade) {
+                if (!cfgAtual || !cfgAtual.pomodoroAtivo) {
+                    await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                }
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfgAtual, null, 'todas');
             }
             agendarSincronizacaoNuvemDebounced(5);
             return { ok: true, agendado: true, atrasoMinutos: 5 };
@@ -363,41 +409,140 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     /* Produtividade & IA F1 (mod-produt) */
     if (acao === 'PING_ATIVIDADE_TRABALHO' || acao === 'OBTER_STATUS_TRABALHO' || acao === 'RESETAR_CONTADORES_TRABALHO' ||
         acao === 'FECHAR_BARRA_POMODORO_GLOBAL' || acao === 'DISPENSAR_POMODORO_DESCANSO_CICLO' ||
-        acao === 'SALVAR_POSICAO_BARRA_POMODORO' || acao === 'ATUALIZAR_ESTADO_BARRA_POMODORO') {
+        acao === 'SALVAR_POSICAO_BARRA_POMODORO' || acao === 'ATUALIZAR_ESTADO_BARRA_POMODORO' ||
+        acao === 'FECHAR_MODAL_PRODUTIVIDADE_GLOBAL' || acao === 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO' ||
+        acao === 'CONFIRMAR_DESCANSO_INICIADO_POMODORO' || acao === 'SINCRONIZAR_DESCANSO_CONCLUIDO_POMODORO' ||
+        acao === 'SINCRONIZAR_GUIA_ATIVA_POMODORO') {
         if (!instanciaModuloProdutividade) { sendResponse({ ok: false }); return false; }
         let op;
-        if (acao === 'PING_ATIVIDADE_TRABALHO') {
-            op = instanciaModuloProdutividade.registrarAtividadeTrabalho(Date.now(), msg.tipoInteracao || 'click_ou_tecla').then(async (r) => {
-                if (r && (r.resetouDescanso || r.iniciouFocoPosDescanso)) {
-                    const cfg = await obterConfiguracoesGerais();
-                    await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, 'todas');
-                }
-                return { ok: true };
-            });
-        } else if (acao === 'OBTER_STATUS_TRABALHO') {
-            op = Promise.all([
+        const montarPayloadStatusTrabalho = async (senderMsg, executarReconciliacao = true) => {
+            const [estado, cfg, metaLoc, estadoBarraGlobal] = await Promise.all([
                 instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
                 obterConfiguracoesGerais(),
                 (chrome.storage && chrome.storage.local)
                     ? chrome.storage.local.get(['jusgovProdNuvemMeta']).catch(() => ({}))
-                    : Promise.resolve({})
-            ]).then(([estado, cfg, metaLoc]) => ({
+                    : Promise.resolve({}),
+                instanciaModuloProdutividade.obterEstadoGlobalBarraPomodoro()
+            ]);
+            const nuvemMeta = (metaLoc && metaLoc.jusgovProdNuvemMeta) ? metaLoc.jusgovProdNuvemMeta : null;
+            const agoraSync = Date.now();
+            if (executarReconciliacao) {
+                const rec = instanciaModuloProdutividade.reconciliarEstadoPomodoroAoVivo(estado, agoraSync, cfg);
+                if (rec && rec.alterouEstado) {
+                    if (chrome.storage && chrome.storage.local) {
+                        await chrome.storage.local.set({ jusgovTrabalhoEstado: estado }).catch(() => { });
+                    }
+                    if (rec.iniciouDescansoReal || rec.concluiuDescanso) {
+                        await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                    }
+                    await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, estado);
+                }
+            }
+            let permitirBeep = false;
+            const senderTab = (senderMsg && senderMsg.tab) ? senderMsg.tab : null;
+            if (senderTab) {
+                if (chrome.windows && typeof chrome.windows.getLastFocused === 'function') {
+                    const winFoc = await chrome.windows.getLastFocused().catch(() => null);
+                    permitirBeep = Boolean(!winFoc || !winFoc.id || senderTab.windowId === winFoc.id);
+                } else {
+                    permitirBeep = true;
+                }
+            }
+            instanciaModuloProdutividade.aplicarIndicadoresChromeAction(cfg, estado, nuvemMeta, agoraSync);
+            const snap = instanciaModuloProdutividade.construirSnapshotExternoPomodoro(estado, cfg, nuvemMeta, estadoBarraGlobal, agoraSync, permitirBeep);
+            return {
                 ok: true,
+                agoraServidor: snap.agoraServidor,
                 estado,
                 config: cfg,
-                nuvemMeta: (metaLoc && metaLoc.jusgovProdNuvemMeta) ? metaLoc.jusgovProdNuvemMeta : null,
-                resumoPomodoro: instanciaModuloProdutividade.calcularResumoPomodoro(estado, cfg)
-            }));
+                nuvemMeta,
+                resumoPomodoro: snap.resumoPomodoro,
+                estadoBarra: snap.estadoBarra,
+                cfgExib: snap.cfgExib
+            };
+        };
+
+        if (acao === 'SINCRONIZAR_GUIA_ATIVA_POMODORO') {
+            op = (async () => {
+                const cfg = await obterConfiguracoesGerais();
+                const senderTabId = (sender && sender.tab && typeof sender.tab.id === 'number') ? sender.tab.id : null;
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, senderTabId);
+                return { ok: true };
+            })();
+        } else if (acao === 'FECHAR_MODAL_PRODUTIVIDADE_GLOBAL' || acao === 'CONFIRMAR_DESCANSO_INICIADO_POMODORO') {
+            op = (async () => {
+                const [st, cfg] = await Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]);
+                const res = instanciaModuloProdutividade.calcularResumoPomodoro(st, cfg, Date.now(), null);
+                const chaveFase = (msg && typeof msg.faseChave === 'string' && msg.faseChave)
+                    ? msg.faseChave
+                    : `${res.fase}:${res.cicloAtual}:${res.faseInicioTs}`;
+                if (st.pomodoroModalDescansoChave || acao === 'CONFIRMAR_DESCANSO_INICIADO_POMODORO') {
+                    st.pomodoroModalExibidoChave = chaveFase;
+                    st.pomodoroModalDescansoChave = '';
+                    await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                }
+                await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st);
+                return { ok: true };
+            })();
+        } else if (acao === 'SINCRONIZAR_DESCANSO_CONCLUIDO_POMODORO') {
+            op = (async () => {
+                const [st, cfg] = await Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]);
+                if (st.pomodoroFase === 'alivio' || st.pomodoroFase === 'pausa_maior') {
+                    const agoraConcl = Date.now();
+                    st.pomodoroDescansoMinCumprido = true;
+                    st.pomodoroDescansoRealizadoNoCiclo = true;
+                    st.pomodoroDescansoPendente = false;
+                    st.pomodoroUltimoDescansoTipo = st.pomodoroFase;
+                    st.pomodoroUltimoDescansoFimTs = Number(st.pomodoroUltimoDescansoFimTs || agoraConcl);
+                    st.pomodoroModalExibidoChave = String((msg && msg.faseChave) || st.pomodoroModalExibidoChave || '');
+                    st.pomodoroModalDescansoChave = '';
+                    await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                }
+                await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st);
+                return { ok: true };
+            })();
+        } else if (acao === 'PING_ATIVIDADE_TRABALHO') {
+            op = instanciaModuloProdutividade.registrarAtividadeTrabalho(Date.now(), msg.tipoInteracao || 'click_ou_tecla').then(async (r) => {
+                const cfg = await obterConfiguracoesGerais();
+                if (r && (r.resetouDescanso || r.iniciouFocoPosDescanso || r.iniciouBadgeVerde || r.ocultouBadgeVerde || r.alterouDescanso)) {
+                    await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, null);
+                } else {
+                    const [estado, metaLoc] = await Promise.all([
+                        instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                        (chrome.storage && chrome.storage.local)
+                            ? chrome.storage.local.get(['jusgovProdNuvemMeta']).catch(() => ({}))
+                            : Promise.resolve({})
+                    ]);
+                    instanciaModuloProdutividade.aplicarIndicadoresChromeAction(cfg, estado, (metaLoc && metaLoc.jusgovProdNuvemMeta) || null, Date.now());
+                }
+                if (msg && msg.retornarSnapshot) {
+                    return await montarPayloadStatusTrabalho(sender, false);
+                }
+                return { ok: true };
+            });
+        } else if (acao === 'OBTER_STATUS_TRABALHO') {
+            op = montarPayloadStatusTrabalho(sender, true);
         } else if (acao === 'RESETAR_CONTADORES_TRABALHO') {
             op = Promise.all([
                 instanciaModuloProdutividade.resetarEstadoTrabalhoHoje(),
                 obterConfiguracoesGerais()
             ]).then(async ([estado, cfg]) => {
-                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, estado, 'todas');
+                const agoraReset = Date.now();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, estado, null);
                 return {
                     ok: true,
+                    agoraServidor: agoraReset,
                     estado,
-                    resumoPomodoro: instanciaModuloProdutividade.calcularResumoPomodoro(estado, cfg)
+                    nuvemMeta: null,
+                    resumoPomodoro: instanciaModuloProdutividade.calcularResumoPomodoro(estado, cfg, agoraReset, null)
                 };
             });
         } else if (acao === 'FECHAR_BARRA_POMODORO_GLOBAL') {
@@ -416,9 +561,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
                 return { ok: true };
             })();
+        } else if (acao === 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO') {
+            op = (async () => {
+                const cfgAtual = await obterConfiguracoesGerais();
+                const modoAtual = (cfgAtual && typeof cfgAtual.pomodoroModoAviso === 'string') ? cfgAtual.pomodoroModoAviso : 'completo';
+                const exibirNoAtivo = Boolean(msg.exibirNoAtivo);
+                let novoModo = modoAtual;
+                if (!exibirNoAtivo) {
+                    if (modoAtual === 'completo') novoModo = 'badge_e_barra_descanso';
+                    else if (modoAtual === 'barra_sempre') novoModo = 'barra_descanso';
+                } else {
+                    if (modoAtual === 'badge_e_barra_descanso' || modoAtual === 'badge' || modoAtual === 'modal') novoModo = 'completo';
+                    else if (modoAtual === 'barra_descanso') novoModo = 'barra_sempre';
+                    await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({ modoFixacao: 1, ancorar: true });
+                }
+                if (instanciaConfig && typeof instanciaConfig.aplicarConfigLocalEAgendarSync === 'function') {
+                    await instanciaConfig.aplicarConfigLocalEAgendarSync({ pomodoroModoAviso: novoModo }, chrome, {
+                        moduloNavegador: instanciaModuloNavegador
+                    });
+                }
+                const cfgNova = await obterConfiguracoesGerais();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfgNova, null, 'todas');
+                return { ok: true, pomodoroModoAviso: novoModo };
+            })();
         } else {
             op = (async () => {
                 const novoEstado = await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro(msg);
+                if (msg && (msg.nivelDetalhe === 0 || msg.nivelDetalhe === 1 || msg.nivelDetalhe === 2) && instanciaConfig && typeof instanciaConfig.aplicarConfigLocalEAgendarSync === 'function') {
+                    const estiloNovo = (novoEstado.nivelDetalhe === 1) ? 'normal' : ((novoEstado.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                    const cfgAtualEst = await obterConfiguracoesGerais();
+                    if (cfgAtualEst && cfgAtualEst.pomodoroEstiloMinipopup !== estiloNovo) {
+                        await instanciaConfig.aplicarConfigLocalEAgendarSync({ pomodoroEstiloMinipopup: estiloNovo }, chrome, {
+                            moduloNavegador: instanciaModuloNavegador
+                        });
+                    }
+                }
                 const cfg = await obterConfiguracoesGerais();
                 await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, 'todas');
                 return { ok: true, estadoBarra: novoEstado };
@@ -583,6 +760,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 if (chrome.windows && chrome.windows.onCreated) {
     chrome.windows.onCreated.addListener(async (janela) => {
         try {
+            await garantirConfigModuloNavegador();
             if (instanciaModuloNavegador) await instanciaModuloNavegador.tratarNovaJanela(janela, chrome);
         } catch (_) { }
     });
@@ -606,7 +784,12 @@ if (chrome.windows && chrome.windows.onRemoved) {
 if (chrome.windows && chrome.windows.onFocusChanged) {
     chrome.windows.onFocusChanged.addListener((winId) => {
         if (winId !== chrome.windows.WINDOW_ID_NONE && instanciaModuloProdutividade) {
-            instanciaModuloProdutividade.registrarAtividadeTrabalho();
+            Promise.all([
+                instanciaModuloProdutividade.registrarAtividadeTrabalho(Date.now(), 'movimento'),
+                obterConfiguracoesGerais()
+            ]).then(([, cfg]) => {
+                return instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg);
+            }).catch(() => { });
         }
     });
 }
@@ -617,6 +800,7 @@ if (chrome.tabs && chrome.tabs.onCreated) {
             if (tab && tab.id && (tab.url === 'about:blank' || !tab.url) && instanciaInjecao) {
                 instanciaInjecao.agendarInjecaoSeguraNaAba(tab.id, null, chrome);
             }
+            await garantirConfigModuloNavegador();
             if (instanciaModuloNavegador) await instanciaModuloNavegador.tratarNovaAba(tab, chrome);
         } catch (_) { }
     });
@@ -625,6 +809,7 @@ if (chrome.tabs && chrome.tabs.onCreated) {
 if (chrome.tabs && chrome.tabs.onUpdated) {
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         try {
+            await garantirConfigModuloNavegador();
             if (instanciaModuloNavegador) await instanciaModuloNavegador.tratarAbaAtualizada(tabId, changeInfo, tab, chrome);
             const url = (tab && tab.url) || (changeInfo && changeInfo.url) || '';
             if (!url) return;
@@ -652,12 +837,15 @@ if (chrome.tabs && chrome.tabs.onActivated) {
             instanciaModuloNavegador.registrarAbaAtivadaHistorico(activeInfo, chrome).catch(() => { });
         }
         if (instanciaModuloProdutividade) {
-            instanciaModuloProdutividade.registrarAtividadeTrabalho(Date.now(), 'movimento');
-            if (activeInfo && activeInfo.tabId) {
-                obterConfiguracoesGerais().then((cfg) => {
+            Promise.all([
+                instanciaModuloProdutividade.registrarAtividadeTrabalho(Date.now(), 'movimento'),
+                obterConfiguracoesGerais()
+            ]).then(([, cfg]) => {
+                if (activeInfo && activeInfo.tabId) {
                     return instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, activeInfo.tabId);
-                }).catch(() => { });
-            }
+                }
+                return null;
+            }).catch(() => { });
         }
         if (instanciaModuloManutencao && activeInfo && activeInfo.tabId && chrome.tabs.get) {
             chrome.tabs.get(activeInfo.tabId, (tab) => {
@@ -669,16 +857,30 @@ if (chrome.tabs && chrome.tabs.onActivated) {
 }
 
 if (chrome.tabs && chrome.tabs.onMoved) {
-    chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
-        if (instanciaModuloNavegador) {
-            instanciaModuloNavegador.tratarAbaMovida(tabId, moveInfo, chrome).catch(() => { });
+    chrome.tabs.onMoved.addListener(async (tabId, moveInfo) => {
+        try {
+            await garantirConfigModuloNavegador();
+            if (instanciaModuloNavegador) {
+                await instanciaModuloNavegador.tratarAbaMovida(tabId, moveInfo, chrome);
+            }
+        } catch (_) { }
+    });
+}
+
+if (chrome.tabs && chrome.tabs.onAttached) {
+    chrome.tabs.onAttached.addListener((tabId) => {
+        if (instanciaModuloProdutividade && tabId) {
+            obterConfiguracoesGerais().then((cfg) => {
+                return instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, null, tabId);
+            }).catch(() => { });
         }
     });
 }
 
 if (chrome.tabs && chrome.tabs.onRemoved) {
-    chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+    chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
         try {
+            await garantirConfigModuloNavegador();
             if (instanciaModuloNavegador) {
                 instanciaModuloNavegador.removerAbaHistorico(tabId, removeInfo, chrome).catch(() => { });
                 instanciaModuloNavegador.tratarAbaRemovida(tabId, chrome);

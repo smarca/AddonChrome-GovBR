@@ -383,6 +383,138 @@
     let inputJaEstavaSelecionadoNoMouseDown = false;
     const inputsJaSelecionadosInicialmente = new WeakSet();
     let ultimoCampoEditavelSelecionado = null;
+    let pendenciaBotaoMeio = null;
+
+    function selecionarTudoAoEntrarNoInput(inputAlvo, delayMs = 20) {
+        if (!inputAlvo || typeof inputAlvo.select !== 'function') return;
+        inputAlvo.dataset.autoselected = 'true';
+        if (!inputAlvo.__jusgovBlurLigado) {
+            inputAlvo.__jusgovBlurLigado = true;
+            inputAlvo.addEventListener('blur', () => {
+                delete inputAlvo.dataset.autoselected;
+                inputAlvo.__jusgovBlurLigado = false;
+            });
+        }
+        setTimeout(() => {
+            try {
+                if (typeof inputAlvo.focus === 'function') inputAlvo.focus();
+                inputAlvo.select();
+                registrarSelecaoAtivaCampoEditavel(inputAlvo);
+            } catch (_) { }
+        }, delayMs);
+    }
+
+    function resolverAlvoEditavelParaMeio(el) {
+        if (!el) return null;
+        const cur = (el.nodeType === 3) ? el.parentElement : el;
+        if (!cur || cur.nodeType !== 1) return null;
+        if (typeof cur.closest === 'function') {
+            const campoDireto = cur.closest('input, textarea, rich-textarea');
+            if (campoDireto && classificarContextoElementoAlvo(campoDireto) === 'CAMPO_SIMPLES_EDITAVEL') {
+                return campoDireto;
+            }
+            const ceHost = cur.closest('[contenteditable], .cke_editable, .ck-editor__editable, .ck-content, .tox-edit-area');
+            if (ceHost) {
+                const attrCe = (typeof ceHost.getAttribute === 'function') ? ceHost.getAttribute('contenteditable') : null;
+                if ((attrCe === null || attrCe.toLowerCase() !== 'false') && classificarContextoElementoAlvo(ceHost) !== 'LINK_CLICAVEL') {
+                    return ceHost;
+                }
+            }
+        }
+        const ctx = classificarContextoElementoAlvo(cur);
+        if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') {
+            return cur;
+        }
+        return null;
+    }
+
+    function focarElementoSeguroMeio(el) {
+        if (!el || typeof el.focus !== 'function') return;
+        try {
+            el.focus({ preventScroll: true });
+        } catch (_) {
+            try { el.focus(); } catch (__) { }
+        }
+    }
+
+    function ativarComponenteParaColagem(alvo, alvoFoco = null) {
+        const alvoParaClicar = alvo || alvoFoco;
+        const alvoParaFocar = alvoFoco || resolverAlvoEditavelParaMeio(alvoParaClicar) || alvoParaClicar;
+        if (!alvoParaClicar) return;
+        focarElementoSeguroMeio(alvoParaFocar);
+        try {
+            const evBase = { bubbles: true, cancelable: true, button: 0 };
+            if (typeof PointerEvent === 'function') {
+                alvoParaClicar.dispatchEvent(new PointerEvent('pointerdown', evBase));
+            }
+            alvoParaClicar.dispatchEvent(new MouseEvent('mousedown', evBase));
+            alvoParaClicar.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+            if (typeof PointerEvent === 'function') {
+                alvoParaClicar.dispatchEvent(new PointerEvent('pointerup', evBase));
+            }
+            alvoParaClicar.dispatchEvent(new MouseEvent('mouseup', evBase));
+            if (typeof alvoParaClicar.click === 'function') alvoParaClicar.click();
+        } catch (_) { }
+        focarElementoSeguroMeio(alvoParaFocar);
+        if (selecaoEditavelAtiva && alvoParaFocar && alvoParaFocar.tagName === 'INPUT' && typeof alvoParaFocar.select === 'function') {
+            selecionarTudoAoEntrarNoInput(alvoParaFocar, 10);
+        }
+    }
+
+    function confirmarFocarEColarBotaoMeio(alvoInicial, modo, usarAnterior, clientX = null, clientY = null, docContext = document, alvoBruto = null) {
+        try {
+            const docRef = (alvoInicial && alvoInicial.ownerDocument) ? alvoInicial.ownerDocument : (docContext || document);
+            let alvoConfirmado = resolverAlvoEditavelParaMeio(alvoInicial);
+            if (alvoConfirmado && alvoConfirmado.isConnected === false) {
+                alvoConfirmado = null;
+            }
+            if (!alvoConfirmado && docRef && docRef.activeElement) {
+                alvoConfirmado = resolverAlvoEditavelParaMeio(docRef.activeElement);
+            }
+            const raizBusca = (alvoBruto && alvoBruto.isConnected !== false) ? alvoBruto : ((alvoInicial && alvoInicial.isConnected !== false) ? alvoInicial : null);
+            if (!alvoConfirmado && raizBusca && typeof raizBusca.querySelector === 'function') {
+                const filhoEdit = raizBusca.querySelector('input:not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), [contenteditable]:not([contenteditable="false"])');
+                if (filhoEdit) alvoConfirmado = resolverAlvoEditavelParaMeio(filhoEdit);
+            }
+            if (!alvoConfirmado) return false;
+
+            focarElementoSeguroMeio(alvoConfirmado);
+
+            const ehCe = Boolean(
+                alvoConfirmado.tagName !== 'INPUT' &&
+                alvoConfirmado.tagName !== 'TEXTAREA' &&
+                (alvoConfirmado.isContentEditable || (typeof alvoConfirmado.closest === 'function' && alvoConfirmado.closest('[contenteditable]:not([contenteditable="false"])')))
+            );
+            const winRef = (docRef && docRef.defaultView) || (typeof window !== 'undefined' ? window : null);
+            if (ehCe && winRef && typeof winRef.getSelection === 'function' && typeof docRef.createRange === 'function') {
+                try {
+                    const sel = winRef.getSelection();
+                    const dentroDoAlvo = Boolean(sel && sel.rangeCount > 0 && alvoConfirmado.contains && alvoConfirmado.contains(sel.anchorNode));
+                    if (!dentroDoAlvo) {
+                        let rangeNovo = null;
+                        if (clientX !== null && clientY !== null && typeof docRef.caretRangeFromPoint === 'function') {
+                            const rPonto = docRef.caretRangeFromPoint(clientX, clientY);
+                            if (rPonto && alvoConfirmado.contains && alvoConfirmado.contains(rPonto.startContainer)) {
+                                rangeNovo = rPonto;
+                            }
+                        }
+                        if (!rangeNovo) {
+                            rangeNovo = docRef.createRange();
+                            rangeNovo.selectNodeContents(alvoConfirmado);
+                            rangeNovo.collapse(false);
+                        }
+                        sel.removeAllRanges();
+                        sel.addRange(rangeNovo);
+                    }
+                } catch (_) { }
+            }
+
+            executarColagemBotaoDireito(alvoConfirmado, modo || 'normal', Boolean(usarAnterior));
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
 
     function registrarSelecaoAtivaCampoEditavel(el) {
         if (!el) return;
@@ -695,6 +827,58 @@
             }
         }
         return false;
+    }
+
+    function ehContextoEditavelOuExtensao(noAlvo) {
+        try {
+            const seExtensao = (n) => {
+                const el = (n && n.nodeType === 1) ? n : (n ? n.parentElement : null);
+                return Boolean(el && typeof el.closest === 'function' && el.closest('[data-jusgov-ignore="true"]'));
+            };
+            const checarNo = (n) => {
+                const el = (n && n.nodeType === 1) ? n : (n ? n.parentElement : null);
+                if (!el || el.nodeType !== 1) return false;
+                const tag = el.tagName ? el.tagName.toUpperCase() : '';
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+                if (el.isContentEditable) return true;
+                return Boolean(typeof el.closest === 'function' && el.closest('[contenteditable="true"], [contenteditable=""], [role="textbox"], .cke_editable, .ck-editor__editable, .ProseMirror, .CodeMirror, .monaco-editor, .tox-edit-area'));
+            };
+            if (seExtensao(noAlvo) || seExtensao(document.activeElement)) return true;
+            if (checarNo(noAlvo) || checarNo(document.activeElement)) return true;
+            const sel = (typeof window.getSelection === 'function') ? window.getSelection() : null;
+            if (sel && (checarNo(sel.anchorNode) || checarNo(sel.focusNode))) return true;
+        } catch (_) { }
+        return false;
+    }
+
+    function sincronizarProtecaoLeituraDom() {
+        try {
+            if (typeof window !== 'undefined' && window.__TESTE_HEADLESS__) return;
+            const doc = typeof document !== 'undefined' ? document : null;
+            if (!doc) return;
+            const permitido = verificarUrlPermitida();
+            if (doc.documentElement) {
+                doc.documentElement.setAttribute('data-jusgov-ativo', permitido ? '1' : '0');
+            }
+            const idEstiloGlobal = 'jusgov-desbloqueio-selecao-global';
+            const estiloExistente = doc.getElementById(idEstiloGlobal);
+            if (!permitido) {
+                if (estiloExistente && estiloExistente.parentNode) {
+                    estiloExistente.parentNode.removeChild(estiloExistente);
+                }
+                return;
+            }
+            if (!estiloExistente) {
+                const alvoCss = doc.head || doc.documentElement;
+                if (alvoCss) {
+                    const st = doc.createElement('style');
+                    st.id = idEstiloGlobal;
+                    st.setAttribute('data-jusgov-ignore', 'true');
+                    st.textContent = 'html body p, html body article, html body section, html body main, html body blockquote, html body pre, html body code, html body h1, html body h2, html body h3, html body h4, html body h5, html body h6, html body li, html body dd, html body dt, html body td, html body th, html body figcaption, [unselectable], [onselectstart], [oncopy], [onbeforecopy] { -webkit-user-select: text !important; user-select: text !important; }';
+                    alvoCss.appendChild(st);
+                }
+            }
+        } catch (_) { }
     }
 
     /*
@@ -3452,20 +3636,29 @@
                 return;
             }
 
-            /* Ctrl + Botao do Meio: apenas anula autoscroll e prepara foco para colagem do buffer anterior */
-            if (e.ctrlKey && !e.altKey && !e.shiftKey) {
-                e.preventDefault();
-                try { elAlvoEfetivo.focus(); } catch (_) { }
-                return;
-            }
-
-            /* Colar com o Botao do Meio ativo:
-             * Anula a rolagem automatica nativa (autoscroll) do Chromium que altera o cursor para icone de bussola,
-             * mesmo se houver erro ou alvo nao editavel, realizando foco preparatorio caso seja campo editavel. */
+            /* Captura componente sob o mouse no mousedown para preservar o alvo mesmo se o ponteiro mover após clicar */
             e.preventDefault();
-            const ctxMeio = classificarContextoElementoAlvo(elAlvoEfetivo);
-            if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
-                try { elAlvoEfetivo.focus(); } catch (_) { }
+            e.stopPropagation();
+            const alvoEditavelMeio = resolverAlvoEditavelParaMeio(elAlvoEfetivo);
+            if (alvoEditavelMeio || e.altKey) {
+                const alvoCapturado = alvoEditavelMeio || elAlvoEfetivo;
+                pendenciaBotaoMeio = {
+                    alvo: alvoCapturado,
+                    alvoBruto: elAlvoEfetivo,
+                    comAlt: Boolean(e.altKey),
+                    usarAnterior: Boolean(e.ctrlKey && !e.shiftKey),
+                    modo: 'normal',
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    concluida: false
+                };
+                if (e.altKey) {
+                    ativarComponenteParaColagem(elAlvoEfetivo || alvoCapturado, alvoEditavelMeio);
+                } else {
+                    focarElementoSeguroMeio(alvoCapturado);
+                }
+            } else {
+                pendenciaBotaoMeio = null;
             }
             return;
         }
@@ -3742,6 +3935,24 @@
             houveArrastoMouse = false;
             return;
         }
+        /* Conclusão do Botão do Meio (e Alt + Botão do Meio) mesmo se o mouse se moveu após clicar */
+        if (e.button === 1) {
+            if (pendenciaBotaoMeio && !pendenciaBotaoMeio.concluida) {
+                const pend = pendenciaBotaoMeio;
+                pend.concluida = true;
+                e.preventDefault();
+                e.stopPropagation();
+                const executarColagemPend = () => {
+                    confirmarFocarEColarBotaoMeio(pend.alvo, pend.modo, pend.usarAnterior, pend.clientX, pend.clientY, document, pend.alvoBruto);
+                };
+                if (pend.comAlt) {
+                    setTimeout(executarColagemPend, 250);
+                } else {
+                    executarColagemPend();
+                }
+            }
+            return;
+        }
         if (e.button !== 0) return;
 
         const elAlvoEfetivo = obterElementoAlvoEfetivo(e);
@@ -3845,21 +4056,7 @@
                     const temAlfanumerico = /[\p{L}\p{N}]/u.test(inputAlvo.value || '');
                     if (!inputAlvo.dataset.autoselected || !temAlfanumerico) {
                         /* 1ª vez ou campo sem caracteres alfanuméricos (ex: máscara de data ___/___/_____): seleciona tudo */
-                        inputAlvo.dataset.autoselected = 'true';
-                        if (!inputAlvo.__jusgovBlurLigado) {
-                            inputAlvo.__jusgovBlurLigado = true;
-                            inputAlvo.addEventListener('blur', () => {
-                                delete inputAlvo.dataset.autoselected;
-                                inputAlvo.__jusgovBlurLigado = false;
-                            });
-                        }
-                        setTimeout(() => {
-                            try {
-                                if (typeof inputAlvo.focus === 'function') inputAlvo.focus();
-                                inputAlvo.select();
-                                registrarSelecaoAtivaCampoEditavel(inputAlvo);
-                            } catch (_) { }
-                        }, 20);
+                        selecionarTudoAoEntrarNoInput(inputAlvo, 20);
                     } else if (inputJaEstavaSelecionadoNoMouseDown) {
                         /* 2º clique consecutivo em campo já focado com texto: permite posicionar o cursor pontualmente */
                         setTimeout(() => {
@@ -4655,39 +4852,28 @@
                 return;
             }
 
-            const ctxMeio = classificarContextoElementoAlvo(e.target);
-            const alvo = (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL')
-                ? ((e.target && typeof e.target.closest === 'function') ? (e.target.closest('input') || e.target) : e.target)
-                : e.target;
-
-            /* Ctrl + Botao do Meio: cola diretamente a penultima selecao copiada (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__),
-             * preservando a ultima selecao intacta e sem rotacionar a memoria interna (Seção 6.63). */
-            if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+            /* Se já foi concluído no mouseup (ex.: mouse moveu antes de soltar), apenas consome auxclick */
+            if (pendenciaBotaoMeio && pendenciaBotaoMeio.concluida) {
+                pendenciaBotaoMeio = null;
                 e.preventDefault();
                 e.stopPropagation();
-                if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
-                    try {
-                        executarColagemBotaoDireito(alvo, 'normal', true);
-                    } catch (_) { }
-                }
                 return;
             }
 
-            /* Colagem normal ou Alt+Meio (250ms de espera para scripts de foco/selecionar-tudo) */
+            const alvoEditavelAux = resolverAlvoEditavelParaMeio(e.target);
+
+            /* Colagem normal, Ctrl+Meio (penúltimo) ou Alt+Meio (foca, confirma input/textarea/contenteditable e cola após 250ms) */
             if (colarBotaoMeioAtivo) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (ctxMeio === 'CAMPO_SIMPLES_EDITAVEL' || ctxMeio === 'EDITOR_MULTILINHA_EDITAVEL') {
+                if (alvoEditavelAux || e.altKey) {
+                    const usarAnt = Boolean(e.ctrlKey && !e.shiftKey);
+                    const alvoCap = alvoEditavelAux || e.target;
                     const executarColagemMeio = () => {
-                        try {
-                            executarColagemBotaoDireito(alvo, 'normal', Boolean(e.ctrlKey));
-                        } catch (_) { }
+                        confirmarFocarEColarBotaoMeio(alvoCap, 'normal', usarAnt, e.clientX, e.clientY, document, e.target);
                     };
                     if (e.altKey) {
-                        try {
-                            if (typeof alvo.focus === 'function') alvo.focus();
-                            if (typeof alvo.click === 'function') alvo.click();
-                        } catch (_) { }
+                        ativarComponenteParaColagem(e.target, alvoEditavelAux);
                         setTimeout(executarColagemMeio, 250);
                     } else {
                         executarColagemMeio();
@@ -5087,6 +5273,17 @@
                 ultimoTimestampEsc = agora;
             }
             return;
+        }
+
+        /* FEAT-56: Blindagem de atalhos de cópia/seleção global (Ctrl+C, Ctrl+Insert, Ctrl+A) contra scripts da página */
+        if (e && !e.altKey && !e.shiftKey && verificarUrlPermitida() && !ehContextoEditavelOuExtensao(e.target)) {
+            const teclaLower = String(e.key || '').toLowerCase();
+            const ehCopiaOuSelectAll = ((e.ctrlKey || e.metaKey) && (teclaLower === 'c' || teclaLower === 'a')) ||
+                (e.ctrlKey && e.key === 'Insert');
+            if (ehCopiaOuSelectAll) {
+                if (typeof e.stopPropagation === 'function') e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+            }
         }
     }
 
@@ -5744,6 +5941,7 @@
         }, { capture: true, signal, passive: true });
 
         blindarCSS();
+        sincronizarProtecaoLeituraDom();
         observarFramesDinamicos();
         iniciarMonitoramentoModificacoesPagina(signal);
 
@@ -5808,9 +6006,28 @@
             }
         }, { signal });
 
-        /* Captura passiva e silenciosa de cópias manuais na página (Ctrl+C nativo do SO) para a Memória Interna de 2 Níveis */
-        document.addEventListener('copy', () => {
+        /* Bloqueio total de propagação de eventos de cópia (copy/beforecopy) para scripts/HTML da página (anti-sequestro, anti-popup e anti-injeção),
+         * preservando a cópia nativa do navegador e a captura passiva para a Memória Interna de 2 Níveis */
+        window.addEventListener('beforecopy', (evBeforeCopy) => {
             try {
+                if (typeof window !== 'undefined' && window.__TESTE_HEADLESS__ && !window.__JUSGOV_TESTAR_BLOQUEIO_COPIA__) return;
+                if (!verificarUrlPermitida()) return;
+                if (evBeforeCopy && typeof evBeforeCopy.stopPropagation === 'function') evBeforeCopy.stopPropagation();
+                if (evBeforeCopy && typeof evBeforeCopy.stopImmediatePropagation === 'function') evBeforeCopy.stopImmediatePropagation();
+            } catch (_) { }
+        }, { capture: true, signal });
+
+        window.addEventListener('copy', (evCopy) => {
+            try {
+                if (typeof window !== 'undefined' && window.__JUSGOV_COPIA_PROGRAMATICA_ATIVA__) return;
+                if (!verificarUrlPermitida()) return;
+                if (!(typeof window !== 'undefined' && window.__TESTE_HEADLESS__ && !window.__JUSGOV_TESTAR_BLOQUEIO_COPIA__)) {
+                    if (evCopy && typeof evCopy.stopPropagation === 'function') evCopy.stopPropagation();
+                    if (evCopy && typeof evCopy.stopImmediatePropagation === 'function') evCopy.stopImmediatePropagation();
+                }
+                if (!selecaoSendoAplicadaPeloAddon && typeof limparFlashBorderImediatamente === 'function') {
+                    limparFlashBorderImediatamente();
+                }
                 setTimeout(() => {
                     const sel = (typeof window.getSelection === 'function') ? window.getSelection().toString() : '';
                     if (sel && sel.trim().length > 0) {
@@ -5823,7 +6040,23 @@
                     }
                 }, 50);
             } catch (_) { }
-        }, { capture: true, signal, passive: true });
+        }, { capture: true, signal });
+
+        /* Bloqueio de propagação de selectstart para impedir onselectstart="return false" / addEventListener('selectstart') em páginas protegidas */
+        window.addEventListener('selectstart', (evSelStart) => {
+            try {
+                if (typeof window !== 'undefined' && window.__TESTE_HEADLESS__ && !window.__JUSGOV_TESTAR_BLOQUEIO_COPIA__) return;
+                if (!verificarUrlPermitida()) return;
+                const t = evSelStart && evSelStart.target;
+                const el = (t && t.nodeType === 1) ? t : (t ? t.parentElement : null);
+                if (el && typeof el.closest === 'function' && el.closest('[data-jusgov-ignore="true"]')) return;
+                if (evSelStart && typeof evSelStart.stopPropagation === 'function') evSelStart.stopPropagation();
+                if (evSelStart && typeof evSelStart.stopImmediatePropagation === 'function') evSelStart.stopImmediatePropagation();
+                if (!selecaoSendoAplicadaPeloAddon && tempoFlashBorderMs <= 0 && typeof limparFlashBorderImediatamente === 'function') {
+                    limparFlashBorderImediatamente();
+                }
+            } catch (_) { }
+        }, { capture: true, signal });
 
         /* FEAT-21 / VIS-01 (Seção 6.105): Captura passiva de colagem nativa (Ctrl+V / menu Colar)
          * para acionar o Marcador Permanente de Conteúdo Colado na página de origem. */
@@ -5836,34 +6069,40 @@
                 confirmarColagemGlobalEMarcarPermanente(txtColado, false);
             } catch (_) { }
         }, { capture: true, signal, passive: true });
-        document.addEventListener('selectionchange', () => {
+        document.addEventListener('selectionchange', (evSelectionChange) => {
             tratarMudancaSelecaoGlobal();
-            if (selecaoSendoAplicadaPeloAddon) return;
-            if (flashExclusivoSemSelecao) return;
-            const temAvisoAtivo = Boolean(
-                validador && (
-                    (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
-                    validador.avisoVisivel ||
-                    validador.temporizadorAlerta
-                )
-            );
-            if (!aguardandoDesselecaoFlash && !temAvisoAtivo) return;
-            const agoraPerf = (typeof performance !== 'undefined' && typeof performance.now === 'function')
-                ? performance.now()
-                : Date.now();
-            const tsRef = Math.max(
-                timestampCriacaoFlash || 0,
-                (validador && validador.timestampCriacaoAviso) ? validador.timestampCriacaoAviso : 0
-            );
-            if ((agoraPerf - tsRef) < 40) return;
-            /* Retirar Seleções do Sistema (window.getSelection) e Contorno Visual (tempoFlashBorderMs) são independentes:
-             * a perda da seleção nativa do sistema não deve encerrar o contorno visual antes do parâmetro próprio. */
-            if (tempoFlashBorderMs === -1) return;
-            const selAtual = window.getSelection();
-            if (!selAtual || selAtual.rangeCount === 0 || selAtual.isCollapsed || selAtual.toString().trim().length === 0) {
-                limparAvisosAuditoriaEWikiImediatamente(true);
+            if (!selecaoSendoAplicadaPeloAddon && !flashExclusivoSemSelecao) {
+                const temAvisoAtivo = Boolean(
+                    validador && (
+                        (typeof validador.estaAvisoVisivel === 'function' && validador.estaAvisoVisivel()) ||
+                        validador.avisoVisivel ||
+                        validador.temporizadorAlerta
+                    )
+                );
+                if (aguardandoDesselecaoFlash || temAvisoAtivo) {
+                    const agoraPerf = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+                        ? performance.now()
+                        : Date.now();
+                    const tsRef = Math.max(
+                        timestampCriacaoFlash || 0,
+                        (validador && validador.timestampCriacaoAviso) ? validador.timestampCriacaoAviso : 0
+                    );
+                    if ((agoraPerf - tsRef) >= 40 && tempoFlashBorderMs !== -1) {
+                        const selAtual = window.getSelection();
+                        if (!selAtual || selAtual.rangeCount === 0 || selAtual.isCollapsed || selAtual.toString().trim().length === 0) {
+                            limparAvisosAuditoriaEWikiImediatamente(true);
+                        }
+                    }
+                }
             }
-        }, { passive: true, signal });
+            /* Proteção anti-detecção de seleção: impede que ouvintes selectionchange da página detectem leitura selecionada e forcem desseleção */
+            try {
+                if (verificarUrlPermitida() && !ehContextoEditavelOuExtensao(evSelectionChange ? evSelectionChange.target : null)) {
+                    if (evSelectionChange && typeof evSelectionChange.stopPropagation === 'function') evSelectionChange.stopPropagation();
+                    if (evSelectionChange && typeof evSelectionChange.stopImmediatePropagation === 'function') evSelectionChange.stopImmediatePropagation();
+                }
+            } catch (_) { }
+        }, { capture: true, signal });
         window.addEventListener('load', (e) => {
             const t = e.target;
             if (t && (t.tagName === 'IFRAME' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
@@ -5916,12 +6155,22 @@
                 validador.atualizarPosicaoAlertaSobRolagem();
             }
         }, { capture: true, passive: true, signal });
-        let ultimoPingAtividadeTrabalhoTs = 0;
+        let ultimoPingMovimentoTs = 0;
+        let ultimoPingClickTs = 0;
         const notificarAtividadeTrabalhoThrottled = (tipoInteracao = 'movimento') => {
             const agora = Date.now();
-            if (tipoInteracao !== 'click_ou_tecla' && (agora - ultimoPingAtividadeTrabalhoTs) < 30000) return;
-            if (tipoInteracao === 'click_ou_tecla' && (agora - ultimoPingAtividadeTrabalhoTs) < 3000) return;
-            ultimoPingAtividadeTrabalhoTs = agora;
+            if (tipoInteracao === 'click_ou_tecla') {
+                if ((agora - ultimoPingClickTs) < 120) return;
+                ultimoPingClickTs = agora;
+            } else {
+                const emTelaDescanso = Boolean(document.getElementById('jusgov-pomodoro-backdrop-global'));
+                if (!emTelaDescanso) {
+                    const barraVisivel = Boolean(document.getElementById('jusgov-pomodoro-barra-global') || document.getElementById('jusgov-pomodoro-barra'));
+                    const intervaloMov = barraVisivel ? 1000 : 4000;
+                    if ((agora - ultimoPingMovimentoTs) < intervaloMov) return;
+                }
+                ultimoPingMovimentoTs = agora;
+            }
             try {
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                     chrome.runtime.sendMessage({ acao: 'PING_ATIVIDADE_TRABALHO', tipoInteracao }).catch(() => {});
@@ -5930,9 +6179,14 @@
         };
         window.addEventListener('keydown', (e) => {
             window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
+            if (!e.repeat) notificarAtividadeTrabalhoThrottled('click_ou_tecla');
+        }, { capture: true, passive: true, signal });
+        window.addEventListener('mousedown', (ev) => {
+            const path = (typeof ev.composedPath === 'function') ? ev.composedPath() : [];
+            if (ev.target && (ev.target.id === 'jusgov-pomodoro-barra-global' || ev.target.id === 'jusgov-pomodoro-barra')) return;
+            if (path.some((el) => el && (el.id === 'jusgov-pomodoro-barra-global' || el.id === 'jusgov-pomodoro-barra'))) return;
             notificarAtividadeTrabalhoThrottled('click_ou_tecla');
         }, { capture: true, passive: true, signal });
-        window.addEventListener('mousedown', () => notificarAtividadeTrabalhoThrottled('click_ou_tecla'), { capture: true, passive: true, signal });
         window.addEventListener('mousemove', () => notificarAtividadeTrabalhoThrottled('movimento'), { capture: true, passive: true, signal });
         window.addEventListener('wheel', () => notificarAtividadeTrabalhoThrottled('movimento'), { capture: true, passive: true, signal });
     }
@@ -6005,6 +6259,7 @@
                         }
                         if (cfg.modoTurbo) modoExecucao = cfg.modoTurbo;
                         if (Array.isArray(cfg.urlsTurbo)) listaUrlsPermitidas = cfg.urlsTurbo;
+                        sincronizarProtecaoLeituraDom();
                         if (typeof cfg.manterFormatacaoBasica === 'boolean') {
                             manterFormatacaoBasica = cfg.manterFormatacaoBasica;
                         }
@@ -6148,6 +6403,7 @@
                     if (area === 'sync') {
                         if (changes.modoTurbo) modoExecucao = changes.modoTurbo.newValue;
                         if (changes.urlsTurbo) listaUrlsPermitidas = changes.urlsTurbo.newValue || [];
+                        sincronizarProtecaoLeituraDom();
                         if (changes.manterFormatacaoBasica !== undefined) {
                             manterFormatacaoBasica = Boolean(changes.manterFormatacaoBasica.newValue);
                         }
@@ -6347,6 +6603,7 @@
                     if (msg && msg.acao === 'atualizarEstadoModulo') {
                         if (msg.modoTurbo) modoExecucao = msg.modoTurbo;
                         if (Array.isArray(msg.urlsTurbo)) listaUrlsPermitidas = msg.urlsTurbo;
+                        sincronizarProtecaoLeituraDom();
                         if (typeof msg.manterFormatacaoBasica === 'boolean') {
                             manterFormatacaoBasica = msg.manterFormatacaoBasica;
                         }

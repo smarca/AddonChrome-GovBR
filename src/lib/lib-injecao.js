@@ -78,6 +78,10 @@
         'src/mod-copia/copia-selecionar.js'
     ]);
 
+    const ARQUIVOS_PROTECAO_MAIN = Object.freeze([
+        'src/mod-copia/copia-protecao-main.js'
+    ]);
+
     const ARQUIVOS_MODULO_CSS_PJE = Object.freeze([
         'src/mod-anti-ampulheta/pje-anti-ampulheta.css',
         'src/mod-anti-ampulheta/eproc-anti-ampulheta.css',
@@ -146,6 +150,10 @@
             return ARQUIVOS_MODULO_CSS_PJE;
         }
 
+        obterArquivosProtecaoMain() {
+            return ARQUIVOS_PROTECAO_MAIN;
+        }
+
         /*
          * FUNCAO / MÉTODO: enfileirarRegistro
          * OBJETIVO DE RECONSTRUCAO: Desregistrar scripts antigos e registrar o conjunto
@@ -198,17 +206,35 @@
                                 : [];
                             if (sanitizadas.length > 0) matchesTurbo = sanitizadas;
                         }
-                        const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                        const [jsExistentes, mainExistentes] = await Promise.all([
+                            this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
+                            this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
+                        ]);
+                        const scriptsParaRegistrar = [];
                         if (jsExistentes.length > 0) {
+                            scriptsParaRegistrar.push({
+                                id: 'jusgovbr-conteudo-integrado',
+                                matches: matchesTurbo,
+                                js: jsExistentes,
+                                runAt: 'document_start',
+                                allFrames: true,
+                                matchAboutBlank: true
+                            });
+                        }
+                        if (mainExistentes.length > 0) {
+                            scriptsParaRegistrar.push({
+                                id: 'jusgovbr-protecao-copia-main',
+                                matches: matchesTurbo,
+                                js: mainExistentes,
+                                runAt: 'document_start',
+                                allFrames: true,
+                                matchAboutBlank: true,
+                                world: 'MAIN'
+                            });
+                        }
+                        if (scriptsParaRegistrar.length > 0) {
                             try {
-                                await apiChrome.scripting.registerContentScripts([{
-                                    id: 'jusgovbr-conteudo-integrado',
-                                    matches: matchesTurbo,
-                                    js: jsExistentes,
-                                    runAt: 'document_start',
-                                    allFrames: true,
-                                    matchAboutBlank: true
-                                }]);
+                                await apiChrome.scripting.registerContentScripts(scriptsParaRegistrar);
                             } catch (errJs) {
                                 console.warn('[JusGovBR] Aviso ao registrar scripts nativos de conteúdo:', errJs);
                             }
@@ -281,7 +307,17 @@
 
                     /* Passo 3.8: Se o modulo de copia e navegacao estiver ativo, garantir injecao dos scripts na aba */
                     if (config.modoTurbo !== 'desligado') {
-                        const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                        const [jsExistentes, mainExistentes] = await Promise.all([
+                            this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
+                            this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
+                        ]);
+                        if (mainExistentes.length > 0) {
+                            apiChrome.scripting.executeScript({
+                                target: { tabId: tab.id, allFrames: true },
+                                files: mainExistentes,
+                                world: 'MAIN'
+                            }).catch(() => { });
+                        }
                         if (jsExistentes.length > 0) {
                             apiChrome.scripting.executeScript({
                                 target: { tabId: tab.id, allFrames: true },
@@ -336,7 +372,18 @@
                 : { tabId, allFrames: true };
 
             (async () => {
-                const jsExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome);
+                const [jsExistentes, mainExistentes] = await Promise.all([
+                    this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
+                    this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
+                ]);
+                if (mainExistentes.length > 0) {
+                    await apiChrome.scripting.executeScript({
+                        target,
+                        files: mainExistentes,
+                        injectImmediately: true,
+                        world: 'MAIN'
+                    });
+                }
                 if (jsExistentes.length === 0) return;
                 await apiChrome.scripting.executeScript({
                     target,

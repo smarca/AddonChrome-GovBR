@@ -65,7 +65,8 @@
         'autoLimpezaCacheCookiesAtiva', 'autoLimpezaIdade', 'tempoTrabalhoCorridoAtivo',
         'tempoTrabalhoCorridoHoras', 'tempoTrabalhoAtivoAtivo', 'tempoTrabalhoAtivoHoras',
         'pomodoroAtivo', 'pomodoroProporcao', 'pomodoroFocoMinutos', 'pomodoroCiclos',
-        'pomodoroPausasAutomaticas', 'pomodoroModoAviso',
+        'pomodoroPausasAutomaticas', 'pomodoroModoAviso', 'pomodoroEstiloMinipopup',
+        'pomodoroBeepConclusaoAtivo', 'pomodoroBeepIntensidade',
         'listaPerfis'
     ]);
     const SET_CHAVES_SYNC = new Set(CHAVES_CONFIGURACAO_SINCRONIZAVEL);
@@ -78,6 +79,28 @@
             try { return require('../cfg/cfg-defaults.js'); } catch (_) { }
         }
         return null;
+    }
+
+    async function lerJsonDeResposta(resp) {
+        if (!resp || !resp.ok) return null;
+        const txt = await resp.text();
+        const def = obterDefaultsModulo();
+        if (def && typeof def.parsearJsonComComentarios === 'function') {
+            return def.parsearJsonComComentarios(txt);
+        }
+        const limpo = String(txt || '').replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim();
+        return limpo ? JSON.parse(limpo) : null;
+    }
+
+    function formatarNomeArquivoExportacao(dataRef = null) {
+        const dt = (dataRef instanceof Date && !Number.isNaN(dataRef.getTime())) ? dataRef : new Date();
+        const p2 = (n) => String(n).padStart(2, '0');
+        const aa = String(dt.getFullYear()).slice(-2);
+        const mm = p2(dt.getMonth() + 1);
+        const dd = p2(dt.getDate());
+        const hh = p2(dt.getHours());
+        const mi = p2(dt.getMinutes());
+        return `JusGovBR-${aa}${mm}${dd}_${hh}${mi}.json`;
     }
 
     function clonarValorSimples(valor) {
@@ -110,6 +133,108 @@
             }
         }
         return false;
+    }
+
+    const ENUNS_CONFIGURACAO_VALIDOS = Object.freeze({
+        modoTurbo: Object.freeze(['global', 'url', 'desligado']),
+        comportamentoCliqueIcone: Object.freeze(['popup', 'alternar']),
+        nivelFiltroFormatacao: Object.freeze(['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido']),
+        modoPlaceholdersMinutasHtml: Object.freeze(['desabilitado', 'placeholders', 'marcacao_amarela']),
+        reutilizarAbasAcaoConteudo: Object.freeze(['manter', 'recarregar', 'fechar', 'recarregar_silencioso']),
+        criterioOrdenacaoGuias: Object.freeze(['nenhum', 'dominio', 'hierarquia_arvore']),
+        sentidoOrdenacaoGuias: Object.freeze(['esq_dir', 'dir_esq']),
+        modoExibicaoValidacao: Object.freeze(['sempre', 'erros']),
+        posicaoAvisosValidacao: Object.freeze(['acima', 'abaixo']),
+        presetMarcadorColado: Object.freeze(['verde_forense', 'azul_institucional', 'ambar_atencao', 'violeta_sutil', 'personalizado']),
+        estiloBadgeMarcadorColado: Object.freeze(['sobrescrito', 'subscrito', 'oculto']),
+        tipoContornoMarcadorColado: Object.freeze(['solido', 'tracejado', 'pontilhado']),
+        modoRetirarSelecao: Object.freeze(['nenhuma', 'com_flash', 'sempre']),
+        modoShiftCnj: Object.freeze(['desligado', '20digitos', 'completo']),
+        autoLimpezaIdade: Object.freeze(['12h', '1d', '3d', '7d', '15d', '30d']),
+        pomodoroModoAviso: Object.freeze(['modal', 'badge', 'barra_descanso', 'barra_sempre', 'badge_e_barra_descanso', 'completo']),
+        pomodoroEstiloMinipopup: Object.freeze(['compacto', 'normal', 'expandido']),
+        pomodoroBeepIntensidade: Object.freeze(['suave', 'moderado', 'grave'])
+    });
+
+    const LIMITES_NUMERICOS_CONFIGURACAO = Object.freeze({
+        tempoInatividadeDescarteMinutos: Object.freeze({ min: 1, max: 1440 }),
+        tempoConferenciaDocumentosMs: Object.freeze({ min: -1, max: 60000 }),
+        tempoExibicaoAlertaMs: Object.freeze({ min: -1, max: 60000 }),
+        tempoFlashBorderMs: Object.freeze({ min: -1, max: 60000 }),
+        opacidadeFundoMarcadorColado: Object.freeze({ min: 0, max: 1 }),
+        minimoCaracteresInterface: Object.freeze({ min: 0, max: 500 }),
+        tempoTrabalhoCorridoHoras: Object.freeze({ min: 1, max: 24 }),
+        tempoTrabalhoAtivoHoras: Object.freeze({ min: 1, max: 24 }),
+        pomodoroProporcao: Object.freeze({ min: 1, max: 20 }),
+        pomodoroFocoMinutos: Object.freeze({ min: 25, max: 180 }),
+        pomodoroCiclos: Object.freeze({ min: 2, max: 10 })
+    });
+
+    function calcularHashPayloadExportacao(texto) {
+        const str = String(texto || '');
+        let h1 = 0xcbf29ce484222325n;
+        let h2 = 0x100000001b3n;
+        const M = 0xffffffffffffffffn;
+        for (let i = 0; i < str.length; i++) {
+            const c = BigInt(str.charCodeAt(i));
+            h1 = ((h1 ^ c) * 0x100000001b3n) & M;
+            h2 = ((h2 + c + BigInt(i + 1)) * 0x9e3779b97f4a7c15n) & M;
+            h1 = ((h1 << 13n) | (h1 >> 51n)) & M;
+            h2 = ((h2 << 17n) | (h2 >> 47n)) & M;
+        }
+        return h1.toString(16).padStart(16, '0') + h2.toString(16).padStart(16, '0');
+    }
+
+    function extrairCabecalhoComentarioExportacao(textoBruto) {
+        const bruto = String(textoBruto || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+        const match = bruto.match(/^\s*\/\*([\s\S]*?)\*\//);
+        if (!match) {
+            return {
+                temComentario: false,
+                metadados: null,
+                payloadTexto: bruto.trim(),
+                conteudoParaHash: ''
+            };
+        }
+        const blocoCompleto = match[0];
+        const blocoComentario = match[1];
+        const restoSemComentarios = bruto.replace(/^\s*(?:\/\*[\s\S]*?\*\/\s*)+/, '').trim();
+        const lerCampo = (padrao) => {
+            const m = blocoComentario.match(padrao);
+            return m && m[1] ? m[1].trim() : '';
+        };
+        const regexLinhasHash = /^[ \t]*\*?[ \t]*Hash:[ \t]*([0-9a-fA-F]+)[ \t]*$/gim;
+        const matchesHash = [...blocoComentario.matchAll(regexLinhasHash)];
+        const hashDeclarado = (matchesHash.length === 1 && matchesHash[0][1]) ? matchesHash[0][1].trim().toLowerCase() : '';
+
+        let conteudoParaHash = '';
+        if (matchesHash.length === 1) {
+            const prefixoAntesMatch = bruto.slice(0, match.index);
+            const linhasBloco = blocoCompleto.split('\n');
+            let removeuHash = false;
+            const linhasFiltradas = linhasBloco.filter((lin) => {
+                if (!removeuHash && /^[ \t]*\*?[ \t]*Hash:[ \t]*[0-9a-fA-F]+[ \t]*$/i.test(lin)) {
+                    removeuHash = true;
+                    return false;
+                }
+                return true;
+            });
+            conteudoParaHash = prefixoAntesMatch + linhasFiltradas.join('\n') + bruto.slice(match.index + blocoCompleto.length);
+        }
+
+        const metadados = {
+            nomeAddon: lerCampo(/^\s*\*?\s*Addon:\s*(.+)$/im),
+            versaoAddon: lerCampo(/^\s*\*?\s*Vers[aã]o(?:\s+do\s+Addon)?:\s*(.+)$/im),
+            dataExportacao: lerCampo(/^\s*\*?\s*Data(?:\s+da\s+Exporta[cç][aã]o)?:\s*(.+)$/im),
+            hashDeclarado,
+            hashesDuplicados: matchesHash.length > 1
+        };
+        return {
+            temComentario: true,
+            metadados,
+            payloadTexto: restoSemComentarios,
+            conteudoParaHash
+        };
     }
 
     function normalizarTextoComparacao(str) {
@@ -151,7 +276,8 @@
             if (typeof fetch === 'function' && apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
                 try {
                     const resp = await fetch(apiChrome.runtime.getURL('src/cfg/perfis.json'));
-                    if (resp && resp.ok) return await resp.json();
+                    const json = await lerJsonDeResposta(resp);
+                    if (json) return json;
                 } catch (_) { }
             }
             return {
@@ -619,13 +745,11 @@
                 try {
                     if (typeof fetch === 'function' && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
                         const respInt = await fetch(apiChrome.runtime.getURL('src/cfg/interface.json'));
-                        if (respInt && respInt.ok) {
-                            const dadosInt = await respInt.json();
-                            if (Array.isArray(dadosInt)) {
-                                regrasPadraoUsuario = dadosInt
-                                    .filter(r => r && r.origem === 'usuario')
-                                    .map(({ origem, ...resto }) => ({ ...resto }));
-                            }
+                        const dadosInt = await lerJsonDeResposta(respInt);
+                        if (Array.isArray(dadosInt)) {
+                            regrasPadraoUsuario = dadosInt
+                                .filter(r => r && r.origem === 'usuario')
+                                .map(({ origem, ...resto }) => ({ ...resto }));
                         }
                     }
                 } catch (_) { }
@@ -650,20 +774,26 @@
 
                 if (apiChrome.storage.local) {
                     try {
-                        const agora = new Date();
-                        const pad = (n) => String(n).padStart(2, '0');
-                        const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
-                        await apiChrome.storage.local.clear();
-                        await apiChrome.storage.local.set({
-                            totalCopias: 0,
-                            totalAlertas: 0,
-                            dataInicioContadores: strData,
-                            [CHAVE_PERFIL_ATIVO]: novoAtivo
-                        });
+                        const CHAVES_ESTATISTICAS_PRESERVADAS = [
+                            'jusgovTrabalhoEstado',
+                            'jusgovProdNuvemMeta',
+                            'jusgovProdResumoSync',
+                            'totalCopias',
+                            'totalAlertas',
+                            'dataInicioContadores'
+                        ];
+                        const locExistente = await apiChrome.storage.local.get(null);
+                        const removerLocais = Object.keys(locExistente || {}).filter(
+                            (k) => !CHAVES_ESTATISTICAS_PRESERVADAS.includes(k) && k !== CHAVE_PERFIL_ATIVO
+                        );
+                        if (removerLocais.length > 0 && typeof apiChrome.storage.local.remove === 'function') {
+                            await apiChrome.storage.local.remove(removerLocais);
+                        }
+                        await apiChrome.storage.local.set({ [CHAVE_PERFIL_ATIVO]: novoAtivo });
                     } catch (_) { }
                 }
-                if (apiChrome.storage.session) {
-                    apiChrome.storage.session.clear().catch(() => { });
+                if (apiChrome.storage.session && typeof apiChrome.storage.session.remove === 'function') {
+                    await apiChrome.storage.session.remove('cacheConfigJusGov').catch(() => { });
                 }
 
                 return {
@@ -733,26 +863,329 @@
             };
         }
 
-        async importarBackupTotal(json = {}, chromeApi = null) {
+        sanitizarObjetoConfiguracao(objBruto = {}, catalogo = null) {
+            const cat = catalogo || (obterDefaultsModulo() ? obterDefaultsModulo().obterCatalogoPerfis() : null);
+            const configBase = (cat && cat.configPadrao && typeof cat.configPadrao === 'object') ? cat.configPadrao : {};
+            const chavesConhecidas = new Set([
+                ...Object.keys(configBase),
+                ...CHAVES_CONFIGURACAO_SINCRONIZAVEL.filter(k => k !== 'listaPerfis' && k !== 'regrasMapeamentoElementos')
+            ]);
+            const configValida = {};
+            const chavesValidas = [];
+            const chavesDescartadas = [];
+
+            if (!objBruto || typeof objBruto !== 'object' || Array.isArray(objBruto)) {
+                return { configValida, chavesValidas, chavesDescartadas };
+            }
+
+            const chaves = Object.keys(objBruto);
+            for (let i = 0; i < chaves.length; i++) {
+                const k = chaves[i];
+                const v = objBruto[k];
+                if (!chavesConhecidas.has(k) || v === undefined || v === null) {
+                    chavesDescartadas.push(k);
+                    continue;
+                }
+                const defVal = configBase[k];
+                const tipoEsperado = defVal !== undefined ? typeof defVal : null;
+                let valido = true;
+
+                if (Array.isArray(defVal) || k === 'urlsTurbo' || k === 'urlsAmpuletas') {
+                    valido = Array.isArray(v) && v.every(item => typeof item === 'string' && item.trim().length > 0 && item !== '<all_urls>');
+                    if (valido) {
+                        configValida[k] = v.map(item => item.trim()).slice(0, 500);
+                    }
+                } else if (tipoEsperado === 'boolean') {
+                    valido = (typeof v === 'boolean');
+                    if (valido) configValida[k] = v;
+                } else if (tipoEsperado === 'number') {
+                    valido = (typeof v === 'number' && Number.isFinite(v));
+                    if (valido && LIMITES_NUMERICOS_CONFIGURACAO[k]) {
+                        const lim = LIMITES_NUMERICOS_CONFIGURACAO[k];
+                        if (v < lim.min || v > lim.max) valido = false;
+                    }
+                    if (valido) configValida[k] = v;
+                } else if (tipoEsperado === 'string') {
+                    valido = (typeof v === 'string');
+                    if (valido && ENUNS_CONFIGURACAO_VALIDOS[k]) {
+                        valido = ENUNS_CONFIGURACAO_VALIDOS[k].includes(v);
+                    }
+                    if (valido && (k === 'corFlashBorder' || k === 'corContornoMarcadorColado' || k === 'corFundoMarcadorColado')) {
+                        valido = /^#[0-9a-fA-F]{3,8}$/.test(v.trim());
+                    }
+                    if (valido) configValida[k] = v;
+                } else {
+                    valido = (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string');
+                    if (valido) configValida[k] = clonarValorSimples(v);
+                }
+
+                if (valido) {
+                    chavesValidas.push(k);
+                } else {
+                    chavesDescartadas.push(k);
+                }
+            }
+
+            return { configValida, chavesValidas, chavesDescartadas };
+        }
+
+        gerarNomeArquivoExportacao(dataRef = null) {
+            return formatarNomeArquivoExportacao(dataRef);
+        }
+
+        gerarArquivoExportacaoDiferencial(syncData = {}, overridesAtuais = null, catalogo = null, opcoes = {}) {
+            const cat = catalogo || (obterDefaultsModulo() ? obterDefaultsModulo().obterCatalogoPerfis() : null);
+            const opts = (opcoes && typeof opcoes === 'object') ? opcoes : {};
+            const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
+
+            const perfisModificados = {};
+            const listaPerfisCustom = [];
+            let totalChavesModificadas = 0;
+
+            for (let i = 0; i < listaPerfis.length; i++) {
+                const p = listaPerfis[i];
+                const chave = this.chaveConfigPerfil(p.id);
+                const savedDiff = (syncData[chave] && typeof syncData[chave] === 'object') ? syncData[chave] : {};
+                let diffPerfil;
+                if (p.id === perfilAtivoId) {
+                    const baseResolvida = this.resolverConfigEfetivaPerfil(p.id, savedDiff, cat);
+                    const sobrescritaFonte = (overridesAtuais && typeof overridesAtuais === 'object')
+                        ? overridesAtuais
+                        : this.extrairConfigPerfilDeObjeto(syncData, cat);
+                    diffPerfil = this.calcularSobrescritasPerfil({ ...baseResolvida, ...sobrescritaFonte }, p.id, cat);
+                } else {
+                    diffPerfil = this.calcularSobrescritasPerfil(this.resolverConfigEfetivaPerfil(p.id, savedDiff, cat), p.id, cat);
+                }
+                const qtdChaves = Object.keys(diffPerfil).length;
+                if (!p.predefinido) {
+                    listaPerfisCustom.push({ id: p.id, nome: p.nome, predefinido: false });
+                    perfisModificados[p.id] = diffPerfil;
+                    totalChavesModificadas += Math.max(1, qtdChaves);
+                } else if (qtdChaves > 0) {
+                    perfisModificados[p.id] = diffPerfil;
+                    totalChavesModificadas += qtdChaves;
+                }
+            }
+
+            const dadosJson = {
+                perfis: perfisModificados
+            };
+            if (listaPerfisCustom.length > 0) {
+                dadosJson.listaPerfis = listaPerfisCustom;
+            }
+            const padraoId = String((cat && cat.perfilPadraoId) || 'padrao');
+            if (perfilAtivoId && perfilAtivoId !== padraoId) {
+                dadosJson.perfilAtivoId = perfilAtivoId;
+            }
+
+            const regrasAtual = (overridesAtuais && Array.isArray(overridesAtuais.regrasMapeamentoElementos))
+                ? overridesAtuais.regrasMapeamentoElementos
+                : (Array.isArray(syncData.regrasMapeamentoElementos) ? syncData.regrasMapeamentoElementos : null);
+            const regrasPadrao = Array.isArray(opts.regrasPadraoUsuario) ? opts.regrasPadraoUsuario : [];
+            if (Array.isArray(regrasAtual) && !valoresIguaisConfig(regrasAtual, regrasPadrao)) {
+                dadosJson.regrasMapeamentoElementos = clonarValorSimples(regrasAtual);
+                totalChavesModificadas += 1;
+            }
+
+            const barraAtual = (opts.barraPomodoroAtual && typeof opts.barraPomodoroAtual === 'object') ? opts.barraPomodoroAtual : null;
+            if (barraAtual) {
+                const barraDiff = {};
+                if (barraAtual.modoFixacao !== undefined && Number(barraAtual.modoFixacao) !== 1) barraDiff.modoFixacao = Number(barraAtual.modoFixacao);
+                if (barraAtual.nivelDetalhe !== undefined && Number(barraAtual.nivelDetalhe) !== 0) barraDiff.nivelDetalhe = Number(barraAtual.nivelDetalhe);
+                if (barraAtual.posicaoVertical !== undefined && barraAtual.posicaoVertical !== 'superior') barraDiff.posicaoVertical = barraAtual.posicaoVertical;
+                if (barraAtual.alinhamento !== undefined && barraAtual.alinhamento !== 'esquerda') barraDiff.alinhamento = barraAtual.alinhamento;
+                if (Object.keys(barraDiff).length > 0) {
+                    dadosJson.barraPomodoro = barraDiff;
+                    totalChavesModificadas += Object.keys(barraDiff).length;
+                }
+            }
+
+            const nomeAddon = String(opts.nomeAddon || 'JusGovBR — Seleção/Cópia Inteligente');
+            const versaoAddon = String(opts.versaoAddon || '0.0.0');
+            const dataExportacao = String(opts.dataExportacao || new Date().toISOString());
+            const payloadJson = JSON.stringify(dadosJson, null, 2);
+
+            const linhasCabecalhoSemHash = [
+                '/* ============================================================================',
+                ` * Addon: ${nomeAddon}`,
+                ` * Versão do Addon: ${versaoAddon}`,
+                ` * Data da Exportação: ${dataExportacao}`,
+                ' * ============================================================================ */'
+            ];
+            const conteudoSemLinhaHash = `${linhasCabecalhoSemHash.join('\n')}\n${payloadJson}\n`;
+            const hash = calcularHashPayloadExportacao(conteudoSemLinhaHash);
+
+            const linhasCabecalhoComHash = [
+                ...linhasCabecalhoSemHash.slice(0, -1),
+                ` * Hash: ${hash}`,
+                linhasCabecalhoSemHash[linhasCabecalhoSemHash.length - 1]
+            ];
+            const comentario = linhasCabecalhoComHash.join('\n');
+            const nomeArquivo = formatarNomeArquivoExportacao(opts.dataArquivo || null);
+
+            return {
+                nomeArquivo,
+                conteudoArquivo: `${comentario}\n${payloadJson}\n`,
+                payloadJson,
+                dadosJson,
+                metadados: { nomeAddon, versaoAddon, dataExportacao, hash },
+                totalChavesModificadas
+            };
+        }
+
+        analisarEValidarArquivoImportacao(entrada, catalogo = null) {
+            const cat = catalogo || (obterDefaultsModulo() ? obterDefaultsModulo().obterCatalogoPerfis() : null);
+            let metadados = null;
+            let jsonBruto = null;
+
+            if (typeof entrada === 'string') {
+                const extraido = extrairCabecalhoComentarioExportacao(entrada);
+                metadados = extraido.metadados;
+                if (extraido.temComentario && metadados) {
+                    if (!metadados.nomeAddon || !metadados.nomeAddon.toLowerCase().includes('jusgovbr')) {
+                        return { ok: false, motivo: 'addon_incompativel', mensagem: 'Arquivo não pertence ao addon JusGovBR.' };
+                    }
+                    if (metadados.hashesDuplicados) {
+                        return { ok: false, motivo: 'hash_invalido', mensagem: 'Cabeçalho de exportação com múltiplos hashes de integridade.' };
+                    }
+                    if (!metadados.hashDeclarado) {
+                        return { ok: false, motivo: 'hash_ausente', mensagem: 'Cabeçalho de exportação sem hash de integridade.' };
+                    }
+                    const hashCalculado = calcularHashPayloadExportacao(extraido.conteudoParaHash);
+                    if (hashCalculado !== metadados.hashDeclarado) {
+                        return { ok: false, motivo: 'hash_invalido', mensagem: 'Hash de integridade inválido: o arquivo foi alterado ou corrompido.' };
+                    }
+                }
+                if (!extraido.payloadTexto) {
+                    return { ok: false, motivo: 'json_invalido', mensagem: 'Conteúdo de configuração vazio.' };
+                }
+                try {
+                    jsonBruto = JSON.parse(extraido.payloadTexto);
+                } catch (_) {
+                    return { ok: false, motivo: 'json_invalido', mensagem: 'Arquivo JSON malformado.' };
+                }
+            } else if (entrada && typeof entrada === 'object' && !Array.isArray(entrada)) {
+                jsonBruto = entrada;
+            } else {
+                return { ok: false, motivo: 'json_invalido', mensagem: 'Formato de entrada inválido.' };
+            }
+
+            if (!jsonBruto || typeof jsonBruto !== 'object' || Array.isArray(jsonBruto)) {
+                return { ok: false, motivo: 'json_invalido', mensagem: 'Estrutura JSON raiz inválida.' };
+            }
+
+            const chavesValidas = [];
+            const chavesDescartadas = [];
+            const chavesReconhecidasRaiz = new Set(['projeto', 'versaoBackup', 'backupTotalPerfis', 'dataExportacao', 'perfilAtivoId', 'listaPerfis', 'perfis', 'regrasMapeamentoElementos', 'barraPomodoro']);
+
+            if (!metadados) {
+                const proj = typeof jsonBruto.projeto === 'string' ? jsonBruto.projeto.toLowerCase() : '';
+                const configPadraoRef = (cat && cat.configPadrao) ? cat.configPadrao : {};
+                const temChaveConfig = Object.keys(jsonBruto).some(k =>
+                    configPadraoRef[k] !== undefined ||
+                    k === 'perfis' ||
+                    k === 'regrasMapeamentoElementos' ||
+                    k === 'barraPomodoro'
+                );
+                if (!proj.includes('jusgovbr') && !temChaveConfig) {
+                    return { ok: false, motivo: 'addon_incompativel', mensagem: 'Arquivo incompatível: nenhuma configuração válida do JusGovBR identificada.' };
+                }
+            }
+
+            const perfisSanitizados = {};
+            if (jsonBruto.perfis && typeof jsonBruto.perfis === 'object' && !Array.isArray(jsonBruto.perfis)) {
+                const pids = Object.keys(jsonBruto.perfis);
+                for (let i = 0; i < pids.length; i++) {
+                    const pid = pids[i];
+                    const sanitizado = this.sanitizarObjetoConfiguracao(jsonBruto.perfis[pid], cat);
+                    perfisSanitizados[pid] = sanitizado.configValida;
+                    sanitizado.chavesValidas.forEach(k => chavesValidas.push(`${pid}.${k}`));
+                    sanitizado.chavesDescartadas.forEach(k => chavesDescartadas.push(`${pid}.${k}`));
+                }
+            } else {
+                const chavesSoltasObj = {};
+                Object.keys(jsonBruto).forEach((k) => {
+                    if (!chavesReconhecidasRaiz.has(k)) {
+                        chavesSoltasObj[k] = jsonBruto[k];
+                    }
+                });
+                const sanV1 = this.sanitizarObjetoConfiguracao(chavesSoltasObj, cat);
+                Object.assign(perfisSanitizados, { __v1__: sanV1.configValida });
+                sanV1.chavesValidas.forEach(k => chavesValidas.push(k));
+                sanV1.chavesDescartadas.forEach(k => chavesDescartadas.push(k));
+            }
+
+            let regrasSanitizadas = null;
+            if (jsonBruto.regrasMapeamentoElementos !== undefined) {
+                if (Array.isArray(jsonBruto.regrasMapeamentoElementos)) {
+                    regrasSanitizadas = jsonBruto.regrasMapeamentoElementos.filter(r =>
+                        r && typeof r === 'object' && !Array.isArray(r) && typeof r.seletor === 'string' && r.seletor.trim().length > 0
+                    );
+                } else {
+                    chavesDescartadas.push('regrasMapeamentoElementos');
+                }
+            }
+
+            let barraSanitizada = null;
+            if (jsonBruto.barraPomodoro !== undefined) {
+                if (jsonBruto.barraPomodoro && typeof jsonBruto.barraPomodoro === 'object' && !Array.isArray(jsonBruto.barraPomodoro)) {
+                    const b = jsonBruto.barraPomodoro;
+                    const outB = {};
+                    if ([0, 1, 2, 3].includes(Number(b.modoFixacao))) outB.modoFixacao = Number(b.modoFixacao);
+                    else if (b.modoFixacao !== undefined) chavesDescartadas.push('barraPomodoro.modoFixacao');
+                    if ([0, 1, 2].includes(Number(b.nivelDetalhe))) outB.nivelDetalhe = Number(b.nivelDetalhe);
+                    else if (b.nivelDetalhe !== undefined) chavesDescartadas.push('barraPomodoro.nivelDetalhe');
+                    if (b.posicaoVertical === 'superior' || b.posicaoVertical === 'inferior') outB.posicaoVertical = b.posicaoVertical;
+                    else if (b.posicaoVertical !== undefined) chavesDescartadas.push('barraPomodoro.posicaoVertical');
+                    if (b.alinhamento === 'esquerda' || b.alinhamento === 'centro' || b.alinhamento === 'direita') outB.alinhamento = b.alinhamento;
+                    else if (b.alinhamento !== undefined) chavesDescartadas.push('barraPomodoro.alinhamento');
+                    barraSanitizada = outB;
+                } else {
+                    chavesDescartadas.push('barraPomodoro');
+                }
+            }
+
+            return {
+                ok: true,
+                metadados,
+                dadosValidados: {
+                    ehMultiperfil: Boolean(jsonBruto.perfis && typeof jsonBruto.perfis === 'object' && !Array.isArray(jsonBruto.perfis)),
+                    perfilAtivoId: typeof jsonBruto.perfilAtivoId === 'string' ? jsonBruto.perfilAtivoId.trim() : '',
+                    listaPerfis: Array.isArray(jsonBruto.listaPerfis) ? jsonBruto.listaPerfis : [],
+                    perfis: perfisSanitizados,
+                    regrasMapeamentoElementos: regrasSanitizadas,
+                    barraPomodoro: barraSanitizada
+                },
+                chavesValidas,
+                chavesDescartadas,
+                totalChavesDescartadas: chavesDescartadas.length
+            };
+        }
+
+        async importarBackupTotal(entrada = {}, chromeApi = null) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
             if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
-            if (!json || typeof json !== 'object' || Array.isArray(json)) return { ok: false, motivo: 'json_invalido' };
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
+            const analise = this.analisarEValidarArquivoImportacao(entrada, cat);
+            if (!analise || !analise.ok) {
+                return analise || { ok: false, motivo: 'json_invalido' };
+            }
+
             const syncAtual = await apiChrome.storage.sync.get(null);
             const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncAtual);
             if (ativoLocal) syncAtual[CHAVE_PERFIL_ATIVO] = ativoLocal;
             const { listaPerfis: listaAtual, perfilAtivoId: ativoAtual } = this.garantirEstruturaPerfis(syncAtual, cat);
+            const dv = analise.dadosValidados;
 
-            if (json.perfis && typeof json.perfis === 'object' && !Array.isArray(json.perfis)) {
+            if (dv.ehMultiperfil) {
                 const predefs = (cat && Array.isArray(cat.perfisPredefinidos)) ? cat.perfisPredefinidos : [];
-                const listaImportadaBruta = Array.isArray(json.listaPerfis) ? json.listaPerfis : [];
                 const idsPredef = new Set(predefs.map(p => p.id));
                 const novaLista = predefs.map(p => ({ id: p.id, nome: String(p.nome || p.id), predefinido: true }));
                 const idsAdicionados = new Set(novaLista.map(p => p.id));
 
-                for (let i = 0; i < listaImportadaBruta.length; i++) {
-                    const item = listaImportadaBruta[i];
+                for (let i = 0; i < dv.listaPerfis.length; i++) {
+                    const item = dv.listaPerfis[i];
                     if (item && typeof item.id === 'string' && item.id.trim() && !idsAdicionados.has(item.id.trim()) && !idsPredef.has(item.id.trim())) {
                         novaLista.push({
                             id: item.id.trim(),
@@ -762,15 +1195,15 @@
                         idsAdicionados.add(item.id.trim());
                     }
                 }
-                Object.keys(json.perfis).forEach((pid) => {
+                Object.keys(dv.perfis).forEach((pid) => {
                     if (pid && !idsAdicionados.has(pid)) {
                         novaLista.push({ id: pid, nome: pid, predefinido: idsPredef.has(pid) });
                         idsAdicionados.add(pid);
                     }
                 });
 
-                const novoAtivo = (typeof json.perfilAtivoId === 'string' && novaLista.some(p => p.id === json.perfilAtivoId))
-                    ? json.perfilAtivoId
+                const novoAtivo = (dv.perfilAtivoId && novaLista.some(p => p.id === dv.perfilAtivoId))
+                    ? dv.perfilAtivoId
                     : (novaLista.some(p => p.id === ativoAtual) ? ativoAtual : String((cat && cat.perfilPadraoId) || 'padrao'));
 
                 const gravacao = {
@@ -780,17 +1213,16 @@
 
                 for (let i = 0; i < novaLista.length; i++) {
                     const p = novaLista[i];
-                    const cfgImportada = (json.perfis[p.id] && typeof json.perfis[p.id] === 'object') ? json.perfis[p.id] : {};
-                    const extraida = this.extrairConfigPerfilDeObjeto(cfgImportada, cat);
-                    const resolvida = this.resolverConfigEfetivaPerfil(p.id, extraida, cat);
+                    const cfgImportada = (dv.perfis[p.id] && typeof dv.perfis[p.id] === 'object') ? dv.perfis[p.id] : {};
+                    const resolvida = this.resolverConfigEfetivaPerfil(p.id, cfgImportada, cat);
                     gravacao[this.chaveConfigPerfil(p.id)] = this.calcularSobrescritasPerfil(resolvida, p.id, cat);
                     if (p.id === novoAtivo) {
                         Object.assign(gravacao, resolvida);
                     }
                 }
 
-                if (Array.isArray(json.regrasMapeamentoElementos)) {
-                    gravacao.regrasMapeamentoElementos = json.regrasMapeamentoElementos;
+                if (Array.isArray(dv.regrasMapeamentoElementos)) {
+                    gravacao.regrasMapeamentoElementos = dv.regrasMapeamentoElementos;
                 }
 
                 const chavesPerfilEsperadas = new Set(novaLista.map(p => this.chaveConfigPerfil(p.id)));
@@ -803,13 +1235,39 @@
                 if (chavesRemover.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
                     await apiChrome.storage.sync.remove(chavesRemover);
                 }
+                if (dv.barraPomodoro && apiChrome.storage.local) {
+                    const b = dv.barraPomodoro;
+                    await apiChrome.storage.local.set({
+                        jusgovPomodoroBarraEstadoGlobal: {
+                            modoFixacao: b.modoFixacao ?? 1,
+                            nivelDetalhe: b.nivelDetalhe ?? 0,
+                            posicaoVertical: b.posicaoVertical || 'superior',
+                            posicaoVerticalAncorada: b.posicaoVertical || 'superior',
+                            topPx: b.posicaoVertical === 'inferior' ? 99999 : 0,
+                            alinhamento: b.alinhamento || 'esquerda',
+                            alinhamentoAncorado: b.alinhamento || 'esquerda',
+                            leftPx: null,
+                            topAncoradoPx: b.posicaoVertical === 'inferior' ? 99999 : 0,
+                            leftAncoradoPx: null
+                        }
+                    });
+                }
 
-                return { ok: true, backupTotal: true, perfilAtivoId: novoAtivo, listaPerfis: novaLista };
+                return {
+                    ok: true,
+                    backupTotal: true,
+                    perfilAtivoId: novoAtivo,
+                    listaPerfis: novaLista,
+                    metadados: analise.metadados,
+                    chavesValidas: analise.chavesValidas,
+                    chavesDescartadas: analise.chavesDescartadas,
+                    totalChavesDescartadas: analise.totalChavesDescartadas
+                };
             }
 
-            /* Retrocompatibilidade v1: importa configuracoes isoladas no perfil ativo atual */
-            const extraidaV1 = this.extrairConfigPerfilDeObjeto(json, cat);
-            const baseMerged = { ...syncAtual, ...extraidaV1 };
+            /* Retrocompatibilidade v1: importa configuracoes isoladas validadas no perfil ativo atual */
+            const cfgV1 = dv.perfis.__v1__ || {};
+            const baseMerged = { ...syncAtual, ...cfgV1 };
             const resolvidaV1 = this.resolverConfigEfetivaPerfil(ativoAtual, baseMerged, cat);
             const gravacaoV1 = {
                 [CHAVE_LISTA_PERFIS]: listaAtual,
@@ -817,12 +1275,21 @@
                 [this.chaveConfigPerfil(ativoAtual)]: this.calcularSobrescritasPerfil(resolvidaV1, ativoAtual, cat),
                 ...resolvidaV1
             };
-            if (Array.isArray(json.regrasMapeamentoElementos)) {
-                gravacaoV1.regrasMapeamentoElementos = json.regrasMapeamentoElementos;
+            if (Array.isArray(dv.regrasMapeamentoElementos)) {
+                gravacaoV1.regrasMapeamentoElementos = dv.regrasMapeamentoElementos;
             }
             await this.salvarPerfilAtivoLocal(ativoAtual, apiChrome);
             await apiChrome.storage.sync.set(gravacaoV1);
-            return { ok: true, backupTotal: false, perfilAtivoId: ativoAtual, listaPerfis: listaAtual };
+            return {
+                ok: true,
+                backupTotal: false,
+                perfilAtivoId: ativoAtual,
+                listaPerfis: listaAtual,
+                metadados: analise.metadados,
+                chavesValidas: analise.chavesValidas,
+                chavesDescartadas: analise.chavesDescartadas,
+                totalChavesDescartadas: analise.totalChavesDescartadas
+            };
         }
 
         /*
@@ -1117,6 +1584,11 @@
                 config.pomodoroModoAviso = padraoPerfil.pomodoroModoAviso || 'completo';
                 precisaSalvar = true;
             }
+            const estilosMinipopupValidos = VALORES_ENUM_CONFIGURACAO.pomodoroEstiloMinipopup;
+            if (typeof config.pomodoroEstiloMinipopup !== 'string' || !estilosMinipopupValidos.includes(config.pomodoroEstiloMinipopup)) {
+                config.pomodoroEstiloMinipopup = padraoPerfil.pomodoroEstiloMinipopup || 'compacto';
+                precisaSalvar = true;
+            }
 
             /* Normalizar demais booleanos e seletores simples a partir do perfil ativo de perfis.json */
             const chavesPadraoKeys = Object.keys(padraoPerfil);
@@ -1155,13 +1627,11 @@
                 try {
                     if (typeof fetch === 'function' && apiChrome && apiChrome.runtime && typeof apiChrome.runtime.getURL === 'function') {
                         const respInt = await fetch(apiChrome.runtime.getURL('src/cfg/interface.json'));
-                        if (respInt && respInt.ok) {
-                            const dadosInt = await respInt.json();
-                            if (Array.isArray(dadosInt)) {
-                                padraoUsuario = dadosInt
-                                    .filter(r => r && r.origem === 'usuario')
-                                    .map(({ origem, ...resto }) => ({ ...resto }));
-                            }
+                        const dadosInt = await lerJsonDeResposta(respInt);
+                        if (Array.isArray(dadosInt)) {
+                            padraoUsuario = dadosInt
+                                .filter(r => r && r.origem === 'usuario')
+                                .map(({ origem, ...resto }) => ({ ...resto }));
                         }
                     }
                 } catch (_) { }
@@ -1203,7 +1673,7 @@
 
             /* Passo 4.3: Espelhar configuracao no chrome.storage.session (RAM rapida) e sincronizar Fachada POO do Navegador */
             if (apiChrome.storage.session) {
-                apiChrome.storage.session.set({ cacheConfigJusGov: config }).catch(() => { });
+                await apiChrome.storage.session.set({ cacheConfigJusGov: config }).catch(() => { });
             }
             if (navegadorUtil && typeof navegadorUtil.atualizarConfiguracoes === 'function') {
                 try {
@@ -1418,8 +1888,8 @@
                     }
                 }
                 await apiChrome.storage.local.set({ [CHAVE_CONFIG_SYNC_PENDENTE]: atualPend });
-                await this.sincronizarEstado(apiChrome, dependencias);
-                return { ok: true };
+                const cfgSincronizada = await this.sincronizarEstado(apiChrome, dependencias);
+                return { ok: true, config: cfgSincronizada };
             } catch (_) {
                 return { ok: false };
             }

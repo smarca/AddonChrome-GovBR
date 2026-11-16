@@ -439,7 +439,9 @@
         if (motorTeste && typeof motorTeste.obterModoRetirarSelecao === 'function' && typeof motorTeste.definirModoRetirarSelecao === 'function') {
             const modoOriginal = motorTeste.obterModoRetirarSelecao();
 
-            /* 1) Teste de Normalizacao dos 4 Modos */
+            /* 1) Teste de Normalizacao dos 5 Modos */
+            motorTeste.definirModoRetirarSelecao('com_flash');
+            const modoComFlash = motorTeste.obterModoRetirarSelecao();
             motorTeste.definirModoRetirarSelecao('total_exceto_arrasto');
             const modoArrasto = motorTeste.obterModoRetirarSelecao();
             motorTeste.definirModoRetirarSelecao('total');
@@ -452,6 +454,7 @@
             const modoFallback = motorTeste.obterModoRetirarSelecao();
 
             const normalizacaoOk = (
+                modoComFlash === 'com_flash' &&
                 modoArrasto === 'total_exceto_arrasto' &&
                 modoTotal === 'total' &&
                 modoNenhuma === 'nenhuma' &&
@@ -462,8 +465,9 @@
             registrar(
                 normalizacaoOk,
                 'MODO_RETIRAR_SELECAO_NORMALIZACAO',
-                'Suporte e normalizacao precisa dos 4 modos (interface, total, total_exceto_arrasto, nenhuma)',
+                'Suporte e normalizacao precisa dos 5 modos (com_flash, interface, total, total_exceto_arrasto, nenhuma)',
                 {
+                    com_flash: modoComFlash,
                     total_exceto_arrasto: modoArrasto,
                     total: modoTotal,
                     nenhuma: modoNenhuma,
@@ -2172,7 +2176,9 @@
             elementoTesteModos.appendChild(pTexto);
             document.body.appendChild(elementoTesteModos);
 
-            // Modo Textual
+            // Modo Textual (garante avaliação sob política de retenção textual 'interface')
+            const modoRetiradaOrig620 = typeof motorTeste.obterModoRetirarSelecao === 'function' ? motorTeste.obterModoRetirarSelecao() : 'com_flash';
+            if (typeof motorTeste.definirModoRetirarSelecao === 'function') motorTeste.definirModoRetirarSelecao('interface');
             motorTeste.definirRegrasMapeamentoElementos([
                 { id: 't1', expressao: '#secaoTesteModos620 .item-custom-regra', tipo: 'textual', herdarFilhos: true, ativo: true }
             ]);
@@ -2192,6 +2198,7 @@
             ]);
             const ctxSemiflexivel = motorTeste.classificarContextoElementoAlvo(pTexto);
             const manterSemiflexivel = motorTeste.deveManterSelecaoAtivaNoDom(pTexto);
+            if (typeof motorTeste.definirModoRetirarSelecao === 'function') motorTeste.definirModoRetirarSelecao(modoRetiradaOrig620);
 
             // Comportamento Semiflexível: Bloco Verificável vs Palavra Comum
             const txtP = pTexto.textContent;
@@ -2336,6 +2343,8 @@
             const modalFechouOk = !document.getElementById('jusgov-modal-mapeamento-regra');
 
             // 4. Modos Comportamentais (1º Interface, 2º Semiflexível, 3º Textual)
+            const modoRetiradaOrig685 = typeof motorTeste.obterModoRetirarSelecao === 'function' ? motorTeste.obterModoRetirarSelecao() : 'com_flash';
+            if (typeof motorTeste.definirModoRetirarSelecao === 'function') motorTeste.definirModoRetirarSelecao('interface');
             motorTeste.definirRegrasMapeamentoElementos([
                 { id: 'r_int', expressao: '#painelTesteMapeamento685', tipoSeletor: 'Seletor CSS', tipo: 'interface', observacao: 'Teste Interface', herdarFilhos: true, ativo: true }
             ]);
@@ -2353,6 +2362,7 @@
             ]);
             const ehTextual = motorTeste.classificarContextoElementoAlvo(elementoAlvo) === 'LEITURA_COMUM';
             const mantemTextual = motorTeste.deveManterSelecaoAtivaNoDom(elementoAlvo) === true;
+            if (typeof motorTeste.definirModoRetirarSelecao === 'function') motorTeste.definirModoRetirarSelecao(modoRetiradaOrig685);
 
             // Limpeza
             elementoAlvo.remove();

@@ -1,3 +1,6 @@
+/* ============================================================================
+ * Addon: JusGovBR — Seleção/Cópia Inteligente
+ * ============================================================================ */
 {
   "versaoEsquema": 1,
   "perfilPadraoId": "padrao",
@@ -72,6 +75,9 @@
     "pomodoroCiclos": 4,
     "pomodoroPausasAutomaticas": true,
     "pomodoroModoAviso": "completo",
+    "pomodoroEstiloMinipopup": "compacto",
+    "pomodoroBeepConclusaoAtivo": true,
+    "pomodoroBeepIntensidade": "suave",
     "urlsTurbo": [
       "*://*.jus.br/*",
       "*://*.gov.br/*",

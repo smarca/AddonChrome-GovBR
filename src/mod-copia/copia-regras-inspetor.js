@@ -113,8 +113,18 @@
                     };
                     if (typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
                         fetch(chrome.runtime.getURL('src/cfg/interface.json'))
-                            .then((resp) => (resp && resp.ok ? resp.json() : null))
-                            .then((dados) => {
+                            .then((resp) => (resp && resp.ok ? resp.text() : null))
+                            .then((txt) => {
+                                if (!txt) {
+                                    tentarIpc();
+                                    return;
+                                }
+                                let dados = null;
+                                try {
+                                    dados = (typeof JusGovCfgDefaults !== 'undefined' && JusGovCfgDefaults && typeof JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                                        ? JusGovCfgDefaults.parsearJsonComComentarios(txt)
+                                        : JSON.parse(String(txt || '').replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim());
+                                } catch (_) { }
                                 if (Array.isArray(dados)) {
                                     aplicarRegrasInterface(dados);
                                 } else {

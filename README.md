@@ -1,14 +1,12 @@
 # ⚖️ JusGovBR — Seleção/Cópia Inteligente & PJe Turbo
 
-> [!NOTE]
-> ### 🧭 AUTO-DESCRIÇÃO E DIRETRIZ DE REÚSO PARA NOVOS PROJETOS
-> - **Identificação do Arquivo:** `docs/README.md`
-> - **Finalidade Primária:** Apresentação executiva, manual de instalação rápida e guia público para usuários e desenvolvedores externos.
-> - **Papel na Governança e Inteligência da IA:** Define a identidade pública do software como fonte canônica primária em `docs/README.md`, replicando-se unidirecionalmente para o `README.md` da raiz através do pipeline de sincronização (protegendo a integridade documental caso arquivos fora de `docs/` sejam apagados acidentalmente).
-> - **Reaproveitamento em Novos Projetos:**
->   - *Comando de Ativação:* Ao iniciar outro projeto, declare: `"vou iniciar um novo projeto do zero..."`.
->   - *Núcleo Perpétuo Reutilizável (DNA do Autor):* Estrutura de tópicos profissionais, seções de compatibilidade, instalação em modo desenvolvedor e replicação a partir de `docs/` para a raiz.
->   - *Seções Específicas de Domínio (A Adaptar):* Descrição do produto, atalhos e funcionalidades do novo sistema.
+> **🗄️ FICHA DE TABELA DOCUMENTAL (`TB-PUB`)**
+> - **Arquivo:** `docs/README.md` (replicado automaticamente para `README.md` na raiz) | **Categoria:** `Apresentação Pública & Guia de Instalação`
+> - **Estrutura & Mutabilidade:** `Documento Público Estático` — **Baixa Mutabilidade**.
+> - **Ciclo de Vida / Status:** Editado sempre em `docs/README.md` e sincronizado unidirecionalmente para `README.md` na raiz por `util/fazer_backup.ps1`.
+> - **Uso pela IA (Carregamento):** `ON-DEMAND` — consultar apenas quando atualizar instruções públicas de instalação ou resumo de recursos para o GitHub.
+> - **Dependências (FK):** Roteador: `docs/00_INDICE_GERAL.md` (`TB-00`); Arquitetura: `docs/02_ARQUITETURA_E_AS_BUILT.md` (`TB-02`).
+> - **Resumo & Chaves Indexadas:** Visão geral do produto, recursos de seleção forense em 1 clique, validação Mod 11/97, atalhos, filtros HTML, PJe Turbo e passo a passo de instalação no Chrome.
 
 
 **JusGovBR (Seleção, Validação e Cópia de Textos Aprimorada)** é uma extensão de alta performance para navegadores baseados em Chromium (Google Chrome, Microsoft Edge, Brave — versão 116+ / Manifest V3), projetada especificamente para acelerar a rotina de **magistrados, assessores, servidores públicos, advogados e operadores do Direito** que atuam diariamente em sistemas judiciais e governamentais brasileiros (como **PJe**, **SEI!**, **e-Proc**, **Projudi** e portais `.jus.br` / `.gov.br`), além de funcionar em qualquer página web ou visualizador de PDF.

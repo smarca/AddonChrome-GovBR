@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnModoGlobal) btnModoGlobal.classList.add('ativo');
             if (labelModoAtual) labelModoAtual.textContent = 'Todos os Sites';
             if (badgeStatusGeral) {
-                preencherBadgeDuasLinhas('ATIVO', '(GLOBAL)');
+                preencherBadgeDuasLinhas('Ativo', '(Global)');
                 badgeStatusGeral.classList.remove('inativo', 'lista');
             }
             if (iconeBg) {
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnModoUrl) btnModoUrl.classList.add('ativo');
             if (labelModoAtual) labelModoAtual.textContent = 'Lista de Sites';
             if (badgeStatusGeral) {
-                preencherBadgeDuasLinhas('ATIVO', '(LISTA)');
+                preencherBadgeDuasLinhas('Ativo', '(Lista)');
                 badgeStatusGeral.classList.remove('inativo');
                 badgeStatusGeral.classList.add('lista');
             }
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnModoDesligado) btnModoDesligado.classList.add('ativo');
             if (labelModoAtual) labelModoAtual.textContent = 'Desligado';
             if (badgeStatusGeral) {
-                badgeStatusGeral.textContent = 'PAUSADO';
+                badgeStatusGeral.textContent = 'Pausado';
                 badgeStatusGeral.classList.remove('lista');
                 badgeStatusGeral.classList.add('inativo');
             }
@@ -439,10 +439,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarContadoresProdutividadePopup() {
         if (!rodapeProdutividadeOnline || typeof chrome === 'undefined') return;
-        const renderizar = (st, cfgObs = null, nuvemMeta = null) => {
+        const renderizar = (st, cfgObs = null, nuvemMeta = null, agoraSrv = null) => {
             if (!st) return;
             if (instanciaProdutividadePopup && typeof instanciaProdutividadePopup.renderizarResumoProdutividadeDom === 'function') {
-                instanciaProdutividadePopup.renderizarResumoProdutividadeDom(rodapeProdutividadeOnline, st, cfgObs || {}, Date.now(), { nuvemMeta });
+                instanciaProdutividadePopup.renderizarResumoProdutividadeDom(rodapeProdutividadeOnline, st, cfgObs || {}, Number(agoraSrv || Date.now()), { nuvemMeta });
                 return;
             }
             const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0)) + Math.max(0, Math.floor(Number(nuvemMeta && nuvemMeta.outrosCorridoMin) || 0));
@@ -453,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizar(resp.estado, resp.config || null, resp.nuvemMeta || null);
+                    renderizar(resp.estado, resp.config || null, resp.nuvemMeta || null, resp.agoraServidor || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
@@ -479,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (area === 'sync') {
                 if (changes.listaPerfis) {
                     carregarEstadoInicial();
+                    atualizarContadoresProdutividadePopup();
                     return;
                 }
                 if (changes.modoTurbo) atualizarInterfaceModo(changes.modoTurbo.newValue);
@@ -489,10 +490,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     cacheUrlsTurbo = Array.isArray(changes.urlsTurbo.newValue) ? changes.urlsTurbo.newValue : [];
                     atualizarBotaoDominioAba();
                 }
-            } else if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta)) {
+                if (
+                    changes.pomodoroAtivo || changes.pomodoroProporcao || changes.pomodoroFocoMinutos ||
+                    changes.pomodoroCiclos || changes.pomodoroModoAviso || changes.pomodoroEstiloMinipopup ||
+                    changes.tempoTrabalhoCorridoAtivo || changes.tempoTrabalhoAtivoAtivo
+                ) {
+                    atualizarContadoresProdutividadePopup();
+                }
+            } else if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta || changes.jusgovPomodoroBarraEstadoGlobal)) {
                 atualizarContadoresProdutividadePopup();
             } else if (area === 'local' && (changes.jusgovConfigSyncPendente || changes.perfilAtivoId)) {
                 carregarEstadoInicial();
+                atualizarContadoresProdutividadePopup();
             }
         });
     }

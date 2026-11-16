@@ -124,7 +124,7 @@
          * @param {Object} chromeApi - Objeto chrome com APIs windows e tabs
          * @returns {Promise<boolean>} True se a janela foi convertida
          */
-        async processarNovaJanela(novaJanela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}) {
+        async processarNovaJanela(novaJanela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}, aoMoverCallback = null) {
             /* Passo 1.1: Guarda de ativação e validação de APIs */
             if (!this.#bloquearNovasJanelas || !novaJanela || !chromeApi || !chromeApi.windows || !chromeApi.tabs) {
                 return false;
@@ -159,14 +159,22 @@
                     return false;
                 }
 
+                const abasPrincipal = await chromeApi.tabs.query({ windowId: janelaPrincipal.id, active: true }).catch(() => []);
+                const abaAtivaOrigemId = (Array.isArray(abasPrincipal) && abasPrincipal[0] && typeof abasPrincipal[0].id === 'number')
+                    ? abasPrincipal[0].id
+                    : undefined;
+
                 const emPrimeiroPlano = (config.abaEmPrimeiroPlano !== undefined)
                     ? Boolean(config.abaEmPrimeiroPlano)
                     : (config.abaEmSegundoPlano !== undefined ? (config.abaEmSegundoPlano === false) : true);
-                /* Passo 1.4: Move as abas para a janela principal */
+                /* Passo 1.4: Move as abas para a janela principal e notifica ordenação/hierarquia */
                 for (const aba of abasNovaJanela) {
                     await chromeApi.tabs.move(aba.id, { windowId: janelaPrincipal.id, index: -1 });
                     if (emPrimeiroPlano) {
                         await chromeApi.tabs.update(aba.id, { active: true });
+                    }
+                    if (typeof aoMoverCallback === 'function') {
+                        await aoMoverCallback({ ...aba, windowId: janelaPrincipal.id }, abaAtivaOrigemId);
                     }
                 }
 

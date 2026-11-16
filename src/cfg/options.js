@@ -203,10 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const containerFecharHierarquiaCascata = document.getElementById('containerFecharHierarquiaCascata');
     const btnRestaurarOrdemGuiasPadrao = document.getElementById('btnRestaurarOrdemGuiasPadrao');
     const feedbackAcoesGuias = document.getElementById('feedbackAcoesGuias');
-    const optModoBarraFavoritosSuperior = document.getElementById('optModoBarraFavoritosSuperior');
-    const btnRestaurarBarraFerramentasPadrao = document.getElementById('btnRestaurarBarraFerramentasPadrao');
     const btnAbrirAparenciaChrome = document.getElementById('btnAbrirAparenciaChrome');
-    const feedbackAparenciaChrome = document.getElementById('feedbackAparenciaChrome');
+    const btnAbrirLimparDadosChrome = document.getElementById('btnAbrirLimparDadosChrome');
     const btnTestarCaixaEntradaRapida = document.getElementById('btnTestarCaixaEntradaRapida');
     const btnTestarAdicaoManualMapeamento = document.getElementById('btnTestarAdicaoManualMapeamento');
     const optDescarteGuiasInativas = document.getElementById('optDescarteGuiasInativas');
@@ -265,8 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblPomodoroAlivioCalculado = document.getElementById('lblPomodoroAlivioCalculado');
     const optPomodoroCiclos = document.getElementById('optPomodoroCiclos');
     const lblPomodoroPausaMaiorCalculada = document.getElementById('lblPomodoroPausaMaiorCalculada');
-    const optPomodoroModoAviso = document.getElementById('optPomodoroModoAviso');
+    const optPomodoroEstiloMinipopup = document.getElementById('optPomodoroEstiloMinipopup');
+    const optPomodoroComportamentoBarra = document.getElementById('optPomodoroComportamentoBarra');
     const optPomodoroPausasAutomaticas = document.getElementById('optPomodoroPausasAutomaticas');
+    const optPomodoroBeepConclusaoAtivo = document.getElementById('optPomodoroBeepConclusaoAtivo');
+    const optPomodoroBeepIntensidade = document.getElementById('optPomodoroBeepIntensidade');
     const painelConfigPomodoro = document.getElementById('painelConfigPomodoro');
     const lblStatusProdutividadeTrabalho = document.getElementById('lblStatusProdutividadeTrabalho');
     const lblStatusPomodoroDetalhado = document.getElementById('lblStatusPomodoroDetalhado');
@@ -427,6 +428,62 @@ document.addEventListener('DOMContentLoaded', () => {
      * OBJETIVO DE RECONSTRUCAO: Alternar entre Configuracoes, Central de Ajuda
      * e Laboratorio de Testes sem recarregar a pagina, com suporte ao Casulo SEC-01.
      */
+    function inicializarCartoesColapsaveis() {
+        const cartoes = document.querySelectorAll('section.cartao');
+        cartoes.forEach((cartao) => {
+            const h2 = Array.from(cartao.children).find((el) => el && el.tagName === 'H2');
+            if (!h2 || h2.dataset.colapsoInicializado === '1') return;
+            h2.dataset.colapsoInicializado = '1';
+            h2.classList.add('cartao-titulo-colapsavel');
+            h2.setAttribute('role', 'button');
+            h2.setAttribute('tabindex', '0');
+            h2.setAttribute('aria-expanded', 'true');
+
+            const esq = document.createElement('span');
+            esq.className = 'cartao-titulo-esquerda';
+            const chevron = document.createElement('span');
+            chevron.className = 'cartao-icone-colapso';
+            chevron.setAttribute('aria-hidden', 'true');
+            chevron.textContent = '▾';
+            esq.appendChild(chevron);
+
+            const acoes = document.createElement('span');
+            acoes.className = 'cartao-titulo-acoes';
+
+            const filhos = Array.from(h2.childNodes);
+            filhos.forEach((node) => {
+                if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BUTTON') {
+                    node.addEventListener('click', (ev) => ev.stopPropagation());
+                    acoes.appendChild(node);
+                } else {
+                    esq.appendChild(node);
+                }
+            });
+
+            h2.replaceChildren(esq);
+            if (acoes.childNodes.length > 0) {
+                h2.appendChild(acoes);
+            }
+
+            const alternar = () => {
+                const colapsado = cartao.classList.toggle('colapsado');
+                h2.setAttribute('aria-expanded', colapsado ? 'false' : 'true');
+            };
+            h2.addEventListener('click', (ev) => {
+                if (ev.target && typeof ev.target.closest === 'function' && ev.target.closest('button, a, input, select')) {
+                    return;
+                }
+                alternar();
+            });
+            h2.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    alternar();
+                }
+            });
+        });
+    }
+
     function configurarNavegacaoAbas() {
         /* Passo 2.2: Vincular clique em cada botao de aba */
         botoesAbas.forEach(btn => {
@@ -644,6 +701,12 @@ document.addEventListener('DOMContentLoaded', () => {
             painelConfigPomodoro.style.opacity = ativo ? '1' : '0.5';
             painelConfigPomodoro.style.pointerEvents = ativo ? 'auto' : 'none';
         }
+        const beepAtivo = optPomodoroBeepConclusaoAtivo ? optPomodoroBeepConclusaoAtivo.checked : true;
+        if (optPomodoroBeepConclusaoAtivo) optPomodoroBeepConclusaoAtivo.disabled = !ativo;
+        if (optPomodoroBeepIntensidade) {
+            optPomodoroBeepIntensidade.disabled = (!ativo || !beepAtivo);
+            optPomodoroBeepIntensidade.style.opacity = (ativo && beepAtivo) ? '1' : '0.5';
+        }
     }
 
     function formatarMinutosHHMM(totalMin) {
@@ -659,16 +722,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarStatusProdutividadeUI() {
         if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined') return;
-        const renderizarEstado = (st, resumo = null, nuvemMeta = null) => {
+        const renderizarEstado = (st, cfgBase = null, nuvemMeta = null, agoraSrv = null) => {
             if (!st) return;
             const cfgPom = {
-                pomodoroAtivo: Boolean(optPomodoroAtivo && optPomodoroAtivo.checked),
-                pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
-                pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5,
-                pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4
+                ...(cfgBase && typeof cfgBase === 'object' ? cfgBase : {}),
+                pomodoroAtivo: optPomodoroAtivo ? Boolean(optPomodoroAtivo.checked) : Boolean(cfgBase && cfgBase.pomodoroAtivo),
+                pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : ((cfgBase && cfgBase.pomodoroFocoMinutos) || 25),
+                pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : ((cfgBase && cfgBase.pomodoroProporcao) || 4.5),
+                pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : ((cfgBase && cfgBase.pomodoroCiclos) || 4)
             };
             if (instanciaProdutividadeOptions && typeof instanciaProdutividadeOptions.renderizarResumoProdutividadeDom === 'function') {
-                instanciaProdutividadeOptions.renderizarResumoProdutividadeDom(lblStatusProdutividadeTrabalho, st, cfgPom, Date.now(), {
+                instanciaProdutividadeOptions.renderizarResumoProdutividadeDom(lblStatusProdutividadeTrabalho, st, cfgPom, Number(agoraSrv || Date.now()), {
                     containerPomodoro: lblStatusPomodoroDetalhado,
                     ocultarPomodoroQuandoInativo: true,
                     nuvemMeta
@@ -683,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizarEstado(resp.estado, resp.resumoPomodoro || null, resp.nuvemMeta || null);
+                    renderizarEstado(resp.estado, resp.config || null, resp.nuvemMeta || null, resp.agoraServidor || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
@@ -699,7 +763,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
-            if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta)) {
+            if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta || changes.jusgovConfigSyncPendente || changes.perfilAtivoId || changes.jusgovPomodoroBarraEstadoGlobal)) {
+                atualizarStatusProdutividadeUI();
+            }
+            if (area === 'sync' && (
+                changes.listaPerfis || changes.pomodoroAtivo || changes.pomodoroProporcao ||
+                changes.pomodoroFocoMinutos || changes.pomodoroCiclos || changes.pomodoroModoAviso ||
+                changes.pomodoroEstiloMinipopup || changes.tempoTrabalhoCorridoAtivo || changes.tempoTrabalhoAtivoAtivo
+            )) {
                 atualizarStatusProdutividadeUI();
             }
         });
@@ -762,10 +833,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return { valorSeguro: num, sofreuResetOverflow: false };
     }
 
-    function normalizarModoRetirarSelecao(val) {
+    function normalizarModoRetirarSelecao(val, flashAtivo = true) {
         const v = String(val || '').trim().toLowerCase();
+        if (v === 'com_flash') return flashAtivo ? 'com_flash' : 'nenhuma';
         if (v === 'total_exceto_arrasto' || v === 'total' || v === 'interface' || v === 'nenhuma') return v;
-        return 'total';
+        return flashAtivo ? 'com_flash' : 'nenhuma';
     }
 
     function converterNivelFiltroParaIndice(nivel) {
@@ -913,10 +985,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function atualizarVisibilidadeSubOpcoesFlash() {
-        const ms = optTempoFlashMs ? Number(optTempoFlashMs.value) : 500;
+    let ultimoFlashAtivoEstado = null;
+
+    function sincronizarOpcaoRetirarComFlash(porInteracaoFlash = false) {
+        const ms = optTempoFlashMs ? Number(optTempoFlashMs.value) : 5250;
+        const flashAtivo = ms > 0;
+        if (!optModoRetirarSelecao) {
+            ultimoFlashAtivoEstado = flashAtivo;
+            return;
+        }
+        const optComFlash = optModoRetirarSelecao.querySelector('option[value="com_flash"]');
+        if (optComFlash) {
+            optComFlash.hidden = !flashAtivo;
+            optComFlash.disabled = !flashAtivo;
+        }
+        if (!flashAtivo) {
+            if (optModoRetirarSelecao.value === 'com_flash' || (porInteracaoFlash && ultimoFlashAtivoEstado === true)) {
+                optModoRetirarSelecao.value = 'nenhuma';
+            }
+        } else if (porInteracaoFlash && ultimoFlashAtivoEstado === false && optModoRetirarSelecao.value === 'nenhuma') {
+            optModoRetirarSelecao.value = 'com_flash';
+        }
+        ultimoFlashAtivoEstado = flashAtivo;
+    }
+
+    function atualizarVisibilidadeSubOpcoesFlash(porInteracaoFlash = false) {
+        const ms = optTempoFlashMs ? Number(optTempoFlashMs.value) : 5250;
         const ativo = ms > 0;
         if (optCorFlashBorder) optCorFlashBorder.disabled = !ativo;
+        sincronizarOpcaoRetirarComFlash(porInteracaoFlash);
     }
 
     function atualizarTodasVisibilidadesCascata() {
@@ -1053,7 +1150,6 @@ document.addEventListener('DOMContentLoaded', () => {
             aplicarRotuloSentidoOrdenacao(sentidoEfetivo === 'esq_dir');
             if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = Boolean(dados.ordenarGuiasFixadas);
             if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = Boolean(dados.fecharHierarquiaEmCascata);
-            if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = Boolean(dados.modoBarraFavoritosSuperior);
             if (optDescarteGuiasInativas) optDescarteGuiasInativas.checked = false;
             if (optTempoInatividadeDescarteMinutos) {
                 optTempoInatividadeDescarteMinutos.value = String(dados.tempoInatividadeDescarteMinutos || '20');
@@ -1116,12 +1212,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 optEstiloBadgeMarcadorColado.value = normalizarEstiloBadgeMarcadorColado(dados.estiloBadgeMarcadorColado);
             }
             atualizarPreviewsVisuaisMarcadorEFlash();
+            const flashAtivoCarregado = optTempoFlashMs ? (Number(optTempoFlashMs.value) > 0) : true;
             if (optModoRetirarSelecao) {
-                optModoRetirarSelecao.value = normalizarModoRetirarSelecao(dados.modoRetirarSelecao);
+                optModoRetirarSelecao.value = normalizarModoRetirarSelecao(dados.modoRetirarSelecao, flashAtivoCarregado);
             }
+            sincronizarOpcaoRetirarComFlash(false);
             if (optMinimoCaracteresInterface) {
-                const minVal = parseInt(dados.minimoCaracteresInterface !== undefined ? dados.minimoCaracteresInterface : 5, 10);
-                optMinimoCaracteresInterface.value = [0, 1, 2, 3, 4, 5, 10].includes(minVal) ? String(minVal) : '5';
+                const minVal = parseInt(dados.minimoCaracteresInterface !== undefined ? dados.minimoCaracteresInterface : 0, 10);
+                optMinimoCaracteresInterface.value = [0, 1, 2, 3, 4, 5, 10].includes(minVal) ? String(minVal) : '0';
             }
 
             if (optAcumuladorSeparador) {
@@ -1162,11 +1260,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cic = Number(dados.pomodoroCiclos);
                 optPomodoroCiclos.value = (Number.isInteger(cic) && cic >= 2 && cic <= 10) ? String(cic) : '4';
             }
-            if (optPomodoroModoAviso) {
-                optPomodoroModoAviso.value = normalizarModoAvisoPomodoro(dados.pomodoroModoAviso);
+            if (optPomodoroEstiloMinipopup) {
+                const estMini = String(dados.pomodoroEstiloMinipopup || 'compacto').toLowerCase();
+                optPomodoroEstiloMinipopup.value = ['compacto', 'normal', 'expandido'].includes(estMini) ? estMini : 'compacto';
+            }
+            if (optPomodoroComportamentoBarra) {
+                const modoAvisoAtual = normalizarModoAvisoPomodoro(dados.pomodoroModoAviso);
+                if (modoAvisoAtual === 'badge_e_barra_descanso' || modoAvisoAtual === 'barra_descanso') {
+                    optPomodoroComportamentoBarra.value = 'oculto';
+                } else {
+                    optPomodoroComportamentoBarra.value = 'fixo';
+                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                        chrome.storage.local.get(['jusgovPomodoroBarraEstadoGlobal'], (resLoc) => {
+                            if (chrome.runtime && chrome.runtime.lastError) return;
+                            const estBar = resLoc && resLoc.jusgovPomodoroBarraEstadoGlobal;
+                            if (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value !== 'oculto' && estBar && Number(estBar.modoFixacao) === 2) {
+                                optPomodoroComportamentoBarra.value = 'movel';
+                            }
+                            if (optPomodoroEstiloMinipopup && estBar && (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2)) {
+                                optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                            }
+                        });
+                    }
+                }
             }
             if (optPomodoroPausasAutomaticas) {
                 optPomodoroPausasAutomaticas.checked = (dados.pomodoroPausasAutomaticas !== false);
+            }
+            if (optPomodoroBeepConclusaoAtivo) {
+                optPomodoroBeepConclusaoAtivo.checked = (dados.pomodoroBeepConclusaoAtivo !== false);
+            }
+            if (optPomodoroBeepIntensidade) {
+                const intBeep = String(dados.pomodoroBeepIntensidade || 'suave').toLowerCase();
+                optPomodoroBeepIntensidade.value = ['suave', 'moderado', 'grave'].includes(intBeep) ? intBeep : 'suave';
             }
             atualizarCalculoPomodoroUI();
             atualizarStatusProdutividadeUI();
@@ -1322,7 +1448,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
             ordenarGuiasFixadas: optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false,
             fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
-            modoBarraFavoritosSuperior: optModoBarraFavoritosSuperior ? optModoBarraFavoritosSuperior.checked : false,
             descarteGuiasInativasAtivo: false,
             tempoInatividadeDescarteMinutos: optTempoInatividadeDescarteMinutos ? Number(optTempoInatividadeDescarteMinutos.value) : 20,
             validacaoMatematicaAtiva: validacaoAtivaEfetiva,
@@ -1341,8 +1466,10 @@ document.addEventListener('DOMContentLoaded', () => {
             corContornoMarcadorColado: corContornoMarcador,
             corFundoMarcadorColado: corFundoMarcador,
             estiloBadgeMarcadorColado: estiloBadgeMarcador,
-            modoRetirarSelecao: optModoRetirarSelecao ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value) : 'total',
-            minimoCaracteresInterface: optMinimoCaracteresInterface ? (parseInt(optMinimoCaracteresInterface.value, 10) || 0) : 5,
+            modoRetirarSelecao: optModoRetirarSelecao
+                ? normalizarModoRetirarSelecao(optModoRetirarSelecao.value, tempoFlashMs !== 0)
+                : (tempoFlashMs !== 0 ? 'com_flash' : 'nenhuma'),
+            minimoCaracteresInterface: optMinimoCaracteresInterface ? (parseInt(optMinimoCaracteresInterface.value, 10) || 0) : 0,
             separadorAcumulador: sepValor,
             autoLimpezaCacheCookiesAtiva: optAutoLimpezaCacheCookiesAtiva ? optAutoLimpezaCacheCookiesAtiva.checked : true,
             autoLimpezaIdade: optAutoLimpezaIdade ? optAutoLimpezaIdade.value : '7d',
@@ -1355,7 +1482,14 @@ document.addEventListener('DOMContentLoaded', () => {
             pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
             pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4,
             pomodoroPausasAutomaticas: optPomodoroPausasAutomaticas ? optPomodoroPausasAutomaticas.checked : true,
-            pomodoroModoAviso: optPomodoroModoAviso ? normalizarModoAvisoPomodoro(optPomodoroModoAviso.value) : 'completo',
+            pomodoroBeepConclusaoAtivo: optPomodoroBeepConclusaoAtivo ? optPomodoroBeepConclusaoAtivo.checked : true,
+            pomodoroBeepIntensidade: optPomodoroBeepIntensidade ? (['suave', 'moderado', 'grave'].includes(optPomodoroBeepIntensidade.value) ? optPomodoroBeepIntensidade.value : 'suave') : 'suave',
+            pomodoroModoAviso: (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value === 'oculto')
+                ? 'badge_e_barra_descanso'
+                : 'completo',
+            pomodoroEstiloMinipopup: optPomodoroEstiloMinipopup
+                ? (['compacto', 'normal', 'expandido'].includes(optPomodoroEstiloMinipopup.value) ? optPomodoroEstiloMinipopup.value : 'compacto')
+                : 'compacto',
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
             regrasMapeamentoElementos: moduloMapeamento.obterRegrasAtuais()
         };
@@ -1380,11 +1514,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                 chrome.runtime.sendMessage({ acao: 'AGENDAR_SYNC_NUVEM_DIFERIDO', payload }, () => {
                     atualizarStatusProdutividadeUI();
-                    exibirToast('Configurações salvas localmente (sincronização na nuvem em 5 min / ao sair)!');
+                    exibirToast('Configurações salvas!');
                 });
             } else {
                 chrome.storage.local.set({ jusgovConfigSyncPendente: payload }, () => {
-                    exibirToast('Configurações salvas localmente!');
+                    exibirToast('Configurações salvas!');
                 });
             }
         } else {
@@ -1550,30 +1684,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adicionarOuvinteSeguro(optFecharHierarquiaEmCascata, 'change', salvarConfiguracoes);
 
-    adicionarOuvinteSeguro(optModoBarraFavoritosSuperior, 'change', () => {
-        salvarConfiguracoes();
-        if (feedbackAparenciaChrome) {
-            feedbackAparenciaChrome.textContent = optModoBarraFavoritosSuperior.checked
-                ? 'Preferência salva! Use Ctrl+Shift+B ou Aparência do Chrome para exibir a barra.'
-                : 'Preferência salva.';
-            feedbackAparenciaChrome.style.display = 'inline';
-            setTimeout(() => { if (feedbackAparenciaChrome) feedbackAparenciaChrome.style.display = 'none'; }, 4000);
-        }
-    });
-
-    adicionarOuvinteSeguro(btnRestaurarBarraFerramentasPadrao, 'click', () => {
-        if (optModoBarraFavoritosSuperior) optModoBarraFavoritosSuperior.checked = false;
-        salvarConfiguracoes();
-        if (feedbackAparenciaChrome) {
-            feedbackAparenciaChrome.textContent = 'Preferência de barra de ferramentas restaurada ao padrão.';
-            feedbackAparenciaChrome.style.display = 'inline';
-            setTimeout(() => { if (feedbackAparenciaChrome) feedbackAparenciaChrome.style.display = 'none'; }, 3500);
-        }
-    });
-
-    adicionarOuvinteSeguro(btnAbrirAparenciaChrome, 'click', () => {
+    adicionarOuvinteSeguro(btnAbrirAparenciaChrome, 'click', (ev) => {
+        if (ev) ev.stopPropagation();
         try {
             chrome.runtime.sendMessage({ acao: 'abrirPaginaAparenciaChrome' });
+        } catch (_) { }
+    });
+
+    adicionarOuvinteSeguro(btnAbrirLimparDadosChrome, 'click', (ev) => {
+        if (ev) ev.stopPropagation();
+        try {
+            chrome.runtime.sendMessage({ acao: 'abrirPaginaLimparDadosChrome' });
         } catch (_) { }
     });
 
@@ -1695,11 +1816,11 @@ document.addEventListener('DOMContentLoaded', () => {
     adicionarOuvinteSeguro(optPosicaoAvisosValidacao, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optTempoFlashMs, 'input', () => {
         atualizarRotuloSliderFlash();
-        atualizarVisibilidadeSubOpcoesFlash();
+        atualizarVisibilidadeSubOpcoesFlash(true);
         salvarConfiguracoesDebounced(250);
     });
     adicionarOuvinteSeguro(optTempoFlashMs, 'change', () => {
-        atualizarVisibilidadeSubOpcoesFlash();
+        atualizarVisibilidadeSubOpcoesFlash(true);
         salvarConfiguracoes();
     });
     adicionarOuvinteSeguro(optCorFlashBorder, 'input', () => {
@@ -1802,8 +1923,34 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarStatusProdutividadeUI();
         salvarConfiguracoes();
     });
-    adicionarOuvinteSeguro(optPomodoroModoAviso, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optPomodoroEstiloMinipopup, 'change', () => {
+        const estVal = optPomodoroEstiloMinipopup ? optPomodoroEstiloMinipopup.value : 'compacto';
+        const nivel = (estVal === 'normal') ? 1 : ((estVal === 'expandido') ? 2 : 0);
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({
+                acao: 'ATUALIZAR_ESTADO_BARRA_POMODORO',
+                nivelDetalhe: nivel
+            }).catch(() => { });
+        }
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optPomodoroComportamentoBarra, 'change', () => {
+        const comp = optPomodoroComportamentoBarra ? optPomodoroComportamentoBarra.value : 'fixo';
+        if ((comp === 'fixo' || comp === 'movel') && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({
+                acao: 'ATUALIZAR_ESTADO_BARRA_POMODORO',
+                modoFixacao: (comp === 'movel') ? 2 : 1,
+                ancorar: (comp === 'fixo')
+            }).catch(() => { });
+        }
+        salvarConfiguracoes();
+    });
     adicionarOuvinteSeguro(optPomodoroPausasAutomaticas, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optPomodoroBeepConclusaoAtivo, 'change', () => {
+        atualizarCalculoPomodoroUI();
+        salvarConfiguracoes();
+    });
+    adicionarOuvinteSeguro(optPomodoroBeepIntensidade, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(btnResetarContadoresTrabalho, 'click', () => {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'RESETAR_CONTADORES_TRABALHO' }, (resp) => {
@@ -2049,9 +2196,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 atualizarBarraPerfisUI(res.listaPerfis, res.perfilAtivoId);
                 carregarConfiguracoesDoStorage();
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }, () => {
+                        atualizarStatusProdutividadeUI();
+                    });
                 }
-                exibirToast(`Perfil "${nomeAtual}" restaurado para as configurações iniciais!`);
+                exibirToast(`Perfil "${nomeAtual}" restaurado para as configurações iniciais (estatísticas preservadas)!`);
                 return;
             }
         }
@@ -2070,22 +2219,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         const opcoesReset = ehPadronizadoAntes ? { perfilPreferidoId: cachePerfilAtivoId } : {};
 
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-            if (chrome.storage.local) {
-                const agora = new Date();
-                const pad = (n) => String(n).padStart(2, '0');
-                const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
-                chrome.storage.local.clear(() => {
-                    chrome.storage.local.set({ totalCopias: 0, totalAlertas: 0, dataInicioContadores: strData });
-                    if (lblDataInicioContadores) lblDataInicioContadores.textContent = strData;
-                    if (lblTotalCopias) lblTotalCopias.textContent = '0';
-                    if (lblTotalAlertas) lblTotalAlertas.textContent = '0';
-                });
-            }
-            if (chrome.storage.session) {
-                chrome.storage.session.clear().catch(() => { });
-            }
-        }
         if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
             const res = await configuradorPerfis.resetarPerfis('todos', chrome, opcoesReset);
             if (res && res.ok) {
@@ -2093,41 +2226,102 @@ document.addEventListener('DOMContentLoaded', () => {
                 marcarAlteracoesPendentesMapeamento(false);
                 carregarConfiguracoesDoStorage();
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
+                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }, () => {
+                        atualizarStatusProdutividadeUI();
+                    });
                 }
-                exibirToast('Todos os perfis foram restaurados e dados extras apagados com sucesso!');
+                exibirToast('Todos os perfis foram restaurados para o padrão de fábrica (estatísticas preservadas)!');
                 return;
             }
         }
         exibirToast('Todos os perfis restaurados!');
     });
 
-    /* Passo 4.4: Exportar todas as configuracoes em arquivo JSON global */
+    /* Passo 4.4: Exportar apenas configuracoes modificadas com cabecalho de comentario e hash de integridade */
     adicionarOuvinteSeguro(btnExportarJson, 'click', async () => {
         const overridesAtuais = coletarPayloadConfiguracoesUI();
         let syncData = {};
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        let barraEstado = null;
+        let regrasPadraoUsuario = [];
+        if (typeof chrome !== 'undefined' && chrome.storage) {
             try {
-                syncData = await chrome.storage.sync.get(null);
+                if (chrome.storage.sync) syncData = await chrome.storage.sync.get(null);
+            } catch (_) { }
+            try {
+                if (chrome.storage.local) {
+                    const loc = await chrome.storage.local.get(['jusgovPomodoroBarraEstadoGlobal']);
+                    barraEstado = (loc && loc.jusgovPomodoroBarraEstadoGlobal) || null;
+                }
             } catch (_) { }
         }
-        const dadosExportacao = configuradorPerfis
-            ? configuradorPerfis.montarDadosExportacaoBackupTotal({ ...(syncData || {}), perfilAtivoId: cachePerfilAtivoId }, overridesAtuais)
-            : { projeto: 'JusGovBR', ...overridesAtuais };
+        try {
+            if (typeof fetch === 'function' && chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+                const respInt = await fetch(chrome.runtime.getURL('src/cfg/interface.json'));
+                if (respInt && respInt.ok) {
+                    const txtInt = await respInt.text();
+                    const dadosInt = (typeof JusGovCfgDefaults !== 'undefined' && JusGovCfgDefaults && typeof JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                        ? JusGovCfgDefaults.parsearJsonComComentarios(txtInt)
+                        : JSON.parse(String(txtInt || '').replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim());
+                    if (Array.isArray(dadosInt)) {
+                        regrasPadraoUsuario = dadosInt.filter(r => r && r.origem === 'usuario').map(({ origem, ...resto }) => ({ ...resto }));
+                    }
+                }
+            }
+        } catch (_) { }
 
-        const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], { type: 'application/json' });
+        const manifestInfo = (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function')
+            ? chrome.runtime.getManifest()
+            : null;
+        const nomeAddon = (manifestInfo && manifestInfo.name) ? manifestInfo.name : 'JusGovBR — Seleção/Cópia Inteligente';
+        const versaoAddon = (manifestInfo && manifestInfo.version) ? manifestInfo.version : '0.0.0';
+
+        let conteudoFinal = '';
+        let nomeArquivoDownload = '';
+        let totalMods = 0;
+        if (configuradorPerfis && typeof configuradorPerfis.gerarArquivoExportacaoDiferencial === 'function') {
+            const expRes = configuradorPerfis.gerarArquivoExportacaoDiferencial(
+                { ...(syncData || {}), perfilAtivoId: cachePerfilAtivoId },
+                overridesAtuais,
+                null,
+                {
+                    nomeAddon,
+                    versaoAddon,
+                    regrasPadraoUsuario,
+                    barraPomodoroAtual: barraEstado
+                }
+            );
+            conteudoFinal = expRes.conteudoArquivo;
+            nomeArquivoDownload = expRes.nomeArquivo || '';
+            totalMods = expRes.totalChavesModificadas || 0;
+        } else {
+            conteudoFinal = JSON.stringify({ projeto: 'JusGovBR', ...overridesAtuais }, null, 2);
+        }
+
+        if (!nomeArquivoDownload) {
+            if (configuradorPerfis && typeof configuradorPerfis.gerarNomeArquivoExportacao === 'function') {
+                nomeArquivoDownload = configuradorPerfis.gerarNomeArquivoExportacao();
+            } else {
+                const ag = new Date();
+                const p2 = (n) => String(n).padStart(2, '0');
+                nomeArquivoDownload = `JusGovBR-${String(ag.getFullYear()).slice(-2)}${p2(ag.getMonth() + 1)}${p2(ag.getDate())}_${p2(ag.getHours())}${p2(ag.getMinutes())}.json`;
+            }
+        }
+
+        const blob = new Blob([conteudoFinal], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'jusgovbr-configuracoes.json';
+        a.download = nomeArquivoDownload;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        exibirToast('Backup total (todos os perfis) exportado em JSON!');
+        exibirToast(totalMods > 0
+            ? `Configurações modificadas exportadas (${totalMods} ajustes)!`
+            : 'Nenhuma modificação além do padrão — arquivo base exportado.');
     });
 
-    /* Passo 4.5: Importar todas as configuracoes de arquivo JSON global */
+    /* Passo 4.5: Importar configuracoes com validacao de metadados/hash e descarte de chaves obsoletas */
     if (btnImportarJson && inputImportarArquivo) {
         adicionarOuvinteSeguro(btnImportarJson, 'click', () => {
             inputImportarArquivo.click();
@@ -2140,23 +2334,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const leitor = new FileReader();
             leitor.onload = async (ev) => {
                 try {
-                    const json = JSON.parse(String(ev.target.result || '{}'));
+                    const textoBruto = String(ev.target.result || '');
                     if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                        const resImp = await configuradorPerfis.importarBackupTotal(json, chrome);
+                        const resImp = await configuradorPerfis.importarBackupTotal(textoBruto, chrome);
                         if (resImp && resImp.ok) {
                             carregarConfiguracoesDoStorage();
                             if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                                 chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
                             }
-                            exibirToast(resImp.backupTotal
-                                ? 'Backup total (todos os perfis) importado e sincronizado na nuvem!'
-                                : 'Backup JSON importado para o perfil ativo e sincronizado!');
+                            const descartadas = Number(resImp.totalChavesDescartadas || 0);
+                            const msgBase = resImp.backupTotal
+                                ? 'Configurações importadas e sincronizadas!'
+                                : 'Backup JSON importado para o perfil ativo!';
+                            exibirToast(descartadas > 0
+                                ? `${msgBase} (${descartadas} chave(s) inexistente(s)/ultrapassada(s) descartada(s))`
+                                : msgBase);
+                            return;
+                        }
+                        if (resImp && resImp.mensagem) {
+                            exibirToast(`Erro na importação: ${resImp.mensagem}`);
                             return;
                         }
                     }
-                    exibirToast('Erro: Não foi possível importar o arquivo JSON.');
+                    exibirToast('Erro: Não foi possível importar o arquivo.');
                 } catch (_) {
-                    exibirToast('Erro: Arquivo JSON inválido.');
+                    exibirToast('Erro: Arquivo de configurações inválido.');
                 }
             };
             leitor.readAsText(arquivo);
@@ -2207,6 +2409,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (area === 'local' && changes.perfilAtivoId) {
                 carregarConfiguracoesDoStorage();
                 return;
+            }
+            if (area === 'local' && (changes.jusgovPomodoroBarraEstadoGlobal || changes.jusgovConfigSyncPendente)) {
+                carregarConfiguracoesDoStorage();
             }
             if (area === 'sync') {
                 if (changes.listaPerfis) {
@@ -2348,6 +2553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const normFlash = normalizarTempoFlashMs(changes.tempoFlashBorderMs.newValue);
                     optTempoFlashMs.value = normFlash === -1 ? '5250' : String(normFlash);
                     atualizarRotuloSliderFlash();
+                    atualizarVisibilidadeSubOpcoesFlash(false);
                 }
                 if (changes.corFlashBorder !== undefined && optCorFlashBorder) {
                     optCorFlashBorder.value = normalizarCorHex(changes.corFlashBorder.newValue);
@@ -2372,11 +2578,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     optEstiloBadgeMarcadorColado.value = normalizarEstiloBadgeMarcadorColado(changes.estiloBadgeMarcadorColado.newValue);
                 }
                 if (changes.modoRetirarSelecao !== undefined && optModoRetirarSelecao) {
-                    optModoRetirarSelecao.value = normalizarModoRetirarSelecao(changes.modoRetirarSelecao.newValue);
+                    const flashChg = optTempoFlashMs ? (Number(optTempoFlashMs.value) > 0) : true;
+                    optModoRetirarSelecao.value = normalizarModoRetirarSelecao(changes.modoRetirarSelecao.newValue, flashChg);
+                    sincronizarOpcaoRetirarComFlash(false);
                 }
                 if (changes.minimoCaracteresInterface !== undefined && optMinimoCaracteresInterface) {
                     const minChg = parseInt(changes.minimoCaracteresInterface.newValue, 10);
-                    optMinimoCaracteresInterface.value = [0, 1, 2, 3, 4, 5, 10].includes(minChg) ? String(minChg) : '5';
+                    optMinimoCaracteresInterface.value = [0, 1, 2, 3, 4, 5, 10].includes(minChg) ? String(minChg) : '0';
                 }
                 if (changes.converterCabecalhoPjeAtivo !== undefined && optConverterCabecalhoPje) {
                     optConverterCabecalhoPje.checked = (changes.converterCabecalhoPjeAtivo.newValue !== false);
@@ -2452,6 +2660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
         }
         configurarNavegacaoAbas();
+        inicializarCartoesColapsaveis();
         carregarConfiguracoesDoStorage();
         inicializarMonitorPermissaoClipboard();
     })();

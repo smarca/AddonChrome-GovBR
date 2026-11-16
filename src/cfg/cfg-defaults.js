@@ -153,6 +153,18 @@
         sistemasJudiciais: Object.freeze([])
     });
 
+    function removerComentariosCabecalhoJson(texto) {
+        return String(texto || '')
+            .replace(/^\uFEFF/, '')
+            .replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '')
+            .trim();
+    }
+
+    function parsearJsonComComentarios(texto) {
+        const limpo = removerComentariosCabecalhoJson(texto);
+        return limpo ? JSON.parse(limpo) : null;
+    }
+
     function lerPreloadOuRequireJson(chaveGlobal, caminhoRelativo) {
         try {
             const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
@@ -164,7 +176,16 @@
             if (typeof module === 'object' && module.exports && typeof require === 'function') {
                 return require(caminhoRelativo);
             }
-        } catch (_) { }
+        } catch (_) {
+            try {
+                if (typeof require === 'function' && typeof __dirname === 'string') {
+                    const fsMod = require('fs');
+                    const pathMod = require('path');
+                    const bruto = fsMod.readFileSync(pathMod.resolve(__dirname, caminhoRelativo), 'utf8');
+                    return parsearJsonComComentarios(bruto);
+                }
+            } catch (_) { }
+        }
         return null;
     }
 
@@ -185,7 +206,8 @@
             try {
                 const resp = await fetch(urlsCandidatas[i]);
                 if (resp && resp.ok) {
-                    const json = await resp.json();
+                    const txt = await resp.text();
+                    const json = parsearJsonComComentarios(txt);
                     if (json && typeof json === 'object') {
                         if (g) g[chaveGlobal] = json;
                         return json;
@@ -400,6 +422,8 @@
         carregarCatalogoPerfisJson,
         carregarDadosForensesJson,
         carregarRegrasSistemaJson,
+        removerComentariosCabecalhoJson,
+        parsearJsonComComentarios,
         obterCatalogoPerfis,
         obterDadosForenses,
         obterRegrasSistema,

@@ -112,6 +112,8 @@
         ehUrlRaizAlienOuInterna: () => false,
         desvincularPaiDaAba: () => { },
         obterPaiRegistrado: () => undefined,
+        estaDesvinculadaManualmente: () => false,
+        foiPosicionadaInicialmente: () => false,
         posicionarNovaAbaHierarquia: async () => { },
         tratarAbaMovidaManual: async () => { },
         agendarOrdenacaoAbas: () => { },
@@ -473,7 +475,11 @@
                 const emPrimeiroPlano = (cfg.abaEmPrimeiroPlano !== undefined)
                     ? Boolean(cfg.abaEmPrimeiroPlano)
                     : (cfg.abaEmSegundoPlano === false);
-                await api.tabs.create({ url: urlAlvo, active: emPrimeiroPlano });
+                const optsCreate = { url: urlAlvo, active: emPrimeiroPlano };
+                if (sender && sender.tab && typeof sender.tab.id === 'number') {
+                    optsCreate.openerTabId = sender.tab.id;
+                }
+                await api.tabs.create(optsCreate);
                 return true;
             } catch (_) {
                 return false;
@@ -506,7 +512,24 @@
          */
         async tratarNovaJanela(janela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (this.#janelaUnica && typeof this.#janelaUnica.processarNovaJanela === 'function') {
-                await this.#janelaUnica.processarNovaJanela(janela, chromeApi, this.#configuracoes);
+                await this.#janelaUnica.processarNovaJanela(janela, chromeApi, this.#configuracoes, async (abaMovida, openerFallbackId) => {
+                    if (!abaMovida || !abaMovida.id || !this.#ordenacao) return;
+                    const urlAba = abaMovida.url || abaMovida.pendingUrl || '';
+                    const ehAlienOuSistema = typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(urlAba);
+                    const paiEfetivo = (typeof abaMovida.openerTabId === 'number' && abaMovida.openerTabId !== abaMovida.id)
+                        ? abaMovida.openerTabId
+                        : openerFallbackId;
+                    if (!ehAlienOuSistema && typeof paiEfetivo === 'number' && paiEfetivo !== abaMovida.id && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
+                        this.#ordenacao.registrarRelacaoPaiFilha(abaMovida.id, paiEfetivo, chromeApi);
+                    }
+                    const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio;
+                    if (critAtual === 'hierarquia_arvore' && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
+                        await this.#ordenacao.posicionarNovaAbaHierarquia({ ...abaMovida, openerTabId: paiEfetivo }, this.#configuracoes, chromeApi);
+                    } else if (abaMovida.windowId && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
+                        const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
+                        this.#ordenacao.agendarOrdenacaoAbas(abaMovida.windowId, this.#configuracoes, chromeApi, mapa);
+                    }
+                });
             }
         }
 
@@ -581,7 +604,8 @@
             const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || (this.#ordenacao && this.#ordenacao.criterio);
             if (critAtual === 'hierarquia_arvore') {
                 const novaUrl = (changeInfo && changeInfo.url) || (tab && tab.url) || '';
-                if (this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(novaUrl)) {
+                const ehAlien = Boolean(this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(novaUrl));
+                if (ehAlien) {
                     const paiAtual = typeof this.#ordenacao.obterPaiRegistrado === 'function' ? this.#ordenacao.obterPaiRegistrado(tabId) : undefined;
                     if (paiAtual !== undefined) {
                         if (typeof this.#ordenacao.desvincularPaiDaAba === 'function') {
@@ -590,6 +614,17 @@
                         if (tab && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
                             await this.#ordenacao.posicionarNovaAbaHierarquia(tab, this.#configuracoes, chromeApi);
                         }
+                    }
+                } else if (tab && this.#ordenacao) {
+                    const desvinculada = typeof this.#ordenacao.estaDesvinculadaManualmente === 'function' && this.#ordenacao.estaDesvinculadaManualmente(tabId);
+                    const jaPosicionada = typeof this.#ordenacao.foiPosicionadaInicialmente === 'function' && this.#ordenacao.foiPosicionadaInicialmente(tabId);
+                    const paiReg = typeof this.#ordenacao.obterPaiRegistrado === 'function' ? this.#ordenacao.obterPaiRegistrado(tabId) : undefined;
+                    const precisaRegistrarOpener = Boolean(!desvinculada && paiReg === undefined && typeof tab.openerTabId === 'number' && tab.openerTabId !== tabId);
+                    if (precisaRegistrarOpener && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
+                        this.#ordenacao.registrarRelacaoPaiFilha(tabId, tab.openerTabId, chromeApi);
+                    }
+                    if (!desvinculada && (!jaPosicionada || precisaRegistrarOpener) && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
+                        await this.#ordenacao.posicionarNovaAbaHierarquia(tab, this.#configuracoes, chromeApi);
                     }
                 }
                 return;

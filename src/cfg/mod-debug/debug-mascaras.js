@@ -2552,7 +2552,10 @@
                         ? chrome.runtime.getURL('src/cfg/exemplos.json')
                         : 'exemplos.json';
                     fetch(urlJson)
-                        .then(r => r.ok ? r.json() : null)
+                        .then(r => r.ok ? r.text() : null)
+                        .then(txt => txt ? ((window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                            ? window.JusGovCfgDefaults.parsearJsonComComentarios(txt)
+                            : JSON.parse(String(txt).replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim())) : null)
                         .then(dadosJson => {
                             if (dadosJson && Array.isArray(dadosJson.casosDeUso)) {
                                 window.__JUSGOV_EXEMPLOS_JSON_ONLINE__ = dadosJson;

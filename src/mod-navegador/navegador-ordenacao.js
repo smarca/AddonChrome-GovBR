@@ -56,6 +56,7 @@
         #timerPersistirArvore = null;
         #emFechamentoCascata = new Set();
         #estaMovendoBloco = false;
+        #posicionadasInicialmente = new Set();
 
         /**
          * @param {Object} [opcoes={}]
@@ -382,6 +383,30 @@
             return this.#arvoreOpener.get(tabId);
         }
 
+        estaDesvinculadaManualmente(tabId) {
+            return this.#desvinculadasManualmente.has(tabId);
+        }
+
+        foiPosicionadaInicialmente(tabId) {
+            return this.#posicionadasInicialmente.has(tabId);
+        }
+
+        async #moverAbaComRetry(tabId, idxAlvo, chromeApi) {
+            if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.move !== 'function') return false;
+            try {
+                await chromeApi.tabs.move(tabId, { index: idxAlvo });
+                return true;
+            } catch (_) {
+                await new Promise((r) => setTimeout(r, 85));
+                try {
+                    await chromeApi.tabs.move(tabId, { index: idxAlvo });
+                    return true;
+                } catch (__) {
+                    return false;
+                }
+            }
+        }
+
         /**
          * Registra relação genealógica Pai -> Filha (Seção 6.92 / BUG-68 / BUG-71)
          * @param {number} tabId
@@ -429,6 +454,7 @@
             const avoId = this.#arvoreOpener.get(tabId);
             this.#arvoreOpener.delete(tabId);
             this.#desvinculadasManualmente.delete(tabId);
+            this.#posicionadasInicialmente.delete(tabId);
             this.#criacaoPorAba.delete(tabId);
             for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
                 if (paiId === tabId) {
@@ -589,7 +615,10 @@
                         }
                     }
                     if (atual.index !== idxAlvo && typeof chromeApi.tabs.move === 'function') {
-                        await chromeApi.tabs.move(tab.id, { index: idxAlvo }).catch(() => { });
+                        const movOk = await this.#moverAbaComRetry(tab.id, idxAlvo, chromeApi);
+                        if (movOk) this.#posicionadasInicialmente.add(tab.id);
+                    } else {
+                        this.#posicionadasInicialmente.add(tab.id);
                     }
                     return;
                 }
@@ -615,7 +644,10 @@
                 }
                 idxDestino = Math.max(0, Math.min(abas.length - 1, idxDestino));
                 if (atual.index !== idxDestino && typeof chromeApi.tabs.move === 'function') {
-                    await chromeApi.tabs.move(tab.id, { index: idxDestino }).catch(() => { });
+                    const movOk = await this.#moverAbaComRetry(tab.id, idxDestino, chromeApi);
+                    if (movOk) this.#posicionadasInicialmente.add(tab.id);
+                } else {
+                    this.#posicionadasInicialmente.add(tab.id);
                 }
             } finally {
                 setTimeout(() => { this.#estaMovendoBloco = false; }, 120);

@@ -209,6 +209,8 @@
                     try {
                         let copiouViaEvento = false;
                         const manipuladorCopy = (ev) => {
+                            if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+                            if (ev && typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
                             if (ev && ev.clipboardData) {
                                 ev.clipboardData.setData('text/html', htmlParaClipboard);
                                 ev.clipboardData.setData('text/plain', textoPlanoMultilinha);
@@ -216,10 +218,15 @@
                                 copiouViaEvento = true;
                             }
                         };
-                        document.addEventListener('copy', manipuladorCopy, { capture: true, once: true });
-                        const sucessoCopy = document.execCommand('copy');
-                        document.removeEventListener('copy', manipuladorCopy, { capture: true });
-                        if (sucessoCopy || copiouViaEvento) return true;
+                        if (typeof window !== 'undefined') window.__JUSGOV_COPIA_PROGRAMATICA_ATIVA__ = true;
+                        try {
+                            window.addEventListener('copy', manipuladorCopy, { capture: true, once: true });
+                            const sucessoCopy = document.execCommand('copy');
+                            if (sucessoCopy || copiouViaEvento) return true;
+                        } finally {
+                            if (typeof window !== 'undefined') window.__JUSGOV_COPIA_PROGRAMATICA_ATIVA__ = false;
+                            window.removeEventListener('copy', manipuladorCopy, { capture: true });
+                        }
                     } catch (_) { }
                 }
             }
@@ -275,7 +282,7 @@
                 }));
 
                 let pasteTratadoPeloEditor = false;
-                const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable="true"]')) || document.designMode === 'on');
+                const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable]:not([contenteditable="false"])')) || document.designMode === 'on');
                 try {
                     if (typeof DataTransfer !== 'undefined') {
                         const dt = new DataTransfer();
@@ -327,7 +334,14 @@
         inserirTextoEmElemento(alvo, texto, ehHtmlFormatado) {
             try {
                 if (!alvo) return;
-                alvo.focus();
+                const alvoFoco = (alvo.tagName !== 'INPUT' && alvo.tagName !== 'TEXTAREA' && typeof alvo.closest === 'function')
+                    ? (alvo.closest('[contenteditable]:not([contenteditable="false"])') || alvo)
+                    : alvo;
+                try {
+                    if (typeof alvoFoco.focus === 'function') alvoFoco.focus({ preventScroll: true });
+                } catch (_) {
+                    try { if (typeof alvoFoco.focus === 'function') alvoFoco.focus(); } catch (__) { }
+                }
 
                 if (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA') {
                     const tipoInput = (alvo.getAttribute('type') || alvo.type || 'text').toLowerCase();
@@ -380,27 +394,55 @@
                     return;
                 }
 
+                const docRef = alvoFoco.ownerDocument || (typeof document !== 'undefined' ? document : null);
+                const winRef = (docRef && docRef.defaultView) || (typeof window !== 'undefined' ? window : null);
+                if (winRef && typeof winRef.getSelection === 'function' && docRef && typeof docRef.createRange === 'function') {
+                    try {
+                        const selPre = winRef.getSelection();
+                        const selValida = Boolean(selPre && selPre.rangeCount > 0 && alvoFoco.contains && alvoFoco.contains(selPre.anchorNode));
+                        if (!selValida) {
+                            const rangeFim = docRef.createRange();
+                            rangeFim.selectNodeContents(alvoFoco);
+                            rangeFim.collapse(false);
+                            selPre.removeAllRanges();
+                            selPre.addRange(rangeFim);
+                        }
+                    } catch (_) { }
+                }
+
                 let executou = false;
                 try {
-                    executou = document.execCommand(ehHtmlFormatado ? 'insertHTML' : 'insertText', false, texto);
+                    if (docRef && typeof docRef.execCommand === 'function') {
+                        executou = docRef.execCommand(ehHtmlFormatado ? 'insertHTML' : 'insertText', false, texto);
+                    }
                 } catch (_) { }
 
-                if (!executou) {
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
+                if (!executou && winRef && typeof winRef.getSelection === 'function') {
+                    const sel = winRef.getSelection();
+                    if (sel && sel.rangeCount > 0 && docRef) {
                         const range = sel.getRangeAt(0);
                         range.deleteContents();
-                        const node = document.createTextNode(texto);
-                        range.insertNode(node);
-                        range.setStartAfter(node);
-                        range.setEndAfter(node);
+                        if (ehHtmlFormatado && typeof range.createContextualFragment === 'function') {
+                            const frag = range.createContextualFragment(texto);
+                            const ultimoNo = frag.lastChild;
+                            range.insertNode(frag);
+                            if (ultimoNo) {
+                                range.setStartAfter(ultimoNo);
+                                range.setEndAfter(ultimoNo);
+                            }
+                        } else {
+                            const node = docRef.createTextNode(texto);
+                            range.insertNode(node);
+                            range.setStartAfter(node);
+                            range.setEndAfter(node);
+                        }
                         sel.removeAllRanges();
                         sel.addRange(range);
                     }
                 }
                 try {
-                    alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                    alvoFoco.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                    alvoFoco.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
                 } catch (_) { }
             } catch (_) { }
         }
@@ -451,13 +493,26 @@
         async executarColagemBotaoDireito(alvo, modo, usarAnterior = false) {
             try {
                 if (!alvo) return;
+                const docRef = alvo.ownerDocument || (typeof document !== 'undefined' ? document : null);
+                const hostCe = (alvo.tagName !== 'INPUT' && alvo.tagName !== 'TEXTAREA' && typeof alvo.closest === 'function')
+                    ? alvo.closest('[contenteditable]:not([contenteditable="false"]), .ck-editor__editable, .ck-content, .cke_editable, .tox-edit-area')
+                    : null;
+                const alvoEfetivo = hostCe || alvo;
                 const estado = this.#deps.obterEstadoOpcoes() || {};
                 const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
-                const ehEditorRico = Boolean(alvo.isContentEditable ||
-                    (alvo.getAttribute && alvo.getAttribute('contenteditable') === 'true') ||
-                    (alvo.closest && alvo.closest('[contenteditable="true"], [contenteditable=""], .ck-editor__editable, .ck-content')) ||
-                    document.designMode === 'on');
-                const ehCampoTextoPuro = (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || !ehEditorRico);
+                const ehEditorRico = Boolean(
+                    alvoEfetivo.isContentEditable ||
+                    Boolean(hostCe) ||
+                    (alvoEfetivo.getAttribute && ['true', '', 'plaintext-only'].includes((alvoEfetivo.getAttribute('contenteditable') || '').toLowerCase())) ||
+                    (docRef && docRef.designMode === 'on')
+                );
+                const ehCampoTextoPuro = (alvoEfetivo.tagName === 'INPUT' || alvoEfetivo.tagName === 'TEXTAREA' || !ehEditorRico);
+
+                try {
+                    if (typeof alvoEfetivo.focus === 'function') alvoEfetivo.focus({ preventScroll: true });
+                } catch (_) {
+                    try { if (typeof alvoEfetivo.focus === 'function') alvoEfetivo.focus(); } catch (__) { }
+                }
 
                 const itemInterno = usarAnterior
                     ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
@@ -469,11 +524,11 @@
 
                 if (textoEmulado && textoEmulado.trim().length > 0) {
                     if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
-                        this.inserirTextoEmElemento(alvo, textoEmulado, false);
+                        this.inserirTextoEmElemento(alvoEfetivo, textoEmulado, false);
                     } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
-                        this.inserirTextoEmElemento(alvo, htmlEmulado, true);
+                        this.inserirTextoEmElemento(alvoEfetivo, htmlEmulado, true);
                     } else {
-                        this.inserirTextoEmElemento(alvo, textoEmulado, false);
+                        this.inserirTextoEmElemento(alvoEfetivo, textoEmulado, false);
                     }
                     this.confirmarColagemGlobalEMarcarPermanente(textoEmulado, false);
                 }

@@ -186,6 +186,84 @@
             margin-bottom: 6px;
         }
 
+        .cartao > h2.cartao-titulo-colapsavel {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 4px 6px;
+            margin: -4px -6px 8px -6px;
+            border-radius: 6px;
+            transition: background-color 0.15s ease;
+        }
+
+        .cartao > h2.cartao-titulo-colapsavel:hover {
+            background-color: rgba(15, 23, 42, 0.04);
+        }
+
+        .cartao.colapsado > h2.cartao-titulo-colapsavel {
+            margin-bottom: -4px;
+        }
+
+        .cartao.colapsado > :not(h2) {
+            display: none !important;
+        }
+
+        .cartao-titulo-esquerda {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cartao-icone-colapso {
+            font-size: 12px;
+            color: var(--texto-suave);
+            display: inline-block;
+            width: 14px;
+            text-align: center;
+            transition: transform 0.18s ease;
+            flex-shrink: 0;
+        }
+
+        .cartao.colapsado .cartao-icone-colapso {
+            transform: rotate(-90deg);
+        }
+
+        .cartao-titulo-acoes {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .btn-icone-titulo-cartao {
+            background: #f8fafc;
+            border: 1px solid var(--borda-suave);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 14px;
+            line-height: 1.2;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: var(--texto-principal);
+        }
+
+        .btn-icone-titulo-cartao:hover {
+            background: var(--azul-claro);
+            border-color: var(--azul-jusgov);
+        }
+
+        abbr.dica-tags {
+            text-decoration: underline dotted;
+            text-underline-offset: 2px;
+            cursor: help;
+            color: var(--texto-principal);
+            font-weight: 600;
+        }
+
         .cartao p.subtitulo {
             font-size: 13.5px;
             color: var(--texto-secundario);
@@ -571,8 +649,6 @@
         .categoria-avancada-titulo {
             font-size: 12px;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
             color: var(--azul-jusgov);
             background: #eff6ff;
             border-left: 3px solid var(--azul-jusgov);
@@ -705,10 +781,8 @@
 
         .bloco-teste h4 {
             font-size: 12px;
-            text-transform: uppercase;
             color: var(--texto-suave);
             margin-bottom: 8px;
-            letter-spacing: 0.04em;
         }
 
         .editable-demo {
@@ -1322,7 +1396,7 @@
 
             <!-- Secao 1: COPIA INTELIGENTE -->
             <section class="cartao">
-                <h2>1. CÓPIA INTELIGENTE: Editores de Minutas e Validação</h2>
+                <h2>1. Cópia Inteligente: Editores de Minutas e Validação</h2>
             <div class="setting-item">
                 <div>
                     <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
@@ -1335,30 +1409,6 @@
                     <input type="checkbox" id="optConverterCabecalhoPje" checked>
                     <span class="slider"></span>
                 </label>
-            </div>
-
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Seleção Automática de Placeholders em Editores</div>
-                    <div class="setting-help">Em caixas de texto, campos editáveis e editores de minutas
-                        online (como CKEditor, TinyMCE e editores HTML), seleciona marcadores de preenchimento
-                        sem substituir o que você já tinha copiado no teclado: <strong>Desabilitado</strong> (cursor
-                        nativo sem pré-seleção alguma); <strong>Seleção apenas dos
-                            placeholders</strong> (marca <code>#[digite aqui]#</code>, <code>[@@...@@]</code>, <code>##/##/20##</code>,
-                        <code>######</code> com 1 clique); <strong>Seleção Avançada com
-                            Control</strong> (placeholders sem Ctrl; seleção avançada
-                        apenas com <code>Ctrl</code> pressionado); ou <strong>Seleção
-                            Avançada</strong> (seleciona blocos, linhas e texto em qualquer clique,
-                        <strong>sem jamais alterar o seu Ctrl+C</strong>).</div>
-                </div>
-                <select id="selectModoPlaceholdersMinutasHtml" class="seletor-modo">
-                    <option value="desabilitado">Desabilitado (sem seleção alguma)</option>
-                    <option value="placeholders" selected>Seleção apenas dos placeholders</option>
-                    <option value="ctrl_avancado">Seleção Avançada se pressionado "Control"
-                        (Placeholders sem Ctrl)</option>
-                    <option value="avancado">Seleção Avançada (blocos, linhas e texto sem
-                        alterar o Ctrl+C)</option>
-                </select>
             </div>
 
             <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
@@ -1439,7 +1489,8 @@
                     </div>
                     <select id="optModoRetirarSelecao" class="input-select"
                         style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                        <option value="total" selected>Total (interface web e texto de leitura)</option>
+                        <option value="com_flash" selected>Com Flash Temporizado</option>
+                        <option value="total">Total (interface web e texto de leitura)</option>
                         <option value="total_exceto_arrasto">Total (exceto ao arrastar o mouse)</option>
                         <option value="interface">Das partes com interface</option>
                         <option value="nenhuma">Nenhuma (manter selecionado)</option>
@@ -1529,13 +1580,37 @@
                 </div>
                 <select id="optMinimoCaracteresInterface" class="input-select"
                     style="padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
-                    <option value="0">0 (Sem proteção mínima)</option>
+                    <option value="0" selected>0 (Sem proteção mínima)</option>
                     <option value="1">1 caractere</option>
                     <option value="2">2 caracteres</option>
                     <option value="3">3 caracteres</option>
                     <option value="4">4 caracteres</option>
-                    <option value="5" selected>5 caracteres</option>
+                    <option value="5">5 caracteres</option>
                     <option value="10">10 caracteres</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">Seleção Automática de Placeholders em Editores</div>
+                    <div class="setting-help">Em caixas de texto, campos editáveis e editores de minutas
+                        online (como CKEditor, TinyMCE e editores HTML), seleciona marcadores de preenchimento
+                        sem substituir o que você já tinha copiado no teclado: <strong>Desabilitado</strong> (cursor
+                        nativo sem pré-seleção alguma); <strong>Seleção apenas dos
+                            placeholders</strong> (marca <code>#[digite aqui]#</code>, <code>[@@...@@]</code>, <code>##/##/20##</code>,
+                        <code>######</code> com 1 clique); <strong>Seleção Avançada com
+                            Control</strong> (placeholders sem Ctrl; seleção avançada
+                        apenas com <code>Ctrl</code> pressionado); ou <strong>Seleção
+                            Avançada</strong> (seleciona blocos, linhas e texto em qualquer clique,
+                        <strong>sem jamais alterar o seu Ctrl+C</strong>).</div>
+                </div>
+                <select id="selectModoPlaceholdersMinutasHtml" class="seletor-modo">
+                    <option value="desabilitado">Desabilitado (sem seleção alguma)</option>
+                    <option value="placeholders" selected>Seleção apenas dos placeholders</option>
+                    <option value="ctrl_avancado">Seleção Avançada se pressionado "Control"
+                        (Placeholders sem Ctrl)</option>
+                    <option value="avancado">Seleção Avançada (blocos, linhas e texto sem
+                        alterar o Ctrl+C)</option>
                 </select>
             </div>
 
@@ -1614,7 +1689,14 @@
                             padrão por linha (ex: <code>*://*.jus.br/*</code>).
                         </div>
                     </div>
-                    <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
+                    <details id="detalhesListaDominiosMotor" style="border: 1px solid var(--borda-suave); border-radius: 8px; background: #f8fafc; overflow: hidden;">
+                        <summary style="padding: 8px 12px; font-size: 12.5px; font-weight: 600; color: var(--texto-secundario); cursor: pointer; user-select: none;">
+                            🌐 Exibir / Editar Lista de Domínios
+                        </summary>
+                        <div style="padding: 10px 12px; border-top: 1px solid var(--borda-suave); background: #ffffff;">
+                            <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
+                        </div>
+                    </details>
                 </div>
             </section>
 
@@ -1697,21 +1779,35 @@
                                 Escolha a quantidade de estilos mantidos ao copiar textos formatados (cada nível
                                 inclui os anteriores). O tipo e tamanho da fonte original são sempre limpos para
                                 combinar perfeitamente com seu editor de destino:
-                                <br>• <b>1 - Básico (Inline Puro para Mesclagem)</b>: Preserva exclusivamente <b>negrito</b>,
-                                <i>itálico</i>, <u>sublinhado</u>, <s>tachado</s>, texto <sub>subscrito</sub>
-                                (ex: H<sub>2</sub>O), texto <sup>sobrescrito</sup> (ex: 1º) e quebras de linha simples
-                                (&lt;br&gt;). Destinado a colar dentro do texto de outros aplicativos mesclando a formatação do destino.
-                                Sem blocos ou tabelas (parágrafos e blocos são convertidos em &lt;br&gt;).
+                                <br>• <b>1 - Básico (Inline Puro para Mesclagem)</b>: Preserva exclusivamente
+                                <abbr class="dica-tags" title="Tags preservadas: b, strong">negrito</abbr>,
+                                <abbr class="dica-tags" title="Tags preservadas: i, em">itálico</abbr>,
+                                <abbr class="dica-tags" title="Tag preservada: u">sublinhado</abbr>,
+                                <abbr class="dica-tags" title="Tag preservada: s">tachado</abbr>,
+                                <abbr class="dica-tags" title="Tag preservada: sub (ex: H2O)">subscrito</abbr>,
+                                <abbr class="dica-tags" title="Tag preservada: sup (ex: 1º)">sobrescrito</abbr> e
+                                <abbr class="dica-tags" title="Tag de quebra de linha simples: br">quebras de linha simples</abbr>.
+                                Destinado a colar dentro do texto de outros aplicativos mesclando a formatação do destino.
+                                Sem blocos ou tabelas (parágrafos e blocos são convertidos em
+                                <abbr class="dica-tags" title="Convertidos para quebra de linha br">quebras simples</abbr>).
                                 <br>• <b>2 - Intermediário (Parágrafos, Alinhamento e Tabelas)</b>: Inclui o
-                                Nível 1 mais parágrafos (&lt;p&gt;), alinhamentos (&lt;center&gt;, &lt;left&gt;, &lt;right&gt;, &lt;justify&gt;),
-                                formatações semânticas (&lt;strong&gt;, &lt;em&gt;, &lt;mark&gt;, &lt;small&gt;, &lt;code&gt;, &lt;q&gt;, &lt;abbr&gt;, &lt;cite&gt;, &lt;span&gt;)
-                                e <b>tabelas completas</b> (&lt;table&gt;, &lt;thead&gt;, &lt;tbody&gt;, &lt;tfoot&gt;, &lt;tr&gt;, &lt;th&gt;, &lt;td&gt;).
+                                Nível 1 mais <abbr class="dica-tags" title="Tag HTML: p">parágrafos</abbr>,
+                                <abbr class="dica-tags" title="Tags/atributos: center, left, right, justify">alinhamentos</abbr>,
+                                <abbr class="dica-tags" title="Tags HTML: strong, em, mark, small, code, q, abbr, cite, span">formatações semânticas</abbr>
+                                e <abbr class="dica-tags" title="Tags de tabela: table, thead, tbody, tfoot, tr, th, td">tabelas completas</abbr>.
                                 <br>• <b>3 - Avançado (Blocos Estruturados, Listas e Cabeçalhos)</b>: Inclui o Nível 2
-                                mais divisórias &lt;hr&gt;, listas (&lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;), listas de definição (&lt;dl&gt;, &lt;dt&gt;, &lt;dd&gt;),
-                                títulos hierárquicos (&lt;h1&gt; a &lt;h6&gt;), &lt;blockquote&gt;, &lt;pre&gt; e divisões &lt;div&gt; com filtro rigoroso
-                                (permite apenas position: relative; filtra fixed, absolute, z-index negativo, display: none/grid/flex e transform).
+                                mais <abbr class="dica-tags" title="Tag HTML: hr">linhas divisórias</abbr>,
+                                <abbr class="dica-tags" title="Tags HTML: ul, ol, li">listas</abbr>,
+                                <abbr class="dica-tags" title="Tags HTML: dl, dt, dd">listas de definição</abbr>,
+                                <abbr class="dica-tags" title="Tags HTML: h1 até h6">títulos hierárquicos</abbr>,
+                                <abbr class="dica-tags" title="Tag HTML: blockquote">citações em bloco</abbr>,
+                                <abbr class="dica-tags" title="Tag HTML: pre">texto pré-formatado</abbr> e
+                                <abbr class="dica-tags" title="Tag HTML: div (permite apenas position: relative; filtra fixed, absolute, z-index negativo, display none/grid/flex e transform)">divisões com filtro rigoroso</abbr>.
                                 <br>• <b>4 - Estendido (Estrutura de Página e Artigos)</b>: Inclui o Nível
-                                3 mais tags de contorno e seções (&lt;nav&gt;, &lt;main&gt;, &lt;article&gt;, &lt;aside&gt;, &lt;footer&gt;). Mídias (&lt;img&gt;, &lt;video&gt;, &lt;canvas&gt;) e atributos src= permanecem estritamente filtrados em todos os níveis.
+                                3 mais <abbr class="dica-tags" title="Tags HTML de seção e contorno: nav, main, article, aside, footer">tags de contorno e seções</abbr>.
+                                <abbr class="dica-tags" title="Tags de mídia bloqueadas: img, video, canvas">Mídias</abbr> e
+                                <abbr class="dica-tags" title="Atributo de origem externa bloqueado: src">atributos de origem externa</abbr>
+                                permanecem estritamente filtrados em todos os níveis.
                             </span>
                             <br><span
                                 style="display:inline-block; margin-top:4px; font-size:11.5px; color:var(--texto-secundario);">•
@@ -1726,7 +1822,8 @@
                                     Desativável)</b>: Opera ativamente em todos os modos de cópia
                                 (inclusive no modo somente texto). Remove automaticamente caracteres inválidos,
                                 ocultos e de largura zero (zero-width, soft-hyphens, marcas de ordem de byte BOM),
-                                caracteres de controle (&lt; 32) e espaços rígidos (&amp;nbsp;); suprime
+                                <abbr class="dica-tags" title="Códigos de controle ASCII menores que 32">caracteres de controle</abbr> e
+                                <abbr class="dica-tags" title="Espaços inquebráveis HTML (nbsp)">espaços rígidos</abbr>; suprime
                                 linhas em branco redundantes consecutivas e apara espaços supérfluos no
                                 início e fim de cada linha.</span>
                         </p>
@@ -1734,9 +1831,9 @@
                 </div>
             </section>
 
-            <!-- Secao 3: ACELERADOR DO SISTEMA JUDICIAL TURBO (ANTI-AMPULHETAS) -->
+            <!-- Secao 3: Acelerador do Sistema Judicial Turbo (Anti-Ampulhetas) -->
             <section class="cartao">
-                <h2>3. ACELERADOR DO SISTEMA JUDICIAL TURBO (ANTI-AMPULHETAS)</h2>
+                <h2>3. Acelerador do Sistema Judicial Turbo (Anti-Ampulhetas)</h2>
             <div class="setting-item">
                 <div>
                     <div class="setting-label">Acelerador do Sistema Judicial Turbo (Anti-Ampulhetas)</div>
@@ -1760,9 +1857,9 @@
             </div>
             </section>
 
-            <!-- Secao 4: TECLADO/MOUSE -->
+            <!-- Secao 4: Teclado/Mouse -->
             <section class="cartao">
-                <h2>4. TECLADO/MOUSE: Navegação por Teclado e Botões Laterais</h2>
+                <h2>4. Teclado/Mouse: Navegação por Teclado e Botões Laterais</h2>
             <!-- FEAT-24: Alternar entre as duas guias usadas mais recentemente com Ctrl+Tab -->
             <div class="setting-item">
                 <div>
@@ -1778,7 +1875,7 @@
             <div class="setting-item">
                 <div>
                     <div class="setting-label">Navegação entre Abas com os Botões Laterais do Mouse (Botão 4 e Botão 5)</div>
-                    <div class="setting-help">Caso o mouse seja compatível e possua estes botões laterais físicos: <strong>Botão 4 (Voltar)</strong> alterna (bate-e-volta) entre as duas guias usadas mais recentemente; <strong>Ctrl + Botão 4</strong> retorna continuamente pelas guias anteriores; <strong>Botão 5 (Avançar)</strong> avança para a próxima aba à direita. Opera via comando direto da API <code>chrome.tabs.update</code> do Chrome.</div>
+                    <div class="setting-help">Caso o mouse seja compatível e possua estes botões laterais físicos: <strong>Botão 4 (Voltar)</strong> alterna (bate-e-volta) entre as duas guias usadas mais recentemente; <strong>Ctrl + Botão 4</strong> retorna continuamente pelas guias anteriores; <strong>Botão 5 (Avançar)</strong> avança para a próxima aba à direita.</div>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="optCapturaBotoesMouse4e5" checked>
@@ -1876,7 +1973,10 @@
 
             <!-- Secao 5: NAVEGADOR -->
             <section class="cartao">
-                <h2>5. NAVEGADOR: Gerenciamento de Guias e Janelas</h2>
+                <h2>
+                    <span>5. Navegador: Gerenciamento de Guias e Janelas</span>
+                    <button type="button" id="btnAbrirAparenciaChrome" class="btn-icone-titulo-cartao" title="Aparência do Chrome (chrome://settings/appearance)" aria-label="Aparência do Chrome">🎨</button>
+                </h2>
             <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
                     <div>
@@ -1932,7 +2032,7 @@
                     </div>
                     <div id="containerSubCriteriosAcoesReutilizar" style="display: flex; flex-direction: column; gap: 11px; border-top: 1px solid var(--borda-suave); padding-top: 11px; transition: opacity 0.2s ease;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Critérios de Correspondência e Proteção:</span>
+                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario);">Critérios de Correspondência e Proteção:</span>
                             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
                                 <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
                                     title="Monitora e compara a URL original informada no momento da criação da guia">
@@ -1952,7 +2052,7 @@
                             </div>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.5px;">Ação sobre o Conteúdo da Guia Reutilizada:</span>
+                            <span style="font-size: 11.5px; font-weight: 600; color: var(--texto-secundario);">Ação sobre o Conteúdo da Guia Reutilizada:</span>
                             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
                                 <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
                                     title="Apenas foca a guia existente, mantendo seu conteúdo intacto e a posição de rolagem preservada">
@@ -2047,31 +2147,6 @@
                     <button type="button" class="btn btn-secundario" id="btnRestaurarOrdemGuiasPadrao"
                         style="padding: 4px 10px; font-size: 12px; height: 26px;" title="Restaura o padrão do navegador: desativa a ordenação automática e desagrupa todas as guias da janela ativa">Restaurar Padrão do Navegador</button>
                     <span id="feedbackAcoesGuias"
-                        style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
-                </div>
-            </div>
-
-            <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                    <div>
-                        <div class="setting-label">5. NAVEGADOR: Aparência (Barra de Favoritos e Barras do Chrome)</div>
-                        <div class="setting-help">
-                            Preferência de organização visual no topo (<strong>Camada 1: Barra de Favoritos com auto-ocultação ao passar o mouse</strong> ➔ <strong>Camada 2: Guias</strong> ➔ <strong>Camada 3: URL + Addons</strong>). Como extensões Chrome (Manifest V3) não podem reordenar nativamente a barra de ferramentas do navegador, utilize os atalhos abaixo para alternar/restaurar ou abrir diretamente as configurações nativas de aparência do Chrome (<code>Ctrl+Shift+B</code> alterna a Barra de Favoritos).
-                        </div>
-                    </div>
-                    <label class="switch" title="Alternar preferência de Barra de Favoritos superior com auto-ocultação">
-                        <input type="checkbox" id="optModoBarraFavoritosSuperior">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
-                    <button type="button" class="btn btn-secundario" id="btnRestaurarBarraFerramentasPadrao"
-                        style="padding: 4px 10px; font-size: 12px; height: 26px;"
-                        title="Restaura o layout padrão da barra de ferramentas nas preferências do addon">🔄 Restaurar Barra de Ferramentas Padrão</button>
-                    <button type="button" class="btn btn-secundario" id="btnAbrirAparenciaChrome"
-                        style="padding: 4px 10px; font-size: 12px; height: 26px;"
-                        title="Abre diretamente chrome://settings/appearance em uma nova guia">🎨 Aparência do Chrome (chrome://settings/appearance)</button>
-                    <span id="feedbackAparenciaChrome"
                         style="font-size: 12px; color: var(--primaria); font-weight: 600; display: none;"></span>
                 </div>
             </div>
@@ -2230,15 +2305,20 @@
                         <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
                             Pausa Maior: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">24 min</span>
                         </span>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
-                            Exibir contador via:
-                            <select id="optPomodoroModoAviso" class="input-select" style="padding: 4px 8px; font-size: 12px;" title="Escolha como exibir os alertas e o contador contínuo ao trocar de aba">
-                                <option value="completo" selected>Completo (Janela Central + Badge + Barra nas Abas)</option>
-                                <option value="badge_e_barra_descanso">Badge no Ícone + Barra nas Abas (Só no Descanso)</option>
-                                <option value="barra_descanso">Barra Flutuante nas Abas (Só no Descanso)</option>
-                                <option value="barra_sempre">Barra Flutuante nas Abas (Foco e Descanso)</option>
-                                <option value="badge">Apenas Badge no Ícone do Chrome</option>
-                                <option value="modal">Apenas Janela Central ao Concluir (Atual)</option>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);" title="Define o estilo do minipopup no ciclo ativo de Foco (sincronizado com duplo clique)">
+                            Estilo:
+                            <select id="optPomodoroEstiloMinipopup" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                                <option value="compacto" selected>Compacto (+HH:MM)</option>
+                                <option value="normal">Normal (Foco x/x +HH:MM)</option>
+                                <option value="expandido">Expandido (+ Último Alívio)</option>
+                            </select>
+                        </label>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);" title="Define o comportamento do minipopup flutuante em sincronia com o cadeado e o fechar do próprio minipopup">
+                            Minipopup:
+                            <select id="optPomodoroComportamentoBarra" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                                <option value="fixo" selected>Fixo (Cadeado Amarelo)</option>
+                                <option value="movel">Móvel (Cadeado Cinza)</option>
+                                <option value="oculto">Oculto no Ativo (Só no Descanso)</option>
                             </select>
                         </label>
                     </div>
@@ -2253,6 +2333,15 @@
                             <input type="checkbox" id="optPomodoroPausasAutomaticas" checked>
                             Registrar Pausas Automáticas
                         </label>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-principal); cursor: pointer;" title="Emite um beep periódico após concluir o tempo de descanso caso ainda não esteja ativo">
+                            <input type="checkbox" id="optPomodoroBeepConclusaoAtivo" checked>
+                            Beep ao Concluir Descanso
+                        </label>
+                        <select id="optPomodoroBeepIntensidade" class="input-select" style="padding: 4px 8px; font-size: 12px;" title="Intensidade e intervalo do beep enquanto aguarda retorno após concluir o descanso">
+                            <option value="suave" selected>Suave (15s)</option>
+                            <option value="moderado">Moderado (10s)</option>
+                            <option value="grave">Grave (5s)</option>
+                        </select>
                         <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
                     </div>
                 </div>
@@ -2260,7 +2349,10 @@
 
             <!-- Secao 7: Privacidade e Manutencao do Navegador -->
             <section class="cartao">
-                <h2>7. Privacidade e Manutenção do Navegador</h2>
+                <h2>
+                    <span>7. Privacidade e Manutenção do Navegador</span>
+                    <button type="button" id="btnAbrirLimparDadosChrome" class="btn-icone-titulo-cartao" title="Excluir dados de navegação (chrome://settings/clearBrowserData)" aria-label="Excluir dados de navegação">🗑️</button>
+                </h2>
                 <p class="subtitulo">
                     Limpeza automática de cache e cookies antigos para manter o desempenho e a privacidade, preservando logins e sessões ativas.
                 </p>
@@ -2296,15 +2388,12 @@
                     os navegadores. O backup completo inclui todos os perfis cadastrados e as regras de Mapeamento Manual.
                 </p>
                 <div class="barra-botoes" style="margin-top: 8px;">
-                    <button type="button" class="btn btn-secundario" id="btnExportarJson">Exportar Todas as
-                        Configurações (JSON)</button>
-                    <button type="button" class="btn btn-secundario" id="btnImportarJson">Importar
-                        Configurações (JSON)</button>
+                    <button type="button" class="btn btn-secundario" id="btnExportarJson">Exportar</button>
+                    <button type="button" class="btn btn-secundario" id="btnImportarJson">Importar</button>
                     <input type="file" id="inputImportarArquivo" accept=".json" style="display:none;">
                     <button type="button" class="btn btn-secundario" id="btnRestaurarPadroes">Restaurar Padrões
                         de Fábrica</button>
-                    <button type="button" class="btn btn-primario" id="btnSalvarConfiguracoes">Salvar e Sincronizar na
-                        Nuvem</button>
+                    <button type="button" class="btn btn-primario" id="btnSalvarConfiguracoes">Salvar</button>
                 </div>
             </section>
         </div>
@@ -3048,7 +3137,7 @@
                     </div>
                     <div class="clipboard-slots-container" style="display: flex; gap: 12px; flex-wrap: wrap;">
                         <div class="clipboard-slot-col" style="flex: 1 1 calc(50% - 6px); min-width: 260px; display: flex; flex-direction: column; gap: 6px;">
-                            <div class="clipboard-slot-rotulo" style="font-size: 11px; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                            <div class="clipboard-slot-rotulo" style="font-size: 11px; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
                                 <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #38bdf8;"></span>
                                 Slot 1: Última Seleção (Botão do Meio | Ctrl+V)
                             </div>
@@ -3058,7 +3147,7 @@
                             </div>
                         </div>
                         <div class="clipboard-slot-col" style="flex: 1 1 calc(50% - 6px); min-width: 260px; display: flex; flex-direction: column; gap: 6px;">
-                            <div class="clipboard-slot-rotulo" style="font-size: 11px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                            <div class="clipboard-slot-rotulo" style="font-size: 11px; font-weight: 600; color: #a78bfa; display: flex; align-items: center; gap: 6px;">
                                 <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #a78bfa;"></span>
                                 Slot 2: Penúltima Seleção (Ctrl + Botão do Meio)
                             </div>

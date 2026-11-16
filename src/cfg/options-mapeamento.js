@@ -425,7 +425,10 @@
                     try {
                         const url = chrome.runtime.getURL('src/cfg/interface.json');
                         const resp = await fetch(url);
-                        const internas = await resp.json();
+                        const txt = await resp.text();
+                        const internas = (window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                            ? window.JusGovCfgDefaults.parsearJsonComComentarios(txt)
+                            : JSON.parse(String(txt || '').replace(/^\uFEFF/, '').replace(/^(?:\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*))+\s*/, '').trim());
                         const apenasInternas = Array.isArray(internas) ? internas.filter(r => r && r.origem !== 'usuario') : [];
                         this.renderizarLista(apenasInternas, true);
                     } catch (_) {
@@ -496,7 +499,10 @@
                     const leitor = new FileReader();
                     leitor.onload = (ev) => {
                         try {
-                            const json = JSON.parse(ev.target.result);
+                            const txtImp = String(ev.target.result || '');
+                            const json = (window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.parsearJsonComComentarios === 'function')
+                                ? window.JusGovCfgDefaults.parsearJsonComComentarios(txtImp)
+                                : JSON.parse(txtImp);
                             if (Array.isArray(json)) {
                                 this.#regras = json;
                                 this.renderizarLista(this.#regras);
