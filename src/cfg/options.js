@@ -653,83 +653,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${hh}:${mm}`;
     }
 
+    const instanciaProdutividadeOptions = (typeof window !== 'undefined' && typeof window.JusGovModuloProdutividade === 'function')
+        ? new window.JusGovModuloProdutividade()
+        : null;
+
     function atualizarStatusProdutividadeUI() {
         if (!lblStatusProdutividadeTrabalho || typeof chrome === 'undefined') return;
-        const renderizarEstado = (st, resumo = null) => {
+        const renderizarEstado = (st, resumo = null, nuvemMeta = null) => {
             if (!st) return;
-            const dataStr = st.data ? ` (${st.data})` : '';
-            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
-            const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0));
-            const pausas = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0));
-            const partes = [`Hoje${dataStr} — Tempo: Corrido ${formatarMinutosHHMM(corridoMin)}`];
-            if (ativoMin !== corridoMin) {
-                partes.push(`Ativo ${formatarMinutosHHMM(ativoMin)}`);
+            const cfgPom = {
+                pomodoroAtivo: Boolean(optPomodoroAtivo && optPomodoroAtivo.checked),
+                pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
+                pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5,
+                pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4
+            };
+            if (instanciaProdutividadeOptions && typeof instanciaProdutividadeOptions.renderizarResumoProdutividadeDom === 'function') {
+                instanciaProdutividadeOptions.renderizarResumoProdutividadeDom(lblStatusProdutividadeTrabalho, st, cfgPom, Date.now(), {
+                    containerPomodoro: lblStatusPomodoroDetalhado,
+                    ocultarPomodoroQuandoInativo: true,
+                    nuvemMeta
+                });
+                return;
             }
-            if (pausas !== 0) {
-                partes.push(`Pausas ${pausas}`);
-            }
-            lblStatusProdutividadeTrabalho.textContent = partes.join(' • ');
-
-            if (lblStatusPomodoroDetalhado) {
-                if (optPomodoroAtivo && optPomodoroAtivo.checked) {
-                    const focoCfg = optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25;
-                    const propCfg = optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5;
-                    const ciclosCfg = optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4;
-                    const alivioCfg = Math.max(1, Math.round(focoCfg / propCfg));
-                    const pausaMaiorCfg = Math.max(1, Math.round(alivioCfg * ciclosCfg));
-                    const fase = (resumo && resumo.fase) || st.pomodoroFase || 'foco';
-                    const minNaFase = (resumo && typeof resumo.minutosNaFase === 'number') ? resumo.minutosNaFase : Math.max(0, Math.floor(Number(st.pomodoroMinutosNaFase || 0)));
-                    const ciclosMax = (resumo && resumo.ciclosMax) || ciclosCfg;
-                    const cicloAtual = (resumo && resumo.cicloAtual) || (fase === 'foco' ? Math.min(ciclosMax, (st.pomodoroCicloAtual || 0) + 1) : Math.max(1, Math.min(ciclosMax, st.pomodoroCicloAtual || 1)));
-                    const emDescanso = (fase === 'alivio' || fase === 'pausa_maior');
-                    const descansoPendente = resumo ? Boolean(resumo.descansoPendente) : Boolean(st.pomodoroDescansoPendente || (emDescanso && !st.pomodoroDescansoRealizadoNoCiclo));
-                    const descansoRealizado = resumo ? Boolean(resumo.descansoRealizado) : Boolean(st.pomodoroDescansoRealizadoNoCiclo && !descansoPendente);
-
-                    const filhos = [];
-                    const addItem = (texto, estilo = '') => {
-                        const sp = document.createElement('span');
-                        sp.textContent = texto;
-                        if (estilo) sp.style.cssText = estilo;
-                        filhos.push(sp);
-                    };
-                    const addSep = () => addItem('•', 'opacity:0.5;');
-
-                    addItem(`🍅 Pomodoro: Foco ${fase === 'foco' ? `${minNaFase}/${focoCfg}` : `${focoCfg}/${focoCfg}`} min`, 'font-weight:600;color:var(--texto-principal);');
-                    if (fase === 'alivio') {
-                        addSep();
-                        addItem(`Alívio em andamento: ${minNaFase}/${alivioCfg} min`, 'font-weight:600;color:#0284c7;');
-                    } else if (fase === 'pausa_maior') {
-                        addSep();
-                        addItem(`Descanso em andamento: ${minNaFase}/${pausaMaiorCfg} min`, 'font-weight:600;color:#0284c7;');
-                    }
-                    addSep();
-                    addItem(`Ciclo ${cicloAtual}/${ciclosMax}`);
-                    addSep();
-                    if (descansoPendente) {
-                        addItem('Descanso do ciclo: Pendente', 'font-weight:700;color:#dc2626;');
-                    } else if (descansoRealizado) {
-                        addItem('Descanso do ciclo: Realizado', 'font-weight:700;color:#0d9488;');
-                    } else {
-                        addItem('Descanso do ciclo: Aguardando foco', 'color:var(--texto-secundario);');
-                    }
-                    lblStatusPomodoroDetalhado.replaceChildren(...filhos);
-                    lblStatusPomodoroDetalhado.style.display = 'flex';
-                } else {
-                    lblStatusPomodoroDetalhado.replaceChildren();
-                    lblStatusPomodoroDetalhado.style.display = 'none';
-                }
-            }
+            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0)) + Math.max(0, Math.floor(Number(nuvemMeta && nuvemMeta.outrosCorridoMin) || 0));
+            lblStatusProdutividadeTrabalho.textContent = corridoMin > 0
+                ? `👉 Corrido ${formatarDuracaoMinutosHM(corridoMin)}`
+                : '';
         };
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizarEstado(resp.estado, resp.resumoPomodoro || null);
+                    renderizarEstado(resp.estado, resp.resumoPomodoro || null, resp.nuvemMeta || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
-                    chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+                    chrome.storage.local.get(['jusgovTrabalhoEstado', 'jusgovProdNuvemMeta'], (dados) => {
                         if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
-                            renderizarEstado(dados.jusgovTrabalhoEstado, null);
+                            renderizarEstado(dados.jusgovTrabalhoEstado, null, dados.jusgovProdNuvemMeta || null);
                         }
                     });
                 }
@@ -739,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
-            if (area === 'local' && changes.jusgovTrabalhoEstado) {
+            if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta)) {
                 atualizarStatusProdutividadeUI();
             }
         });
@@ -991,14 +951,43 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        chrome.storage.sync.get(null, (cfg) => {
-            const dados = cfg || {};
+        chrome.storage.sync.get(null, async (cfg) => {
+            const dados = { ...(cfg || {}) };
+            let pendLocalObj = null;
+            let temPendLocal = false;
+            try {
+                if (chrome.storage.local) {
+                    const loc = await chrome.storage.local.get(['jusgovConfigSyncPendente', 'perfilAtivoId']);
+                    if (loc && typeof loc.perfilAtivoId === 'string' && loc.perfilAtivoId.trim()) {
+                        dados.perfilAtivoId = loc.perfilAtivoId.trim();
+                    }
+                    if (loc && loc.jusgovConfigSyncPendente && typeof loc.jusgovConfigSyncPendente === 'object' && Object.keys(loc.jusgovConfigSyncPendente).length > 0) {
+                        pendLocalObj = loc.jusgovConfigSyncPendente;
+                        temPendLocal = true;
+                    }
+                }
+            } catch (_) { }
             if (configuradorPerfis) {
-                const estrutura = configuradorPerfis.garantirEstruturaPerfis(dados);
+                const cat = await configuradorPerfis.carregarCatalogoPerfis(typeof chrome !== 'undefined' ? chrome : null).catch(() => null);
+                const estrutura = configuradorPerfis.garantirEstruturaPerfis(dados, cat);
+                /* Se outro PC sincronizou chaves top-level de outro perfil, resolve UI pelo perfil local selecionado */
+                if (dados.jusgovSyncPerfilBaseTopLevel && dados.jusgovSyncPerfilBaseTopLevel !== estrutura.perfilAtivoId) {
+                    const chaveCfg = configuradorPerfis.chaveConfigPerfil(estrutura.perfilAtivoId);
+                    const rawPerfil = (dados[chaveCfg] && typeof dados[chaveCfg] === 'object') ? dados[chaveCfg] : {};
+                    Object.assign(dados, configuradorPerfis.resolverConfigEfetivaPerfil(estrutura.perfilAtivoId, rawPerfil, cat));
+                }
+                if (pendLocalObj) {
+                    Object.assign(dados, pendLocalObj);
+                }
                 atualizarBarraPerfisUI(estrutura.listaPerfis, estrutura.perfilAtivoId);
-                if (estrutura.alteracoes) {
+                if (chrome.storage.local && (!dados.perfilAtivoId || dados.perfilAtivoId !== estrutura.perfilAtivoId)) {
+                    chrome.storage.local.set({ perfilAtivoId: estrutura.perfilAtivoId }).catch(() => { });
+                }
+                if (estrutura.alteracoes && Object.keys(estrutura.alteracoes).length > 0 && !temPendLocal) {
                     chrome.storage.sync.set(estrutura.alteracoes).catch(() => { });
                 }
+            } else if (pendLocalObj) {
+                Object.assign(dados, pendLocalObj);
             }
             const modoAtual = dados.modoTurbo || 'global';
             if (selectModoTurbo) selectModoTurbo.value = modoAtual;
@@ -1252,10 +1241,15 @@ document.addEventListener('DOMContentLoaded', () => {
      * e seletores continuos (eventos 'input') para blindar contra o estouro da
      * cota MAX_WRITE_OPERATIONS_PER_MINUTE (120 escritas/min) do chrome.storage.sync.
      */
-    function salvarConfiguracoesDebounced(delayMs = 250) {
+    function cancelarDebounceSalvarConfig() {
         if (timerDebounceSalvarConfig) {
             clearTimeout(timerDebounceSalvarConfig);
+            timerDebounceSalvarConfig = null;
         }
+    }
+
+    function salvarConfiguracoesDebounced(delayMs = 250) {
+        cancelarDebounceSalvarConfig();
         timerDebounceSalvarConfig = setTimeout(() => {
             timerDebounceSalvarConfig = null;
             salvarConfiguracoes();
@@ -1381,14 +1375,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (textoUrlsTurbo) textoUrlsTurbo.value = payload.urlsTurbo.join('\n');
 
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             chrome.storage.sync.remove('flashBorderAtivo').catch(() => { });
-            chrome.storage.sync.set(payload, () => {
-                if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
-                    chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
-                }
-                exibirToast('Configurações salvas e sincronizadas na nuvem!');
-            });
+            if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                chrome.runtime.sendMessage({ acao: 'AGENDAR_SYNC_NUVEM_DIFERIDO', payload }, () => {
+                    atualizarStatusProdutividadeUI();
+                    exibirToast('Configurações salvas localmente (sincronização na nuvem em 5 min / ao sair)!');
+                });
+            } else {
+                chrome.storage.local.set({ jusgovConfigSyncPendente: payload }, () => {
+                    exibirToast('Configurações salvas localmente!');
+                });
+            }
         } else {
             exibirToast('Configurações aplicadas localmente!');
         }
@@ -2043,10 +2041,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adicionarOuvinteSeguro(btnResetPerfilAtual, 'click', async () => {
         fecharModalResetPerfis();
+        cancelarDebounceSalvarConfig();
         const nomeAtual = obterNomePerfilAtivo();
         if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
             const res = await configuradorPerfis.resetarPerfis('atual', chrome);
             if (res && res.ok) {
+                atualizarBarraPerfisUI(res.listaPerfis, res.perfilAtivoId);
                 carregarConfiguracoesDoStorage();
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                     chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
@@ -2060,6 +2060,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adicionarOuvinteSeguro(btnResetTodosPerfis, 'click', async () => {
         fecharModalResetPerfis();
+        cancelarDebounceSalvarConfig();
+        /* Salvar antes o perfil atual apenas se for um dos padronizados (Padrão, Trabalho, Casa, Estudo);
+         * se for um perfil criado pelo usuário, ele é apagado no reset completo e volta à 1ª escolha ("Padrão"). */
+        const perfilAtualAntes = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
+        const ehPadronizadoAntes = Boolean(
+            (perfilAtualAntes && perfilAtualAntes.predefinido === true) ||
+            ['padrao', 'trabalho', 'casa', 'estudo'].includes(cachePerfilAtivoId)
+        );
+        const opcoesReset = ehPadronizadoAntes ? { perfilPreferidoId: cachePerfilAtivoId } : {};
+
         if (typeof chrome !== 'undefined' && chrome.storage) {
             if (chrome.storage.local) {
                 const agora = new Date();
@@ -2077,8 +2087,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         if (configuradorPerfis && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            const res = await configuradorPerfis.resetarPerfis('todos', chrome);
+            const res = await configuradorPerfis.resetarPerfis('todos', chrome, opcoesReset);
             if (res && res.ok) {
+                atualizarBarraPerfisUI(res.listaPerfis, res.perfilAtivoId);
                 marcarAlteracoesPendentesMapeamento(false);
                 carregarConfiguracoesDoStorage();
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
@@ -2101,7 +2112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (_) { }
         }
         const dadosExportacao = configuradorPerfis
-            ? configuradorPerfis.montarDadosExportacaoBackupTotal(syncData || {}, overridesAtuais)
+            ? configuradorPerfis.montarDadosExportacaoBackupTotal({ ...(syncData || {}), perfilAtivoId: cachePerfilAtivoId }, overridesAtuais)
             : { projeto: 'JusGovBR', ...overridesAtuais };
 
         const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], { type: 'application/json' });
@@ -2193,8 +2204,12 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Passo 4.8: Escutar alteracoes vindas do atalho Esc+Esc, do Popup ou de contadores */
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local' && changes.perfilAtivoId) {
+                carregarConfiguracoesDoStorage();
+                return;
+            }
             if (area === 'sync') {
-                if (changes.perfilAtivoId || changes.listaPerfis) {
+                if (changes.listaPerfis) {
                     carregarConfiguracoesDoStorage();
                     return;
                 }

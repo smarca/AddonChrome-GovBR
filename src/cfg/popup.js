@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * identificar a URL da aba ativa na janela atual.
      */
     function carregarEstadoInicial() {
-        /* Passo 3.1: Ler chaves salvas na nuvem */
+        /* Passo 3.1: Ler chaves salvas na nuvem com sobreposicao local pendente (anti-cota) */
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
             chrome.storage.sync.get([
                 'modoTurbo',
@@ -298,8 +298,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 'comportamentoCliqueIcone',
                 'listaPerfis',
                 'perfilAtivoId'
-            ], (config) => {
-                const cfg = config || {};
+            ], async (config) => {
+                const cfg = { ...(config || {}) };
+                try {
+                    if (chrome.storage.session) {
+                        const ses = await chrome.storage.session.get(['cacheConfigJusGov']);
+                        if (ses && ses.cacheConfigJusGov && typeof ses.cacheConfigJusGov === 'object') {
+                            Object.assign(cfg, ses.cacheConfigJusGov);
+                        }
+                    }
+                } catch (_) { }
+                try {
+                    if (chrome.storage.local) {
+                        const loc = await chrome.storage.local.get(['jusgovConfigSyncPendente', 'perfilAtivoId']);
+                        if (loc && typeof loc.perfilAtivoId === 'string' && loc.perfilAtivoId.trim()) {
+                            cfg.perfilAtivoId = loc.perfilAtivoId.trim();
+                        }
+                        if (loc && loc.jusgovConfigSyncPendente && typeof loc.jusgovConfigSyncPendente === 'object') {
+                            Object.assign(cfg, loc.jusgovConfigSyncPendente);
+                        }
+                    }
+                } catch (_) { }
                 const modo = cfg.modoTurbo || 'global';
                 cacheUrlsTurbo = Array.isArray(cfg.urlsTurbo) ? cfg.urlsTurbo : [];
 
@@ -337,26 +356,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function salvarPreferenciaPopupDiferida(patch, callback) {
+        if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+            chrome.runtime.sendMessage({ acao: 'AGENDAR_SYNC_NUVEM_DIFERIDO', payload: patch }, () => {
+                if (typeof callback === 'function') callback();
+            });
+            return;
+        }
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            chrome.storage.sync.set(patch, callback);
+        }
+    }
+
     /* Passo 4.1: Eventos dos botoes de Modo de Execucao com blindagem defensiva */
     adicionarOuvinteSeguro(btnModoGlobal, 'click', () => {
         atualizarInterfaceModo('global');
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ modoTurbo: 'global' });
-        }
+        salvarPreferenciaPopupDiferida({ modoTurbo: 'global' });
     });
 
     adicionarOuvinteSeguro(btnModoUrl, 'click', () => {
         atualizarInterfaceModo('url');
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ modoTurbo: 'url' });
-        }
+        salvarPreferenciaPopupDiferida({ modoTurbo: 'url' });
     });
 
     adicionarOuvinteSeguro(btnModoDesligado, 'click', () => {
         atualizarInterfaceModo('desligado');
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ modoTurbo: 'desligado' });
-        }
+        salvarPreferenciaPopupDiferida({ modoTurbo: 'desligado' });
     });
 
     /* Passo 4.2: Evento do botao de incluir/remover dominio da aba atual */
@@ -373,18 +398,14 @@ document.addEventListener('DOMContentLoaded', () => {
             cacheUrlsTurbo.push(mascaraDominioAbaAtual);
         }
 
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ urlsTurbo: cacheUrlsTurbo }, () => {
-                atualizarBotaoDominioAba();
-            });
-        }
+        salvarPreferenciaPopupDiferida({ urlsTurbo: cacheUrlsTurbo }, () => {
+            atualizarBotaoDominioAba();
+        });
     });
 
     /* Passo 4.4: Evento do switch "PJe Turbo (Anti-Ampulhetas)" */
     adicionarOuvinteSeguro(checkAmpuletas, 'change', (e) => {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ ativoAmpuletas: e.target.checked });
-        }
+        salvarPreferenciaPopupDiferida({ ativoAmpuletas: e.target.checked });
     });
 
     /* Passo 4.5: Evento de abertura da pagina completa de Opcoes e Central de Ajuda */
@@ -412,63 +433,41 @@ document.addEventListener('DOMContentLoaded', () => {
         window.close();
     });
 
-    function formatarMinutosHHMM(totalMin) {
-        const mTotal = Math.max(0, Math.floor(Number(totalMin) || 0));
-        const hh = String(Math.floor(mTotal / 60)).padStart(2, '0');
-        const mm = String(mTotal % 60).padStart(2, '0');
-        return `${hh}:${mm}`;
-    }
+    const instanciaProdutividadePopup = (typeof window !== 'undefined' && typeof window.JusGovModuloProdutividade === 'function')
+        ? new window.JusGovModuloProdutividade()
+        : null;
 
     function atualizarContadoresProdutividadePopup() {
         if (!rodapeProdutividadeOnline || typeof chrome === 'undefined') return;
-        const renderizar = (st, resumo = null) => {
+        const renderizar = (st, cfgObs = null, nuvemMeta = null) => {
             if (!st) return;
-            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0));
-            const ativoMin = Math.max(0, Math.floor(Number(st.ativoMinutos) || 0));
-            const pausas = Math.max(0, Math.floor(Number(st.pausasConfirmadas) || 0));
-            const partes = [`Tempo: Corrido ${formatarMinutosHHMM(corridoMin)}`];
-            if (ativoMin !== corridoMin) {
-                partes.push(`Ativo ${formatarMinutosHHMM(ativoMin)}`);
+            if (instanciaProdutividadePopup && typeof instanciaProdutividadePopup.renderizarResumoProdutividadeDom === 'function') {
+                instanciaProdutividadePopup.renderizarResumoProdutividadeDom(rodapeProdutividadeOnline, st, cfgObs || {}, Date.now(), { nuvemMeta });
+                return;
             }
-            if (pausas !== 0) {
-                partes.push(`Pausas ${pausas}`);
-            }
-            if (resumo && resumo.ativo) {
-                partes.push(`🍅 ${resumo.faseLabel} ${resumo.minutosNaFase}/${resumo.metaFaseMin}m (C${resumo.cicloAtual}/${resumo.ciclosMax})`);
-                if (resumo.descansoPendente) {
-                    const spBase = document.createElement('span');
-                    spBase.textContent = `${partes.join(' • ')} • `;
-                    const spPend = document.createElement('span');
-                    spPend.textContent = 'Descanso Pendente';
-                    spPend.style.color = '#dc2626';
-                    spPend.style.fontWeight = '700';
-                    rodapeProdutividadeOnline.replaceChildren(spBase, spPend);
-                    return;
-                }
-                if (resumo.descansoRealizado) {
-                    partes.push('Descanso Realizado');
-                }
-            }
-            rodapeProdutividadeOnline.textContent = partes.join(' • ');
+            const corridoMin = Math.max(0, Math.floor(Number(st.corridoMinutos) || 0)) + Math.max(0, Math.floor(Number(nuvemMeta && nuvemMeta.outrosCorridoMin) || 0));
+            const hh = String(Math.floor(corridoMin / 60)).padStart(2, '0');
+            const mm = String(corridoMin % 60).padStart(2, '0');
+            rodapeProdutividadeOnline.textContent = corridoMin > 0 ? `👉 Corrido ${hh}h:${mm}m` : '';
         };
         if (chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'OBTER_STATUS_TRABALHO' }, (resp) => {
                 if (!chrome.runtime.lastError && resp && resp.ok && resp.estado) {
-                    renderizar(resp.estado, resp.resumoPomodoro || null);
+                    renderizar(resp.estado, resp.config || null, resp.nuvemMeta || null);
                     return;
                 }
                 if (chrome.storage && chrome.storage.local) {
-                    chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+                    chrome.storage.local.get(['jusgovTrabalhoEstado', 'jusgovProdNuvemMeta'], (dados) => {
                         if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
-                            renderizar(dados.jusgovTrabalhoEstado);
+                            renderizar(dados.jusgovTrabalhoEstado, null, dados.jusgovProdNuvemMeta || null);
                         }
                     });
                 }
             });
         } else if (chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get(['jusgovTrabalhoEstado'], (dados) => {
+            chrome.storage.local.get(['jusgovTrabalhoEstado', 'jusgovProdNuvemMeta'], (dados) => {
                 if (!chrome.runtime.lastError && dados && dados.jusgovTrabalhoEstado) {
-                    renderizar(dados.jusgovTrabalhoEstado);
+                    renderizar(dados.jusgovTrabalhoEstado, null, dados.jusgovProdNuvemMeta || null);
                 }
             });
         }
@@ -478,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'sync') {
-                if (changes.listaPerfis || changes.perfilAtivoId) {
+                if (changes.listaPerfis) {
                     carregarEstadoInicial();
                     return;
                 }
@@ -490,8 +489,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     cacheUrlsTurbo = Array.isArray(changes.urlsTurbo.newValue) ? changes.urlsTurbo.newValue : [];
                     atualizarBotaoDominioAba();
                 }
-            } else if (area === 'local' && changes.jusgovTrabalhoEstado) {
+            } else if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta)) {
                 atualizarContadoresProdutividadePopup();
+            } else if (area === 'local' && (changes.jusgovConfigSyncPendente || changes.perfilAtivoId)) {
+                carregarEstadoInicial();
             }
         });
     }

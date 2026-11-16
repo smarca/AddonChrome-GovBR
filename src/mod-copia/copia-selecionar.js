@@ -324,8 +324,8 @@
     let opacidadeFundoMarcadorColado = 0.24;
     let estiloBadgeMarcadorColado = 'sobrescrito';
     let tipoContornoMarcadorColado = 'solido';
-    let minimoCaracteresInterface = 5;
-    let modoRetirarSelecao = 'total_exceto_arrasto'; // 'total_exceto_arrasto' (padrao), 'total', 'interface', 'nenhuma'
+    let minimoCaracteresInterface = 0;
+    let modoRetirarSelecao = 'com_flash'; // 'com_flash' (padrao qd flash ativo), 'total_exceto_arrasto', 'total', 'interface', 'nenhuma'
     let timerFlashBorder = null;
     let aguardandoDesselecaoFlash = false;
     let flashExclusivoSemSelecao = false;
@@ -1406,7 +1406,7 @@
 
     function normalizarModoRetirarSelecao(val) {
         const v = String(val || '').trim().toLowerCase();
-        if (v === 'total' || v === 'interface' || v === 'nenhuma') return v;
+        if (v === 'com_flash' || v === 'total' || v === 'interface' || v === 'nenhuma') return v;
         return 'total_exceto_arrasto';
     }
 
@@ -1417,6 +1417,7 @@
      */
     function deveManterSelecaoAtivaNoDom(noOuElemento, eraArrasto = false) {
         if (modoRetirarSelecao === 'nenhuma') return true;
+        if (modoRetirarSelecao === 'com_flash') return (tempoFlashBorderMs === 0);
         if (modoRetirarSelecao === 'total') return false;
         if (!noOuElemento) return true;
         /* Regra manual explícita do usuário (Mapeamento Manual Avançado) tem prioridade sobre total_exceto_arrasto */
@@ -2506,9 +2507,11 @@
         if (!rangeAlvo) return { ok: false, manterSelecao: true };
         const noContexto = opcoes.noContexto || rangeAlvo.commonAncestorContainer || null;
         const eraArrasto = Boolean(opcoes.eraArrasto);
-        const manterSelecao = (opcoes.forcarDesselecao === true && modoRetirarSelecao !== 'nenhuma' && (modoRetirarSelecao !== 'total_exceto_arrasto' || !eraArrasto))
+        const removePorFlash = (modoRetirarSelecao === 'com_flash' && tempoFlashBorderMs !== 0);
+        const manterPorSemFlash = (modoRetirarSelecao === 'nenhuma' || (modoRetirarSelecao === 'com_flash' && tempoFlashBorderMs === 0));
+        const manterSelecao = (opcoes.forcarDesselecao === true && !manterPorSemFlash && (modoRetirarSelecao !== 'total_exceto_arrasto' || !eraArrasto))
             ? false
-            : ((opcoes.forcarManterSelecao === true && modoRetirarSelecao !== 'total' && (modoRetirarSelecao !== 'total_exceto_arrasto' || eraArrasto))
+            : ((opcoes.forcarManterSelecao === true && modoRetirarSelecao !== 'total' && !removePorFlash && (modoRetirarSelecao !== 'total_exceto_arrasto' || eraArrasto))
                 ? true
                 : deveManterSelecaoAtivaNoDom(noContexto, eraArrasto));
 
@@ -2750,6 +2753,8 @@
             let deveManter = true;
             if (modoRetirarSelecao === 'nenhuma') {
                 deveManter = true;
+            } else if (modoRetirarSelecao === 'com_flash') {
+                deveManter = (tempoFlashBorderMs === 0);
             } else if (modoRetirarSelecao === 'total') {
                 deveManter = false;
             } else if (modoRetirarSelecao === 'total_exceto_arrasto') {
@@ -3977,6 +3982,7 @@
                 ultimoTimestampSelecaoManual = Date.now();
 
                 const deveDesselecionarArrasto = (modoRetirarSelecao === 'total') ||
+                    (modoRetirarSelecao === 'com_flash' && tempoFlashBorderMs !== 0) ||
                     (modoRetirarSelecao === 'interface' && ehSistemaEstrito);
 
                 ignorarProximoClick = true;
@@ -5911,23 +5917,24 @@
             }
         }, { capture: true, passive: true, signal });
         let ultimoPingAtividadeTrabalhoTs = 0;
-        const notificarAtividadeTrabalhoThrottled = () => {
+        const notificarAtividadeTrabalhoThrottled = (tipoInteracao = 'movimento') => {
             const agora = Date.now();
-            if ((agora - ultimoPingAtividadeTrabalhoTs) < 30000) return;
+            if (tipoInteracao !== 'click_ou_tecla' && (agora - ultimoPingAtividadeTrabalhoTs) < 30000) return;
+            if (tipoInteracao === 'click_ou_tecla' && (agora - ultimoPingAtividadeTrabalhoTs) < 3000) return;
             ultimoPingAtividadeTrabalhoTs = agora;
             try {
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    chrome.runtime.sendMessage({ acao: 'PING_ATIVIDADE_TRABALHO' }).catch(() => {});
+                    chrome.runtime.sendMessage({ acao: 'PING_ATIVIDADE_TRABALHO', tipoInteracao }).catch(() => {});
                 }
             } catch (_) { }
         };
         window.addEventListener('keydown', (e) => {
             window.__JUSGOV_MODO_BARALHO__ = Boolean(e.ctrlKey && e.altKey && e.shiftKey);
-            notificarAtividadeTrabalhoThrottled();
+            notificarAtividadeTrabalhoThrottled('click_ou_tecla');
         }, { capture: true, passive: true, signal });
-        window.addEventListener('mousedown', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
-        window.addEventListener('mousemove', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
-        window.addEventListener('wheel', notificarAtividadeTrabalhoThrottled, { capture: true, passive: true, signal });
+        window.addEventListener('mousedown', () => notificarAtividadeTrabalhoThrottled('click_ou_tecla'), { capture: true, passive: true, signal });
+        window.addEventListener('mousemove', () => notificarAtividadeTrabalhoThrottled('movimento'), { capture: true, passive: true, signal });
+        window.addEventListener('wheel', () => notificarAtividadeTrabalhoThrottled('movimento'), { capture: true, passive: true, signal });
     }
 
     function sincronizarConfiguracaoMarcadorVisual() {
@@ -6707,7 +6714,7 @@
         localizarCampoSimbolosSobCursor,
         definirMinimoCaracteresInterface(valor) {
             const v = Number(valor);
-            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(v) ? v : 5;
+            minimoCaracteresInterface = [0, 1, 2, 3, 4, 5, 10].includes(v) ? v : 0;
         },
         obterMinimoCaracteresInterface() {
             return minimoCaracteresInterface;

@@ -446,9 +446,9 @@
             if (typeof fnAsync !== 'function' && typeof fnSync !== 'function') {
                 if (this.#painelResultado) {
                     this.#painelResultado.style.display = 'block';
-                    this.#painelResultado.innerHTML = this.#renderizarRelatorioAuditoriaFormatado('[ERRO] Módulo debug.js não carregado.');
+                    this.#painelResultado.innerHTML = this.#renderizarRelatorioAuditoriaFormatado('[ERRO] Módulo mod-debug.js não carregado.');
                 }
-                this.registrarMensagemDireta('ERROR', 'Módulo debug.js não carregado.');
+                this.registrarMensagemDireta('ERROR', 'Módulo mod-debug.js não carregado.');
                 return;
             }
 

@@ -39,10 +39,12 @@
     const CHAVE_PERFIL_ATIVO = 'perfilAtivoId';
     const CHAVE_LISTA_PERFIS = 'listaPerfis';
     const PREFIXO_CHAVE_PERFIL_CFG = 'perfilCfg_';
+    const CHAVE_CONFIG_SYNC_PENDENTE = 'jusgovConfigSyncPendente';
+    const CHAVE_SYNC_PERFIL_BASE_TOP = 'jusgovSyncPerfilBaseTopLevel';
     const LIMITE_BYTES_ITEM_SYNC = 8000;
     const JANELA_DUPLO_CLIQUE_ICONE_MS = 260;
 
-    /* Lista canonica de chaves sincronizaveis (evita reinjecao por alteracao em contadores locais) */
+    /* Lista canonica de chaves sincronizaveis (perfilAtivoId permanece estritamente local por dispositivo — ARQ-07 / FEAT-48) */
     const CHAVES_CONFIGURACAO_SINCRONIZAVEL = Object.freeze([
         'urlsTurbo', 'urlsAmpuletas', 'modoTurbo', 'comportamentoCliqueIcone', 'ativoAmpuletas',
         'manterFormatacaoBasica', 'nivelFiltroFormatacao', 'selecaoEditavelAtiva',
@@ -52,7 +54,7 @@
         'reutilizarAbasAbertas', 'reutilizarAbasFocoPrimeiroPlano', 'protegerGuiasModificadas',
         'reutilizarAbasAcaoConteudo', 'monitorarUrlOriginalAbertura', 'monitorarUrlAtualPagina',
         'criterioOrdenacaoGuias', 'sentidoOrdenacaoGuias', 'ordenarGuiasFixadas',
-        'fecharHierarquiaEmCascata', 'modoBarraFavoritosSuperior', 'descarteGuiasInativasAtivo',
+        'fecharHierarquiaEmCascata', 'descarteGuiasInativasAtivo',
         'tempoInatividadeDescarteMinutos', 'validacaoMatematicaAtiva', 'tempoConferenciaDocumentosMs',
         'modoExibicaoValidacao', 'posicaoAvisosValidacao', 'tempoFlashBorderMs', 'corFlashBorder',
         'marcadorConteudoColadoAtivo', 'presetMarcadorColado', 'corContornoMarcadorColado',
@@ -64,7 +66,7 @@
         'tempoTrabalhoCorridoHoras', 'tempoTrabalhoAtivoAtivo', 'tempoTrabalhoAtivoHoras',
         'pomodoroAtivo', 'pomodoroProporcao', 'pomodoroFocoMinutos', 'pomodoroCiclos',
         'pomodoroPausasAutomaticas', 'pomodoroModoAviso',
-        'perfilAtivoId', 'listaPerfis'
+        'listaPerfis'
     ]);
     const SET_CHAVES_SYNC = new Set(CHAVES_CONFIGURACAO_SINCRONIZAVEL);
 
@@ -284,6 +286,34 @@
             return candidato;
         }
 
+        async obterPerfilAtivoLocal(chromeApi = null, fallbackSyncData = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            try {
+                if (apiChrome && apiChrome.storage && apiChrome.storage.local) {
+                    const loc = await apiChrome.storage.local.get([CHAVE_PERFIL_ATIVO]);
+                    if (loc && typeof loc[CHAVE_PERFIL_ATIVO] === 'string' && loc[CHAVE_PERFIL_ATIVO].trim()) {
+                        return loc[CHAVE_PERFIL_ATIVO].trim();
+                    }
+                }
+            } catch (_) { }
+            if (fallbackSyncData && typeof fallbackSyncData[CHAVE_PERFIL_ATIVO] === 'string' && fallbackSyncData[CHAVE_PERFIL_ATIVO].trim()) {
+                return fallbackSyncData[CHAVE_PERFIL_ATIVO].trim();
+            }
+            return '';
+        }
+
+        async salvarPerfilAtivoLocal(perfilId, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            const idStr = (typeof perfilId === 'string' && perfilId.trim()) ? perfilId.trim() : 'padrao';
+            try {
+                if (apiChrome && apiChrome.storage && apiChrome.storage.local) {
+                    await apiChrome.storage.local.set({ [CHAVE_PERFIL_ATIVO]: idStr });
+                    return true;
+                }
+            } catch (_) { }
+            return false;
+        }
+
         garantirEstruturaPerfis(syncData = {}, catalogo = null) {
             const cat = catalogo || {};
             const predefs = Array.isArray(cat.perfisPredefinidos) && cat.perfisPredefinidos.length > 0
@@ -336,12 +366,10 @@
                 perfilAtivoId = perfilPadraoId;
             }
 
+            /* NUNCA gravar perfilAtivoId em alteracoes de chrome.storage.sync (isolamento por dispositivo — FEAT-48) */
             const alteracoes = {};
             if (!tinhaListaAnterior || JSON.stringify(syncData[CHAVE_LISTA_PERFIS]) !== JSON.stringify(listaFinal)) {
                 alteracoes[CHAVE_LISTA_PERFIS] = listaFinal;
-            }
-            if (syncData[CHAVE_PERFIL_ATIVO] !== perfilAtivoId) {
-                alteracoes[CHAVE_PERFIL_ATIVO] = perfilAtivoId;
             }
 
             for (let i = 0; i < listaFinal.length; i++) {
@@ -365,6 +393,16 @@
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
             const syncData = await apiChrome.storage.sync.get(null);
+            const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncData);
+            if (ativoLocal) syncData[CHAVE_PERFIL_ATIVO] = ativoLocal;
+            try {
+                if (apiChrome.storage.local) {
+                    const locPend = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE]);
+                    if (locPend && locPend[CHAVE_CONFIG_SYNC_PENDENTE] && typeof locPend[CHAVE_CONFIG_SYNC_PENDENTE] === 'object') {
+                        Object.assign(syncData, locPend[CHAVE_CONFIG_SYNC_PENDENTE]);
+                    }
+                }
+            } catch (_) { }
             const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
 
             const alvoNorm = normalizarTextoComparacao(novoPerfilId);
@@ -378,12 +416,15 @@
 
             const atualizacao = {
                 [CHAVE_LISTA_PERFIS]: listaPerfis,
-                [CHAVE_PERFIL_ATIVO]: destino.id
+                [CHAVE_SYNC_PERFIL_BASE_TOP]: destino.id
             };
 
             /* Passo P.1: Persistir snapshot das preferencias atuais no perfil que estava ativo */
             const chaveAtual = this.chaveConfigPerfil(perfilAtivoId);
-            atualizacao[chaveAtual] = this.calcularSobrescritasPerfil(syncData, perfilAtivoId, cat);
+            const fonteAtual = (!syncData[CHAVE_SYNC_PERFIL_BASE_TOP] || syncData[CHAVE_SYNC_PERFIL_BASE_TOP] === perfilAtivoId)
+                ? syncData
+                : this.resolverConfigEfetivaPerfil(perfilAtivoId, (syncData[chaveAtual] && typeof syncData[chaveAtual] === 'object') ? syncData[chaveAtual] : {}, cat);
+            atualizacao[chaveAtual] = this.calcularSobrescritasPerfil(fonteAtual, perfilAtivoId, cat);
 
             /* Passo P.2: Carregar configuracoes efetivas do perfil destino (sem alterar regrasMapeamentoElementos globais) */
             const chaveDestino = this.chaveConfigPerfil(destino.id);
@@ -395,7 +436,13 @@
             const configDestino = this.resolverConfigEfetivaPerfil(destino.id, sobrescritasDestino, cat);
             Object.assign(atualizacao, configDestino);
 
+            await this.salvarPerfilAtivoLocal(destino.id, apiChrome);
             await apiChrome.storage.sync.set(atualizacao);
+            try {
+                if (apiChrome.storage.local && typeof apiChrome.storage.local.remove === 'function') {
+                    await apiChrome.storage.local.remove([CHAVE_CONFIG_SYNC_PENDENTE]);
+                }
+            } catch (_) { }
             return { ok: true, perfilAtivoId: destino.id, perfil: destino, listaPerfis, config: configDestino };
         }
 
@@ -408,6 +455,16 @@
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
             const syncData = await apiChrome.storage.sync.get(null);
+            const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncData);
+            if (ativoLocal) syncData[CHAVE_PERFIL_ATIVO] = ativoLocal;
+            try {
+                if (apiChrome.storage.local) {
+                    const locPend = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE]);
+                    if (locPend && locPend[CHAVE_CONFIG_SYNC_PENDENTE] && typeof locPend[CHAVE_CONFIG_SYNC_PENDENTE] === 'object') {
+                        Object.assign(syncData, locPend[CHAVE_CONFIG_SYNC_PENDENTE]);
+                    }
+                }
+            } catch (_) { }
             const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
 
             const nomeNorm = normalizarTextoComparacao(nome);
@@ -429,12 +486,13 @@
 
             const atualizacao = {
                 [CHAVE_LISTA_PERFIS]: novaLista,
-                [CHAVE_PERFIL_ATIVO]: novoId,
+                [CHAVE_SYNC_PERFIL_BASE_TOP]: novoId,
                 [chaveAtual]: snapshotAtual,
                 [this.chaveConfigPerfil(novoId)]: sobrescritasNovo,
                 ...configNovo
             };
 
+            await this.salvarPerfilAtivoLocal(novoId, apiChrome);
             await apiChrome.storage.sync.set(atualizacao);
             return { ok: true, perfil: novoPerfil, perfilAtivoId: novoId, listaPerfis: novaLista, config: configNovo };
         }
@@ -469,6 +527,16 @@
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
             const syncData = await apiChrome.storage.sync.get(null);
+            const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncData);
+            if (ativoLocal) syncData[CHAVE_PERFIL_ATIVO] = ativoLocal;
+            try {
+                if (apiChrome.storage.local) {
+                    const locPend = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE]);
+                    if (locPend && locPend[CHAVE_CONFIG_SYNC_PENDENTE] && typeof locPend[CHAVE_CONFIG_SYNC_PENDENTE] === 'object') {
+                        Object.assign(syncData, locPend[CHAVE_CONFIG_SYNC_PENDENTE]);
+                    }
+                }
+            } catch (_) { }
             const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
 
             const alvo = listaPerfis.find(p => p.id === perfilId);
@@ -483,9 +551,10 @@
                     ? syncData[this.chaveConfigPerfil(perfilPadraoId)]
                     : {};
                 const configPadraoAplicada = this.resolverConfigEfetivaPerfil(perfilPadraoId, sobrescritasPadrao, cat);
+                await this.salvarPerfilAtivoLocal(perfilPadraoId, apiChrome);
                 await apiChrome.storage.sync.set({
                     [CHAVE_LISTA_PERFIS]: novaLista,
-                    [CHAVE_PERFIL_ATIVO]: perfilPadraoId,
+                    [CHAVE_SYNC_PERFIL_BASE_TOP]: perfilPadraoId,
                     ...configPadraoAplicada
                 });
             } else {
@@ -498,12 +567,40 @@
             return { ok: true, perfilAtivoId: (perfilAtivoId === perfilId ? perfilPadraoId : perfilAtivoId), listaPerfis: novaLista };
         }
 
-        async resetarPerfis(escopo = 'atual', chromeApi = null) {
+        /**
+         * Determina qual perfil deve permanecer selecionado após "Restaurar Configurações Iniciais (Todos)":
+         * preserva o perfil atual se ele for um dos padronizados (Padrão, Trabalho, Casa, Estudo);
+         * caso seja um perfil criado pelo usuário, retorna à primeira escolha ("Padrão").
+         * @param {string} perfilCandidatoId
+         * @param {Array<{id: string, predefinido?: boolean}>} [listaPredef]
+         * @param {string} [perfilPadraoId]
+         * @returns {string}
+         */
+        resolverPerfilAtivoPosReset(perfilCandidatoId, listaPredef = [], perfilPadraoId = 'padrao') {
+            const lista = Array.isArray(listaPredef) ? listaPredef : [];
+            const candidato = typeof perfilCandidatoId === 'string' ? perfilCandidatoId.trim() : '';
+            const encontrado = lista.find(p => p && p.id === candidato && p.predefinido !== false);
+            if (encontrado) return encontrado.id;
+            const primeiraEscolha = (lista[0] && lista[0].id) ? lista[0].id : '';
+            return primeiraEscolha || String(perfilPadraoId || 'padrao');
+        }
+
+        async resetarPerfis(escopo = 'atual', chromeApi = null, opcoes = {}) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
             if (!apiChrome || !apiChrome.storage || !apiChrome.storage.sync) return { ok: false, motivo: 'storage_indisponivel' };
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
             const syncData = await apiChrome.storage.sync.get(null);
+            const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncData);
+            if (ativoLocal) syncData[CHAVE_PERFIL_ATIVO] = ativoLocal;
+            try {
+                if (apiChrome.storage.local) {
+                    const locPend = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE]);
+                    if (locPend && locPend[CHAVE_CONFIG_SYNC_PENDENTE] && typeof locPend[CHAVE_CONFIG_SYNC_PENDENTE] === 'object') {
+                        Object.assign(syncData, locPend[CHAVE_CONFIG_SYNC_PENDENTE]);
+                    }
+                }
+            } catch (_) { }
             const { listaPerfis, perfilAtivoId } = this.garantirEstruturaPerfis(syncData, cat);
 
             if (escopo === 'todos') {
@@ -512,7 +609,10 @@
                     nome: String(p.nome || p.id),
                     predefinido: true
                 }));
-                const novoAtivo = listaPredef.some(p => p.id === perfilAtivoId) ? perfilAtivoId : String(cat.perfilPadraoId || 'padrao');
+                const candidatoPreferido = (opcoes && typeof opcoes.perfilPreferidoId === 'string' && opcoes.perfilPreferidoId.trim())
+                    ? opcoes.perfilPreferidoId.trim()
+                    : perfilAtivoId;
+                const novoAtivo = this.resolverPerfilAtivoPosReset(candidatoPreferido, listaPredef, cat.perfilPadraoId || 'padrao');
                 const configAplicada = this.resolverConfigEfetivaPerfil(novoAtivo, {}, cat);
 
                 let regrasPadraoUsuario = [];
@@ -532,7 +632,7 @@
 
                 const novoSync = {
                     [CHAVE_LISTA_PERFIS]: listaPredef,
-                    [CHAVE_PERFIL_ATIVO]: novoAtivo,
+                    [CHAVE_SYNC_PERFIL_BASE_TOP]: novoAtivo,
                     regrasMapeamentoElementos: regrasPadraoUsuario,
                     ...configAplicada
                 };
@@ -543,10 +643,10 @@
                 const chavesValidas = new Set(Object.keys(novoSync));
                 const chavesOrfas = Object.keys(syncData || {}).filter(k => !chavesValidas.has(k));
 
-                await apiChrome.storage.sync.set(novoSync);
                 if (chavesOrfas.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
                     await apiChrome.storage.sync.remove(chavesOrfas);
                 }
+                await apiChrome.storage.sync.set(novoSync);
 
                 if (apiChrome.storage.local) {
                     try {
@@ -554,7 +654,12 @@
                         const pad = (n) => String(n).padStart(2, '0');
                         const strData = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
                         await apiChrome.storage.local.clear();
-                        await apiChrome.storage.local.set({ totalCopias: 0, totalAlertas: 0, dataInicioContadores: strData });
+                        await apiChrome.storage.local.set({
+                            totalCopias: 0,
+                            totalAlertas: 0,
+                            dataInicioContadores: strData,
+                            [CHAVE_PERFIL_ATIVO]: novoAtivo
+                        });
                     } catch (_) { }
                 }
                 if (apiChrome.storage.session) {
@@ -574,9 +679,10 @@
             /* Escopo 'atual': Restaura apenas o perfil atualmente selecionado, preservando demais perfis e regras globais XPath/CSS */
             const chaveAtual = this.chaveConfigPerfil(perfilAtivoId);
             const configRestaurada = this.resolverConfigEfetivaPerfil(perfilAtivoId, {}, cat);
+            await this.salvarPerfilAtivoLocal(perfilAtivoId, apiChrome);
             await apiChrome.storage.sync.set({
                 [CHAVE_LISTA_PERFIS]: listaPerfis,
-                [CHAVE_PERFIL_ATIVO]: perfilAtivoId,
+                [CHAVE_SYNC_PERFIL_BASE_TOP]: perfilAtivoId,
                 [chaveAtual]: {},
                 ...configRestaurada
             });
@@ -634,6 +740,8 @@
 
             const cat = await this.carregarCatalogoPerfis(apiChrome);
             const syncAtual = await apiChrome.storage.sync.get(null);
+            const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncAtual);
+            if (ativoLocal) syncAtual[CHAVE_PERFIL_ATIVO] = ativoLocal;
             const { listaPerfis: listaAtual, perfilAtivoId: ativoAtual } = this.garantirEstruturaPerfis(syncAtual, cat);
 
             if (json.perfis && typeof json.perfis === 'object' && !Array.isArray(json.perfis)) {
@@ -663,11 +771,11 @@
 
                 const novoAtivo = (typeof json.perfilAtivoId === 'string' && novaLista.some(p => p.id === json.perfilAtivoId))
                     ? json.perfilAtivoId
-                    : String((cat && cat.perfilPadraoId) || 'padrao');
+                    : (novaLista.some(p => p.id === ativoAtual) ? ativoAtual : String((cat && cat.perfilPadraoId) || 'padrao'));
 
                 const gravacao = {
                     [CHAVE_LISTA_PERFIS]: novaLista,
-                    [CHAVE_PERFIL_ATIVO]: novoAtivo
+                    [CHAVE_SYNC_PERFIL_BASE_TOP]: novoAtivo
                 };
 
                 for (let i = 0; i < novaLista.length; i++) {
@@ -690,6 +798,7 @@
                     k.startsWith(PREFIXO_CHAVE_PERFIL_CFG) && !chavesPerfilEsperadas.has(k)
                 );
 
+                await this.salvarPerfilAtivoLocal(novoAtivo, apiChrome);
                 await apiChrome.storage.sync.set(gravacao);
                 if (chavesRemover.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
                     await apiChrome.storage.sync.remove(chavesRemover);
@@ -704,13 +813,14 @@
             const resolvidaV1 = this.resolverConfigEfetivaPerfil(ativoAtual, baseMerged, cat);
             const gravacaoV1 = {
                 [CHAVE_LISTA_PERFIS]: listaAtual,
-                [CHAVE_PERFIL_ATIVO]: ativoAtual,
+                [CHAVE_SYNC_PERFIL_BASE_TOP]: ativoAtual,
                 [this.chaveConfigPerfil(ativoAtual)]: this.calcularSobrescritasPerfil(resolvidaV1, ativoAtual, cat),
                 ...resolvidaV1
             };
             if (Array.isArray(json.regrasMapeamentoElementos)) {
                 gravacaoV1.regrasMapeamentoElementos = json.regrasMapeamentoElementos;
             }
+            await this.salvarPerfilAtivoLocal(ativoAtual, apiChrome);
             await apiChrome.storage.sync.set(gravacaoV1);
             return { ok: true, backupTotal: false, perfilAtivoId: ativoAtual, listaPerfis: listaAtual };
         }
@@ -759,11 +869,49 @@
             /* Passo 4.0: Carregar catalogo externo de perfis e personalizacoes (src/cfg/perfis.json) */
             const cat = await this.carregarCatalogoPerfis(apiChrome);
 
-            /* Passo 4.1: Ler todas as chaves de configuracao no chrome.storage.sync */
-            const config = await apiChrome.storage.sync.get(null);
+            /* Passo 4.1: Ler configuracoes da nuvem + perfil local do dispositivo + pendencias locais */
+            const syncBruto = await apiChrome.storage.sync.get(null);
+            let pendObj = null;
+            let perfilLocalSalvo = '';
+            try {
+                if (apiChrome.storage.local) {
+                    const loc = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE, CHAVE_PERFIL_ATIVO]);
+                    if (loc && typeof loc[CHAVE_PERFIL_ATIVO] === 'string' && loc[CHAVE_PERFIL_ATIVO].trim()) {
+                        perfilLocalSalvo = loc[CHAVE_PERFIL_ATIVO].trim();
+                    }
+                    if (loc && loc[CHAVE_CONFIG_SYNC_PENDENTE] && typeof loc[CHAVE_CONFIG_SYNC_PENDENTE] === 'object' && Object.keys(loc[CHAVE_CONFIG_SYNC_PENDENTE]).length > 0) {
+                        pendObj = loc[CHAVE_CONFIG_SYNC_PENDENTE];
+                    }
+                }
+            } catch (_) { }
+            const temPendenteLocal = Boolean(pendObj);
+            const basePerfisEntrada = { ...syncBruto };
+            if (perfilLocalSalvo) basePerfisEntrada[CHAVE_PERFIL_ATIVO] = perfilLocalSalvo;
+            const { listaPerfis, perfilAtivoId, alteracoes: alteracoesPerfis } = this.garantirEstruturaPerfis(basePerfisEntrada, cat);
 
-            const { listaPerfis, perfilAtivoId, alteracoes: alteracoesPerfis } = this.garantirEstruturaPerfis(config, cat);
+            if (perfilLocalSalvo !== perfilAtivoId) {
+                await this.salvarPerfilAtivoLocal(perfilAtivoId, apiChrome);
+            }
+
+            /* Se outro dispositivo escreveu chaves top-level de outro perfil no sync, isola este PC usando o perfilCfg_<localPerfilAtivoId> */
+            const perfilTopSync = typeof syncBruto[CHAVE_SYNC_PERFIL_BASE_TOP] === 'string' ? syncBruto[CHAVE_SYNC_PERFIL_BASE_TOP].trim() : '';
+            const chaveCfgAtivo = this.chaveConfigPerfil(perfilAtivoId);
+            const config = (perfilTopSync && perfilTopSync !== perfilAtivoId)
+                ? {
+                    ...syncBruto,
+                    ...this.resolverConfigEfetivaPerfil(
+                        perfilAtivoId,
+                        (syncBruto[chaveCfgAtivo] && typeof syncBruto[chaveCfgAtivo] === 'object') ? syncBruto[chaveCfgAtivo] : {},
+                        cat
+                    )
+                }
+                : { ...syncBruto };
+
+            if (pendObj) {
+                Object.assign(config, pendObj);
+            }
             Object.assign(config, alteracoesPerfis);
+            config[CHAVE_PERFIL_ATIVO] = perfilAtivoId;
             let precisaSalvar = Object.keys(alteracoesPerfis).length > 0;
 
             const padraoPerfil = this.obterConfigPadraoParaPerfil(perfilAtivoId, cat);
@@ -821,8 +969,12 @@
                 config.nivelFiltroFormatacao = padraoPerfil.nivelFiltroFormatacao;
                 precisaSalvar = true;
             }
-            if (!['total', 'total_exceto_arrasto', 'interface', 'nenhuma'].includes(config.modoRetirarSelecao)) {
-                config.modoRetirarSelecao = padraoPerfil.modoRetirarSelecao;
+            if (!['com_flash', 'total', 'total_exceto_arrasto', 'interface', 'nenhuma'].includes(config.modoRetirarSelecao)) {
+                config.modoRetirarSelecao = (config.tempoFlashBorderMs === 0) ? 'nenhuma' : (padraoPerfil.modoRetirarSelecao || 'com_flash');
+                precisaSalvar = true;
+            }
+            if (config.tempoFlashBorderMs === 0 && config.modoRetirarSelecao === 'com_flash') {
+                config.modoRetirarSelecao = 'nenhuma';
                 precisaSalvar = true;
             }
             if (config.modoPlaceholdersMinutasHtml === undefined) {
@@ -1018,7 +1170,6 @@
             }
 
             /* Passo 4.2.0: Manter snapshot de sobrescritas do perfil ativo sempre sincronizado caso uma chave tenha sido alterada (ex: Popup ou Esc+Esc) */
-            const chaveCfgAtivo = this.chaveConfigPerfil(perfilAtivoId);
             const diffAtivoCalculado = this.calcularSobrescritasPerfil(config, perfilAtivoId, cat);
             if (!valoresIguaisConfig(config[chaveCfgAtivo], diffAtivoCalculado)) {
                 config[chaveCfgAtivo] = diffAtivoCalculado;
@@ -1026,20 +1177,28 @@
                 precisaSalvar = true;
             }
 
-            if (precisaSalvar) {
+            const mesmoPerfilTop = (!perfilTopSync || perfilTopSync === perfilAtivoId);
+            if (precisaSalvar && !temPendenteLocal) {
                 const payloadSalvar = {
-                    ...this.extrairConfigPerfilDeObjeto(config, cat),
                     regrasMapeamentoElementos: config.regrasMapeamentoElementos,
                     [CHAVE_LISTA_PERFIS]: listaPerfis,
-                    [CHAVE_PERFIL_ATIVO]: perfilAtivoId,
                     ...alteracoesPerfis
                 };
+                if (mesmoPerfilTop) {
+                    Object.assign(payloadSalvar, this.extrairConfigPerfilDeObjeto(config, cat));
+                    payloadSalvar[CHAVE_SYNC_PERFIL_BASE_TOP] = perfilAtivoId;
+                }
                 await apiChrome.storage.sync.set(payloadSalvar);
             }
 
-            /* Passo 4.2.1: Limpar variaveis estatisticas e chaves redundantes do storage.sync para manter a nuvem limpa */
-            if (apiChrome.storage.sync.remove) {
-                apiChrome.storage.sync.remove(['totalCopias', 'totalAlertas', 'flashBorderAtivo']).catch(() => { });
+            /* Passo 4.2.1: Limpar variaveis estatisticas, perfilAtivoId legado e chaves redundantes do storage.sync */
+            if (apiChrome.storage.sync.remove && (
+                syncBruto[CHAVE_PERFIL_ATIVO] !== undefined ||
+                config.totalCopias !== undefined ||
+                config.totalAlertas !== undefined ||
+                config.flashBorderAtivo !== undefined
+            )) {
+                apiChrome.storage.sync.remove([CHAVE_PERFIL_ATIVO, 'totalCopias', 'totalAlertas', 'flashBorderAtivo']).catch(() => { });
             }
 
             /* Passo 4.3: Espelhar configuracao no chrome.storage.session (RAM rapida) e sincronizar Fachada POO do Navegador */
@@ -1131,7 +1290,7 @@
                     tituloModo = 'Pausado';
                 }
 
-                if (apiChrome.action.setTitle) {
+                if (apiChrome.action.setTitle && !(typeof self !== 'undefined' && self.JusGovModuloProdutividade)) {
                     const subtituloAcao = (comportamento === 'acoes_rapidas')
                         ? '\n(1 clique: alternar modo | 2 cliques: abrir Opcoes)'
                         : '\n(1 clique: abrir popup)';
@@ -1241,30 +1400,71 @@
             }, JANELA_DUPLO_CLIQUE_ICONE_MS);
         }
 
-        /* Sincronizacao coalescida para chrome.storage.sync: aceita exclusivamente chaves de configuracao/perfil
-         * e valida cota maxima de 8KB por item (evitando vazamento de chaves locais de cookies/trabalho/clipboard). */
+        /* Aplica alteracoes imediatamente no runtime local + storage.local sem disparar gravacao imediata em storage.sync */
+        async aplicarConfigLocalEAgendarSync(payload = {}, chromeApi = null, dependencias = {}) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.storage || !apiChrome.storage.local) return { ok: false };
+            try {
+                const loc = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE]);
+                const atualPend = (loc && loc[CHAVE_CONFIG_SYNC_PENDENTE] && typeof loc[CHAVE_CONFIG_SYNC_PENDENTE] === 'object')
+                    ? { ...loc[CHAVE_CONFIG_SYNC_PENDENTE] } : {};
+                if (payload && typeof payload === 'object') {
+                    const ks = Object.keys(payload);
+                    for (let i = 0; i < ks.length; i++) {
+                        const k = ks[i];
+                        if (SET_CHAVES_SYNC.has(k) || k.startsWith(PREFIXO_CHAVE_PERFIL_CFG)) {
+                            atualPend[k] = clonarValorSimples(payload[k]);
+                        }
+                    }
+                }
+                await apiChrome.storage.local.set({ [CHAVE_CONFIG_SYNC_PENDENTE]: atualPend });
+                await this.sincronizarEstado(apiChrome, dependencias);
+                return { ok: true };
+            } catch (_) {
+                return { ok: false };
+            }
+        }
+
+        /* Sincronizacao coalescida para chrome.storage.sync (disparada por alarme de 5 min ou ao fechar o navegador):
+         * compara diferencas reais com a nuvem e grava em lote unico apenas chaves permitidas <= 8KB. */
         async executarSincronizacaoNuvemCoalescida(chromeApi = null, dependencias = {}) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
             if (!apiChrome || !apiChrome.storage) return false;
             try {
                 if (apiChrome.storage.local && apiChrome.storage.sync) {
-                    const dadosLocais = await apiChrome.storage.local.get(null);
+                    const [dadosLocais, dadosSyncAtuais] = await Promise.all([
+                        apiChrome.storage.local.get(null),
+                        apiChrome.storage.sync.get(null)
+                    ]);
                     if (dadosLocais && typeof dadosLocais === 'object') {
+                        const origemCombinada = { ...dadosLocais };
+                        const pendenteObj = dadosLocais[CHAVE_CONFIG_SYNC_PENDENTE];
+                        if (pendenteObj && typeof pendenteObj === 'object') {
+                            Object.assign(origemCombinada, pendenteObj);
+                        }
                         const payloadSync = {};
-                        const chaves = Object.keys(dadosLocais);
+                        const chaves = Object.keys(origemCombinada);
                         for (let i = 0; i < chaves.length; i++) {
                             const k = chaves[i];
                             const ehChavePermitida = SET_CHAVES_SYNC.has(k) || k.startsWith(PREFIXO_CHAVE_PERFIL_CFG);
                             if (!ehChavePermitida) continue;
+                            if (dadosSyncAtuais && valoresIguaisConfig(dadosSyncAtuais[k], origemCombinada[k])) continue;
                             try {
-                                const bytes = JSON.stringify({ [k]: dadosLocais[k] }).length;
+                                const bytes = JSON.stringify({ [k]: origemCombinada[k] }).length;
                                 if (bytes <= LIMITE_BYTES_ITEM_SYNC) {
-                                    payloadSync[k] = dadosLocais[k];
+                                    payloadSync[k] = origemCombinada[k];
                                 }
                             } catch (_) { }
                         }
                         if (Object.keys(payloadSync).length > 0) {
+                            const ativoLocal = typeof dadosLocais[CHAVE_PERFIL_ATIVO] === 'string' ? dadosLocais[CHAVE_PERFIL_ATIVO].trim() : '';
+                            if (ativoLocal && Object.keys(payloadSync).some(k => !k.startsWith(PREFIXO_CHAVE_PERFIL_CFG) && k !== CHAVE_LISTA_PERFIS && k !== 'regrasMapeamentoElementos')) {
+                                payloadSync[CHAVE_SYNC_PERFIL_BASE_TOP] = ativoLocal;
+                            }
                             await apiChrome.storage.sync.set(payloadSync);
+                        }
+                        if (pendenteObj && typeof apiChrome.storage.local.remove === 'function') {
+                            await apiChrome.storage.local.remove([CHAVE_CONFIG_SYNC_PENDENTE]);
                         }
                     }
                 }
@@ -1282,9 +1482,14 @@
             try {
                 if (msg.acao === 'OBTER_PERFIS') {
                     const catalogo = await this.carregarCatalogoPerfis(apiChrome);
-                    const syncData = await apiChrome.storage.sync.get(['listaPerfis', 'perfilAtivoId']);
-                    const estrutura = this.garantirEstruturaPerfis(syncData || {}, catalogo);
-                    if (estrutura.alteracoes) {
+                    const syncData = (await apiChrome.storage.sync.get(['listaPerfis', 'perfilAtivoId'])) || {};
+                    const ativoLocal = await this.obterPerfilAtivoLocal(apiChrome, syncData);
+                    if (ativoLocal) syncData[CHAVE_PERFIL_ATIVO] = ativoLocal;
+                    const estrutura = this.garantirEstruturaPerfis(syncData, catalogo);
+                    if (!ativoLocal || ativoLocal !== estrutura.perfilAtivoId) {
+                        await this.salvarPerfilAtivoLocal(estrutura.perfilAtivoId, apiChrome);
+                    }
+                    if (estrutura.alteracoes && Object.keys(estrutura.alteracoes).length > 0) {
                         await apiChrome.storage.sync.set(estrutura.alteracoes);
                     }
                     return { ok: true, listaPerfis: estrutura.listaPerfis, perfilAtivoId: estrutura.perfilAtivoId };
@@ -1329,7 +1534,7 @@
                     return (await this.excluirPerfil(msg.perfilId, apiChrome)) || { ok: false };
                 }
                 if (msg.acao === 'RESETAR_PERFIS') {
-                    const res = await this.resetarPerfis(msg.escopo || 'atual', apiChrome);
+                    const res = await this.resetarPerfis(msg.escopo || 'atual', apiChrome, { perfilPreferidoId: msg.perfilPreferidoId });
                     if (res && res.ok) await this.sincronizarEstado(apiChrome, dependencias);
                     return res || { ok: false };
                 }

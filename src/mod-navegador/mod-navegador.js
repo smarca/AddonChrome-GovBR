@@ -109,6 +109,11 @@
         obterDescendentesDaAba: () => [],
         marcarFechamentoCascata: () => { },
         consumirFechamentoCascata: () => false,
+        ehUrlRaizAlienOuInterna: () => false,
+        desvincularPaiDaAba: () => { },
+        obterPaiRegistrado: () => undefined,
+        posicionarNovaAbaHierarquia: async () => { },
+        tratarAbaMovidaManual: async () => { },
         agendarOrdenacaoAbas: () => { },
         executarOrdenacaoGuias: async () => { },
         agruparPorDominio: async () => 0,
@@ -527,28 +532,31 @@
                 chromeApi.tabs.update(tab.openerTabId, { active: true }).catch(() => { });
             }
 
-            if (tab && tab.id && tab.openerTabId && this.#ordenacao && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
+            const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || (this.#ordenacao && this.#ordenacao.criterio);
+            const ehAlienOuSistema = Boolean(
+                this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' &&
+                this.#ordenacao.ehUrlRaizAlienOuInterna(urlTab)
+            );
+
+            if (this.#ordenacao) {
                 if (typeof this.#ordenacao.garantirArvoreHidratada === 'function') {
                     await this.#ordenacao.garantirArvoreHidratada(chromeApi);
                 }
-                this.#ordenacao.registrarRelacaoPaiFilha(tab.id, tab.openerTabId, chromeApi);
-                const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio;
-                const sentAtual = (this.#configuracoes && this.#configuracoes.sentidoOrdenacaoGuias) || this.#ordenacao.sentido || 'esq_dir';
-                if (critAtual === 'hierarquia_arvore' && chromeApi && chromeApi.tabs && typeof chromeApi.tabs.get === 'function') {
-                    try {
-                        const abaPai = await chromeApi.tabs.get(tab.openerTabId);
-                        if (abaPai && typeof abaPai.index === 'number') {
-                            if (typeof abaPai.groupId === 'number' && abaPai.groupId > 0 && (!tab.groupId || tab.groupId <= 0) && typeof chromeApi.tabs.group === 'function') {
-                                await chromeApi.tabs.group({ groupId: abaPai.groupId, tabIds: [tab.id] }).catch(() => { });
-                            }
-                            if (sentAtual === 'esq_dir' && typeof chromeApi.tabs.move === 'function') {
-                                await chromeApi.tabs.move(tab.id, { index: abaPai.index + 1 }).catch(() => { });
-                            }
-                        }
-                    } catch (_) { }
+                if (tab && tab.id && tab.openerTabId && !ehAlienOuSistema && typeof this.#ordenacao.registrarRelacaoPaiFilha === 'function') {
+                    this.#ordenacao.registrarRelacaoPaiFilha(tab.id, tab.openerTabId, chromeApi);
+                } else if (tab && tab.id) {
+                    if (typeof this.#ordenacao.registrarCriacaoAba === 'function') {
+                        this.#ordenacao.registrarCriacaoAba(tab.id);
+                    }
+                    if (ehAlienOuSistema && typeof this.#ordenacao.desvincularPaiDaAba === 'function') {
+                        this.#ordenacao.desvincularPaiDaAba(tab.id, chromeApi);
+                    }
                 }
-            } else if (tab && tab.id && this.#ordenacao && typeof this.#ordenacao.registrarCriacaoAba === 'function') {
-                this.#ordenacao.registrarCriacaoAba(tab.id);
+
+                if (critAtual === 'hierarquia_arvore' && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
+                    await this.#ordenacao.posicionarNovaAbaHierarquia(tab, this.#configuracoes, chromeApi);
+                    return;
+                }
             }
 
             if (tab && tab.windowId && this.#ordenacao && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
@@ -570,11 +578,40 @@
                 if (res && res.duplicada) return;
             }
 
+            const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || (this.#ordenacao && this.#ordenacao.criterio);
+            if (critAtual === 'hierarquia_arvore') {
+                const novaUrl = (changeInfo && changeInfo.url) || (tab && tab.url) || '';
+                if (this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(novaUrl)) {
+                    const paiAtual = typeof this.#ordenacao.obterPaiRegistrado === 'function' ? this.#ordenacao.obterPaiRegistrado(tabId) : undefined;
+                    if (paiAtual !== undefined) {
+                        if (typeof this.#ordenacao.desvincularPaiDaAba === 'function') {
+                            this.#ordenacao.desvincularPaiDaAba(tabId, chromeApi);
+                        }
+                        if (tab && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
+                            await this.#ordenacao.posicionarNovaAbaHierarquia(tab, this.#configuracoes, chromeApi);
+                        }
+                    }
+                }
+                return;
+            }
+
             if (tab && tab.windowId && (changeInfo.status === 'complete' || changeInfo.title || changeInfo.url)) {
                 if (this.#ordenacao && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
                     const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
                     this.#ordenacao.agendarOrdenacaoAbas(tab.windowId, this.#configuracoes, chromeApi, mapa);
                 }
+            }
+        }
+
+        /**
+         * Trata movimentação manual de guias (chrome.tabs.onMoved) para manter filhos com o pai ou promover filha desmembrada.
+         * @param {number} tabId
+         * @param {Object} moveInfo
+         * @param {Object} [chromeApi]
+         */
+        async tratarAbaMovida(tabId, moveInfo = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (this.#ordenacao && typeof this.#ordenacao.tratarAbaMovidaManual === 'function') {
+                await this.#ordenacao.tratarAbaMovidaManual(tabId, moveInfo, chromeApi, this.#configuracoes);
             }
         }
 

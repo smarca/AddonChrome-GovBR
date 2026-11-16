@@ -194,7 +194,7 @@
          * @param {number} [minimoCaracteresInterface=5]
          * @returns {boolean}
          */
-        verificarProtecaoTamanhoMinimoInterface(texto, elAlvo, temModificadorTeclado, minimoCaracteresInterface = 5) {
+        verificarProtecaoTamanhoMinimoInterface(texto, elAlvo, temModificadorTeclado, minimoCaracteresInterface = 0) {
             if (temModificadorTeclado) return true;
             if (!texto || typeof texto !== 'string') return false;
 

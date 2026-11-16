@@ -13,7 +13,7 @@
  * - Arquivo: src/cfg/options.html
  * - Finalidade: Página de Opções, Configurações Globais, Sandbox Interativo, Central de Ajuda e Wiki Forense
  * - Seções UI: Painel Lateral de Navegação (#sidebar), Conteúdo Central (#content), Grupos de Configurações (#grupo-copia, #grupo-anti-ampulheta, #grupo-input, #grupo-navegador), Sandbox de Testes Forenses (#sandbox-container), Central de Ajuda (#central-ajuda)
- * - Scripts Carregados: src/cfg/exemplos.js, src/cfg/options.js, src/cfg/debug.js
+ * - Scripts Carregados: src/cfg/exemplos.js, src/cfg/options.js, src/cfg/mod-debug/mod-debug.js (+ debug-*.js)
  * ========================================================================== -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Opções, Central de Ajuda e Testes | JusGovBR</title>
@@ -2119,8 +2119,8 @@
                 </p>
                 <div class="setting-item">
                     <div>
-                        <div class="setting-label">Tempo de Trabalho Corrido (Meta Diária)</div>
-                        <div class="setting-help">Conta a jornada diária corrida enquanto o Chrome está em execução e exibe alerta ao atingir a meta. <strong>Serão:</strong> o dia vira às <strong>04:00</strong>, salvo trabalho contínuo (descanso &lt; 3h), que segue no dia anterior.</div>
+                        <div class="setting-label">Tempo de Uso Corrido (Meta Diária)</div>
+                        <div class="setting-help">Conta o uso diário corrido enquanto o Chrome está em execução e exibe alerta ao atingir a meta. <strong>Serão:</strong> o dia vira às <strong>04:00</strong>, salvo uso contínuo (descanso &lt; 3h), que segue no dia anterior.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select id="optTempoTrabalhoCorridoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
@@ -2137,7 +2137,7 @@
                             <option value="11">11 horas</option>
                             <option value="12">12 horas</option>
                         </select>
-                        <label class="switch" title="Ativar alerta de tempo de trabalho corrido">
+                        <label class="switch" title="Ativar alerta de tempo de uso corrido">
                             <input type="checkbox" id="optTempoTrabalhoCorridoAtivo">
                             <span class="slider"></span>
                         </label>
@@ -2145,7 +2145,7 @@
                 </div>
                 <div class="setting-item">
                     <div>
-                        <div class="setting-label">Tempo Ativo de Trabalho (Meta Diária)</div>
+                        <div class="setting-label">Tempo de Atividade (Meta Diária)</div>
                         <div class="setting-help">Conta apenas minutos com atividade real no navegador (qualquer movimentação de mouse ou teclado). <strong>Regra:</strong> inatividade &lt; 5 min segue como Tempo Ativo; com <strong>5 min seguidos</strong> sem interação confirma <strong>Pausa</strong> e todo o intervalo vai para <em>Pausas</em>.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -2163,7 +2163,7 @@
                             <option value="11">11 horas</option>
                             <option value="12">12 horas</option>
                         </select>
-                        <label class="switch" title="Ativar alerta de tempo ativo estilo Workrave">
+                        <label class="switch" title="Ativar alerta de tempo de atividade estilo Workrave">
                             <input type="checkbox" id="optTempoTrabalhoAtivoAtivo">
                             <span class="slider"></span>
                         </label>
@@ -2245,7 +2245,7 @@
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
                     <div style="display: flex; flex-direction: column; gap: 3px;">
-                        <span id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;">Hoje — Tempo: Corrido 00:00</span>
+                        <div id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;"></div>
                         <div id="lblStatusPomodoroDetalhado" class="setting-help" style="margin: 0; font-size: 12px; display: none; flex-wrap: wrap; align-items: center; gap: 6px;"></div>
                     </div>
                     <div style="margin-left: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end;">
@@ -2412,7 +2412,7 @@
                             <span class="badge-stage" style="background: #059669; color: #fff;">Perfis</span>
                         </div>
                         <p style="font-size: 12.5px; color: var(--texto-secundario); line-height: 1.5; margin: 0;">
-                            Alterne entre <strong>Padrão</strong>, <strong>Trabalho</strong>, <strong>Casa</strong>, <strong>Estudo</strong> ou crie novos perfis pelo ícone da extensão ou em Configurações. As regras de <strong>Mapeamento Manual</strong> valem para todos os perfis, e o backup completo salva todos eles. Ao restaurar, escolha apenas o perfil atual ou todos.
+                            Alterne entre <strong>Padrão</strong>, <strong>Trabalho</strong>, <strong>Casa</strong>, <strong>Estudo</strong> ou crie novos perfis pelo ícone da extensão ou em Configurações. A escolha de qual perfil está ativo é <strong>local por computador</strong> (não troca seu perfil de casa pelo do trabalho), enquanto todas as configurações de cada perfil, as regras de <strong>Mapeamento Manual (XPath/CSS)</strong> e as estatísticas diárias multi-computador (sincronizadas ao abrir, a cada 30 min e ao fechar) permanecem sincronizadas na nuvem. No minipopup do Pomodoro, o cadeado <strong>🔒</strong> permite arrastar livremente para qualquer ponto da tela.
                         </p>
                     </div>
                 </div>
@@ -3691,9 +3691,17 @@
     <script src="../mod-navegador/mod-navegador.js"></script>
     <script src="../mod-copia/copia-selecionar.js"></script>
     <script src="exemplos.js"></script>
-    <script src="debug.js"></script>
+    <script src="mod-debug/debug-geradores.js"></script>
+    <script src="mod-debug/debug-verificadores.js"></script>
+    <script src="mod-debug/debug-mascaras.js"></script>
+    <script src="mod-debug/debug-selecao.js"></script>
+    <script src="mod-debug/debug-interface.js"></script>
+    <script src="mod-debug/debug-modulos.js"></script>
+    <script src="mod-debug/debug-fuzzing.js"></script>
+    <script src="mod-debug/mod-debug.js"></script>
     <script src="options-mapeamento.js"></script>
     <script src="options-laboratorio.js"></script>
+    <script src="../mod-produt/mod-produt.js"></script>
     <script src="options.js"></script>
     <script src="editor_demo.js"></script>
 </body>

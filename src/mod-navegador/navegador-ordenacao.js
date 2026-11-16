@@ -48,12 +48,14 @@
         #timerOrdenacaoAbas = null;
         #estaOrdenandoGuias = false;
         #arvoreOpener = new Map();
+        #desvinculadasManualmente = new Set();
         #criacaoPorAba = new Map();
         #seqCriacao = 0;
         #arvoreHidratada = false;
         #promessaHidratacaoArvore = null;
         #timerPersistirArvore = null;
         #emFechamentoCascata = new Set();
+        #estaMovendoBloco = false;
 
         /**
          * @param {Object} [opcoes={}]
@@ -353,7 +355,35 @@
         }
 
         /**
-         * Registra relação genealógica Pai -> Filha (Seção 6.92 / BUG-68)
+         * Identifica URLs internas da extensão/navegador (ex.: options.html, newtab, chrome://) que
+         * devem nascer sempre como raízes independentes e jamais entrar no meio de árvores web (BUG-71).
+         * @param {string} urlStr
+         * @returns {boolean}
+         */
+        ehUrlRaizAlienOuInterna(urlStr = '') {
+            const u = String(urlStr || '').trim();
+            if (!u) return false;
+            return /^(?:chrome|edge|devtools|view-source|chrome-extension):/i.test(u) || /^about:(?!blank$)/i.test(u);
+        }
+
+        /**
+         * Remove apenas o vínculo com o pai atual, promovendo a aba a raiz independente com seus filhos intactos.
+         * @param {number} tabId
+         * @param {Object} [chromeApi]
+         */
+        desvincularPaiDaAba(tabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (typeof tabId !== 'number') return;
+            this.#arvoreOpener.delete(tabId);
+            this.#desvinculadasManualmente.add(tabId);
+            this.#agendarPersistenciaArvore(chromeApi);
+        }
+
+        obterPaiRegistrado(tabId) {
+            return this.#arvoreOpener.get(tabId);
+        }
+
+        /**
+         * Registra relação genealógica Pai -> Filha (Seção 6.92 / BUG-68 / BUG-71)
          * @param {number} tabId
          * @param {number} openerTabId
          * @param {Object} [chromeApi]
@@ -362,6 +392,7 @@
             if (typeof tabId === 'number' && typeof openerTabId === 'number' && tabId !== openerTabId) {
                 this.registrarCriacaoAba(openerTabId);
                 this.registrarCriacaoAba(tabId);
+                this.#desvinculadasManualmente.delete(tabId);
                 this.#arvoreOpener.set(tabId, openerTabId);
                 this.#agendarPersistenciaArvore(chromeApi);
             }
@@ -397,6 +428,7 @@
         removerDaArvore(tabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             const avoId = this.#arvoreOpener.get(tabId);
             this.#arvoreOpener.delete(tabId);
+            this.#desvinculadasManualmente.delete(tabId);
             this.#criacaoPorAba.delete(tabId);
             for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
                 if (paiId === tabId) {
@@ -423,11 +455,12 @@
         }
 
         /**
-         * Ordena abas em formato de árvore genealógica DFS contígua (Seção 6.92 / BUG-68):
-         * - Preserva subárvores inteiras juntas sem intercalar guias estranhas no meio.
-         * - No sentido 'esq_dir' (Novo-Antigo): nó filho mais novo fica imediatamente à direita do pai
-         *   (Pai -> Filha mais nova -> Subfilhas -> Filha anterior -> Raiz seguinte).
-         * - No sentido 'dir_esq' (Antigo-Novo): ordem cronológica crescente nas filhas e inversa nas raízes.
+         * Ordena abas em formato de árvore genealógica DFS "Baralho" (Seção 6.92 / BUG-68 / BUG-71):
+         * - No sentido 'esq_dir' (Novo-Antigo): novas guias pai ficam mais à esquerda, seguidas
+         *   imediatamente pelos seus filhos/netos mais novos até os mais antigos, depois o pai anterior.
+         * - No sentido 'dir_esq' (Antigo-Novo): ordem invertida (pais mais antigos à esquerda e novos por último;
+         *   filhos mais antigos primeiro dentro do bloco do pai).
+         * - Páginas internas (ex.: options.html) e abas promovidas manualmente permanecem como raízes independentes.
          * - Preserva grupos nativos (Tab Groups) mantendo seus membros contíguos sem dissolver grupos.
          * @param {Array<Object>} abasAlvo
          * @param {string} [sentido]
@@ -437,6 +470,11 @@
         ordenarPorHierarquiaArvore(abasAlvo, sentido = 'esq_dir', mapa = null) {
             const conjuntoIds = new Set(abasAlvo.map(t => t.id));
             for (const t of abasAlvo) {
+                const urlT = t.url || t.pendingUrl || '';
+                if (this.ehUrlRaizAlienOuInterna(urlT) || this.#desvinculadasManualmente.has(t.id)) {
+                    this.#arvoreOpener.delete(t.id);
+                    continue;
+                }
                 if (typeof t.openerTabId === 'number' && t.openerTabId !== t.id && !this.#arvoreOpener.has(t.id)) {
                     this.#arvoreOpener.set(t.id, t.openerTabId);
                 }
@@ -446,10 +484,12 @@
             const raizes = [];
 
             for (const t of abasAlvo) {
-                const paiRegistrado = this.#arvoreOpener.get(t.id);
+                const urlT = t.url || t.pendingUrl || '';
+                const bloquearVinculo = this.ehUrlRaizAlienOuInterna(urlT) || this.#desvinculadasManualmente.has(t.id);
+                const paiRegistrado = bloquearVinculo ? undefined : this.#arvoreOpener.get(t.id);
                 const paiId = (paiRegistrado !== undefined && conjuntoIds.has(paiRegistrado))
                     ? paiRegistrado
-                    : ((typeof t.openerTabId === 'number' && conjuntoIds.has(t.openerTabId)) ? t.openerTabId : undefined);
+                    : ((!bloquearVinculo && typeof t.openerTabId === 'number' && conjuntoIds.has(t.openerTabId)) ? t.openerTabId : undefined);
                 if (paiId !== undefined && paiId !== t.id && conjuntoIds.has(paiId)) {
                     if (!filhosPorPai.has(paiId)) filhosPorPai.set(paiId, []);
                     filhosPorPai.get(paiId).push(t);
@@ -460,9 +500,9 @@
 
             const cmpCrono = (a, b) => this.compararPorCriacaoCronologica(a, b, mapa);
 
-            raizes.sort((a, b) => (sentido === 'dir_esq') ? -cmpCrono(a, b) : cmpCrono(a, b));
+            /* Modelo Baralho (BUG-71): esq_dir -> Novo-Antigo para pais e filhos; dir_esq -> Antigo-Novo */
+            raizes.sort((a, b) => (sentido === 'dir_esq') ? cmpCrono(a, b) : -cmpCrono(a, b));
             for (const lista of filhosPorPai.values()) {
-                /* Opção A (Novo-Antigo): no sentido padrão esq_dir, filho mais novo fica colado logo à direita do pai */
                 lista.sort((a, b) => (sentido === 'dir_esq') ? cmpCrono(a, b) : -cmpCrono(a, b));
             }
 
@@ -508,6 +548,155 @@
                 }
             }
             return resultadoCompactado;
+        }
+
+        /**
+         * Posiciona imediatamente uma aba recém-criada na árvore "Baralho" sem desfazer movimentos manuais
+         * existentes na janela (BUG-71).
+         * @param {Object} tab
+         * @param {Object} [config]
+         * @param {Object} [chromeApi]
+         */
+        async posicionarNovaAbaHierarquia(tab, config = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!tab || !tab.id || !tab.windowId || !chromeApi || !chromeApi.tabs) return;
+            await this.garantirArvoreHidratada(chromeApi);
+            const sentido = config.sentidoOrdenacaoGuias || this.#sentido || 'esq_dir';
+            const ordenarFixadas = (config.ordenarGuiasFixadas !== undefined) ? Boolean(config.ordenarGuiasFixadas) : this.#ordenarGuiasFixadas;
+            const urlTab = tab.url || tab.pendingUrl || '';
+            const ehRaizForcada = this.ehUrlRaizAlienOuInterna(urlTab) || this.#desvinculadasManualmente.has(tab.id);
+
+            this.#estaMovendoBloco = true;
+            try {
+                const abas = await chromeApi.tabs.query({ windowId: tab.windowId });
+                if (!abas || abas.length <= 1) return;
+                abas.sort((a, b) => a.index - b.index);
+                const atual = abas.find(t => t.id === tab.id) || tab;
+                if (!ordenarFixadas && atual.pinned) return;
+
+                const paiId = ehRaizForcada ? undefined : (this.#arvoreOpener.get(tab.id) ?? tab.openerTabId);
+                const paiTab = (paiId !== undefined && paiId !== tab.id) ? abas.find(t => t.id === paiId) : null;
+
+                if (!paiTab) {
+                    /* Nova aba PAI/raiz (ex.: Nova Guia, Opções ou aba alienígena): 1ª posição não-fixada em esq_dir, fim em dir_esq */
+                    const primeiroLivre = ordenarFixadas ? 0 : Math.max(0, abas.findIndex(t => !t.pinned));
+                    let idxAlvo = (sentido === 'dir_esq') ? (abas.length - 1) : primeiroLivre;
+                    /* Garante nunca cair no meio de um grupo/família caso primeiroLivre esteja dentro de grupo */
+                    if (sentido !== 'dir_esq' && abas[idxAlvo] && typeof abas[idxAlvo].groupId === 'number' && abas[idxAlvo].groupId > 0 && atual.groupId !== abas[idxAlvo].groupId) {
+                        const grpId = abas[idxAlvo].groupId;
+                        const foraGrupo = abas.findIndex((t, i) => i >= primeiroLivre && (!t.groupId || t.groupId <= 0 || t.groupId !== grpId));
+                        if (foraGrupo >= 0 && atual.index > foraGrupo) {
+                            idxAlvo = Math.min(idxAlvo, foraGrupo);
+                        }
+                    }
+                    if (atual.index !== idxAlvo && typeof chromeApi.tabs.move === 'function') {
+                        await chromeApi.tabs.move(tab.id, { index: idxAlvo }).catch(() => { });
+                    }
+                    return;
+                }
+
+                /* Aba FILHA: herda Tab Group do pai se houver e posiciona logo à direita do pai (esq_dir) ou ao final da subárvore (dir_esq) */
+                if (typeof paiTab.groupId === 'number' && paiTab.groupId > 0 && (!atual.groupId || atual.groupId <= 0) && typeof chromeApi.tabs.group === 'function') {
+                    await chromeApi.tabs.group({ groupId: paiTab.groupId, tabIds: [tab.id] }).catch(() => { });
+                }
+
+                let idxDestino;
+                if (sentido === 'dir_esq') {
+                    const descPai = new Set(this.obterDescendentesDaAba(paiTab.id));
+                    descPai.delete(tab.id);
+                    let ultimoIdx = paiTab.index;
+                    for (const t of abas) {
+                        if (descPai.has(t.id) && t.index > ultimoIdx) {
+                            ultimoIdx = t.index;
+                        }
+                    }
+                    idxDestino = (atual.index < ultimoIdx) ? ultimoIdx : (ultimoIdx + 1);
+                } else {
+                    idxDestino = (atual.index < paiTab.index) ? paiTab.index : (paiTab.index + 1);
+                }
+                idxDestino = Math.max(0, Math.min(abas.length - 1, idxDestino));
+                if (atual.index !== idxDestino && typeof chromeApi.tabs.move === 'function') {
+                    await chromeApi.tabs.move(tab.id, { index: idxDestino }).catch(() => { });
+                }
+            } finally {
+                setTimeout(() => { this.#estaMovendoBloco = false; }, 120);
+            }
+        }
+
+        /**
+         * Trata movimentação manual de guia (tabs.onMoved):
+         * - Se uma aba PAI for movida, todos os seus descendentes contíguos a acompanham no mesmo bloco.
+         * - Se uma aba FILHA for arrastada manualmente para fora do bloco do seu pai, transforma-se em PAI independente.
+         * @param {number} tabId
+         * @param {Object} moveInfo
+         * @param {Object} [chromeApi]
+         * @param {Object} [config]
+         */
+        async tratarAbaMovidaManual(tabId, moveInfo = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}) {
+            if (this.#estaMovendoBloco || this.#estaOrdenandoGuias) return;
+            const criterio = config.criterioOrdenacaoGuias || this.#criterio;
+            if (criterio !== 'hierarquia_arvore' || !chromeApi || !chromeApi.tabs) return;
+            const windowId = moveInfo && moveInfo.windowId;
+            if (!windowId) return;
+
+            await this.garantirArvoreHidratada(chromeApi);
+            const abas = await chromeApi.tabs.query({ windowId }).catch(() => []);
+            if (!abas || abas.length <= 1) return;
+            abas.sort((a, b) => a.index - b.index);
+
+            const abaMovida = abas.find(t => t.id === tabId);
+            if (!abaMovida) return;
+
+            /* 1) Se a aba movida é filha de alguém, checar se saiu para fora do conjunto contíguo do pai */
+            const paiId = this.#arvoreOpener.get(tabId);
+            if (paiId !== undefined) {
+                const paiTab = abas.find(t => t.id === paiId);
+                if (paiTab) {
+                    const familiaPai = new Set([paiId, ...this.obterDescendentesDaAba(paiId)]);
+                    const minIdx = Math.min(paiTab.index, abaMovida.index);
+                    const maxIdx = Math.max(paiTab.index, abaMovida.index);
+                    let saiuDoConjunto = (abaMovida.index < paiTab.index);
+                    if (!saiuDoConjunto) {
+                        for (let k = minIdx; k <= maxIdx; k++) {
+                            const tMeio = abas[k];
+                            if (tMeio && !familiaPai.has(tMeio.id)) {
+                                saiuDoConjunto = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (saiuDoConjunto) {
+                        this.desvincularPaiDaAba(tabId, chromeApi);
+                    }
+                }
+            }
+
+            /* 2) Se a aba movida tem filhos/descendentes, fazer todos acompanharem logo à direita dela */
+            const descSet = new Set(this.obterDescendentesDaAba(tabId));
+            if (descSet.size === 0) return;
+
+            const descVisual = abas.filter(t => descSet.has(t.id));
+            if (descVisual.length === 0) return;
+
+            this.#estaMovendoBloco = true;
+            try {
+                let cursorIdx = abaMovida.index;
+                for (const d of descVisual) {
+                    const posAlvo = (d.index < cursorIdx) ? cursorIdx : (cursorIdx + 1);
+                    if (d.index !== posAlvo) {
+                        await chromeApi.tabs.move(d.id, { index: posAlvo }).catch(() => { });
+                    }
+                    const atualizada = await chromeApi.tabs.get(abaMovida.id).catch(() => null);
+                    if (atualizada && typeof atualizada.index === 'number') {
+                        /* Recalcula cursor baseado na última posição do bloco movido */
+                        const dAtual = await chromeApi.tabs.get(d.id).catch(() => null);
+                        cursorIdx = (dAtual && typeof dAtual.index === 'number') ? dAtual.index : posAlvo;
+                    } else {
+                        cursorIdx = posAlvo;
+                    }
+                }
+            } finally {
+                setTimeout(() => { this.#estaMovendoBloco = false; }, 160);
+            }
         }
 
         /**
