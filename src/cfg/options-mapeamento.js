@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: options-mapeamento.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Configurações & Interface — Mapeamento Manual Avançado (XPath / CSS)
+ * ARQUIVO: src/cfg/options-mapeamento.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Configurações & Interface — Mapeamento Manual Avançado (XPath / CSS)
  *
  * @MAPA-IA:
  * - Arquivo: src/cfg/options-mapeamento.js

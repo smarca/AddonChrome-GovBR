@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio6.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioTabelas
  * 
  * @MAPA-IA:
@@ -40,7 +42,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.6: Estágio 6 - Tabelas e Acumulador)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.6: Estágio 6 e Acumulador)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';

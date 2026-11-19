@@ -1,10 +1,17 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/generico-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/generico-anti-ampulheta.css
+ *
 @name         Web Generica - Anti-Ampulheta
 @namespace    global
 @version      1.1.0
 @description  Remove bloqueios genericos (BlockUI, SweetAlert2, modais Bootstrap vazios).
-@match        *://*/*
+ * ========================================================================== */*
 ==/UserStyle== */
 
 /* ==========================================================================
@@ -64,4 +71,24 @@
 html[style*="wait" i]:not(:has(.progress, .progress-bar, [role="progressbar"])),
 body[style*="wait" i]:not(:has(.progress, .progress-bar, [role="progressbar"])) {
     cursor: auto !important;
+}
+
+/* --------------------------------------------------------------------------
+ * REGRA 6: PRESERVACAO ESTRITA DE OPERACOES EM LOTE E PROGRESSBARS
+ * -------------------------------------------------------------------------- */
+#mpProgressoContainer,
+#mpProgresso,
+[id*="mpProgresso" i],
+pje-assinatura-lote,
+[class*="assinatura-lote" i],
+[role="progressbar"],
+.progress-bar,
+mat-progress-bar,
+p-progressbar,
+.rich-progress-bar,
+#divAvisoAssinatura,
+#divInfraAreaProcessamento {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
 }

@@ -1,6 +1,6 @@
 /* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-aviso-flutuante.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
@@ -93,6 +93,18 @@
     // CLASSE PRINCIPAL: MOTOR DE VALIDACAO MATEMATICA E AVISO FLUTUANTE
     // =====================================================================
     class MotorValidacao {
+        #uiTela = null;
+
+        #obterUiTela() {
+            if (this.#uiTela) return this.#uiTela;
+            try {
+                if (typeof window !== 'undefined' && typeof window.JusGovLibUiTela === 'function') {
+                    this.#uiTela = new window.JusGovLibUiTela();
+                    return this.#uiTela;
+                }
+            } catch (_) { }
+            return null;
+        }
         constructor(opcoes = {}) {
             /* Passo 1.2: Inicializar 100% das propriedades no construtor com tipos
              * previsiveis para preservar Hidden Classes (Shapes) monomorficas no
@@ -245,30 +257,56 @@
         validarBoletoBancario(linhaStr) { return this.verificadores ? this.verificadores.validarBoletoBancario(linhaStr) : { valido: true, tipo: 'BOLETO', msg: '' }; }
         validarNumeroGenericoFallback(texto) { return this.verificadores ? this.verificadores.validarNumeroGenericoFallback(texto) : { valido: true, msg: '' }; }
 
+        #obterContextoRaizUi() {
+            const docLocal = typeof document !== 'undefined' ? document : null;
+            const winLocal = typeof window !== 'undefined' ? window : null;
+            let w = winLocal;
+            let ox = 0;
+            let oy = 0;
+            while (w && w !== w.top) {
+                try {
+                    const pDoc = w.parent && w.parent.document;
+                    const fe = w.frameElement;
+                    if (!pDoc || !pDoc.body || !fe) break;
+                    const r = fe.getBoundingClientRect();
+                    ox += r.left;
+                    oy += r.top;
+                    w = w.parent;
+                } catch (_) {
+                    break;
+                }
+            }
+            const docUi = (w && w.document && w.document.body) ? w.document : docLocal;
+            const winUi = w || winLocal;
+            return { docUi, winUi, offsetX: ox, offsetY: oy };
+        }
+
         /*
          * METODO: garantirEstruturaShadowPopover
-         * OBJETIVO DE RECONSTRUCAO: Instanciar um hospedeiro com ShadowRoot fechado
+         * OBJETIVO DE RECONSTRUCAO: Instanciar um hospedeiro no documento HTML raiz com ShadowRoot fechado
          * (mode: 'closed') e atributo popover="manual" para top layer sem Reflow.
          */
         garantirEstruturaShadowPopover() {
-            /* Passo 6.1: Reutilizar estrutura existente se ja estiver conectada */
-            if (this.hospedeiroShadow && document.body && document.body.contains(this.hospedeiroShadow)) {
+            const docUi = this.#obterContextoRaizUi().docUi || (typeof document !== 'undefined' ? document : null);
+            if (!docUi || !docUi.body) return;
+
+            /* Passo 6.1: Reutilizar estrutura existente se ja estiver conectada no documento raiz */
+            if (this.hospedeiroShadow && docUi.body.contains(this.hospedeiroShadow)) {
                 return;
             }
-            if (!document.body) return;
 
             /* Passo 6.2: Criar elemento hospedeiro com atributo data-jusgov-ignore */
-            const host = document.createElement('div');
+            const host = docUi.createElement('div');
             host.id = 'jusgov-hospedeiro-top-layer';
             host.setAttribute('data-jusgov-ignore', 'true');
             if ('popover' in HTMLElement.prototype) {
                 host.setAttribute('popover', 'manual');
             }
-            host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;padding:0;margin:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647;';
+            host.style.cssText = 'position:fixed !important;top:0 !important;left:0 !important;width:0;height:0;border:none;padding:0;margin:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647 !important;';
 
             /* Passo 6.3: Anexar arvore Shadow DOM fechada e injetar CSS encapsulado */
             const shadow = host.attachShadow({ mode: 'closed' });
-            const style = document.createElement('style');
+            const style = docUi.createElement('style');
             style.textContent = `
                 .cartao-aviso {
                     position: fixed;
@@ -324,15 +362,15 @@
             `;
 
             /* Passo 6.4: Criar elementos internos */
-            const destaque = document.createElement('div');
+            const destaque = docUi.createElement('div');
             destaque.className = 'destaque-amarelo';
             destaque.style.display = 'none';
 
-            const cartao = document.createElement('div');
+            const cartao = docUi.createElement('div');
             cartao.className = 'cartao-aviso';
             cartao.style.display = 'none';
 
-            const miniTip = document.createElement('div');
+            const miniTip = docUi.createElement('div');
             miniTip.className = 'minitip-global';
             miniTip.style.display = 'none';
 
@@ -340,7 +378,7 @@
             shadow.appendChild(destaque);
             shadow.appendChild(cartao);
             shadow.appendChild(miniTip);
-            document.body.appendChild(host);
+            docUi.body.appendChild(host);
 
             this.hospedeiroShadow = host;
             this.raizShadow = shadow;
@@ -642,12 +680,18 @@
             } catch (_) {}
             if (!rect || (rect.width === 0 && rect.height === 0)) return;
 
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
+            const ox = ctxUi.offsetX;
+            const oy = ctxUi.offsetY;
+
             const FOLGA_CONTORNO_FLASH = 1;
-            let boxTop = rect.top;
-            let boxBottom = rect.bottom;
-            let boxLeft = rect.left;
-            let boxRight = rect.right;
-            let rectPrimeiraLinha = rect;
+            let boxTop = rect.top + oy;
+            let boxBottom = rect.bottom + oy;
+            let boxLeft = rect.left + ox;
+            let boxRight = rect.right + ox;
+            let refLeftFirst = rect.left + ox;
 
             try {
                 const clientRects = typeof range.getClientRects === 'function' ? range.getClientRects() : null;
@@ -661,24 +705,24 @@
                         if (!r || (r.width < 0.5 && r.height < 0.5)) continue;
                         if (r.top < minT) {
                             minT = r.top;
-                            rectPrimeiraLinha = r;
+                            refLeftFirst = r.left + ox;
                         }
                         if (r.bottom > maxB) maxB = r.bottom;
                         if (r.left < minL) minL = r.left;
                         if (r.right > maxR) maxR = r.right;
                     }
                     if (Number.isFinite(minT) && Number.isFinite(maxB)) {
-                        boxTop = minT;
-                        boxBottom = maxB;
-                        boxLeft = minL;
-                        boxRight = maxR;
+                        boxTop = minT + oy;
+                        boxBottom = maxB + oy;
+                        boxLeft = minL + ox;
+                        boxRight = maxR + ox;
                     }
                 }
             } catch (_) {}
 
             if (this.destacarSelecaoAmarelaAtiva && this.elementoDestaqueAmarelo) {
-                this.elementoDestaqueAmarelo.style.top = `${rect.top - 1}px`;
-                this.elementoDestaqueAmarelo.style.left = `${rect.left - 1}px`;
+                this.elementoDestaqueAmarelo.style.top = `${rect.top + oy - 1}px`;
+                this.elementoDestaqueAmarelo.style.left = `${rect.left + ox - 1}px`;
                 this.elementoDestaqueAmarelo.style.width = `${rect.width + 2}px`;
                 this.elementoDestaqueAmarelo.style.height = `${rect.height + 2}px`;
             }
@@ -687,14 +731,14 @@
             const larguraCartao = (rectCartaoMedido && rectCartaoMedido.width > 0) ? Math.ceil(rectCartaoMedido.width) : 230;
             const alturaFinalCartao = (rectCartaoMedido && rectCartaoMedido.height > 0) ? Math.ceil(rectCartaoMedido.height) : 46;
 
-            const vw = Math.max(window.innerWidth || 0, document.documentElement ? document.documentElement.clientWidth : 0, 320);
-            const vh = Math.max(window.innerHeight || 0, document.documentElement ? document.documentElement.clientHeight : 0, 240);
+            const vw = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 320);
+            const vh = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 240);
             const MARGEM_JANELA = 8;
             const DISTANCIA_SEGURANCA_ABAIXO = 4;
             const DISTANCIA_SEGURANCA_SUPERIOR = 2;
 
-            const refLeft = (rectPrimeiraLinha && Number.isFinite(rectPrimeiraLinha.left))
-                ? rectPrimeiraLinha.left
+            const refLeft = Number.isFinite(refLeftFirst)
+                ? refLeftFirst
                 : (Number.isFinite(boxLeft) ? boxLeft : MARGEM_JANELA);
             const leftPos = Math.max(MARGEM_JANELA, Math.min(refLeft, vw - larguraCartao - MARGEM_JANELA));
 
@@ -717,6 +761,9 @@
 
         registrarOuvinteScrollAlerta() {
             this.removerOuvinteScrollAlerta();
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
             const aoRolarOuRedimensionar = () => {
                 this.atualizarPosicaoAlertaSobRolagem();
             };
@@ -724,10 +771,16 @@
             window.addEventListener('scroll', aoRolarOuRedimensionar, opts);
             document.addEventListener('scroll', aoRolarOuRedimensionar, opts);
             window.addEventListener('resize', aoRolarOuRedimensionar, opts);
+            if (winUi !== window) winUi.addEventListener('scroll', aoRolarOuRedimensionar, opts);
+            if (docUi !== document) docUi.addEventListener('scroll', aoRolarOuRedimensionar, opts);
+            if (winUi !== window) winUi.addEventListener('resize', aoRolarOuRedimensionar, opts);
             this.limparOuvinteScrollAlerta = () => {
                 window.removeEventListener('scroll', aoRolarOuRedimensionar, opts);
                 document.removeEventListener('scroll', aoRolarOuRedimensionar, opts);
                 window.removeEventListener('resize', aoRolarOuRedimensionar, opts);
+                if (winUi !== window) winUi.removeEventListener('scroll', aoRolarOuRedimensionar, opts);
+                if (docUi !== document) docUi.removeEventListener('scroll', aoRolarOuRedimensionar, opts);
+                if (winUi !== window) winUi.removeEventListener('resize', aoRolarOuRedimensionar, opts);
                 this.limparOuvinteScrollAlerta = null;
             };
         }
@@ -823,14 +876,19 @@
             }
             if (!rect || (rect.width === 0 && rect.height === 0)) return;
 
-            /* Calcula o envelope geometrico completo do texto selecionado + folga externa do contorno Flash (1px) */
+            /* Calcula o envelope geometrico completo do texto selecionado no sistema de coordenadas da pagina raiz + folga externa (1px) */
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
+            const ox = ctxUi.offsetX;
+            const oy = ctxUi.offsetY;
+
             const FOLGA_CONTORNO_FLASH = 1;
-            let boxTop = rect.top;
-            let boxBottom = rect.bottom;
-            let boxLeft = rect.left;
-            let boxRight = rect.right;
-            let rectPrimeiraLinha = rect;
-            let rectUltimaLinha = rect;
+            let boxTop = rect.top + oy;
+            let boxBottom = rect.bottom + oy;
+            let boxLeft = rect.left + ox;
+            let boxRight = rect.right + ox;
+            let refLeftFirst = rect.left + ox;
 
             try {
                 const clientRects = typeof range.getClientRects === 'function' ? range.getClientRects() : null;
@@ -844,20 +902,19 @@
                         if (!r || (r.width < 0.5 && r.height < 0.5)) continue;
                         if (r.top < minT) {
                             minT = r.top;
-                            rectPrimeiraLinha = r;
+                            refLeftFirst = r.left + ox;
                         }
                         if (r.bottom > maxB) {
                             maxB = r.bottom;
-                            rectUltimaLinha = r;
                         }
                         if (r.left < minL) minL = r.left;
                         if (r.right > maxR) maxR = r.right;
                     }
                     if (Number.isFinite(minT) && Number.isFinite(maxB)) {
-                        boxTop = minT;
-                        boxBottom = maxB;
-                        boxLeft = minL;
-                        boxRight = maxR;
+                        boxTop = minT + oy;
+                        boxBottom = maxB + oy;
+                        boxLeft = minL + ox;
+                        boxRight = maxR + ox;
                     }
                 }
             } catch (_) {}
@@ -871,10 +928,10 @@
                         if (elF && elF.tagName !== 'svg' && typeof elF.getBoundingClientRect === 'function') {
                             const rf = elF.getBoundingClientRect();
                             if (rf && rf.width > 0 && rf.height > 0) {
-                                if (rf.top < boxTop) boxTop = rf.top;
-                                if (rf.bottom > boxBottom) boxBottom = rf.bottom;
-                                if (rf.left < boxLeft) boxLeft = rf.left;
-                                if (rf.right > boxRight) boxRight = rf.right;
+                                if (rf.top + oy < boxTop) boxTop = rf.top + oy;
+                                if (rf.bottom + oy > boxBottom) boxBottom = rf.bottom + oy;
+                                if (rf.left + ox < boxLeft) boxLeft = rf.left + ox;
+                                if (rf.right + ox > boxRight) boxRight = rf.right + ox;
                             }
                         }
                     }
@@ -922,8 +979,8 @@
                 document.head.appendChild(styleEl);
                 this.estiloSelecaoInjetado = styleEl;
 
-                this.elementoDestaqueAmarelo.style.top = `${rect.top - 1}px`;
-                this.elementoDestaqueAmarelo.style.left = `${rect.left - 1}px`;
+                this.elementoDestaqueAmarelo.style.top = `${rect.top + oy - 1}px`;
+                this.elementoDestaqueAmarelo.style.left = `${rect.left + ox - 1}px`;
                 this.elementoDestaqueAmarelo.style.width = `${rect.width + 2}px`;
                 this.elementoDestaqueAmarelo.style.height = `${rect.height + 2}px`;
                 this.elementoDestaqueAmarelo.style.display = 'block';
@@ -965,17 +1022,16 @@
                 : (this.elementoCartaoAviso.offsetWidth || 0);
             const larguraCartao = larguraMedidaReal > 0 ? Math.max(larguraMedidaReal, 180) : 230;
 
-            const vw = Math.max(window.innerWidth || 0, document.documentElement ? document.documentElement.clientWidth : 0, 320);
-            const vh = Math.max(window.innerHeight || 0, document.documentElement ? document.documentElement.clientHeight : 0, 240);
+            const vw = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 320);
+            const vh = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 240);
             const MARGEM_JANELA = 8;
             const DISTANCIA_SEGURANCA_ABAIXO = 4;
             const DISTANCIA_SEGURANCA_SUPERIOR = 2;
 
             /* Seção 6.71 (FEAT-07): Determina ponto de referencia horizontal ancorado estritamente
-             * ao inicio das palavras do Range (rectPrimeiraLinha.left), garantindo alinhamento por palavra
-             * e eliminando desvios provocados por caixas externas ou coordenadas soltas do cursor */
-            let refLeft = (rectPrimeiraLinha && Number.isFinite(rectPrimeiraLinha.left))
-                ? rectPrimeiraLinha.left
+             * ao inicio das palavras do Range (refLeftFirst), traduzido para o sistema de coordenadas raiz */
+            let refLeft = Number.isFinite(refLeftFirst)
+                ? refLeftFirst
                 : (Number.isFinite(boxLeft) ? boxLeft : MARGEM_JANELA);
 
             /* Calcula coordenada horizontal garantindo alinhamento por palavra e clamp nas bordas da janela */
@@ -1116,13 +1172,19 @@
             };
 
             /* Verificação adicional de coordenadas no mousemove global caso o cursor passe sobre o retângulo do cartão após 1s */
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
             const tratarMouseMoveGlobalHover = (e) => {
                 if (!e || !this.elementoCartaoAviso || this.elementoCartaoAviso.style.display === 'none') return;
                 const agora = (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
                 if ((agora - timestampInicio) < CARENCIA_HOVER_MS) return;
                 const r = this.elementoCartaoAviso.getBoundingClientRect();
                 if (r && r.width > 0 && r.height > 0) {
-                    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+                    const mesmoTop = (!e.view || e.view === winUi);
+                    const evX = e.clientX + (mesmoTop ? 0 : ctxUi.offsetX);
+                    const evY = e.clientY + (mesmoTop ? 0 : ctxUi.offsetY);
+                    if (evX >= r.left && evX <= r.right && evY >= r.top && evY <= r.bottom) {
                         this.limparAlertaVisual();
                     }
                 }
@@ -1134,6 +1196,15 @@
             window.addEventListener('mousedown', tratarMouseDown, opts);
             document.addEventListener('mousedown', tratarMouseDown, opts);
             window.addEventListener('mousemove', tratarMouseMoveGlobalHover, opts);
+            if (winUi !== window) {
+                winUi.addEventListener('keydown', tratarKeyDown, opts);
+                winUi.addEventListener('mousedown', tratarMouseDown, opts);
+                winUi.addEventListener('mousemove', tratarMouseMoveGlobalHover, opts);
+            }
+            if (docUi !== document) {
+                docUi.addEventListener('keydown', tratarKeyDown, opts);
+                docUi.addEventListener('mousedown', tratarMouseDown, opts);
+            }
 
             if (this.elementoCartaoAviso) {
                 this.elementoCartaoAviso.addEventListener('mouseenter', tratarHoverCartao, { passive: true });
@@ -1146,6 +1217,15 @@
                 window.removeEventListener('mousedown', tratarMouseDown, opts);
                 document.removeEventListener('mousedown', tratarMouseDown, opts);
                 window.removeEventListener('mousemove', tratarMouseMoveGlobalHover, opts);
+                if (winUi !== window) {
+                    winUi.removeEventListener('keydown', tratarKeyDown, opts);
+                    winUi.removeEventListener('mousedown', tratarMouseDown, opts);
+                    winUi.removeEventListener('mousemove', tratarMouseMoveGlobalHover, opts);
+                }
+                if (docUi !== document) {
+                    docUi.removeEventListener('keydown', tratarKeyDown, opts);
+                    docUi.removeEventListener('mousedown', tratarMouseDown, opts);
+                }
                 if (this.elementoCartaoAviso) {
                     this.elementoCartaoAviso.removeEventListener('mouseenter', tratarHoverCartao);
                     this.elementoCartaoAviso.removeEventListener('mousemove', tratarHoverCartao);
@@ -1210,11 +1290,17 @@
                 this.ocultarMiniTipGlobal();
             };
 
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
             const tratarMouseMoveGlobalMiniTip = (e) => {
                 if (!e || !this.elementoMiniTipGlobal || this.elementoMiniTipGlobal.style.display === 'none') return;
                 const r = this.elementoMiniTipGlobal.getBoundingClientRect();
                 if (r && r.width > 0 && r.height > 0) {
-                    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+                    const mesmoTop = (!e.view || e.view === winUi);
+                    const evX = e.clientX + (mesmoTop ? 0 : ctxUi.offsetX);
+                    const evY = e.clientY + (mesmoTop ? 0 : ctxUi.offsetY);
+                    if (evX >= r.left && evX <= r.right && evY >= r.top && evY <= r.bottom) {
                         this.ocultarMiniTipGlobal();
                     }
                 }
@@ -1228,6 +1314,17 @@
             window.addEventListener('mousedown', tratarMouseDownMiniTip, opts);
             document.addEventListener('mousedown', tratarMouseDownMiniTip, opts);
             window.addEventListener('mousemove', tratarMouseMoveGlobalMiniTip, opts);
+            if (winUi !== window) {
+                winUi.addEventListener('keydown', tratarKeyDownMiniTip, opts);
+                winUi.addEventListener('keyup', tratarKeyUpMiniTip, opts);
+                winUi.addEventListener('mousedown', tratarMouseDownMiniTip, opts);
+                winUi.addEventListener('mousemove', tratarMouseMoveGlobalMiniTip, opts);
+            }
+            if (docUi !== document) {
+                docUi.addEventListener('keydown', tratarKeyDownMiniTip, opts);
+                docUi.addEventListener('keyup', tratarKeyUpMiniTip, opts);
+                docUi.addEventListener('mousedown', tratarMouseDownMiniTip, opts);
+            }
 
             if (this.elementoMiniTipGlobal) {
                 this.elementoMiniTipGlobal.addEventListener('mouseenter', tratarHoverMiniTip, { passive: true });
@@ -1242,6 +1339,17 @@
                 window.removeEventListener('mousedown', tratarMouseDownMiniTip, opts);
                 document.removeEventListener('mousedown', tratarMouseDownMiniTip, opts);
                 window.removeEventListener('mousemove', tratarMouseMoveGlobalMiniTip, opts);
+                if (winUi !== window) {
+                    winUi.removeEventListener('keydown', tratarKeyDownMiniTip, opts);
+                    winUi.removeEventListener('keyup', tratarKeyUpMiniTip, opts);
+                    winUi.removeEventListener('mousedown', tratarMouseDownMiniTip, opts);
+                    winUi.removeEventListener('mousemove', tratarMouseMoveGlobalMiniTip, opts);
+                }
+                if (docUi !== document) {
+                    docUi.removeEventListener('keydown', tratarKeyDownMiniTip, opts);
+                    docUi.removeEventListener('keyup', tratarKeyUpMiniTip, opts);
+                    docUi.removeEventListener('mousedown', tratarMouseDownMiniTip, opts);
+                }
                 if (this.elementoMiniTipGlobal) {
                     this.elementoMiniTipGlobal.removeEventListener('mouseenter', tratarHoverMiniTip);
                     this.elementoMiniTipGlobal.removeEventListener('mousemove', tratarHoverMiniTip);
@@ -1257,6 +1365,12 @@
         }
 
         ocultarMiniTipGlobal() {
+            try {
+                const uiTela = this.#obterUiTela();
+                if (uiTela && typeof uiTela.ocultarNaTela === 'function') {
+                    uiTela.ocultarNaTela();
+                }
+            } catch (_) { }
             this.removerOuvinteInteracaoParaMiniTip();
             if (this.temporizadorMiniTip) {
                 clearTimeout(this.temporizadorMiniTip);
@@ -1284,7 +1398,32 @@
             /* Se o usuario configurou 0 (Desligar avisos na tela), suprime o mini-tip */
             if (this.tempoExibicaoMs === 0 && duracaoOpcionalMs === null) return;
 
-            /* Passo 7.7: Garantir estrutura Shadow DOM e exibir o mini-tip */
+            const duracaoEfetivaMs = (typeof duracaoOpcionalMs === 'number' && duracaoOpcionalMs > 0)
+                ? duracaoOpcionalMs
+                : ((typeof this.tempoExibicaoMs === 'number') ? this.tempoExibicaoMs : -1);
+
+            /* FEAT-102 (Seção 6.260): Em produção, delega à biblioteca global JusGovLibUiTela
+             * (via Background Service Worker -> frameId: 0 / window.top), garantindo posição fixa
+             * idêntica em 100% das páginas e iframes cross-origin (Esc+Esc, Acumulador, etc.). */
+            const ehHeadless = (typeof window !== 'undefined' && Boolean(window.__TESTE_HEADLESS__));
+            const uiTela = !ehHeadless ? this.#obterUiTela() : null;
+            if (uiTela && typeof uiTela.exibirNaTela === 'function') {
+                try {
+                    const agoraTela = (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+                    this.avisoVisivel = true;
+                    this.timestampCriacaoAviso = agoraTela;
+                    this.timestampCriacaoMiniTip = agoraTela;
+                    uiTela.exibirNaTela({
+                        mensagem: String(mensagem || ''),
+                        corBorda,
+                        duracaoMs: duracaoEfetivaMs,
+                        posicao: 'topo_centro'
+                    });
+                    return;
+                } catch (_) { }
+            }
+
+            /* Fallback local / ambiente de testes headless (Shadow DOM + Popover Top-Layer) */
             this.garantirEstruturaShadowPopover();
             if (!this.elementoMiniTipGlobal) return;
 
@@ -1310,10 +1449,6 @@
             this.avisoVisivel = true;
             this.timestampCriacaoAviso = agora;
             this.timestampCriacaoMiniTip = agora;
-
-            const duracaoEfetivaMs = (typeof duracaoOpcionalMs === 'number' && duracaoOpcionalMs > 0)
-                ? duracaoOpcionalMs
-                : ((typeof this.tempoExibicaoMs === 'number') ? this.tempoExibicaoMs : -1);
 
             if (duracaoEfetivaMs > 0) {
                 this.removerOuvinteInteracaoParaMiniTip();

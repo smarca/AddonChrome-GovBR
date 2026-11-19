@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: input-teclado-campos.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Botões Laterais
+ * ARQUIVO: src/mod-input/input-teclado-campos.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Botões Laterais
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-input/input-teclado-campos.js

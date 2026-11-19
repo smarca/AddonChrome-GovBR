@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: lib-config.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca de Configurações, Estado e Ícones Vetoriais
+ * ARQUIVO: src/lib/lib-config.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca de Configurações, Estado e Ícones Vetoriais
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-config.js
@@ -67,6 +68,7 @@
         'pomodoroAtivo', 'pomodoroProporcao', 'pomodoroFocoMinutos', 'pomodoroCiclos',
         'pomodoroPausasAutomaticas', 'pomodoroModoAviso', 'pomodoroEstiloMinipopup',
         'pomodoroBeepConclusaoAtivo', 'pomodoroBeepIntensidade',
+        'automatePjeAtivo',
         'listaPerfis'
     ]);
     const SET_CHAVES_SYNC = new Set(CHAVES_CONFIGURACAO_SINCRONIZAVEL);
@@ -152,7 +154,7 @@
         modoShiftCnj: Object.freeze(['desligado', '20digitos', 'completo']),
         autoLimpezaIdade: Object.freeze(['12h', '1d', '3d', '7d', '15d', '30d']),
         pomodoroModoAviso: Object.freeze(['modal', 'badge', 'barra_descanso', 'barra_sempre', 'badge_e_barra_descanso', 'completo']),
-        pomodoroEstiloMinipopup: Object.freeze(['compacto', 'normal', 'expandido']),
+        pomodoroEstiloMinipopup: Object.freeze(['micro', 'compacto', 'normal', 'expandido']),
         pomodoroBeepIntensidade: Object.freeze(['suave', 'moderado', 'grave'])
     });
 
@@ -289,7 +291,9 @@
                     { id: 'padrao', nome: 'Padrão', predefinido: true, sobrescritas: {} },
                     { id: 'trabalho', nome: 'Trabalho', predefinido: true, sobrescritas: {} },
                     { id: 'casa', nome: 'Casa', predefinido: true, sobrescritas: {} },
-                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true, sobrescritas: {} }
+                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true, sobrescritas: {} },
+                    { id: 'leitura', nome: 'Leitura / Pesquisa', aliases: ['leitura', 'pesquisa'], predefinido: true, sobrescritas: {} },
+                    { id: 'reuniao', nome: 'Apresentação / Reunião', aliases: ['reuniao', 'apresentacao'], predefinido: true, sobrescritas: {} }
                 ]
             };
         }
@@ -448,7 +452,9 @@
                     { id: 'padrao', nome: 'Padrão', predefinido: true },
                     { id: 'trabalho', nome: 'Trabalho', predefinido: true },
                     { id: 'casa', nome: 'Casa', predefinido: true },
-                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true }
+                    { id: 'estudo', nome: 'Estudo', aliases: ['estudar'], predefinido: true },
+                    { id: 'leitura', nome: 'Leitura / Pesquisa', aliases: ['leitura', 'pesquisa'], predefinido: true },
+                    { id: 'reuniao', nome: 'Apresentação / Reunião', aliases: ['reuniao', 'apresentacao'], predefinido: true }
                 ];
 
             const tinhaListaAnterior = Array.isArray(syncData[CHAVE_LISTA_PERFIS]) && syncData[CHAVE_LISTA_PERFIS].length > 0;
@@ -1302,16 +1308,33 @@
             if (!apiChrome || !apiChrome.storage) return {};
 
             try {
+                let baseCfg = null;
                 if (apiChrome.storage.session) {
                     const cached = await apiChrome.storage.session.get('cacheConfigJusGov');
-                    if (cached && cached.cacheConfigJusGov) {
-                        return cached.cacheConfigJusGov;
+                    if (cached && cached.cacheConfigJusGov && typeof cached.cacheConfigJusGov === 'object' && typeof cached.cacheConfigJusGov.modoTurbo === 'string') {
+                        baseCfg = { ...cached.cacheConfigJusGov };
                     }
                 }
-                if (apiChrome.storage.sync) {
-                    return await apiChrome.storage.sync.get(null);
+                if (!baseCfg && apiChrome.storage.sync) {
+                    const syncCfg = await apiChrome.storage.sync.get(null);
+                    if (syncCfg && typeof syncCfg === 'object') {
+                        baseCfg = { ...syncCfg };
+                    }
                 }
-                return {};
+                if (!baseCfg) baseCfg = {};
+                if (apiChrome.storage.local) {
+                    const loc = await apiChrome.storage.local.get([CHAVE_CONFIG_SYNC_PENDENTE, CHAVE_PERFIL_ATIVO]);
+                    if (loc && typeof loc[CHAVE_PERFIL_ATIVO] === 'string' && loc[CHAVE_PERFIL_ATIVO].trim()) {
+                        baseCfg[CHAVE_PERFIL_ATIVO] = loc[CHAVE_PERFIL_ATIVO].trim();
+                    }
+                    if (loc && loc[CHAVE_CONFIG_SYNC_PENDENTE] && typeof loc[CHAVE_CONFIG_SYNC_PENDENTE] === 'object') {
+                        Object.assign(baseCfg, loc[CHAVE_CONFIG_SYNC_PENDENTE]);
+                    }
+                }
+                if (baseCfg.pomodoroAtivo === undefined) {
+                    baseCfg.pomodoroAtivo = true;
+                }
+                return baseCfg;
             } catch (_) {
                 return {};
             }
@@ -1574,10 +1597,8 @@
                 config.pomodoroCiclos = padraoPerfil.pomodoroCiclos;
                 precisaSalvar = true;
             }
-            if (typeof config.pomodoroPausasAutomaticas !== 'boolean') {
-                config.pomodoroPausasAutomaticas = (padraoPerfil.pomodoroPausasAutomaticas !== undefined)
-                    ? Boolean(padraoPerfil.pomodoroPausasAutomaticas)
-                    : true;
+            if (config.pomodoroPausasAutomaticas !== true) {
+                config.pomodoroPausasAutomaticas = true;
                 precisaSalvar = true;
             }
             if (typeof config.pomodoroModoAviso !== 'string' || !modosAvisoPomodoroValidos.includes(config.pomodoroModoAviso)) {
@@ -1699,6 +1720,10 @@
             }
 
             /* Passo 4.5: Atualizar dinamicamente o icone e o popup da extensao na barra de ferramentas */
+            if (typeof self !== 'undefined') {
+                self.__JUSGOV_MODO_TURBO_ATUAL__ = config.modoTurbo;
+                self.__JUSGOV_COMPORTAMENTO_ICONE_ATUAL__ = config.comportamentoCliqueIcone;
+            }
             this.sincronizarComportamentoIcone(config.comportamentoCliqueIcone, apiChrome);
             this.desenharIconeVetorialFallback(config.modoTurbo, config.comportamentoCliqueIcone, apiChrome);
 
@@ -1733,13 +1758,16 @@
          * - Modo Lista (Ativo Lista): Fundo Azul Real (#1a73e8), Borda #1557b0, Raio Amarelo (#fbbc04).
          * - Modo Desligado (Pausado): Fundo Cinza (#64748b), Borda #475569, Raio Cinza Claro (#cbd5e1).
          */
-        desenharIconeVetorialFallback(modoAtivo, comportamento, chromeApi = null) {
+        desenharIconeVetorialFallback(modoAtivo, comportamento, chromeApi = null, badgePomodoro = undefined) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
             if (typeof OffscreenCanvas === 'undefined' || !apiChrome || !apiChrome.action || !apiChrome.action.setIcon) {
-                return;
+                return false;
             }
 
             try {
+                const badgeAtivo = (badgePomodoro === undefined && typeof self !== 'undefined')
+                    ? (self.__JUSGOV_ULTIMO_BADGE_POMODORO__ || null)
+                    : badgePomodoro;
                 const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
                     ? JusGovCfgDefaults.obterRegrasSistema()
                     : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
@@ -1769,7 +1797,7 @@
                     }).catch(() => { });
                 }
 
-                const tamanhos = [16, 32, 48, 128];
+                const tamanhos = [16, 24, 32, 48, 128];
                 const imageDataMap = {};
 
                 for (let i = 0; i < tamanhos.length; i++) {
@@ -1779,11 +1807,24 @@
                     if (!ctx) continue;
 
                     const escala = dim / 128;
+                    const txtBrutoPre = (badgeAtivo && badgeAtivo.texto) ? String(badgeAtivo.texto).trim() : '';
+                    const matchMinPre = txtBrutoPre.match(/^(!?)(\d+)\s*m$/i);
+                    const txtBadge = txtBrutoPre
+                        ? (matchMinPre
+                            ? (Number(matchMinPre[2]) <= 9 ? `${matchMinPre[1]}${Number(matchMinPre[2])}m` : `${matchMinPre[1]}${Number(matchMinPre[2])}`)
+                            : txtBrutoPre)
+                        : '';
+                    const temBadgeTexto = Boolean(txtBadge);
 
-                    /* Passo 5.2: Fundo arredondado (rect x=6, y=6, w=116, h=116, rx=26) */
+                    /* Passo 5.2: Fundo arredondado; quando ha numero em badge, eleva a caixa para que o numeral fique ressaltado abaixo da borda inferior */
+                    const yBoxBase = temBadgeTexto ? 2 : 6;
+                    const hBoxBase = temBadgeTexto ? 110 : 116;
+                    const escalaVert = hBoxBase / 116;
+                    const mapY = (yOrig) => (yBoxBase + (yOrig - 6) * escalaVert) * escala;
+
                     ctx.fillStyle = corFundo;
                     ctx.beginPath();
-                    ctx.roundRect(6 * escala, 6 * escala, 116 * escala, 116 * escala, 26 * escala);
+                    ctx.roundRect(6 * escala, yBoxBase * escala, 116 * escala, hBoxBase * escala, (temBadgeTexto ? 24 : 26) * escala);
                     ctx.fill();
 
                     ctx.strokeStyle = corBorda;
@@ -1793,9 +1834,9 @@
                     /* Passo 5.3: Faixas documentais semi-transparentes */
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                     ctx.beginPath();
-                    ctx.roundRect(24 * escala, 34 * escala, 46 * escala, 10 * escala, 3 * escala);
-                    ctx.roundRect(24 * escala, 54 * escala, 34 * escala, 10 * escala, 3 * escala);
-                    ctx.roundRect(24 * escala, 74 * escala, 40 * escala, 10 * escala, 3 * escala);
+                    ctx.roundRect(24 * escala, mapY(34), 46 * escala, 10 * escalaVert * escala, 3 * escala);
+                    ctx.roundRect(24 * escala, mapY(54), 34 * escala, 10 * escalaVert * escala, 3 * escala);
+                    ctx.roundRect(24 * escala, mapY(74), 40 * escala, 10 * escalaVert * escala, 3 * escala);
                     ctx.fill();
 
                     /* Passo 5.4: Desenho do Raiozinho Original (points: 78,20 44,68 68,68 54,108 100,56 74,56) */
@@ -1805,21 +1846,108 @@
                     ctx.lineJoin = 'round';
 
                     ctx.beginPath();
-                    ctx.moveTo(78 * escala, 20 * escala);
-                    ctx.lineTo(44 * escala, 68 * escala);
-                    ctx.lineTo(68 * escala, 68 * escala);
-                    ctx.lineTo(54 * escala, 108 * escala);
-                    ctx.lineTo(100 * escala, 56 * escala);
-                    ctx.lineTo(74 * escala, 56 * escala);
+                    ctx.moveTo(78 * escala, mapY(20));
+                    ctx.lineTo(44 * escala, mapY(68));
+                    ctx.lineTo(68 * escala, mapY(68));
+                    ctx.lineTo(54 * escala, mapY(108));
+                    ctx.lineTo(100 * escala, mapY(56));
+                    ctx.lineTo(74 * escala, mapY(56));
                     ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
+
+                    /* Passo 5.5 (FEAT-67 / BUG-93): Apenas texto em negrito encostado exatamente na borda inferior maxima do canvas (efeito ressaltado) */
+                    if (temBadgeTexto) {
+                        const txt = txtBadge;
+                        ctx.save();
+                        const maxLarguraTxt = Math.max(10, dim - Math.max(1, Math.round(dim * 0.04)));
+                        const famFonte = '"Segoe UI", "Roboto", Arial, sans-serif';
+                        let tamFonte = (txt.length <= 2)
+                            ? Math.max(10, Math.round(dim * 0.65))
+                            : Math.max(8, Math.round(dim * 0.50));
+                        const tamMin = Math.max(7, Math.round(dim * 0.40));
+
+                        const temM = /^!?\d+m$/i.test(txt);
+                        const numParte = temM ? txt.slice(0, -1) : txt;
+                        const medirLargura = (tBase) => {
+                            if (!temM) {
+                                ctx.font = `800 ${tBase}px ${famFonte}`;
+                                return ctx.measureText(txt).width;
+                            }
+                            ctx.font = `800 ${tBase}px ${famFonte}`;
+                            const wN = ctx.measureText(numParte).width;
+                            const tM = Math.max(6, Math.round(tBase * 0.64));
+                            ctx.font = `400 ${tM}px ${famFonte}`;
+                            return wN + ctx.measureText('m').width;
+                        };
+
+                        while (tamFonte > tamMin && medirLargura(tamFonte) > maxLarguraTxt) {
+                            tamFonte -= 1;
+                        }
+
+                        let corNumero = '#ffffff';
+                        const corBadge = String(badgeAtivo.cor || '').toLowerCase();
+                        if (corBadge === '#eab308' || corBadge === '#facc15') corNumero = '#fde047';
+                        else if (corBadge === '#dc2626') corNumero = '#fca5a5';
+                        else if (corBadge === '#0284c7') corNumero = '#7dd3fc';
+                        else if (corBadge === '#16a34a') corNumero = '#86efac';
+
+                        ctx.textBaseline = 'alphabetic';
+                        ctx.font = `800 ${tamFonte}px ${famFonte}`;
+                        const metricaRef = ctx.measureText(temM ? numParte : txt);
+                        const descentReal = (metricaRef && typeof metricaRef.actualBoundingBoxDescent === 'number' && Number.isFinite(metricaRef.actualBoundingBoxDescent))
+                            ? Math.max(0, metricaRef.actualBoundingBoxDescent)
+                            : 0;
+                        const xCentro = dim / 2;
+                        const yBase = dim - descentReal;
+
+                        ctx.lineJoin = 'round';
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.92)';
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                        ctx.strokeStyle = 'rgba(15, 23, 42, 0.78)';
+                        ctx.lineWidth = Math.max(1.1, dim * 0.08);
+                        ctx.fillStyle = corNumero;
+
+                        if (temM) {
+                            ctx.textAlign = 'left';
+                            const wN = metricaRef.width;
+                            const tamM = Math.max(6, Math.round(tamFonte * 0.64));
+                            ctx.font = `400 ${tamM}px ${famFonte}`;
+                            const wM = ctx.measureText('m').width;
+                            const xIni = Math.max(0, (dim - (wN + wM)) / 2);
+
+                            ctx.font = `800 ${tamFonte}px ${famFonte}`;
+                            ctx.shadowBlur = Math.max(2, dim * 0.14);
+                            ctx.strokeText(numParte, xIni, yBase);
+                            ctx.shadowBlur = Math.max(1, dim * 0.07);
+                            ctx.fillText(numParte, xIni, yBase);
+
+                            ctx.font = `400 ${tamM}px ${famFonte}`;
+                            ctx.shadowBlur = Math.max(1.5, dim * 0.12);
+                            ctx.strokeText('m', xIni + wN, yBase);
+                            ctx.shadowBlur = Math.max(1, dim * 0.06);
+                            ctx.fillText('m', xIni + wN, yBase);
+                        } else {
+                            ctx.textAlign = 'center';
+                            ctx.font = `800 ${tamFonte}px ${famFonte}`;
+                            ctx.shadowBlur = Math.max(2, dim * 0.14);
+                            ctx.strokeText(txt, xCentro, yBase);
+
+                            ctx.shadowBlur = Math.max(1, dim * 0.07);
+                            ctx.fillText(txt, xCentro, yBase);
+                        }
+                        ctx.restore();
+                    }
 
                     imageDataMap[dim] = ctx.getImageData(0, 0, dim, dim);
                 }
 
                 apiChrome.action.setIcon({ imageData: imageDataMap }).catch(() => { });
-            } catch (_) { }
+                return true;
+            } catch (_) {
+                return false;
+            }
         }
 
         obterChavesConfigSync() {
@@ -1886,6 +2014,17 @@
                             atualPend[k] = clonarValorSimples(payload[k]);
                         }
                     }
+                }
+                /* BUG-81: Atualizar cacheConfigJusGov na RAM (storage.session) ANTES de gravar storage.local,
+                 * para que listeners de storage.onChanged (background, popup, options) ja enxerguem o novo estado ao vivo! */
+                if (apiChrome.storage.session) {
+                    try {
+                        const sess = await apiChrome.storage.session.get('cacheConfigJusGov');
+                        if (sess && sess.cacheConfigJusGov && typeof sess.cacheConfigJusGov === 'object' && typeof sess.cacheConfigJusGov.modoTurbo === 'string') {
+                            const baseSess = { ...sess.cacheConfigJusGov, ...atualPend };
+                            await apiChrome.storage.session.set({ cacheConfigJusGov: baseSess });
+                        }
+                    } catch (_) { }
                 }
                 await apiChrome.storage.local.set({ [CHAVE_CONFIG_SYNC_PENDENTE]: atualPend });
                 const cfgSincronizada = await this.sincronizarEstado(apiChrome, dependencias);

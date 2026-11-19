@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: input-botao-meio.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Botões Laterais
+ * ARQUIVO: src/mod-input/input-botao-meio.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Botões Laterais
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-input/input-botao-meio.js
@@ -455,20 +456,37 @@
                 if (typeof e.stopPropagation === 'function') e.stopPropagation();
             } catch (_) { }
 
-            /* Passo 3.3: Proteção de debounce restrita a múltiplos cliques físicos rápidos de mouse */
+            /* Passo 3.3: Proteção anti-loop / anti-duplicidade com copia-colar.js + debounce de cliques físicos rápidos */
             const agora = Date.now();
+            if (e.isTrusted && typeof window !== 'undefined' && window.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__ && (agora - window.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__) < 80) {
+                return true;
+            }
             if (e.isTrusted && (agora - this.#ultimoDisparoTimestamp < this.#intervaloMinimoDisparoMs)) {
                 return true;
             }
             this.#ultimoDisparoTimestamp = agora;
 
+            const aplicarFiltroShift = Boolean(e.shiftKey && !comAlt);
             const executarColagem = (slotIndex) => {
-                const alvoConfirmado = this.#confirmarEFocarAlvoFinal(alvoInicial);
+                const alvoConfirmado = comAlt ? this.#confirmarEFocarAlvoFinal(alvoInicial) : alvoEditavelInicial;
                 if (!alvoConfirmado) return;
-                const textoParaColar = this.#obterTextoDoHistorico(slotIndex, bufferUltimaSelecao, bufferPenultimaSelecao);
+                let textoParaColar = this.#obterTextoDoHistorico(slotIndex, bufferUltimaSelecao, bufferPenultimaSelecao);
+                if (aplicarFiltroShift && textoParaColar && typeof window !== 'undefined' && typeof window.JusGovModuloColagem === 'function') {
+                    try {
+                        const modColagemTemp = new window.JusGovModuloColagem();
+                        textoParaColar = modColagemTemp.aplicarFiltroShiftParaColagem(textoParaColar);
+                    } catch (_) { }
+                }
                 /* BLIND-01 (Seção 6.104): Se nulo ou vazio, operação no-op silenciosa */
                 if (textoParaColar && typeof textoParaColar === 'string' && textoParaColar.length > 0) {
-                    const colou = this.#inserirTextoNoCursor(alvoConfirmado, textoParaColar);
+                    const prevInterna = (typeof window !== 'undefined') ? Boolean(window.__JUSGOV_COLAGEM_INTERNA_ATIVA__) : false;
+                    if (typeof window !== 'undefined') window.__JUSGOV_COLAGEM_INTERNA_ATIVA__ = true;
+                    let colou = false;
+                    try {
+                        colou = this.#inserirTextoNoCursor(alvoConfirmado, textoParaColar);
+                    } finally {
+                        if (typeof window !== 'undefined') window.__JUSGOV_COLAGEM_INTERNA_ATIVA__ = prevInterna;
+                    }
                     if (colou && typeof window !== 'undefined' && window.JusGovMotorSelecaoTeste && typeof window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo === 'function') {
                         try { window.JusGovMotorSelecaoTeste.confirmarColagemDeConteudo(textoParaColar, slotIndex); } catch (_) { }
                     }

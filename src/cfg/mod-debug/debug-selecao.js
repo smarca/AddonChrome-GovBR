@@ -2916,7 +2916,7 @@
                     let ancoraCurtaOk = false;
                     const pCurta = document.createElement('p');
                     pCurta.textContent = 'Se houver urgência comprovada nos autos';
-                    pCurta.style.cssText = 'position: fixed; left: 24px; top: 24px; font-size: 16px; line-height: 24px; margin: 0; padding: 0;';
+                    pCurta.style.cssText = 'position: fixed; left: 24px; top: 24px; z-index: 2147483640; background: #ffffff; color: #000000; font-size: 16px; line-height: 24px; margin: 0; padding: 0;';
                     document.body.appendChild(pCurta);
                     const minAnt = motorTeste.obterMinimoCaracteresInterface();
                     motorTeste.definirMinimoCaracteresInterface(5);
@@ -3436,6 +3436,88 @@
                 { detalhe: detalheBug69 }
             );
 
+            }
+
+            {
+                /* TEST-08 (FEAT-63): Seleção extensa / multipágina com Shift e preservação de seleção nas teclas modificadoras */
+                let test08Ok = false;
+                let detalheTest08 = '';
+                try {
+                    const motor8 = window.JusGovMotorSelecaoTeste;
+                    const Prog8 = window.JusGovProgressaoAtalhosSelecao;
+                    const prog = typeof Prog8 === 'function' ? new Prog8({}) : null;
+                    const textoLongo = 'A'.repeat(1250);
+                    const textoLinhas = Array.from({ length: 14 }, (_, idx) => `Linha ${idx + 1}`).join('\n');
+                    const textoCurto = 'Frase curta simples.';
+                    const extensaOk = Boolean(
+                        prog &&
+                        prog.isSelecaoExtensaOuMultipage(null, textoLongo) === true &&
+                        prog.isSelecaoExtensaOuMultipage(null, textoLinhas) === true &&
+                        prog.isSelecaoExtensaOuMultipage(null, textoCurto) === false
+                    );
+
+                    const p8 = document.createElement('p');
+                    p8.textContent = 'Texto preservado durante tecla modificadora Shift.';
+                    document.body.appendChild(p8);
+                    const sel8 = window.getSelection();
+                    const r8 = document.createRange();
+                    r8.selectNodeContents(p8.firstChild);
+                    sel8.removeAllRanges();
+                    sel8.addRange(r8);
+                    let manteveMods = true;
+                    ['Shift', 'Control', 'Alt', 'Meta'].forEach((k) => {
+                        if (motor8 && typeof motor8.aoPressionarTecla === 'function') {
+                            motor8.aoPressionarTecla({ key: k });
+                        }
+                        if (!sel8 || sel8.isCollapsed || !sel8.toString().includes('preservado')) {
+                            manteveMods = false;
+                        }
+                    });
+                    sel8.removeAllRanges();
+                    p8.remove();
+                    test08Ok = extensaOk && manteveMods;
+                    detalheTest08 = `extensa=${extensaOk}, manteveMods=${manteveMods}`;
+                } catch (eT8) { detalheTest08 = eT8.message || String(eT8); }
+                registrar(test08Ok, 'TEST_08_FEAT_63_SELECAO_EXTENSA_E_PRESERVACAO_MODS', 'isSelecaoExtensaOuMultipage detecta >= 1200 chars / >= 12 linhas e teclas modificadoras preservam a seleção ativa.', { detalhe: detalheTest08 });
+            }
+
+            {
+                /* TEST-10 (BUG-88): Ctrl+C síncrono atualiza slots internos e mousedown/mouseup em .icone-copy preserva fluxo nativo no motor */
+                let test10Ok = false;
+                let detalheTest10 = '';
+                try {
+                    const motor10 = window.JusGovMotorSelecaoTeste;
+                    const box10 = document.createElement('div');
+                    box10.innerHTML = '<p id="p-10">Primeiro Valor Copiado</p><p id="p-10b">Segundo Valor Copiado</p><a class="icone-copy" id="ico-10" title="Copiar">C</a>';
+                    document.body.appendChild(box10);
+                    const p10 = document.getElementById('p-10');
+                    const sel10 = window.getSelection();
+                    const r10 = document.createRange();
+                    r10.selectNodeContents(p10.firstChild);
+                    sel10.removeAllRanges();
+                    sel10.addRange(r10);
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', ctrlKey: true, bubbles: true, cancelable: true }));
+                    const slot1A = window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto;
+
+                    const r10b = document.createRange();
+                    r10b.selectNodeContents(document.getElementById('p-10b').firstChild);
+                    sel10.removeAllRanges();
+                    sel10.addRange(r10b);
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', ctrlKey: true, bubbles: true, cancelable: true }));
+                    const slot1B = window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto;
+                    const slot2B = window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ && window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__.texto;
+
+                    let prevPadraoBtn = false;
+                    const ico10 = document.getElementById('ico-10');
+                    const evMouse10 = new MouseEvent('mouseup', { button: 0, detail: 1, clientX: 5, clientY: 5, bubbles: true, cancelable: true });
+                    ico10.dispatchEvent(evMouse10);
+                    prevPadraoBtn = evMouse10.defaultPrevented;
+                    sel10.removeAllRanges();
+                    box10.remove();
+                    test10Ok = Boolean(slot1A === 'Primeiro Valor Copiado' && slot1B === 'Segundo Valor Copiado' && slot2B === 'Primeiro Valor Copiado' && !prevPadraoBtn);
+                    detalheTest10 = `slot1=${slot1B}, slot2=${slot2B}, nativoPres=${!prevPadraoBtn}`;
+                } catch (eT10) { detalheTest10 = eT10.message || String(eT10); }
+                registrar(test10Ok, 'TEST_10_BUG_88_CTRL_C_SLOTS_E_BOTAO_WEB', 'Ctrl+C manual sincroniza os 2 slots passivos e mouseup simples em .icone-copy não cancela a ação nativa.', { detalhe: detalheTest10 });
             }
         }
     }

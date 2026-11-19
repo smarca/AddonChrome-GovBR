@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: lib-block-addon.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca de Casulo, Proteção de Acesso Externo e Roteador Seguro
+ * ARQUIVO: src/lib/lib-block-addon.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca de Casulo, Proteção de Acesso Externo e Roteador Seguro
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-block-addon.js

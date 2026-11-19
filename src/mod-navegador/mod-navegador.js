@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: mod-navegador.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
+ * ARQUIVO: src/mod-navegador/mod-navegador.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-navegador/mod-navegador.js
@@ -440,7 +441,6 @@
                 const monitorarAtual = (cfg.monitorarUrlAtualPagina !== false);
                 const abaExistente = abas.find(t => {
                     const reg = mapaAbas.get(t.id);
-                    if (reg && reg.duplicacaoManualPermitida) return false;
                     const uAtual = normalizador(t.url || t.pendingUrl || '');
                     if (monitorarAtual && urlAlvoNorm === uAtual) return true;
                     if (monitorarOrig && reg) {

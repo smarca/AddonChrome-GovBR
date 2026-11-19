@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: lib-urls.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca de Roteamento, Máscaras e Correspondência de URLs
+ * ARQUIVO: src/lib/lib-urls.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca de Roteamento, Máscaras e Correspondência de URLs
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-urls.js
@@ -153,6 +154,9 @@
                     host.endsWith('.gov.br') ||
                     host.endsWith('.leg.br') ||
                     host.endsWith('.mp.br') ||
+                    host === 'frontend.prd.cnj.cloud' ||
+                    host.endsWith('.cnj.cloud') ||
+                    host === 'sso.cloud.pje.jus.br' ||
                     host.includes('pje') ||
                     host.includes('eproc') ||
                     host.includes('projudi') ||

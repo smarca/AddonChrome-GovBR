@@ -1,11 +1,12 @@
 /* ==========================================================================
- * Nome do arquivo: copia-regras-inspetor.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 1 - CÓPIA INTELIGENTE & FORENSE (Mapeamento XPath/CSS & Inspetor)
+ * ARQUIVO: src/mod-XPath/xpath-regras-inspetor.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
+ * MÓDULO: MOD-XPATH — Mapeamento Manual Avançado Global (XPath/CSS & Inspetor)
+ *
  * @MAPA-IA:
- * - Arquivo: src/mod-copia/copia-regras-inspetor.js
+ * - Arquivo: src/mod-XPath/xpath-regras-inspetor.js
  * - Classe Exportada: RegrasEInspetorDOM (window.JusGovRegrasEInspetor)
  * - Métodos Públicos: carregarRegrasInternas, definirRegrasUsuario, obterRegrasUsuario,
  *   definirRegrasInternas, adicionarRegrasUsuario, limparCache, elementoCorrespondeXPath,
@@ -48,11 +49,19 @@
         '(click)', '@click', 'v-on:click', 'ng-click', 'routerlink'
     ]);
     const TAGS_ESTRUTURAIS_WIZ = new Set(['c-wiz', 'c-data', 'main', 'section', 'article']);
+    const TAGS_DOCUMENTAIS_SEMPRE_LEITURA = new Set([
+        'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'CODE',
+        'LI', 'DT', 'DD', 'TD', 'TH', 'CAPTION', 'B', 'STRONG', 'I', 'EM', 'U',
+        'INS', 'S', 'STRIKE', 'DEL', 'SUB', 'SUP', 'MARK', 'SMALL', 'ABBR',
+        'CITE', 'Q', 'DFN', 'KBD', 'SAMP', 'VAR', 'ARTICLE', 'SECTION', 'MAIN',
+        'HTML', 'BODY'
+    ]);
     const RX_JSACTION_CLIQUE = /(?:^|[;\s])(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|tap)\s*:/i;
 
     class RegrasEInspetorDOM {
         #regrasUsuario = [];
         #regrasInternas = [];
+        #ultimoAlvoValidoInspecionado = null;
         #cacheEl = null;
         #cacheTs = 0;
         #cacheRes = null;
@@ -81,6 +90,15 @@
 
         obterIdFrameInspetor() {
             return this.#idFrameInspetor;
+        }
+
+        obterUltimoAlvoValidoInspecionado() {
+            try {
+                if (this.#ultimoAlvoValidoInspecionado && this.#ultimoAlvoValidoInspecionado.isConnected) {
+                    return this.#ultimoAlvoValidoInspecionado;
+                }
+            } catch (_) { }
+            return null;
         }
 
         temPainelInspetorVisivel() {
@@ -302,14 +320,37 @@
             return `<${tag}${idSufixo}${clsStr}>`;
         }
 
+        #temTextoDiretoVisivel(el) {
+            if (!el || !el.childNodes) return false;
+            const filhos = el.childNodes;
+            for (let i = 0; i < filhos.length; i++) {
+                const ch = filhos[i];
+                if (ch && ch.nodeType === Node.TEXT_NODE && String(ch.nodeValue || '').trim().length > 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         temEventosAssociadosAoObjeto(el) {
             if (!el) return null;
-            let atual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+            const baseInicial = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+            const dentroDeBlocoTexto = Boolean(baseInicial && typeof baseInicial.closest === 'function' && baseInicial.closest('p, article, blockquote, pre'));
+            let atual = baseInicial;
             let profundidade = 0;
 
-            while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 2) {
+            while (atual && atual !== document.body && atual !== document.documentElement && profundidade < 3) {
                 profundidade++;
                 if (atual.nodeType === Node.ELEMENT_NODE) {
+                    const tagAtual = (atual.tagName || '').toLowerCase();
+                    if (profundidade === 3) {
+                        if (dentroDeBlocoTexto || TAGS_ESTRUTURAIS_WIZ.has(tagAtual) || tagAtual === 'table' || tagAtual === 'tbody') {
+                            break;
+                        }
+                        if (String(atual.textContent || '').trim().length > 60) {
+                            break;
+                        }
+                    }
                     const descNo = this.descreverNoCurto(atual);
                     const onde = profundidade === 1 ? 'no elemento' : `no ancestral +${profundidade - 1}`;
 
@@ -321,7 +362,6 @@
                     if (atual.onpointerup) return `evento JS onpointerup em ${descNo} (${onde})`;
 
                     if (atual.attributes && atual.attributes.length > 0) {
-                        const tagAtual = (atual.tagName || '').toLowerCase();
                         for (let a = 0; a < atual.attributes.length; a++) {
                             const attrNome = (atual.attributes[a].name || '').toLowerCase();
                             if (ATRIBUTOS_CLIQUE_JS.has(attrNome)) {
@@ -525,22 +565,35 @@
                     } else {
                         const tagB = (base.tagName || '').toUpperCase();
                         const ehParagrafo = tagB === 'P' || tagB === 'ARTICLE' || tagB === 'BLOCKQUOTE';
-                        const txt = (base.textContent || '').trim();
-                        if (!ehParagrafo && txt.length > 0 && txt.length <= 80 && !txt.includes('\n')) {
-                            const temMascara = /\b(\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}(?::\d{2})?|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b/.test(txt);
-                            if (temMascara) {
-                                diag.tipo = 'semiflexivel';
+                        const ehTagDocumentalSemTextoDireto = TAGS_DOCUMENTAIS_SEMPRE_LEITURA.has(tagB);
+                        const ehEditavelDireto = Boolean(
+                            (typeof this.#ehCampoEditavelFn === 'function' && this.#ehCampoEditavelFn(base)) ||
+                            (typeof base.matches === 'function' && base.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"]), rich-textarea, [role="textbox"], [role="searchbox"]'))
+                        );
+                        if (!ehEditavelDireto && !ehTagDocumentalSemTextoDireto && !this.#temTextoDiretoVisivel(base)) {
+                            diag.tipo = 'interface';
+                            diag.origem = 'Heurística Estrutural';
+                            diag.rotuloDetalhe = 'Sem Texto Direto';
+                            diag.detalhe = `<${tagB.toLowerCase()}> apenas estrutural/propriedades`;
+                            registrarEtapa('3. Heurística', `sem texto direto <${tagB.toLowerCase()}>`, 'interface', false);
+                        } else {
+                            const txt = (base.textContent || '').trim();
+                            if (!ehParagrafo && txt.length > 0 && txt.length <= 80 && !txt.includes('\n')) {
+                                const temMascara = /\b(\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}(?::\d{2})?|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b/.test(txt);
+                                if (temMascara) {
+                                    diag.tipo = 'semiflexivel';
+                                    diag.origem = 'Heurística Browser';
+                                    diag.rotuloDetalhe = 'Heurística';
+                                    diag.detalhe = 'Texto curto com máscara forense';
+                                    registrarEtapa('3. Heurística', 'máscara forense curta', 'semiflexivel', false);
+                                }
+                            } else if (txt.length > 100) {
+                                diag.tipo = 'textual';
                                 diag.origem = 'Heurística Browser';
                                 diag.rotuloDetalhe = 'Heurística';
-                                diag.detalhe = 'Texto curto com máscara forense';
-                                registrarEtapa('3. Heurística', 'máscara forense curta', 'semiflexivel', false);
+                                diag.detalhe = `Bloco de texto longo (${txt.length} chars)`;
+                                registrarEtapa('3. Heurística', `texto longo (${txt.length} chars)`, 'textual', false);
                             }
-                        } else if (txt.length > 100) {
-                            diag.tipo = 'textual';
-                            diag.origem = 'Heurística Browser';
-                            diag.rotuloDetalhe = 'Heurística';
-                            diag.detalhe = `Bloco de texto longo (${txt.length} chars)`;
-                            registrarEtapa('3. Heurística', `texto longo (${txt.length} chars)`, 'textual', false);
                         }
                     }
                 } catch (_) { }
@@ -548,11 +601,21 @@
 
             const regraDetalhe = this.obterDiagnosticoRegraDetalhado(base);
             if (regraDetalhe) {
-                const rebaixadoPorRegraInterna = (
+                const ehProtecaoSemTextoDiretoBasico = (
                     diag.tipo === 'interface' &&
-                    (diag.origem === 'Contêiner de Formulário' || diag.origem === 'Controle / Rótulo') &&
+                    diag.rotuloDetalhe === 'Sem Texto Direto' &&
                     regraDetalhe.origem === 'Regra Interna' &&
-                    regraDetalhe.tipo === 'textual'
+                    regraDetalhe.tipo === 'textual' &&
+                    !/pdf|cke_editable|textLayer|downloadBinario/i.test(String(regraDetalhe.regra || ''))
+                );
+                const rebaixadoPorRegraInterna = (
+                    (
+                        diag.tipo === 'interface' &&
+                        (diag.origem === 'Contêiner de Formulário' || diag.origem === 'Controle / Rótulo') &&
+                        regraDetalhe.origem === 'Regra Interna' &&
+                        regraDetalhe.tipo === 'textual'
+                    ) ||
+                    ehProtecaoSemTextoDiretoBasico
                 );
                 if (!rebaixadoPorRegraInterna) {
                     diag.tipo = regraDetalhe.tipo;
@@ -577,44 +640,180 @@
             return diag;
         }
 
-        ocultarInspetorTempoReal() {
-            if (this.#painelInspetorEl && this.#painelInspetorEl.parentNode) {
-                this.#painelInspetorEl.parentNode.removeChild(this.#painelInspetorEl);
+        #obterContextoRaizUi() {
+            const docLocal = typeof document !== 'undefined' ? document : null;
+            const winLocal = typeof window !== 'undefined' ? window : null;
+            let w = winLocal;
+            let ox = 0;
+            let oy = 0;
+            while (w && w !== w.top) {
+                try {
+                    const pDoc = w.parent && w.parent.document;
+                    const fe = w.frameElement;
+                    if (!pDoc || !pDoc.body || !fe) break;
+                    const r = fe.getBoundingClientRect();
+                    ox += r.left;
+                    oy += r.top;
+                    w = w.parent;
+                } catch (_) {
+                    break;
+                }
             }
-            this.#painelInspetorEl = null;
+            const docUi = (w && w.document && w.document.body) ? w.document : docLocal;
+            const winUi = w || winLocal;
+            return { docUi, winUi, offsetX: ox, offsetY: oy };
         }
 
-        notificarOutrosFramesOcultarInspetor() {
+        ocultarInspetorTempoReal(ignorarOrigemId = null) {
+            if (!ignorarOrigemId || !this.#painelInspetorEl || this.#painelInspetorEl.getAttribute('data-jusgov-origem-frame') !== ignorarOrigemId) {
+                try {
+                    if (this.#painelInspetorEl) {
+                        if (typeof this.#painelInspetorEl.hidePopover === 'function') {
+                            try { this.#painelInspetorEl.hidePopover(); } catch (_) { }
+                        }
+                        if (this.#painelInspetorEl.parentNode) {
+                            this.#painelInspetorEl.parentNode.removeChild(this.#painelInspetorEl);
+                        }
+                    }
+                } catch (_) { }
+                this.#painelInspetorEl = null;
+            }
+            const docsLimpar = [];
+            if (typeof document !== 'undefined') docsLimpar.push(document);
+            const { docUi } = this.#obterContextoRaizUi();
+            if (docUi && !docsLimpar.includes(docUi)) docsLimpar.push(docUi);
+            docsLimpar.forEach((docRef) => {
+                try {
+                    const orfaos = docRef.querySelectorAll('#jusgov-inspetor-tempo-real, [data-jusgov-inspetor="true"]');
+                    for (let i = 0; i < orfaos.length; i++) {
+                        if (ignorarOrigemId && orfaos[i].getAttribute && orfaos[i].getAttribute('data-jusgov-origem-frame') === ignorarOrigemId) {
+                            continue;
+                        }
+                        try {
+                            if (typeof orfaos[i].hidePopover === 'function') orfaos[i].hidePopover();
+                        } catch (_) { }
+                        try { orfaos[i].remove(); } catch (_) { }
+                    }
+                } catch (_) { }
+            });
+        }
+
+        notificarOutrosFramesOcultarInspetor(origemOverride = null) {
             try {
-                const payload = { __jusgovAcao: 'OCULTAR_INSPETOR_TEMPO_REAL', origemId: this.#idFrameInspetor };
+                const payload = {
+                    __jusgovAcao: 'OCULTAR_INSPETOR_TEMPO_REAL',
+                    origemId: origemOverride || this.#idFrameInspetor
+                };
+                if (typeof window === 'undefined') return;
                 if (window.top && window.top !== window) {
-                    window.top.postMessage(payload, '*');
-                } else if (window.frames && window.frames.length > 0) {
+                    try { window.top.postMessage(payload, '*'); } catch (_) { }
+                }
+                if (window.parent && window.parent !== window && window.parent !== window.top) {
+                    try { window.parent.postMessage(payload, '*'); } catch (_) { }
+                }
+                if (window.frames && window.frames.length > 0) {
                     for (let i = 0; i < window.frames.length; i++) {
-                        try { window.frames[i].postMessage(payload, '*'); } catch (_) { }
+                        try { window.frames[i].postMessage({ ...payload, __repassado: true }, '*'); } catch (_) { }
                     }
                 }
             } catch (_) { }
         }
 
+        #obterDominioCompletoUrl(baseEl, winUi) {
+            const extrairHostDeUrl = (urlBruta) => {
+                try {
+                    if (!urlBruta || typeof urlBruta !== 'string') return '';
+                    if (/^about:/i.test(urlBruta)) return '';
+                    const u = new URL(urlBruta);
+                    if (u.host) return u.host;
+                    if (u.protocol === 'file:') return 'file://';
+                } catch (_) { }
+                return '';
+            };
+            try {
+                const docAlvo = (baseEl && baseEl.ownerDocument) ? baseEl.ownerDocument : (typeof document !== 'undefined' ? document : null);
+                const winAlvo = (docAlvo && docAlvo.defaultView) ? docAlvo.defaultView : (typeof window !== 'undefined' ? window : null);
+                const candidatos = [];
+                if (winAlvo && winAlvo.location && winAlvo.location.href) candidatos.push(winAlvo.location.href);
+                if (winUi && winUi.location && winUi.location.href) candidatos.push(winUi.location.href);
+                if (docAlvo && docAlvo.referrer) candidatos.push(docAlvo.referrer);
+                if (typeof document !== 'undefined' && document.referrer) candidatos.push(document.referrer);
+                for (let i = 0; i < candidatos.length; i++) {
+                    const host = extrairHostDeUrl(candidatos[i]);
+                    if (host) return host;
+                }
+            } catch (_) { }
+            return '';
+        }
+
         atualizarInspetorTempoReal(x, y, alvo, ehCampoEditavelOverride = null) {
             if (typeof document === 'undefined' || !document.body) return;
             const base = (alvo && alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
-            if (!base || (base.closest && base.closest('[data-jusgov-ignore="true"]'))) return;
-            if (base.tagName === 'IFRAME' || base.tagName === 'FRAME') {
+            if (!base) {
+                this.ocultarInspetorTempoReal();
+                this.notificarOutrosFramesOcultarInspetor();
+                return;
+            }
+            if (base.closest && (base.closest('[data-jusgov-inspetor="true"]') || base.closest('#jusgov-inspetor-tempo-real'))) {
+                this.ocultarInspetorTempoReal();
+                this.notificarOutrosFramesOcultarInspetor();
+                return;
+            }
+            if (base.closest && base.closest('[data-jusgov-ignore="true"]')) {
                 this.ocultarInspetorTempoReal();
                 return;
             }
+            if (base.tagName === 'IFRAME' || base.tagName === 'FRAME' || base.tagName === 'EMBED' || base.tagName === 'OBJECT') {
+                this.ocultarInspetorTempoReal();
+                this.notificarOutrosFramesOcultarInspetor();
+                return;
+            }
+            this.#ultimoAlvoValidoInspecionado = base;
 
+            /* Fecha qualquer inspetor antigo local (inclusive órfãos) ou em outros frames antes de renderizar o novo */
+            this.ocultarInspetorTempoReal();
             this.notificarOutrosFramesOcultarInspetor();
 
-            if (!this.#painelInspetorEl) {
-                this.#painelInspetorEl = document.createElement('div');
-                this.#painelInspetorEl.id = 'jusgov-inspetor-tempo-real';
-                this.#painelInspetorEl.setAttribute('data-jusgov-ignore', 'true');
-                this.#painelInspetorEl.style.cssText = 'position: fixed; z-index: 2147483647; pointer-events: none; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border: 1px solid #38bdf8; border-radius: 8px; padding: 8px 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; line-height: 1.45; box-shadow: 0 10px 25px rgba(0,0,0,0.55); max-width: 420px; word-break: break-word;';
-                document.body.appendChild(this.#painelInspetorEl);
+            const ctxUi = this.#obterContextoRaizUi();
+            const docUi = ctxUi.docUi || document;
+            const winUi = ctxUi.winUi || window;
+
+            const painel = docUi.createElement('div');
+            painel.id = 'jusgov-inspetor-tempo-real';
+            painel.setAttribute('data-jusgov-ignore', 'true');
+            painel.setAttribute('data-jusgov-inspetor', 'true');
+            painel.setAttribute('data-jusgov-origem-frame', this.#idFrameInspetor);
+            if (typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype) {
+                painel.setAttribute('popover', 'manual');
             }
+            painel.style.cssText = 'position: fixed !important; left: -9999px; top: -9999px; inset: auto !important; right: auto !important; bottom: auto !important; margin: 0 !important; z-index: 2147483647 !important; isolation: isolate !important; pointer-events: auto !important; cursor: default !important; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border: 1px solid #38bdf8; border-radius: 8px; padding: 8px 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; line-height: 1.45; box-shadow: 0 10px 25px rgba(0,0,0,0.55); max-width: 420px; word-break: break-word;';
+
+            const fecharAoPassarMouse = (ev) => {
+                if (ev && ev.isTrusted && ev.type !== 'mousedown' && ev.ctrlKey && ev.altKey && ev.shiftKey) {
+                    return;
+                }
+                try {
+                    if (typeof painel.hidePopover === 'function') painel.hidePopover();
+                } catch (_) { }
+                try {
+                    if (painel && painel.parentNode) painel.parentNode.removeChild(painel);
+                } catch (_) { }
+                this.ocultarInspetorTempoReal();
+                this.notificarOutrosFramesOcultarInspetor();
+            };
+            painel.addEventListener('mouseenter', fecharAoPassarMouse);
+            painel.addEventListener('mousemove', fecharAoPassarMouse);
+            painel.addEventListener('mousedown', fecharAoPassarMouse);
+            docUi.body.appendChild(painel);
+            if (typeof painel.showPopover === 'function') {
+                try {
+                    if (painel.matches && painel.matches(':popover-open')) {
+                        painel.hidePopover();
+                    }
+                    painel.showPopover();
+                } catch (_) { }
+            }
+            this.#painelInspetorEl = painel;
 
             const fnCampo = typeof ehCampoEditavelOverride === 'function' ? ehCampoEditavelOverride : this.#ehCampoEditavelFn;
             const ehCampoEditavel = Boolean(fnCampo(base));
@@ -639,33 +838,33 @@
                 : '';
 
             this.#painelInspetorEl.replaceChildren();
-            const l1 = document.createElement('div');
+            const l1 = docUi.createElement('div');
             l1.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 4px;';
-            const badgeTipo = document.createElement('span');
+            const badgeTipo = docUi.createElement('span');
             badgeTipo.style.cssText = `font-weight: 700; color: ${ehCampoEditavel ? '#c084fc' : infoTipo.cor};`;
             badgeTipo.textContent = ehCampoEditavel ? '● Campo Editável (Regra de Ouro)' : `● ${infoTipo.nome}`;
-            const badgeOrigem = document.createElement('span');
+            const badgeOrigem = docUi.createElement('span');
             badgeOrigem.style.cssText = 'font-size: 10px; color: #94a3b8; background: #1e293b; padding: 1px 6px; border-radius: 4px;';
             badgeOrigem.textContent = ehCampoEditavel ? 'Edição Nativa' : diag.origem;
             l1.append(badgeTipo, badgeOrigem);
 
-            const l2 = document.createElement('div');
+            const l2 = docUi.createElement('div');
             l2.style.cssText = 'font-family: monospace; font-size: 10px; color: #cbd5e1; margin-bottom: 3px;';
             l2.textContent = `Elemento: <${tag}${idStr}${nameStr}${typeStr}${roleStr}${clsStr}>`;
             this.#painelInspetorEl.append(l1, l2);
 
             if (ehCampoEditavel) {
-                const l3 = document.createElement('div');
+                const l3 = docUi.createElement('div');
                 l3.style.cssText = 'font-family: monospace; font-size: 10px; font-weight: 700; color: #c084fc;';
                 l3.textContent = 'Comportamento: Edição livre (nunca intercepta clique/seleção)';
                 this.#painelInspetorEl.appendChild(l3);
             }
 
             if (Array.isArray(diag.trilha) && diag.trilha.length > 0) {
-                const boxTrilha = document.createElement('div');
+                const boxTrilha = docUi.createElement('div');
                 boxTrilha.style.cssText = 'font-family: monospace; font-size: 9.5px; margin-top: 5px; border-top: 1px dashed #334155; padding-top: 4px; display: flex; flex-direction: column; gap: 2px;';
                 diag.trilha.forEach((etapa) => {
-                    const linhaT = document.createElement('div');
+                    const linhaT = docUi.createElement('div');
                     const corEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].cor : '#94a3b8';
                     const nomeEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].nome : etapa.tipo;
                     const tagParada = etapa.parou ? ' [PAROU]' : (etapa.passo.startsWith('4.') ? ' [continua]' : '');
@@ -682,7 +881,7 @@
                     boxTrilha.appendChild(linhaT);
 
                     if (etapa.observacao) {
-                        const linhaObs = document.createElement('div');
+                        const linhaObs = docUi.createElement('div');
                         linhaObs.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; color: #fbbf24; font-style: italic; padding-left: 14px; margin-bottom: 2px;';
                         linhaObs.textContent = `Obs: ${etapa.observacao}`;
                         boxTrilha.appendChild(linhaObs);
@@ -691,23 +890,38 @@
                 this.#painelInspetorEl.appendChild(boxTrilha);
             }
 
+            const dominioCompleto = this.#obterDominioCompletoUrl(base, winUi);
+            if (dominioCompleto) {
+                const barraStatus = docUi.createElement('div');
+                barraStatus.style.cssText = 'font-family: monospace; font-size: 9.5px; color: #94a3b8; margin-top: 5px; border-top: 1px solid #334155; padding-top: 3px; display: flex; align-items: center; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+                const spanDom = docUi.createElement('span');
+                spanDom.style.cssText = 'color: #7dd3fc; overflow: hidden; text-overflow: ellipsis;';
+                spanDom.textContent = `🌐 ${dominioCompleto}`;
+                barraStatus.appendChild(spanDom);
+                this.#painelInspetorEl.appendChild(barraStatus);
+            }
+
             const rectPainel = this.#painelInspetorEl.getBoundingClientRect();
             const larguraPainel = rectPainel.width || 420;
             const alturaPainel = rectPainel.height || 200;
             const margemTela = 8;
             const deslocamentoCursor = 16;
+            const vwUi = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 320);
+            const vhUi = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 240);
+            const xTela = x + ctxUi.offsetX;
+            const yTela = y + ctxUi.offsetY;
 
-            let left = x + deslocamentoCursor;
-            if (left + larguraPainel > window.innerWidth - margemTela) {
-                left = x - larguraPainel - deslocamentoCursor;
+            let left = xTela + deslocamentoCursor;
+            if (left + larguraPainel > vwUi - margemTela) {
+                left = xTela - larguraPainel - deslocamentoCursor;
             }
-            left = Math.max(margemTela, Math.min(left, window.innerWidth - larguraPainel - margemTela));
+            left = Math.max(margemTela, Math.min(left, vwUi - larguraPainel - margemTela));
 
-            let top = y + deslocamentoCursor;
-            if (top + alturaPainel > window.innerHeight - margemTela) {
-                top = y - alturaPainel - deslocamentoCursor;
+            let top = yTela + deslocamentoCursor;
+            if (top + alturaPainel > vhUi - margemTela) {
+                top = yTela - alturaPainel - deslocamentoCursor;
             }
-            top = Math.max(margemTela, Math.min(top, window.innerHeight - alturaPainel - margemTela));
+            top = Math.max(margemTela, Math.min(top, vhUi - alturaPainel - margemTela));
 
             this.#painelInspetorEl.style.left = `${Math.round(left)}px`;
             this.#painelInspetorEl.style.top = `${Math.round(top)}px`;

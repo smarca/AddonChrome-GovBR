@@ -1,6 +1,6 @@
 /* ==========================================================================
- * Nome do arquivo: background.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * ARQUIVO: src/cfg/background.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
@@ -49,6 +49,7 @@
         '../lib/lib-geradores.js',
         '../lib/lib-urls.js',
         '../lib/lib-injecao.js',
+        '../lib/lib-ui-tela.js',
         '../lib/lib-config.js',
         '../mod-navegador/navegador-janela-unica.js',
         '../mod-navegador/navegador-anti-duplicacao.js',
@@ -56,7 +57,9 @@
         '../mod-navegador/navegador-descarte.js',
         '../mod-navegador/mod-navegador.js',
         '../mod-manut/mod-manut.js',
-        '../mod-produt/mod-produt.js'
+        '../mod-produt/lib-produt-bem-estar.js',
+        '../mod-produt/mod-produt.js',
+        '../mod-automate/mod-automate.js'
     ];
     for (let i = 0; i < caminhosScripts.length; i++) {
         try { importScripts(caminhosScripts[i]); } catch (_) { }
@@ -78,6 +81,7 @@ const instanciaVerificadores = instanciarModulo('JusGovVerificadores', undefined
 const instanciaGeradores = instanciarModulo('JusGovGeradores', undefined, 'JusGovInstanciaGeradores');
 const instanciaUrls = instanciarModulo('JusGovUrls', undefined, 'JusGovInstanciaUrls');
 const instanciaInjecao = instanciarModulo('JusGovInjecaoScripts', { urls: instanciaUrls }, 'JusGovInstanciaInjecao');
+const instanciaUiTela = instanciarModulo('JusGovLibUiTela', undefined, 'JusGovInstanciaUiTela');
 const instanciaModuloNavegador = instanciarModulo('JusGovModuloNavegador', undefined, 'JusGovInstanciaNavegador');
 
 const obterConfiguracoesGerais = async () => (
@@ -93,6 +97,11 @@ const instanciaModuloProdutividade = instanciarModulo(
     'JusGovModuloProdutividade',
     { obterConfiguracoes: () => obterConfiguracoesGerais() },
     'JusGovInstanciaProdutividade'
+);
+const instanciaModuloAutomate = instanciarModulo(
+    'JusGovModuloAutomate',
+    { ativo: false },
+    'JusGovInstanciaAutomate'
 );
 const instanciaConfig = instanciarModulo(
     'JusGovConfiguracoes',
@@ -139,9 +148,41 @@ const ARQUIVOS_JSON_ESTATICOS_PERMITIDOS = Object.freeze({
     'perfis.json': 'src/cfg/perfis.json',
     'interface.json': 'src/cfg/interface.json',
     'dados-forenses.json': 'src/cfg/dados-forenses.json',
-    'regras-sistema.json': 'src/cfg/regras-sistema.json'
+    'regras-sistema.json': 'src/cfg/regras-sistema.json',
+    'automate-dados.json': 'src/mod-automate/automate-dados.json'
+});
+const ARQUIVOS_CSS_ANTI_AMPULHETA_PERMITIDOS = Object.freeze({
+    'pje-anti-ampulheta.css': 'src/mod-anti-ampulheta/pje-anti-ampulheta.css',
+    'eproc-anti-ampulheta.css': 'src/mod-anti-ampulheta/eproc-anti-ampulheta.css',
+    'seeu-projudi-anti-ampulheta.css': 'src/mod-anti-ampulheta/seeu-projudi-anti-ampulheta.css',
+    'saj-anti-ampulheta.css': 'src/mod-anti-ampulheta/saj-anti-ampulheta.css',
+    'pdpj-stf-stj-anti-ampulheta.css': 'src/mod-anti-ampulheta/pdpj-stf-stj-anti-ampulheta.css',
+    'creta-anti-ampulheta.css': 'src/mod-anti-ampulheta/creta-anti-ampulheta.css',
+    'generico-anti-ampulheta.css': 'src/mod-anti-ampulheta/generico-anti-ampulheta.css'
 });
 const cacheJsonEstaticoSw = new Map();
+const cacheCssEstaticoSw = new Map();
+
+async function obterCssAntiAmpulhetaDoPacote(nomeArquivo) {
+    const caminhoRel = ARQUIVOS_CSS_ANTI_AMPULHETA_PERMITIDOS[String(nomeArquivo || '')];
+    if (!caminhoRel) return null;
+    if (cacheCssEstaticoSw.has(caminhoRel)) {
+        return cacheCssEstaticoSw.get(caminhoRel);
+    }
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
+        try {
+            const resp = await fetch(chrome.runtime.getURL(caminhoRel));
+            if (resp && resp.ok) {
+                const txt = await resp.text();
+                cacheCssEstaticoSw.set(caminhoRel, txt);
+                return txt;
+            }
+        } catch (err) {
+            registrarErroSw('obterCssAntiAmpulhetaDoPacote', err);
+        }
+    }
+    return null;
+}
 
 function registrarErroSw(origem, erro) {
     if (typeof self !== 'undefined' && self.__JUSGOV_DEBUG_SW__ === true && typeof console !== 'undefined' && console.warn) {
@@ -230,7 +271,69 @@ async function sincronizarAoSairNavegador() {
 // =====================================================================
 // SECAO 4: CICLO DE VIDA DO SERVICE WORKER E LISTENERS NATIVOS
 // =====================================================================
-chrome.runtime.onInstalled.addListener(async () => {
+let promessaRecargaLimpaSw = null;
+let recargaLimpaSwConcluida = false;
+
+async function executarRecargaLimpaExtensao(motivo = 'boot') {
+    if (recargaLimpaSwConcluida) return;
+    if (promessaRecargaLimpaSw) return promessaRecargaLimpaSw;
+    promessaRecargaLimpaSw = (async () => {
+        try {
+            const versaoAtual = (chrome.runtime && typeof chrome.runtime.getManifest === 'function')
+                ? String((chrome.runtime.getManifest() || {}).version || '')
+                : '';
+            if (instanciaInjecao && typeof instanciaInjecao.limparUisOrfasEmAbasAbertas === 'function') {
+                await instanciaInjecao.limparUisOrfasEmAbasAbertas(chrome).catch(() => { });
+            }
+            if (chrome.storage && chrome.storage.session && typeof chrome.storage.session.set === 'function') {
+                await chrome.storage.session.set({
+                    jusgovSwBootToken: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    jusgovSwMotivoBoot: String(motivo || 'boot')
+                }).catch(() => { });
+            }
+            if (versaoAtual && chrome.storage && chrome.storage.local) {
+                await chrome.storage.local.set({ jusgovUltimaVersaoExecutada: versaoAtual }).catch(() => { });
+            }
+            recargaLimpaSwConcluida = true;
+        } catch (err) {
+            registrarErroSw(`executarRecargaLimpaExtensao:${motivo}`, err);
+        } finally {
+            promessaRecargaLimpaSw = null;
+        }
+    })();
+    return promessaRecargaLimpaSw;
+}
+
+async function verificarBootFrioOuMudancaVersaoSw() {
+    if (recargaLimpaSwConcluida || promessaRecargaLimpaSw) return;
+    try {
+        const versaoAtual = (chrome.runtime && typeof chrome.runtime.getManifest === 'function')
+            ? String((chrome.runtime.getManifest() || {}).version || '')
+            : '';
+        let precisaLimpar = false;
+        if (chrome.storage && chrome.storage.session && typeof chrome.storage.session.get === 'function') {
+            const ses = await chrome.storage.session.get(['jusgovSwBootToken']).catch(() => ({}));
+            if (!ses || !ses.jusgovSwBootToken) {
+                precisaLimpar = true;
+            }
+        }
+        if (!precisaLimpar && versaoAtual && chrome.storage && chrome.storage.local) {
+            const loc = await chrome.storage.local.get(['jusgovUltimaVersaoExecutada']).catch(() => ({}));
+            if (!loc || loc.jusgovUltimaVersaoExecutada !== versaoAtual) {
+                precisaLimpar = true;
+            }
+        }
+        if (recargaLimpaSwConcluida || promessaRecargaLimpaSw) return;
+        if (precisaLimpar) {
+            await executarRecargaLimpaExtensao('boot_frio_ou_versao');
+            await sincronizarEstado();
+        } else {
+            recargaLimpaSwConcluida = true;
+        }
+    } catch (_) { }
+}
+
+chrome.runtime.onInstalled.addListener(async (detalhes) => {
     try {
         if (chrome.storage && chrome.storage.local) {
             await chrome.storage.local.set({ jusgovSessaoEntradaTs: Date.now() });
@@ -239,6 +342,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     if (instanciaModuloProdutividade && typeof instanciaModuloProdutividade.recuperarResumoProdutividadeNuvemAoAbrir === 'function') {
         try { await instanciaModuloProdutividade.recuperarResumoProdutividadeNuvemAoAbrir(chrome); } catch (_) { }
     }
+    await executarRecargaLimpaExtensao(`onInstalled:${(detalhes && detalhes.reason) || 'reload'}`);
     await sincronizarEstado();
     if (instanciaModuloNavegador) {
         try { await instanciaModuloNavegador.inicializarSessaoAbas(chrome); } catch (_) { }
@@ -249,6 +353,19 @@ chrome.runtime.onInstalled.addListener(async () => {
     if (instanciaConfig) {
         await instanciaConfig.sincronizarMenusContexto(chrome);
     }
+    try {
+        if (detalhes && detalhes.reason === 'install' && chrome.tabs && typeof chrome.tabs.create === 'function') {
+            const locOnb = (chrome.storage && chrome.storage.local)
+                ? await chrome.storage.local.get(['jusgovOnboardingConcluido']).catch(() => ({}))
+                : {};
+            if (!locOnb || !locOnb.jusgovOnboardingConcluido) {
+                chrome.tabs.create({
+                    url: chrome.runtime.getURL('src/cfg/onboarding.html'),
+                    active: true
+                }).catch(() => { });
+            }
+        }
+    } catch (_) { }
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -260,6 +377,7 @@ chrome.runtime.onStartup.addListener(async () => {
     if (instanciaModuloProdutividade && typeof instanciaModuloProdutividade.recuperarResumoProdutividadeNuvemAoAbrir === 'function') {
         try { await instanciaModuloProdutividade.recuperarResumoProdutividadeNuvemAoAbrir(chrome); } catch (_) { }
     }
+    await executarRecargaLimpaExtensao('onStartup');
     await sincronizarEstado();
     if (instanciaModuloNavegador) {
         try { await instanciaModuloNavegador.inicializarSessaoAbas(chrome); } catch (_) { }
@@ -327,8 +445,13 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             (async () => {
                 if (changes.pomodoroEstiloMinipopup) {
                     const estNovo = changes.pomodoroEstiloMinipopup.newValue;
+                    const ehMicro = (estNovo === 'micro');
                     const nivel = (estNovo === 'normal') ? 1 : ((estNovo === 'expandido') ? 2 : 0);
-                    await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({ nivelDetalhe: nivel });
+                    await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({
+                        minimizadoMicro: ehMicro,
+                        ...(ehMicro ? {} : { minimizadoDescansoAdiadoTs: 0 }),
+                        nivelDetalhe: nivel
+                    });
                 }
                 const cfg = await obterConfiguracoesGerais();
                 if (!cfg || !cfg.pomodoroAtivo) {
@@ -361,11 +484,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const acao = msg.acao;
     const depsConfig = { urls: instanciaUrls, injecao: instanciaInjecao, navegador: instanciaModuloNavegador };
 
-    if (acao === 'OBTER_JSON_ESTATICO') {
+    if (acao === 'OBTER_JSON_ESTATICO' || acao === 'OBTER_ARQUIVO_JSON_ESTATICO') {
         obterJsonEstaticoDoPacote(msg.arquivo)
-            .then((dados) => sendResponse({ ok: Boolean(dados), dados }))
-            .catch(() => sendResponse({ ok: false, dados: null }));
+            .then((dados) => sendResponse({ ok: Boolean(dados), sucesso: Boolean(dados), dados }))
+            .catch(() => sendResponse({ ok: false, sucesso: false, dados: null }));
         return true;
+    }
+
+    if (acao === 'OBTER_CSS_ANTI_AMPULHETA') {
+        obterCssAntiAmpulhetaDoPacote(msg.arquivo)
+            .then((css) => sendResponse({ ok: typeof css === 'string', css: css || '' }))
+            .catch(() => sendResponse({ ok: false, css: '' }));
+        return true;
+    }
+
+    if (acao === 'AUTOMATE_GARANTIR_INJECAO_ABA') {
+        (async () => {
+            let tabId = Number(msg.tabId);
+            if (!tabId && chrome.tabs && chrome.tabs.query) {
+                const abas = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+                if (abas && abas[0] && abas[0].id) tabId = abas[0].id;
+            }
+            if (!tabId) return { ok: false, motivo: 'ABA_INDISPONIVEL' };
+            if (instanciaInjecao && typeof instanciaInjecao.garantirModuloAutomateNaAba === 'function') {
+                await instanciaInjecao.garantirModuloAutomateNaAba(tabId, chrome);
+            }
+            if (msg.ativo !== undefined && chrome.tabs && chrome.tabs.sendMessage) {
+                await chrome.tabs.sendMessage(tabId, {
+                    acao: 'atualizarEstadoModulo',
+                    automatePjeAtivo: Boolean(msg.ativo),
+                    restaurarBarra: msg.restaurarBarra !== false,
+                    expandirBarra: Boolean(msg.expandirBarra)
+                }).catch(() => { });
+            }
+            return { ok: true, tabId };
+        })().then((r) => sendResponse(r)).catch(() => sendResponse({ ok: false }));
+        return true;
+    }
+
+    if (acao.startsWith('AUTOMATE_') && instanciaModuloAutomate && typeof instanciaModuloAutomate.tratarMensagemRuntime === 'function') {
+        return instanciaModuloAutomate.tratarMensagemRuntime(msg, sender, sendResponse);
     }
 
     if (acao === 'forcarSincronizacaoNuvem' || acao === 'AGENDAR_SYNC_NUVEM_DIFERIDO') {
@@ -412,7 +570,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         acao === 'SALVAR_POSICAO_BARRA_POMODORO' || acao === 'ATUALIZAR_ESTADO_BARRA_POMODORO' ||
         acao === 'FECHAR_MODAL_PRODUTIVIDADE_GLOBAL' || acao === 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO' ||
         acao === 'CONFIRMAR_DESCANSO_INICIADO_POMODORO' || acao === 'SINCRONIZAR_DESCANSO_CONCLUIDO_POMODORO' ||
-        acao === 'SINCRONIZAR_GUIA_ATIVA_POMODORO') {
+        acao === 'SINCRONIZAR_GUIA_ATIVA_POMODORO' || acao === 'PULAR_DESCANSO_INICIAR_FOCO_POMODORO' ||
+        acao === 'RETOMAR_DESCANSO_PULADO_POMODORO' || acao === 'PAUSAR_OU_ADIANTAR_POMODORO') {
         if (!instanciaModuloProdutividade) { sendResponse({ ok: false }); return false; }
         let op;
         const montarPayloadStatusTrabalho = async (senderMsg, executarReconciliacao = true) => {
@@ -479,11 +638,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 const chaveFase = (msg && typeof msg.faseChave === 'string' && msg.faseChave)
                     ? msg.faseChave
                     : `${res.fase}:${res.cicloAtual}:${res.faseInicioTs}`;
-                if (st.pomodoroModalDescansoChave || acao === 'CONFIRMAR_DESCANSO_INICIADO_POMODORO') {
-                    st.pomodoroModalExibidoChave = chaveFase;
-                    st.pomodoroModalDescansoChave = '';
-                    await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
-                }
+                st.pomodoroModalExibidoChave = chaveFase;
+                st.pomodoroModalDescansoChave = '';
+                st.pomodoroModalFechadoNestaPausa = true;
+                await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
                 await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
                 await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st);
                 return { ok: true };
@@ -500,9 +658,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                     st.pomodoroDescansoRealizadoNoCiclo = true;
                     st.pomodoroDescansoPendente = false;
                     st.pomodoroUltimoDescansoTipo = st.pomodoroFase;
+                    const progConcl = instanciaModuloProdutividade.calcularProgressoDescanso(st, agoraConcl, cfg, { mutar: false });
+                    const acumConclMs = Math.max(
+                        Number(progConcl && progConcl.acumuladoMs || 0),
+                        Number(st.pomodoroDescansoAcumuladoMs || 0),
+                        Number(st.pomodoroMinutosNaFase || 0) * 60000
+                    );
+                    if (acumConclMs > 0) {
+                        st.pomodoroDescansoAcumuladoMs = acumConclMs;
+                        st.pomodoroDescansoSyncTs = agoraConcl;
+                    }
                     st.pomodoroUltimoDescansoFimTs = Number(st.pomodoroUltimoDescansoFimTs || agoraConcl);
+                    st.pomodoroUltimoDescansoDuracaoMin = instanciaModuloProdutividade.arredondarMinutosDescansoExato(
+                        acumConclMs || ((st.pomodoroFase === 'pausa_maior' ? 40 : 10) * 60000)
+                    );
                     st.pomodoroModalExibidoChave = String((msg && msg.faseChave) || st.pomodoroModalExibidoChave || '');
                     st.pomodoroModalDescansoChave = '';
+                    st.pomodoroModalFechadoNestaPausa = true;
                     await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
                 }
                 await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
@@ -548,11 +720,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } else if (acao === 'FECHAR_BARRA_POMODORO_GLOBAL') {
             op = (async () => {
                 const st = await instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje();
-                st.pomodoroBarraOcultadaChave = String(msg.faseChave || '');
+                st.pomodoroBarraOcultadaChave = '';
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({ minimizadoMicro: true });
                 const cfg = await obterConfiguracoesGerais();
                 await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st, 'todas');
-                return { ok: true };
+                return { ok: true, minimizadoMicro: true };
             })();
         } else if (acao === 'DISPENSAR_POMODORO_DESCANSO_CICLO') {
             op = (async () => {
@@ -560,6 +733,59 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 st.pomodoroPularProximoPopupFoco = true;
                 await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
                 return { ok: true };
+            })();
+        } else if (acao === 'PULAR_DESCANSO_INICIAR_FOCO_POMODORO') {
+            op = (async () => {
+                const [st, cfg] = await Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]);
+                const agoraPular = Date.now();
+                instanciaModuloProdutividade.pularDescansoEIniciarFoco(st, agoraPular, cfg);
+                await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                if (msg && msg.minimizarMicro) {
+                    await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({
+                        minimizadoMicro: true,
+                        minimizadoDescansoAdiadoTs: Number(msg.minimizadoDescansoAdiadoTs || agoraPular)
+                    });
+                }
+                await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st, 'todas');
+                return await montarPayloadStatusTrabalho(sender, false);
+            })();
+        } else if (acao === 'RETOMAR_DESCANSO_PULADO_POMODORO') {
+            op = (async () => {
+                const [st, cfg] = await Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]);
+                const resFlex = instanciaModuloProdutividade.retomarDescansoFlexivel(st, Date.now(), cfg);
+                if (!resFlex || !resFlex.ok) {
+                    return { ok: false, motivo: (resFlex && resFlex.motivo) || 'Não foi possível retomar o descanso agora.', governanca: resFlex && resFlex.governanca };
+                }
+                await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro({
+                    minimizadoMicro: false,
+                    minimizadoDescansoAdiadoTs: 0
+                });
+                await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st, 'todas');
+                return await montarPayloadStatusTrabalho(sender, false);
+            })();
+        } else if (acao === 'PAUSAR_OU_ADIANTAR_POMODORO') {
+            op = (async () => {
+                const [st, cfg] = await Promise.all([
+                    instanciaModuloProdutividade.obterOuIniciarEstadoTrabalhoHoje(),
+                    obterConfiguracoesGerais()
+                ]);
+                const resFlex = instanciaModuloProdutividade.alternarPausaOuAdiantarDescanso(st, Date.now(), cfg, { manual: true });
+                if (!resFlex || !resFlex.ok) {
+                    return { ok: false, motivo: (resFlex && resFlex.motivo) || 'Limite diário de pausas atingido.', governanca: resFlex && resFlex.governanca };
+                }
+                await chrome.storage.local.set({ jusgovTrabalhoEstado: st });
+                await instanciaModuloProdutividade.fecharModalProdutividadeEmTodasJanelas();
+                await instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg, st, 'todas');
+                return await montarPayloadStatusTrabalho(sender, false);
             })();
         } else if (acao === 'ALTERNAR_EXIBICAO_BARRA_ATIVO_POMODORO') {
             op = (async () => {
@@ -587,8 +813,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } else {
             op = (async () => {
                 const novoEstado = await instanciaModuloProdutividade.atualizarEstadoGlobalBarraPomodoro(msg);
-                if (msg && (msg.nivelDetalhe === 0 || msg.nivelDetalhe === 1 || msg.nivelDetalhe === 2) && instanciaConfig && typeof instanciaConfig.aplicarConfigLocalEAgendarSync === 'function') {
-                    const estiloNovo = (novoEstado.nivelDetalhe === 1) ? 'normal' : ((novoEstado.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                if (msg && (msg.minimizadoMicro !== undefined || msg.nivelDetalhe === 0 || msg.nivelDetalhe === 1 || msg.nivelDetalhe === 2) && instanciaConfig && typeof instanciaConfig.aplicarConfigLocalEAgendarSync === 'function') {
+                    const estiloNovo = novoEstado.minimizadoMicro
+                        ? 'micro'
+                        : ((novoEstado.nivelDetalhe === 1) ? 'normal' : ((novoEstado.nivelDetalhe === 2) ? 'expandido' : 'compacto'));
                     const cfgAtualEst = await obterConfiguracoesGerais();
                     if (cfgAtualEst && cfgAtualEst.pomodoroEstiloMinipopup !== estiloNovo) {
                         await instanciaConfig.aplicarConfigLocalEAgendarSync({ pomodoroEstiloMinipopup: estiloNovo }, chrome, {
@@ -618,11 +846,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tabId = sender && sender.tab ? sender.tab.id : null;
         if (tabId && instanciaInjecao) {
             obterConfiguracoesGerais().then((cfg) => {
-                if (cfg && cfg.modoTurbo !== 'desligado') instanciaInjecao.agendarInjecaoSeguraNaAba(tabId, null, chrome);
+                if (cfg && cfg.modoTurbo !== 'desligado') instanciaInjecao.agendarInjecaoSeguraNaAba(tabId, null, chrome, 'subframes');
             }).catch(() => { });
         }
         sendResponse({ ok: true });
         return false;
+    }
+
+    if (acao === 'EXIBIR_MENSAGEM_NA_TELA') {
+        (async () => {
+            try {
+                const tabId = (sender && sender.tab && typeof sender.tab.id === 'number') ? sender.tab.id : null;
+                if (tabId !== null && instanciaUiTela && typeof instanciaUiTela.exibirNaAba === 'function') {
+                    const ok = await instanciaUiTela.exibirNaAba(tabId, msg.payload || msg);
+                    sendResponse({ ok: Boolean(ok) });
+                    return;
+                }
+            } catch (_) { }
+            sendResponse({ ok: false });
+        })();
+        return true;
+    }
+
+    if (acao === 'OCULTAR_MENSAGEM_NA_TELA') {
+        (async () => {
+            try {
+                const tabId = (sender && sender.tab && typeof sender.tab.id === 'number') ? sender.tab.id : null;
+                if (tabId !== null && instanciaUiTela && typeof instanciaUiTela.ocultarNaAba === 'function') {
+                    const ok = await instanciaUiTela.ocultarNaAba(tabId, msg.idHost || null);
+                    sendResponse({ ok: Boolean(ok) });
+                    return;
+                }
+            } catch (_) { }
+            sendResponse({ ok: false });
+        })();
+        return true;
     }
 
     if (acao === 'broadcastDeselecionarGeral') {
@@ -847,10 +1105,15 @@ if (chrome.tabs && chrome.tabs.onActivated) {
                 return null;
             }).catch(() => { });
         }
-        if (instanciaModuloManutencao && activeInfo && activeInfo.tabId && chrome.tabs.get) {
+        if (activeInfo && activeInfo.tabId && chrome.tabs.get) {
             chrome.tabs.get(activeInfo.tabId, (tab) => {
                 if (chrome.runtime && chrome.runtime.lastError) return;
-                if (tab && tab.url) instanciaModuloManutencao.registrarAcessoUrl(tab.url).catch(() => { });
+                if (tab && (tab.url === 'about:blank' || !tab.url) && instanciaInjecao) {
+                    instanciaInjecao.agendarInjecaoSeguraNaAba(activeInfo.tabId, null, chrome);
+                }
+                if (instanciaModuloManutencao && tab && tab.url) {
+                    instanciaModuloManutencao.registrarAcessoUrl(tab.url).catch(() => { });
+                }
             });
         }
     });
@@ -907,19 +1170,20 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation) {
         }
     }
 
-    const garantirInjecaoEmFrameNavegado = async (details) => {
+    const garantirInjecaoEmFrameNavegado = (fase) => async (details) => {
         try {
             if (!details || !details.tabId || !instanciaInjecao) return;
             if (details.url && (/^(?:chrome|edge|devtools|view-source|chrome-extension):/i.test(details.url) || (/^about:/i.test(details.url) && details.url !== 'about:blank'))) return;
             const config = await obterConfiguracoesGerais();
             if (config.modoTurbo !== 'desligado') {
                 const frameIds = (typeof details.frameId === 'number' && details.frameId > 0) ? [details.frameId] : null;
-                instanciaInjecao.agendarInjecaoSeguraNaAba(details.tabId, frameIds, chrome);
+                instanciaInjecao.agendarInjecaoSeguraNaAba(details.tabId, frameIds, chrome, fase);
             }
         } catch (_) { }
     };
-    if (chrome.webNavigation.onCommitted) chrome.webNavigation.onCommitted.addListener(garantirInjecaoEmFrameNavegado);
-    if (chrome.webNavigation.onCompleted) chrome.webNavigation.onCompleted.addListener(garantirInjecaoEmFrameNavegado);
+    if (chrome.webNavigation.onCommitted) chrome.webNavigation.onCommitted.addListener(garantirInjecaoEmFrameNavegado('committed'));
+    if (chrome.webNavigation.onDOMContentLoaded) chrome.webNavigation.onDOMContentLoaded.addListener(garantirInjecaoEmFrameNavegado('dom'));
+    if (chrome.webNavigation.onCompleted) chrome.webNavigation.onCompleted.addListener(garantirInjecaoEmFrameNavegado('completed'));
 }
 
 if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged) {
@@ -963,3 +1227,5 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
         registrarErroSw('setupAlarms', err);
     }
 }
+
+verificarBootFrioOuMudancaVersaoSw().catch(() => { });

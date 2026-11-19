@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: lib-verificadores.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca Matemática de Verificação de Documentos e Datas
+ * ARQUIVO: src/lib/lib-verificadores.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca Matemática de Verificação de Documentos e Datas
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-verificadores.js

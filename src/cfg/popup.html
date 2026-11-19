@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <!-- ==========================================================================
- * Nome do arquivo: popup.html
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * ARQUIVO: src/cfg/popup.html
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
@@ -16,333 +16,7 @@
  * ========================================================================== -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JusGovBR - Painel de Controle Rápido</title>
-    <style>
-        :root {
-            --azul-primario: #1a73e8;
-            --azul-escuro: #1557b0;
-            --azul-claro: #eff6ff;
-            --fundo-pagina: #f8fafc;
-            --fundo-cartao: #ffffff;
-            --texto-forte: #0f172a;
-            --texto-medio: #475569;
-            --texto-suave: #64748b;
-            --borda-padrao: #e2e8f0;
-            --verde-ativo: #10b981;
-            --amarelo-aviso: #f59e0b;
-            --vermelho-perigo: #ef4444;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            width: 350px;
-            font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-            background-color: var(--fundo-pagina);
-            color: var(--texto-forte);
-            user-select: none;
-            overflow-x: hidden;
-        }
-
-        header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
-            color: #ffffff;
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
-        }
-
-        .marca-grupo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo-container {
-            width: 36px;
-            height: 36px;
-            flex-shrink: 0;
-        }
-
-        .titulo-cabecalho h1 {
-            font-size: 15px;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            line-height: 1.2;
-        }
-
-        .titulo-cabecalho p {
-            font-size: 11px;
-            color: #bfdbfe;
-            margin-top: 2px;
-        }
-
-        .badge-status {
-            font-size: 10.5px;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 999px;
-            background: rgba(16, 185, 129, 0.25);
-            border: 1px solid #34d399;
-            color: #ecfdf5;
-            text-align: center;
-        }
-
-        .badge-status.lista {
-            background: rgba(26, 115, 232, 0.28);
-            border-color: #60a5fa;
-            color: #dbeafe;
-        }
-
-        .badge-status.inativo {
-            background: rgba(239, 68, 68, 0.25);
-            border-color: #f87171;
-            color: #fef2f2;
-        }
-
-        main {
-            padding: 12px 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .cartao {
-            background: var(--fundo-cartao);
-            border: 1px solid var(--borda-padrao);
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        }
-
-        .cartao-titulo {
-            font-size: 10.5px;
-            font-weight: 600;
-            color: var(--texto-suave);
-            margin-bottom: 9px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .grade-modos {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 6px;
-        }
-
-        .btn-modo {
-            background: var(--fundo-pagina);
-            border: 1px solid var(--borda-padrao);
-            color: var(--texto-medio);
-            padding: 8px 6px;
-            border-radius: 6px;
-            font-size: 11.5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            text-align: center;
-            white-space: nowrap;
-        }
-
-        .btn-modo:hover {
-            background: #f1f5f9;
-            border-color: #cbd5e1;
-            color: var(--texto-forte);
-        }
-
-        .btn-modo.ativo {
-            background: #ecfdf5;
-            border-color: var(--verde-ativo);
-            color: #065f46;
-            box-shadow: inset 0 0 0 1px var(--verde-ativo);
-        }
-
-        .btn-modo.modo-url.ativo {
-            background: var(--azul-claro);
-            border-color: var(--azul-primario);
-            color: var(--azul-primario);
-            box-shadow: inset 0 0 0 1px var(--azul-primario);
-        }
-
-        .btn-modo.perigo.ativo {
-            background: #fef2f2;
-            border-color: var(--vermelho-perigo);
-            color: #b91c1c;
-            box-shadow: inset 0 0 0 1px var(--vermelho-perigo);
-        }
-
-        .barra-dominio-atual {
-            margin-top: 9px;
-            padding-top: 9px;
-            border-top: 1px dashed var(--borda-padrao);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-        }
-
-        .info-dominio {
-            font-size: 11px;
-            color: var(--texto-medio);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            flex: 1;
-        }
-
-        .info-dominio strong {
-            color: var(--texto-forte);
-            font-family: Consolas, monospace;
-        }
-
-        .btn-alternar-dominio {
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            color: var(--texto-forte);
-            padding: 4px 8px;
-            border-radius: 5px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
-        .btn-alternar-dominio:hover {
-            background: #e2e8f0;
-        }
-
-        .linha-switch {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 7px 0;
-            border-top: 1px solid var(--borda-padrao);
-        }
-
-        .linha-switch:first-of-type {
-            border-top: none;
-            padding-top: 0;
-        }
-
-        .linha-switch:last-of-type {
-            padding-bottom: 0;
-        }
-
-        .switch-texto {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .switch-titulo {
-            font-size: 12.5px;
-            font-weight: 600;
-            color: var(--texto-forte);
-        }
-
-        .switch-sub {
-            font-size: 11px;
-            color: var(--texto-suave);
-            line-height: 1.3;
-        }
-
-        .tag-atalho {
-            display: inline-block;
-            background: #fef08a;
-            color: #9a3412;
-            font-weight: 700;
-            font-size: 10px;
-            padding: 1px 5px;
-            border-radius: 3px;
-            margin-top: 2px;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 42px;
-            height: 22px;
-            flex-shrink: 0;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #cbd5e1;
-            transition: 0.2s;
-            border-radius: 22px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            left: 3px;
-            bottom: 3px;
-            background-color: #ffffff;
-            transition: 0.2s;
-            border-radius: 50%;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-        }
-
-        input:checked + .slider {
-            background-color: var(--azul-primario);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(20px);
-        }
-
-        footer {
-            padding: 10px 14px 12px;
-            background: var(--fundo-cartao);
-            border-top: 1px solid var(--borda-padrao);
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .btn-opcoes {
-            width: 100%;
-            background: var(--azul-primario);
-            color: #ffffff;
-            border: none;
-            padding: 9px 12px;
-            border-radius: 6px;
-            font-size: 12.5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .btn-opcoes:hover {
-            background: var(--azul-escuro);
-        }
-
-        .rodape-nota {
-            text-align: center;
-            font-size: 10.5px;
-            color: var(--texto-suave);
-        }
-    </style>
+    <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <header>
@@ -365,77 +39,155 @@
     </header>
 
     <main>
-        <section class="cartao" id="cartaoPerfilPopup">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                <label for="selectPerfilPopup" style="font-size: 12px; font-weight: 700; color: var(--texto-forte); white-space: nowrap;">Perfil de Uso</label>
-                <select id="selectPerfilPopup" class="seletor-acao" aria-label="Perfil de Uso Ativo" style="flex: 1; max-width: 215px; font-size: 12px; padding: 5px 8px;">
+        <div class="linha-topo-popup">
+            <section class="cartao" id="cartaoPerfilPopup" style="flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <label for="selectPerfilPopup" style="font-size: 11px; font-weight: 700; color: var(--texto-forte); white-space: nowrap;">Perfil de Uso</label>
+                <select id="selectPerfilPopup" class="seletor-acao" aria-label="Perfil de Uso Ativo" style="flex: 1; min-width: 0; font-size: 11px; padding: 2px 5px; border: 1px solid #cbd5e1; border-radius: 5px; background: #ffffff;">
                     <option value="padrao">Padrão</option>
                     <option value="trabalho">Trabalho</option>
                     <option value="casa">Casa</option>
                     <option value="estudo">Estudo</option>
+                    <option value="leitura">Leitura / Pesquisa</option>
+                    <option value="reuniao">Apresentação / Reunião</option>
                 </select>
-            </div>
-        </section>
-        <div id="avisoMiniTipPopup" role="status" aria-live="polite" style="display: none; background: rgba(15, 23, 42, 0.94); color: #f8fafc; border: 2px solid #2563eb; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; text-align: center; white-space: pre-line; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);"></div>
+            </section>
+            <section class="cartao cartao-compacto-inativos" id="grupoInativosPopup" aria-label="Funcionalidades Desativadas" style="display: none;">
+                <button type="button" class="btn-icone-inativo" id="btnIconeAutomateDesativado" title="Automação de Tarefas (Desativada) — clique para habilitar" aria-label="Habilitar Automação de Tarefas">
+                    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="4.5" width="10" height="8" rx="2"/>
+                        <path d="M8 2v2.5M5.8 8h.01M10.2 8h.01M6 10.5h4"/>
+                    </svg>
+                </button>
+            </section>
+        </div>
+        <div id="avisoMiniTipPopup" role="status" aria-live="polite" style="display: none; background: rgba(15, 23, 42, 0.94); color: #f8fafc; border: 2px solid #2563eb; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 700; text-align: center; white-space: pre-line; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);"></div>
 
-        <section class="cartao">
-            <div class="cartao-titulo">
-                <span>Modo do Motor de Cópia</span>
-                <span id="labelModoAtual">Todos os Sites</span>
-            </div>
-            <div class="grade-modos">
-                <button type="button" class="btn-modo" id="btnModoGlobal" title="Funciona em qualquer site aberto no Chrome">
-                    Todos os Sites
-                </button>
-                <button type="button" class="btn-modo modo-url" id="btnModoUrl" title="Funciona apenas nos sites cadastrados na lista">
-                    Lista de Sites
-                </button>
-                <button type="button" class="btn-modo perigo" id="btnModoDesligado" title="Desativa temporariamente o motor de seleção">
-                    Desligado
-                </button>
-            </div>
-            <div class="barra-dominio-atual" id="barraDominioAtual" style="display: none;">
-                <div class="info-dominio" id="infoDominioAba">Site: <strong>...</strong></div>
-                <button type="button" class="btn-alternar-dominio" id="btnAlternarDominioAba" title="Adiciona ou remove o site desta aba na lista">
-                    + Incluir na Lista
-                </button>
-            </div>
-        </section>
-
-        <!-- Opcao PJe Anti-Ampulhetas (Oculto por padrao, visivel apenas se PJe) -->
-        <section class="cartao" id="containerAmpuletas" style="display: none;">
-            <div class="linha-switch" style="border-top: none; padding: 0;">
-                <div class="switch-texto">
-                    <span class="switch-titulo" id="tituloAmpuletas">PJe Turbo (Anti-Ampulhetas)</span>
-                    <span class="switch-sub" id="subtituloAmpuletas">
-                        Neutraliza cortinas de bloqueio ("Aguarde...") e libera cliques imediatos no PJe.
+        <section class="cartao grupo-colapsavel colapsado" id="cartaoMotorCopiaPopup">
+            <div class="grupo-cabecalho" role="button" tabindex="0" aria-expanded="false" title="Passe o mouse ou clique para expandir/recolher os modos do Motor de Cópia">
+                <span class="grupo-titulo-esq">
+                    <span class="grupo-chevron" aria-hidden="true">▾</span>
+                    <span>Motor de Cópia</span>
+                </span>
+                <span class="grupo-status-dir">
+                    <span id="labelModoAtual">Todos os Sites</span>
+                    <span class="indicador-status-discreto operacional" id="iconeStatusMotorCopia" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M9.4 1.8 4.2 8.8h3.4l-.7 5.4 5.1-7H8.6z"/></svg>
                     </span>
+                </span>
+            </div>
+            <div class="grupo-corpo">
+                <div class="grade-modos">
+                    <button type="button" class="btn-modo" id="btnModoGlobal" title="Funciona em qualquer site aberto no Chrome">
+                        Todos os Sites
+                    </button>
+                    <button type="button" class="btn-modo modo-url" id="btnModoUrl" title="Funciona apenas nos sites cadastrados na lista">
+                        Lista de Sites
+                    </button>
+                    <button type="button" class="btn-modo perigo" id="btnModoDesligado" title="Desativa temporariamente o motor de seleção">
+                        Desligado
+                    </button>
                 </div>
-                <label class="switch" title="Ativa ou desativa a ocultação de ampulhetas no PJe">
-                    <input type="checkbox" id="checkAmpuletas" checked>
-                    <span class="slider"></span>
-                </label>
+                <div class="barra-dominio-atual" id="barraDominioAtual" style="display: none;">
+                    <div class="info-dominio" id="infoDominioAba">Site: <strong>...</strong></div>
+                    <button type="button" class="btn-alternar-dominio" id="btnAlternarDominioAba" title="Adiciona ou remove o site desta aba na lista">
+                        + Incluir na Lista
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Opcao Sistema Judicial Turbo (Anti-Ampulhetas: auto-colapsavel, visivel apenas em sistemas judiciais) -->
+        <section class="cartao grupo-colapsavel colapsado" id="containerAmpuletas" style="display: none; flex-direction: column;">
+            <div class="grupo-cabecalho grupo-cabecalho-discreto" role="button" tabindex="0" aria-expanded="false" title="Passe o mouse ou clique para configurar Anti-Ampulhetas">
+                <span class="grupo-titulo-esq">
+                    <span class="grupo-chevron" aria-hidden="true">▾</span>
+                    <span id="tituloAmpuletas">Sistema Judicial Turbo</span>
+                </span>
+                <span class="grupo-status-dir">
+                    <span class="indicador-status-discreto operacional" id="iconeStatusAmpuletas" title="Operacional" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    </span>
+                </span>
+            </div>
+            <div class="grupo-corpo">
+                <div class="linha-switch" style="border-top: none; padding: 0;">
+                    <div class="switch-texto">
+                        <span class="switch-sub" id="subtituloAmpuletas">
+                            Neutraliza bloqueios ("Aguarde...") e libera cliques imediatos no Sistema Judicial.
+                        </span>
+                    </div>
+                    <label class="switch" title="Ativa ou desativa a ocultação de ampulhetas">
+                        <input type="checkbox" id="checkAmpuletas" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Opcao Automacao de Tarefas (visivel aqui apenas se operacional; desativada vai em icone para #grupoInativosPopup) -->
+        <section class="cartao grupo-colapsavel colapsado" id="containerAutomatePje" style="display: none; flex-direction: column;">
+            <div class="grupo-cabecalho grupo-cabecalho-discreto" role="button" tabindex="0" aria-expanded="false" title="Passe o mouse ou clique para controlar a Automação de Tarefas">
+                <span class="grupo-titulo-esq">
+                    <span class="grupo-chevron" aria-hidden="true">▾</span>
+                    <span>Automação de Tarefas</span>
+                </span>
+                <span class="grupo-status-dir">
+                    <span class="indicador-status-discreto operacional" id="iconeStatusAutomate" title="Operacional" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    </span>
+                </span>
+            </div>
+            <div class="grupo-corpo">
+                <div class="linha-switch" style="border-top: none; padding: 0;">
+                    <div class="switch-texto">
+                        <span class="switch-sub" id="subtituloAutomatePopup">
+                            Automações hierárquicas do navegador (inclui pacote PJe).
+                        </span>
+                    </div>
+                    <label class="switch" title="Ativa ou desativa a Automação de Tarefas">
+                        <input type="checkbox" id="checkAutomatePje">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="barraAcoesAutomatePopup" style="display: none; gap: 4px; padding-top: 4px; margin-top: 4px; border-top: 1px dashed var(--borda-padrao);">
+                    <button type="button" class="btn-modo ativo" id="btnExecutarAutomatePopup" style="flex: 1.1; padding: 3px 4px; font-size: 10px;" title="Disparar agora o fluxo do contexto atual">
+                        ▶ Executar
+                    </button>
+                    <button type="button" class="btn-modo modo-url ativo" id="btnConfigurarAutomatePopup" style="flex: 1; padding: 3px 4px; font-size: 10px;" title="Configurar contexto, domínios de auto-ativação e parâmetros">
+                        ⚙ Config
+                    </button>
+                    <button type="button" class="btn-modo perigo ativo" id="btnPararAutomatePopup" style="flex: 0.8; padding: 3px 4px; font-size: 10px;" title="Parar imediatamente qualquer ciclo em andamento">
+                        ■ Parar
+                    </button>
+                    <button type="button" class="btn-modo" id="btnRestaurarBarraAutomatePopup" style="flex: 0 0 auto; width: 28px; padding: 3px 4px; display: inline-flex; align-items: center; justify-content: center;" title="Exibir ou ocultar a barra compacta na borda inferior desta aba" aria-label="Exibir ou ocultar barra">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </section>
     </main>
 
     <footer>
-        <div style="display: flex; align-items: stretch; gap: 6px; width: 100%;">
+        <div style="display: flex; align-items: stretch; gap: 5px; width: 100%;">
             <button type="button" class="btn-opcoes" id="btnAbrirOpcoes" style="flex: 1;">
                 Abrir Opções e Central de Ajuda
             </button>
             <button type="button" id="btnBugsOnline" title="Reportar Bugs / Ajuda Online (GitHub)"
-                style="display: inline-flex; align-items: center; justify-content: center; padding: 0 11px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #b91c1c; cursor: pointer; transition: background-color 0.15s ease;">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                style="display: inline-flex; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #b91c1c; cursor: pointer; transition: background-color 0.15s ease;">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M8 2l1.88 1.88M14.12 3.88L16 2M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/>
                     <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/>
                     <path d="M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M22 13h-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/>
                 </svg>
             </button>
         </div>
-        <div class="rodape-nota" id="rodapeProdutividadeOnline" style="text-align: left; line-height: 1.45;" title="Contadores diários atualizados em tempo real (tempo mínimo de 5 min sem interação para confirmar pausa)"></div>
+        <div class="rodape-nota" id="rodapeProdutividadeOnline" style="text-align: left; line-height: 1.25;" title="Contadores diários atualizados em tempo real (inatividade computada a partir de 3 min sem interação)"></div>
     </footer>
 
+    <script src="../mod-produt/lib-produt-bem-estar.js"></script>
     <script src="../mod-produt/mod-produt.js"></script>
     <script src="popup.js"></script>
 </body>

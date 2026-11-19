@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: navegador-descarte.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
+ * ARQUIVO: src/mod-navegador/navegador-descarte.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-navegador/navegador-descarte.js

@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: options-laboratorio.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Configurações & Interface — Laboratório Interativo, Console e Auditoria V8
+ * ARQUIVO: src/cfg/options-laboratorio.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Configurações & Interface — Laboratório Interativo, Console e Auditoria V8
  *
  * @MAPA-IA:
  * - Arquivo: src/cfg/options-laboratorio.js

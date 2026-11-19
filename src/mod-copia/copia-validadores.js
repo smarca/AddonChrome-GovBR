@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-validadores.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: ValidadoresForenses
  * 
  * @MAPA-IA:
@@ -33,7 +35,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regras 2.4, 2.8: Validação Forense e Proteção UI)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 6: Auditoria Forense e Wiki)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';

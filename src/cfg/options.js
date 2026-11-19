@@ -1,6 +1,6 @@
 /* ==========================================================================
- * Nome do arquivo: options.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * ARQUIVO: src/cfg/options.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
@@ -84,7 +84,9 @@ const PADROES_FABRICA_TURBO = Object.freeze([
     '*://*.mp.br/*',
     '*://*.def.br/*',
     '*://gemini.google.com/*',
-    '*://serasa-judicial.serasaexperian.com.br/*'
+    '*://serasa-judicial.serasaexperian.com.br/*',
+    '*://frontend.prd.cnj.cloud/*',
+    '*://sso.cloud.pje.jus.br/*'
 ]);
 
 const PADROES_FABRICA_AMPULETAS = Object.freeze([
@@ -92,7 +94,9 @@ const PADROES_FABRICA_AMPULETAS = Object.freeze([
     '*://*.pje.jus.br/*',
     '*://pje.jus.br/*',
     '*://*pje*.jus.br/*',
-    '*://*pje*.*.jus.br/*'
+    '*://*pje*.*.jus.br/*',
+    '*://frontend.prd.cnj.cloud/*',
+    '*://sso.cloud.pje.jus.br/*'
 ]);
 
 /* Regras de Mapeamento Manual Avancado de Elementos (XPath / CSS) Padroes de Fabrica (Secao 6.20) - Padrao vazio conforme Seção 6.85 */
@@ -220,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const optPosicaoAvisosValidacao = document.getElementById('optPosicaoAvisosValidacao');
     const containerPosicaoAvisosValidacao = document.getElementById('containerPosicaoAvisosValidacao');
     const checkOpcaoAmpuletas = document.getElementById('checkOpcaoAmpuletas');
+    const optAutomatePjeAtivo = document.getElementById('optAutomatePjeAtivo');
     const optConverterCabecalhoPje = document.getElementById('optConverterCabecalhoPje');
     const optTempoFlashMs = document.getElementById('optTempoFlashMs');
     const optCorFlashBorder = document.getElementById('optCorFlashBorder');
@@ -265,9 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblPomodoroPausaMaiorCalculada = document.getElementById('lblPomodoroPausaMaiorCalculada');
     const optPomodoroEstiloMinipopup = document.getElementById('optPomodoroEstiloMinipopup');
     const optPomodoroComportamentoBarra = document.getElementById('optPomodoroComportamentoBarra');
-    const optPomodoroPausasAutomaticas = document.getElementById('optPomodoroPausasAutomaticas');
     const optPomodoroBeepConclusaoAtivo = document.getElementById('optPomodoroBeepConclusaoAtivo');
-    const optPomodoroBeepIntensidade = document.getElementById('optPomodoroBeepIntensidade');
     const painelConfigPomodoro = document.getElementById('painelConfigPomodoro');
     const lblStatusProdutividadeTrabalho = document.getElementById('lblStatusProdutividadeTrabalho');
     const lblStatusPomodoroDetalhado = document.getElementById('lblStatusPomodoroDetalhado');
@@ -300,6 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelarGerenciarPerfil = document.getElementById('btnCancelarGerenciarPerfil');
     let cacheListaPerfis = [];
     let cachePerfilAtivoId = 'padrao';
+    let cacheCatalogoPerfis = null;
+    let salvandoConfigLocalAgora = false;
     let modoModalGerenciarPerfil = 'criar';
 
     function obterNomePerfilAtivo() {
@@ -428,9 +433,44 @@ document.addEventListener('DOMContentLoaded', () => {
      * OBJETIVO DE RECONSTRUCAO: Alternar entre Configuracoes, Central de Ajuda
      * e Laboratorio de Testes sem recarregar a pagina, com suporte ao Casulo SEC-01.
      */
+    function obterChaveDataLocalOpcoes(agora = Date.now()) {
+        const d = new Date(agora);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
     function inicializarCartoesColapsaveis() {
         const cartoes = document.querySelectorAll('section.cartao');
-        cartoes.forEach((cartao) => {
+        const refsCartoes = [];
+        const aplicarEstadoCartao = (cartao, h2, colapsado) => {
+            cartao.classList.toggle('colapsado', Boolean(colapsado));
+            h2.setAttribute('aria-expanded', colapsado ? 'false' : 'true');
+        };
+        const salvarEstadoDiarioCartoes = () => {
+            const mapaAtual = {};
+            refsCartoes.forEach((item) => {
+                mapaAtual[item.chave] = item.cartao.classList.contains('colapsado');
+            });
+            try {
+                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                    chrome.storage.local.set({
+                        jusgovOpcoesCartoesColapsadosDia: {
+                            data: obterChaveDataLocalOpcoes(),
+                            mapa: mapaAtual
+                        }
+                    });
+                } else if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('jusgovOpcoesCartoesColapsadosDia', JSON.stringify({
+                        data: obterChaveDataLocalOpcoes(),
+                        mapa: mapaAtual
+                    }));
+                }
+            } catch (_) { }
+        };
+
+        cartoes.forEach((cartao, idxCartao) => {
             const h2 = Array.from(cartao.children).find((el) => el && el.tagName === 'H2');
             if (!h2 || h2.dataset.colapsoInicializado === '1') return;
             h2.dataset.colapsoInicializado = '1';
@@ -465,9 +505,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 h2.appendChild(acoes);
             }
 
+            const paiPainel = cartao.closest('.painel-aba');
+            const chaveCartao = cartao.id
+                ? `id:${cartao.id}`
+                : `${paiPainel && paiPainel.id ? paiPainel.id : 'geral'}:${idxCartao}:${String(esq.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48)}`;
+            refsCartoes.push({ chave: chaveCartao, cartao, h2 });
+
             const alternar = () => {
                 const colapsado = cartao.classList.toggle('colapsado');
                 h2.setAttribute('aria-expanded', colapsado ? 'false' : 'true');
+                salvarEstadoDiarioCartoes();
             };
             h2.addEventListener('click', (ev) => {
                 if (ev.target && typeof ev.target.closest === 'function' && ev.target.closest('button, a, input, select')) {
@@ -482,6 +529,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        /* Estado padrão estendido; mantém escolhas apenas durante o mesmo dia de trabalho, re-estendendo no dia seguinte */
+        const aplicarMapaSalvo = (registro) => {
+            const hoje = obterChaveDataLocalOpcoes();
+            if (registro && registro.data === hoje && registro.mapa && typeof registro.mapa === 'object') {
+                refsCartoes.forEach((item) => {
+                    if (Object.prototype.hasOwnProperty.call(registro.mapa, item.chave)) {
+                        aplicarEstadoCartao(item.cartao, item.h2, Boolean(registro.mapa[item.chave]));
+                    }
+                });
+            } else {
+                refsCartoes.forEach((item) => aplicarEstadoCartao(item.cartao, item.h2, false));
+                if (registro && registro.data && registro.data !== hoje) {
+                    salvarEstadoDiarioCartoes();
+                }
+            }
+        };
+
+        try {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get(['jusgovOpcoesCartoesColapsadosDia'], (res) => {
+                    if (chrome.runtime && chrome.runtime.lastError) return;
+                    aplicarMapaSalvo(res && res.jusgovOpcoesCartoesColapsadosDia);
+                });
+            } else if (typeof localStorage !== 'undefined') {
+                const raw = localStorage.getItem('jusgovOpcoesCartoesColapsadosDia');
+                aplicarMapaSalvo(raw ? JSON.parse(raw) : null);
+            }
+        } catch (_) { }
     }
 
     function configurarNavegacaoAbas() {
@@ -691,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function atualizarCalculoPomodoroUI() {
         const ativo = optPomodoroAtivo ? optPomodoroAtivo.checked : false;
         const proporcao = optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5;
-        const foco = optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25;
+        const foco = optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 45) : 45;
         const ciclos = optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4;
         const alivio = Math.max(1, Math.round(foco / proporcao));
         const pausaMaior = Math.max(1, Math.round(alivio * ciclos));
@@ -701,12 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
             painelConfigPomodoro.style.opacity = ativo ? '1' : '0.5';
             painelConfigPomodoro.style.pointerEvents = ativo ? 'auto' : 'none';
         }
-        const beepAtivo = optPomodoroBeepConclusaoAtivo ? optPomodoroBeepConclusaoAtivo.checked : true;
         if (optPomodoroBeepConclusaoAtivo) optPomodoroBeepConclusaoAtivo.disabled = !ativo;
-        if (optPomodoroBeepIntensidade) {
-            optPomodoroBeepIntensidade.disabled = (!ativo || !beepAtivo);
-            optPomodoroBeepIntensidade.style.opacity = (ativo && beepAtivo) ? '1' : '0.5';
-        }
     }
 
     function formatarMinutosHHMM(totalMin) {
@@ -727,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cfgPom = {
                 ...(cfgBase && typeof cfgBase === 'object' ? cfgBase : {}),
                 pomodoroAtivo: optPomodoroAtivo ? Boolean(optPomodoroAtivo.checked) : Boolean(cfgBase && cfgBase.pomodoroAtivo),
-                pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : ((cfgBase && cfgBase.pomodoroFocoMinutos) || 25),
+                pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 45) : ((cfgBase && cfgBase.pomodoroFocoMinutos) || 45),
                 pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : ((cfgBase && cfgBase.pomodoroProporcao) || 4.5),
                 pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : ((cfgBase && cfgBase.pomodoroCiclos) || 4)
             };
@@ -764,6 +835,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'local' && (changes.jusgovTrabalhoEstado || changes.jusgovProdNuvemMeta || changes.jusgovConfigSyncPendente || changes.perfilAtivoId || changes.jusgovPomodoroBarraEstadoGlobal)) {
+                if (changes.jusgovPomodoroBarraEstadoGlobal && optPomodoroEstiloMinipopup) {
+                    const estBar = changes.jusgovPomodoroBarraEstadoGlobal.newValue;
+                    if (estBar && estBar.minimizadoMicro) {
+                        optPomodoroEstiloMinipopup.value = 'micro';
+                    } else if (estBar && (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2)) {
+                        optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                    }
+                }
                 atualizarStatusProdutividadeUI();
             }
             if (area === 'sync' && (
@@ -771,6 +850,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 changes.pomodoroFocoMinutos || changes.pomodoroCiclos || changes.pomodoroModoAviso ||
                 changes.pomodoroEstiloMinipopup || changes.tempoTrabalhoCorridoAtivo || changes.tempoTrabalhoAtivoAtivo
             )) {
+                if (changes.pomodoroEstiloMinipopup && optPomodoroEstiloMinipopup) {
+                    const estMini = String(changes.pomodoroEstiloMinipopup.newValue || 'compacto').toLowerCase();
+                    if (['micro', 'compacto', 'normal', 'expandido'].includes(estMini)) {
+                        optPomodoroEstiloMinipopup.value = estMini;
+                    }
+                }
                 atualizarStatusProdutividadeUI();
             }
         });
@@ -923,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     : 'Protege o trabalho do operador: se a página existente tiver formulários em edição, minutas sendo digitadas ou navegação interna SPA, não a reutiliza para evitar descarte ou perda de dados';
             }
         }
-        if (btnFecharDuplicadasAgora) btnFecharDuplicadasAgora.disabled = !ativoFoco;
+        if (btnFecharDuplicadasAgora) btnFecharDuplicadasAgora.disabled = false;
 
         if (containerSubOpcoesReutilizarAbas) {
             containerSubOpcoesReutilizarAbas.style.opacity = ativoMestre ? '1' : '0.45';
@@ -1066,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (_) { }
             if (configuradorPerfis) {
                 const cat = await configuradorPerfis.carregarCatalogoPerfis(typeof chrome !== 'undefined' ? chrome : null).catch(() => null);
+                if (cat) cacheCatalogoPerfis = cat;
                 const estrutura = configuradorPerfis.garantirEstruturaPerfis(dados, cat);
                 /* Se outro PC sincronizou chaves top-level de outro perfil, resolve UI pelo perfil local selecionado */
                 if (dados.jusgovSyncPerfilBaseTopLevel && dados.jusgovSyncPerfilBaseTopLevel !== estrutura.perfilAtivoId) {
@@ -1086,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (pendLocalObj) {
                 Object.assign(dados, pendLocalObj);
             }
-            const modoAtual = dados.modoTurbo || 'global';
+            const modoAtual = dados.modoTurbo || 'url';
             if (selectModoTurbo) selectModoTurbo.value = modoAtual;
             const compIcone = dados.comportamentoCliqueIcone || 'popup';
             if (selectComportamentoIcone) selectComportamentoIcone.value = compIcone;
@@ -1101,6 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             atualizarRotuloNivelFiltro();
             atualizarEstadoOfuscamentoNivelFiltro();
             if (checkOpcaoAmpuletas) checkOpcaoAmpuletas.checked = (dados.ativoAmpuletas !== false);
+            if (optAutomatePjeAtivo) optAutomatePjeAtivo.checked = Boolean(dados.automatePjeAtivo);
             if (selectModoPlaceholdersMinutasHtml) {
                 if (typeof dados.modoPlaceholdersMinutasHtml === 'string' && ['desabilitado', 'placeholders', 'ctrl_avancado', 'avancado'].includes(dados.modoPlaceholdersMinutasHtml)) {
                     selectModoPlaceholdersMinutasHtml.value = dados.modoPlaceholdersMinutasHtml;
@@ -1254,7 +1341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (optPomodoroFocoMinutos) {
                 const foco = Number(dados.pomodoroFocoMinutos);
-                optPomodoroFocoMinutos.value = (foco >= 25 && foco <= 90 && foco % 5 === 0) ? String(foco) : '25';
+                optPomodoroFocoMinutos.value = (foco >= 25 && foco <= 90 && foco % 5 === 0) ? String(foco) : '45';
             }
             if (optPomodoroCiclos) {
                 const cic = Number(dados.pomodoroCiclos);
@@ -1262,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (optPomodoroEstiloMinipopup) {
                 const estMini = String(dados.pomodoroEstiloMinipopup || 'compacto').toLowerCase();
-                optPomodoroEstiloMinipopup.value = ['compacto', 'normal', 'expandido'].includes(estMini) ? estMini : 'compacto';
+                optPomodoroEstiloMinipopup.value = ['micro', 'compacto', 'normal', 'expandido'].includes(estMini) ? estMini : 'compacto';
             }
             if (optPomodoroComportamentoBarra) {
                 const modoAvisoAtual = normalizarModoAvisoPomodoro(dados.pomodoroModoAviso);
@@ -1277,22 +1364,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value !== 'oculto' && estBar && Number(estBar.modoFixacao) === 2) {
                                 optPomodoroComportamentoBarra.value = 'movel';
                             }
-                            if (optPomodoroEstiloMinipopup && estBar && (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2)) {
-                                optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                            if (optPomodoroEstiloMinipopup && estBar) {
+                                if (estBar.minimizadoMicro) {
+                                    optPomodoroEstiloMinipopup.value = 'micro';
+                                } else if (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2) {
+                                    optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                                }
                             }
                         });
                     }
                 }
             }
-            if (optPomodoroPausasAutomaticas) {
-                optPomodoroPausasAutomaticas.checked = (dados.pomodoroPausasAutomaticas !== false);
-            }
             if (optPomodoroBeepConclusaoAtivo) {
-                optPomodoroBeepConclusaoAtivo.checked = (dados.pomodoroBeepConclusaoAtivo !== false);
-            }
-            if (optPomodoroBeepIntensidade) {
-                const intBeep = String(dados.pomodoroBeepIntensidade || 'suave').toLowerCase();
-                optPomodoroBeepIntensidade.value = ['suave', 'moderado', 'grave'].includes(intBeep) ? intBeep : 'suave';
+                optPomodoroBeepConclusaoAtivo.checked = (dados.pomodoroBeepConclusaoAtivo === false);
             }
             atualizarCalculoPomodoroUI();
             atualizarStatusProdutividadeUI();
@@ -1414,11 +1498,12 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarRotuloSliderFlash();
 
         return {
-            modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'global',
+            modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'url',
             comportamentoCliqueIcone: selectComportamentoIcone ? selectComportamentoIcone.value : 'popup',
             manterFormatacaoBasica: manterBasica,
             nivelFiltroFormatacao: optNivelFiltroEstilos ? converterIndiceParaNivelFiltro(optNivelFiltroEstilos.value) : 'basico',
             ativoAmpuletas: checkOpcaoAmpuletas ? checkOpcaoAmpuletas.checked : true,
+            automatePjeAtivo: optAutomatePjeAtivo ? optAutomatePjeAtivo.checked : false,
             selecaoEditavelAtiva: selectModoPlaceholdersMinutasHtml ? (selectModoPlaceholdersMinutasHtml.value !== 'desabilitado') : true,
             modoPlaceholdersMinutasHtml: selectModoPlaceholdersMinutasHtml ? selectModoPlaceholdersMinutasHtml.value : 'placeholders',
             placeholdersMinutasHtmlAtivo: selectModoPlaceholdersMinutasHtml ? (selectModoPlaceholdersMinutasHtml.value !== 'desabilitado') : true,
@@ -1479,16 +1564,15 @@ document.addEventListener('DOMContentLoaded', () => {
             tempoTrabalhoAtivoHoras: optTempoTrabalhoAtivoHoras ? (Number(optTempoTrabalhoAtivoHoras.value) || 6) : 6,
             pomodoroAtivo: optPomodoroAtivo ? optPomodoroAtivo.checked : false,
             pomodoroProporcao: optPomodoroProporcao ? (Number(optPomodoroProporcao.value) || 4.5) : 4.5,
-            pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 25) : 25,
+            pomodoroFocoMinutos: optPomodoroFocoMinutos ? (Number(optPomodoroFocoMinutos.value) || 45) : 45,
             pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4,
-            pomodoroPausasAutomaticas: optPomodoroPausasAutomaticas ? optPomodoroPausasAutomaticas.checked : true,
-            pomodoroBeepConclusaoAtivo: optPomodoroBeepConclusaoAtivo ? optPomodoroBeepConclusaoAtivo.checked : true,
-            pomodoroBeepIntensidade: optPomodoroBeepIntensidade ? (['suave', 'moderado', 'grave'].includes(optPomodoroBeepIntensidade.value) ? optPomodoroBeepIntensidade.value : 'suave') : 'suave',
+            pomodoroPausasAutomaticas: true,
+            pomodoroBeepConclusaoAtivo: optPomodoroBeepConclusaoAtivo ? !optPomodoroBeepConclusaoAtivo.checked : true,
             pomodoroModoAviso: (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value === 'oculto')
                 ? 'badge_e_barra_descanso'
                 : 'completo',
             pomodoroEstiloMinipopup: optPomodoroEstiloMinipopup
-                ? (['compacto', 'normal', 'expandido'].includes(optPomodoroEstiloMinipopup.value) ? optPomodoroEstiloMinipopup.value : 'compacto')
+                ? (['micro', 'compacto', 'normal', 'expandido'].includes(optPomodoroEstiloMinipopup.value) ? optPomodoroEstiloMinipopup.value : 'compacto')
                 : 'compacto',
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
             regrasMapeamentoElementos: moduloMapeamento.obterRegrasAtuais()
@@ -1503,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = coletarPayloadConfiguracoesUI();
         if (configuradorPerfis) {
             const perfilId = cachePerfilAtivoId || 'padrao';
-            payload[configuradorPerfis.chaveConfigPerfil(perfilId)] = configuradorPerfis.calcularSobrescritasPerfil(payload, perfilId);
+            payload[configuradorPerfis.chaveConfigPerfil(perfilId)] = configuradorPerfis.calcularSobrescritasPerfil(payload, perfilId, cacheCatalogoPerfis);
         }
         atualizarIconeModoOptions(payload.modoTurbo);
 
@@ -1511,13 +1595,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             chrome.storage.sync.remove('flashBorderAtivo').catch(() => { });
+            salvandoConfigLocalAgora = true;
             if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                 chrome.runtime.sendMessage({ acao: 'AGENDAR_SYNC_NUVEM_DIFERIDO', payload }, () => {
+                    setTimeout(() => { salvandoConfigLocalAgora = false; }, 120);
                     atualizarStatusProdutividadeUI();
                     exibirToast('Configurações salvas!');
                 });
             } else {
                 chrome.storage.local.set({ jusgovConfigSyncPendente: payload }, () => {
+                    setTimeout(() => { salvandoConfigLocalAgora = false; }, 120);
+                    atualizarStatusProdutividadeUI();
                     exibirToast('Configurações salvas!');
                 });
             }
@@ -1544,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     adicionarOuvinteSeguro(textoUrlsTurbo, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(checkOpcaoAmpuletas, 'change', salvarConfiguracoes);
+    adicionarOuvinteSeguro(optAutomatePjeAtivo, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optConverterCabecalhoPje, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(selectModoPlaceholdersMinutasHtml, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optAlternarAbasRecentesCtrlTab, 'change', salvarConfiguracoes);
@@ -1925,10 +2014,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     adicionarOuvinteSeguro(optPomodoroEstiloMinipopup, 'change', () => {
         const estVal = optPomodoroEstiloMinipopup ? optPomodoroEstiloMinipopup.value : 'compacto';
+        const ehMicro = (estVal === 'micro');
         const nivel = (estVal === 'normal') ? 1 : ((estVal === 'expandido') ? 2 : 0);
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({
                 acao: 'ATUALIZAR_ESTADO_BARRA_POMODORO',
+                minimizadoMicro: ehMicro,
+                ...(ehMicro ? {} : { minimizadoDescansoAdiadoTs: 0 }),
                 nivelDetalhe: nivel
             }).catch(() => { });
         }
@@ -1945,12 +2037,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         salvarConfiguracoes();
     });
-    adicionarOuvinteSeguro(optPomodoroPausasAutomaticas, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optPomodoroBeepConclusaoAtivo, 'change', () => {
         atualizarCalculoPomodoroUI();
         salvarConfiguracoes();
     });
-    adicionarOuvinteSeguro(optPomodoroBeepIntensidade, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(btnResetarContadoresTrabalho, 'click', () => {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
             chrome.runtime.sendMessage({ acao: 'RESETAR_CONTADORES_TRABALHO' }, (resp) => {
@@ -2215,7 +2305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const perfilAtualAntes = cacheListaPerfis.find(p => p && p.id === cachePerfilAtivoId);
         const ehPadronizadoAntes = Boolean(
             (perfilAtualAntes && perfilAtualAntes.predefinido === true) ||
-            ['padrao', 'trabalho', 'casa', 'estudo'].includes(cachePerfilAtivoId)
+            ['padrao', 'trabalho', 'casa', 'estudo', 'leitura', 'reuniao'].includes(cachePerfilAtivoId)
         );
         const opcoesReset = ehPadronizadoAntes ? { perfilPreferidoId: cachePerfilAtivoId } : {};
 
@@ -2410,7 +2500,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 carregarConfiguracoesDoStorage();
                 return;
             }
-            if (area === 'local' && (changes.jusgovPomodoroBarraEstadoGlobal || changes.jusgovConfigSyncPendente)) {
+            if (area === 'local' && (changes.jusgovPomodoroBarraEstadoGlobal || (changes.jusgovConfigSyncPendente && !salvandoConfigLocalAgora))) {
                 carregarConfiguracoesDoStorage();
             }
             if (area === 'sync') {
@@ -2435,6 +2525,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (changes.ativoAmpuletas !== undefined && checkOpcaoAmpuletas) {
                     checkOpcaoAmpuletas.checked = (changes.ativoAmpuletas.newValue !== false);
+                }
+                if (changes.automatePjeAtivo !== undefined && optAutomatePjeAtivo) {
+                    optAutomatePjeAtivo.checked = Boolean(changes.automatePjeAtivo.newValue);
                 }
                 if (changes.modoPlaceholdersMinutasHtml !== undefined && selectModoPlaceholdersMinutasHtml) {
                     selectModoPlaceholdersMinutasHtml.value = changes.modoPlaceholdersMinutasHtml.newValue || 'placeholders';

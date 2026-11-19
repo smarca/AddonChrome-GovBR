@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-minutas.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: PlaceholdersMinutas
  * 
  * @MAPA-IA:
@@ -44,7 +46,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regras 2.14, 2.15: Minutas e Placeholders)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 7: Placeholders e Editores Ricos)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -221,16 +223,9 @@
                         const { estagio1, estagio2, estagio3, estagio4, estagio5 } = dependencias.estagios;
 
                         if (detail >= 3 && estagio5) {
-                            const resTriplo = estagio5.resolverSelecaoTriploClique(mapa, idxCursor);
+                            const resTriplo = estagio5.resolverSelecaoTriploClique(mapa, idxCursor) || estagio5.delimitarParagrafoLocalizado(texto, idxCursor);
                             if (resTriplo && geometria) {
                                 rangeParaSelecionar = geometria.criarRangeDOMAPartirDeIndices(mapa, resTriplo.inicio, resTriplo.fim);
-                            }
-                            if (!rangeParaSelecionar && geometria) {
-                                const bloco = geometria.obterBlocoAncestralContextual(ponto.no);
-                                if (bloco && bloco !== docAlvo.body) {
-                                    rangeParaSelecionar = docAlvo.createRange();
-                                    rangeParaSelecionar.selectNodeContents(bloco);
-                                }
                             }
                         } else if (detail === 2) {
                             let resIndices = null;

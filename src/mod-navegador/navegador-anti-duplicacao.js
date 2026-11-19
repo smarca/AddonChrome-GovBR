@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: navegador-anti-duplicacao.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
+ * ARQUIVO: src/mod-navegador/navegador-anti-duplicacao.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 4 - NAVEGADOR: Gerenciamento de Guias e Janelas
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-navegador/navegador-anti-duplicacao.js
@@ -243,7 +244,19 @@
                 const urlInicial = this.normalizarUrlParaComparacao(tab.url || tab.pendingUrl || '');
                 const agora = Date.now();
 
-                /* Detectar duplicação manual disparada pelo menu nativo de contexto da guia do Chrome ("Duplicar") */
+                const ehNovaGuiaEmBranco = (u) => {
+                    if (!u) return true;
+                    return (
+                        u === 'about:blank' ||
+                        u === 'chrome://newtab' ||
+                        u === 'edge://newtab' ||
+                        u.startsWith('chrome://newtab/') ||
+                        u.startsWith('edge://newtab/')
+                    );
+                };
+                const ehNovaGuiaNavegador = ehNovaGuiaEmBranco(urlInicial);
+
+                /* Detectar duplicação manual ("Duplicar") ou abertura de Nova Guia em branco (Ctrl+T / +) */
                 let duplicacaoManualPermitida = false;
                 if (tab.openerTabId) {
                     try {
@@ -256,18 +269,20 @@
                         }
                     } catch (_) { }
                 }
+                const isentarContraAnteriores = Boolean(duplicacaoManualPermitida || ehNovaGuiaNavegador);
 
                 this.#mapaAbasUrls.set(tab.id, {
                     urlOriginal: urlInicial || '',
                     urlAtual: urlInicial || '',
                     criadaEm: agora,
                     ultimoAcessoNavegacao: agora,
-                    duplicacaoManualPermitida
+                    duplicacaoManualPermitida,
+                    isentarContraAnteriores
                 });
                 this.salvarMapaAbasSessionDebounced(chromeApi);
 
                 const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this.#reutilizarAbasAbertas;
-                if (!duplicacaoManualPermitida && reutilizarAtivo !== false && urlInicial && urlInicial !== 'about:blank' && !urlInicial.startsWith('chrome://')) {
+                if (!isentarContraAnteriores && reutilizarAtivo !== false && urlInicial && !ehNovaGuiaNavegador && !urlInicial.startsWith('chrome://')) {
                     const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
                     const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
                     const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
@@ -277,7 +292,7 @@
                     const abaDuplicada = abasJanela.find((t) => {
                         if (t.id === tab.id) return false;
                         const reg = this.#mapaAbasUrls.get(t.id);
-                        if (reg && reg.duplicacaoManualPermitida) return false;
+                        /* FEAT-74: Novas abas abertas normalmente comparam contra todas as anteriores (inclusive novas guias/duplicadas) */
                         /* Seção 6.91 / FEAT-13: Se ambas forem modificadas e proteção estiver ativa, mantém ambas abertas */
                         if (protegerModificadas && reg && reg.paginaModificada && regNova && regNova.paginaModificada) {
                             return false;
@@ -345,14 +360,23 @@
             let duplicacaoManualPermitida = false;
             try {
                 const regInicial = this.#mapaAbasUrls.get(tabId);
-                if (regInicial && regInicial.duplicacaoManualPermitida) {
+                if (regInicial && (regInicial.duplicacaoManualPermitida || regInicial.isentarContraAnteriores)) {
                     duplicacaoManualPermitida = true;
                 }
                 if (changeInfo.url) {
                     const uNova = this.normalizarUrlParaComparacao(changeInfo.url);
                     let reg = this.#mapaAbasUrls.get(tabId);
-                    const urlAnteriorValida = (reg && reg.urlAtual && reg.urlAtual !== 'about:blank' && !reg.urlAtual.startsWith('chrome://') && reg.urlAtual !== uNova)
-                        ? reg.urlAtual
+                    const urlAnteriorStr = reg && reg.urlAtual ? reg.urlAtual : '';
+                    const ehOrigemEmBranco = Boolean(
+                        !urlAnteriorStr ||
+                        urlAnteriorStr === 'about:blank' ||
+                        urlAnteriorStr === 'chrome://newtab' ||
+                        urlAnteriorStr === 'edge://newtab' ||
+                        urlAnteriorStr.startsWith('chrome://newtab/') ||
+                        urlAnteriorStr.startsWith('edge://newtab/')
+                    );
+                    const urlAnteriorValida = (!ehOrigemEmBranco && urlAnteriorStr !== uNova)
+                        ? urlAnteriorStr
                         : '';
                     const ehAbaPreExistente = Boolean(urlAnteriorValida || (reg && reg.carregamentoConcluido));
 
@@ -363,11 +387,12 @@
                             criadaEm: Date.now(),
                             ultimoAcessoNavegacao: Date.now(),
                             duplicacaoManualPermitida: false,
+                            isentarContraAnteriores: false,
                             carregamentoConcluido: false
                         };
                     } else {
                         /* Preservar estritamente a URL original de abertura: nunca sobrescrever uma vez registrada */
-                        if (!reg.urlOriginal || reg.urlOriginal === 'about:blank' || reg.urlOriginal.startsWith('chrome://')) {
+                        if (!reg.urlOriginal || reg.urlOriginal === 'about:blank' || reg.urlOriginal.startsWith('chrome://newtab') || reg.urlOriginal.startsWith('edge://newtab') || reg.urlOriginal.startsWith('chrome://')) {
                             reg.urlOriginal = uNova;
                         }
                         if (urlAnteriorValida) {
@@ -376,11 +401,12 @@
                         reg.urlAtual = uNova;
                         reg.ultimoAcessoNavegacao = Date.now();
                     }
+                    const isentaNestaNavegacao = Boolean(reg.isentarContraAnteriores || reg.duplicacaoManualPermitida);
                     this.#mapaAbasUrls.set(tabId, reg);
                     this.salvarMapaAbasSessionDebounced(chromeApi);
 
                     const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this.#reutilizarAbasAbertas;
-                    if (!reg.duplicacaoManualPermitida && reutilizarAtivo !== false && uNova && uNova !== 'about:blank' && !uNova.startsWith('chrome://')) {
+                    if (!isentaNestaNavegacao && reutilizarAtivo !== false && uNova && uNova !== 'about:blank' && !uNova.startsWith('chrome://')) {
                         const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
                         const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
                         const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
@@ -389,7 +415,7 @@
                         const abaExistente = abasJanela.find((t) => {
                             if (t.id === tabId) return false;
                             const regOutra = this.#mapaAbasUrls.get(t.id);
-                            if (regOutra && regOutra.duplicacaoManualPermitida) return false;
+                            /* FEAT-74: Novas abas comparam normalmente contra guias novas/duplicadas anteriores */
                             /* Seção 6.91 / FEAT-13: Se ambas forem modificadas e proteção ativa, mantém ambas */
                             if (protegerModificadas && regOutra && regOutra.paginaModificada && reg && reg.paginaModificada) {
                                 return false;
@@ -476,6 +502,11 @@
                     if (regAtual) {
                         regAtual.carregamentoConcluido = true;
                         regAtual.ultimoAcessoNavegacao = Date.now();
+                        const uConc = regAtual.urlAtual || '';
+                        if (uConc && uConc !== 'about:blank' && !uConc.startsWith('chrome://newtab') && !uConc.startsWith('edge://newtab')) {
+                            regAtual.isentarContraAnteriores = false;
+                            regAtual.duplicacaoManualPermitida = false;
+                        }
                         this.#mapaAbasUrls.set(tabId, regAtual);
                     }
                 }
@@ -510,6 +541,39 @@
             reg.modificadaEm = Date.now();
             this.#mapaAbasUrls.set(tabId, reg);
             this.salvarMapaAbasSessionDebounced(chromeApi);
+        }
+
+        /**
+         * FEAT-74: Desempate estrito em duplicidade ->
+         * 1) guia protegida (active/pinned); 2) mais recentemente navegada (ultimoAcessoNavegacao);
+         * 3) mais recentemente acessada (tab.lastAccessed / ultimoAcessoFoco).
+         * @param {Array<Object>} candidatas
+         * @returns {Object|null}
+         */
+        selecionarEleitaPorDesempate(candidatas) {
+            if (!Array.isArray(candidatas) || candidatas.length === 0) return null;
+            const protegidas = candidatas.filter(t => t.active || t.pinned);
+            const basePool = protegidas.length > 0 ? protegidas : candidatas;
+            let melhor = basePool[0];
+            for (let idx = 1; idx < basePool.length; idx++) {
+                const atual = basePool[idx];
+                if (atual.active && !melhor.active) { melhor = atual; continue; }
+                if (melhor.active && !atual.active) continue;
+                const regA = this.#mapaAbasUrls.get(atual.id);
+                const regM = this.#mapaAbasUrls.get(melhor.id);
+                const navA = Number((regA && regA.ultimoAcessoNavegacao) ?? atual.ultimoAcessoNavegacao) || 0;
+                const navM = Number((regM && regM.ultimoAcessoNavegacao) ?? melhor.ultimoAcessoNavegacao) || 0;
+                if (navA !== navM) {
+                    if (navA > navM) melhor = atual;
+                    continue;
+                }
+                const accA = Number(atual.lastAccessed) || (regA && Number(regA.ultimoAcessoFoco)) || 0;
+                const accM = Number(melhor.lastAccessed) || (regM && Number(regM.ultimoAcessoFoco)) || 0;
+                if (accA > accM) {
+                    melhor = atual;
+                }
+            }
+            return melhor;
         }
 
         /**
@@ -588,11 +652,6 @@
                         }
                     }
 
-                    /* Seção 6.91 / FEAT-13: Regra de Ouro com Proteção de Guias Modificadas Ativa:
-                     * - Se há guias modificadas e não-modificadas: mantém exclusivamente as modificadas (todas elas se forem múltiplas),
-                     *   fechando as não-modificadas (seja primeira ou última).
-                     * - Se todas forem modificadas: mantém todas intactas.
-                     * - Se nenhuma for modificada: mantém uma (ativa ou primeira) e fecha as demais. */
                     if (protegerModificadas) {
                         if (modificadas.length > 0) {
                             for (const t of naoModificadas) {
@@ -601,17 +660,17 @@
                                 }
                             }
                         } else {
-                            let eleita = grupo.find(t => t.active) || grupo.find(t => t.pinned) || grupo[0];
+                            const eleita = this.selecionarEleitaPorDesempate(grupo);
                             for (const t of grupo) {
-                                if (t.id !== eleita.id && !t.pinned && !t.active) {
+                                if (eleita && t.id !== eleita.id && !t.pinned && !t.active) {
                                     idsParaFechar.push(t.id);
                                 }
                             }
                         }
                     } else {
-                        let eleita = grupo.find(t => t.active) || grupo.find(t => t.pinned) || grupo[0];
+                        const eleita = this.selecionarEleitaPorDesempate(grupo);
                         for (const t of grupo) {
-                            if (t.id !== eleita.id && !t.pinned && !t.active) {
+                            if (eleita && t.id !== eleita.id && !t.pinned && !t.active) {
                                 idsParaFechar.push(t.id);
                             }
                         }

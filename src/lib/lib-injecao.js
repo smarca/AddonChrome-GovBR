@@ -1,14 +1,15 @@
 /* ==========================================================================
- * Nome do arquivo: lib-injecao.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca de Gerenciamento, Registro e Injeção de Scripts/CSS
+ * ARQUIVO: src/lib/lib-injecao.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca de Gerenciamento, Registro e Injeção de Scripts/CSS
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-injecao.js
  * - Classe Exportada: JusGovInjecaoScripts (self.JusGovInjecaoScripts / window.JusGovInjecaoScripts)
  * - Métodos Públicos: filtrarArquivosExistentes, enfileirarRegistro, injetarRetroativamenteNasAbasAbertas, agendarInjecaoSeguraNaAba,
- *   obterArquivosNucleoCopia, obterArquivosModuloInput, obterArquivosConteudoIntegrado, obterArquivosCssPje, limparDebounceAba
+ *   obterArquivosNucleoCopia, obterArquivosModuloInput, obterArquivosConteudoIntegrado, obterArquivosCssPje, limparDebounceAba, limparUisOrfasEmAbasAbertas
  * - Padrão Arquitetural: UMD (Universal Module Definition) para compatibilidade cruzada
  *   com Service Worker (Background MV3), Content Scripts, Popups/Options e ambiente Node/Jest.
  * - Regras / Seções: Diretrizes 1/4/11/16, Seção 3 (BP-06 / ARQ-01)
@@ -35,17 +36,30 @@
 }(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
 
-    /* Grupo 2: CÓPIA INTELIGENTE — Núcleo desacoplado de constantes, auditoria, acumulador e estágios POO */
+    /* Grupo 2: CÓPIA INTELIGENTE + Bibliotecas UI (Tela/Ancorado) + Módulos Globais (mod-XPath e mod-colar) */
     const ARQUIVOS_NUCLEO_MODULO_COPIA = Object.freeze([
         'src/cfg/cfg-defaults.js',
+        'src/lib/lib-base-modulo.js',
         'src/lib/lib-constantes.js',
         'src/lib/lib-verificadores.js',
+        'src/lib/lib-escopo-url.js',
+        'src/lib/lib-ui-tela.js',
+        'src/lib/lib-ui-ancorado.js',
+        'src/mod-XPath/xpath-dialogo.js',
+        'src/mod-XPath/xpath-regras-inspetor.js',
+        'src/mod-XPath/mod-xpath.js',
+        'src/mod-colar/mod-colar.js',
+        'src/mod-input/input-orquestrador-mouse.js',
+        'src/mod-copia/copia-synccfg.js',
+        'src/mod-copia/copia-dom.js',
+        'src/mod-copia/copia-teclado.js',
+        'src/mod-copia/lib-copia-padroes.js',
+        'src/mod-copia/lib-copia-filtros-texto.js',
         'src/mod-copia/copia-aviso-flutuante.js',
-        'src/mod-copia/copia-dialogo-mapeamento.js',
-        'src/mod-copia/copia-regras-inspetor.js',
         'src/mod-copia/copia-clipboard.js',
         'src/mod-copia/copia-acumulador.js',
         'src/mod-copia/copia-geometria.js',
+        'src/mod-copia/copia-filtros-html.js',
         'src/mod-copia/copia-filtros.js',
         'src/mod-copia/copia-validadores.js',
         'src/mod-copia/copia-minutas.js',
@@ -56,6 +70,10 @@
         'src/mod-copia/copia-estagio4.js',
         'src/mod-copia/copia-estagio5.js',
         'src/mod-copia/copia-estagio6.js',
+        'src/mod-copia/copia-comportamento-dom.js',
+        'src/mod-copia/copia-progressao.js',
+        'src/mod-copia/copia-copiar.js',
+        'src/mod-copia/copia-monitor-dom.js',
         'src/mod-copia/mod-copia.js'
     ]);
 
@@ -69,12 +87,22 @@
         'src/mod-input/mod-input.js'
     ]);
 
+    /* Grupo Automação PJe (Isolado e Opcional) — Submódulos POO declarativos XPath/CSS/PAD-Custom, Espera, Diálogos e Motor de Fluxo */
+    const ARQUIVOS_MODULO_AUTOMATE = Object.freeze([
+        'src/mod-automate/automate-seletores.js',
+        'src/mod-automate/automate-espera.js',
+        'src/mod-automate/automate-dialogos.js',
+        'src/mod-automate/automate-motor-fluxo.js',
+        'src/mod-automate/mod-automate.js'
+    ]);
+
     /* Cadeia determinística unificada do Content Script (espelhando 1:1 a ordem de options.html e executar_testes.html):
-     * 1º Núcleo Grupo 1 (Anti-Ampulheta POO) -> 2º Núcleo Grupo 2 (Cópia POO) -> 3º Núcleo Grupo 3 (Input POO) -> 4º Orquestrador DOM copia-selecionar.js */
+     * 1º Núcleo Grupo 1 (Anti-Ampulheta POO) -> 2º Núcleo Grupo 2 (Cópia POO) -> 3º Núcleo Grupo 3 (Input POO) -> 4º Módulo Automate Opcional -> 5º Orquestrador DOM copia-selecionar.js */
     const ARQUIVOS_CONTEUDO_INTEGRADO = Object.freeze([
         'src/mod-anti-ampulheta/mod-anti-ampulheta.js',
         ...ARQUIVOS_NUCLEO_MODULO_COPIA,
         ...ARQUIVOS_MODULO_INPUT,
+        ...ARQUIVOS_MODULO_AUTOMATE,
         'src/mod-copia/copia-selecionar.js'
     ]);
 
@@ -142,6 +170,10 @@
             return ARQUIVOS_MODULO_INPUT;
         }
 
+        obterArquivosModuloAutomate() {
+            return ARQUIVOS_MODULO_AUTOMATE;
+        }
+
         obterArquivosConteudoIntegrado() {
             return ARQUIVOS_CONTEUDO_INTEGRADO;
         }
@@ -196,16 +228,12 @@
                     }
 
                     /* Passo 3.4: Registro dinâmico dos Content Scripts JS no motor nativo do Chrome
-                     * Configurado com runAt: 'document_start' para vincular os botões do mouse e o teclado
-                     * instantaneamente no primeiro ciclo do navegador, sem ter que esperar a página carregar */
+                     * Configurado com runAt: 'document_start' e '<all_urls>' + matchAboutBlank: true para vincular
+                     * periféricos globais (botões 4/5, botão do meio em iframes CKEditor about:blank e guias vazias)
+                     * instantaneamente no primeiro ciclo do navegador; o filtro de domínios da seleção/cópia é
+                     * aplicado em tempo real por verificarUrlPermitida() dentro de copia-selecionar.js. */
                     if (modoTurbo !== 'desligado') {
-                        let matchesTurbo = ['<all_urls>'];
-                        if (modoTurbo === 'url' && Array.isArray(urlsTurbo) && urlsTurbo.length > 0) {
-                            const sanitizadas = urlsUtil && typeof urlsUtil.sanitizarParaMatches === 'function'
-                                ? urlsUtil.sanitizarParaMatches(urlsTurbo)
-                                : [];
-                            if (sanitizadas.length > 0) matchesTurbo = sanitizadas;
-                        }
+                        const matchesTurbo = ['<all_urls>'];
                         const [jsExistentes, mainExistentes] = await Promise.all([
                             this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
                             this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
@@ -278,6 +306,7 @@
                         modoTurbo: config.modoTurbo,
                         urlsTurbo: config.urlsTurbo,
                         ativoAmpuletas: config.ativoAmpuletas !== false,
+                        automatePjeAtivo: Boolean(config.automatePjeAtivo),
                         manterFormatacaoBasica: Boolean(config.manterFormatacaoBasica),
                         nivelFiltroFormatacao: config.nivelFiltroFormatacao || 'basico',
                         modoRetirarSelecao: config.modoRetirarSelecao || ((config.tempoFlashBorderMs === 0) ? 'nenhuma' : 'com_flash'),
@@ -324,6 +353,14 @@
                                 files: jsExistentes
                             }).catch(() => { });
                         }
+                    } else if (config.automatePjeAtivo) {
+                        const autoExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_AUTOMATE, apiChrome);
+                        if (autoExistentes.length > 0) {
+                            apiChrome.scripting.executeScript({
+                                target: { tabId: tab.id, allFrames: false },
+                                files: autoExistentes
+                            }).catch(() => { });
+                        }
                     }
 
                     /* Passo 3.9: Se o PJe Anti-Ampulhetas estiver ativo para esta URL, garantir que o CSS esteja injetado; caso desativado, remover dinamicamente sem reload */
@@ -356,13 +393,14 @@
          * OBJETIVO DE RECONSTRUCAO: Injetar e sincronizar automaticamente ao concluir o
          * carregamento de abas e frames com debounce de 350ms para evitar sobrecarga.
          */
-        agendarInjecaoSeguraNaAba(tabId, frameIdsOpcional = null, chromeApi = null) {
+        agendarInjecaoSeguraNaAba(tabId, frameIdsOpcional = null, chromeApi = null, faseOpcional = 'padrao') {
             if (!tabId) return;
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
             if (!apiChrome || !apiChrome.scripting) return;
 
             const agora = Date.now();
-            const chave = frameIdsOpcional ? `${tabId}_${frameIdsOpcional.join(',')}` : `${tabId}_all`;
+            const chaveBase = frameIdsOpcional ? `${tabId}_${frameIdsOpcional.join(',')}` : `${tabId}_all`;
+            const chave = `${chaveBase}_${faseOpcional || 'padrao'}`;
             const ultimo = this.mapaDebounceInjecaoTab.get(chave) || 0;
             if ((agora - ultimo) < 350) return;
             this.mapaDebounceInjecaoTab.set(chave, agora);
@@ -400,6 +438,32 @@
         }
 
         /**
+         * Injeta sob demanda o modulo isolado Automacao de Tarefas (`src/mod-automate/`) no frame principal
+         * de uma aba especifica (inclusive quando `modoTurbo` estiver em `url` ou `desligado`).
+         * @param {number} tabId
+         * @param {Object} [chromeApi]
+         * @returns {Promise<boolean>}
+         */
+        async garantirModuloAutomateNaAba(tabId, chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!tabId || !apiChrome || !apiChrome.scripting || typeof apiChrome.scripting.executeScript !== 'function') {
+                return false;
+            }
+            try {
+                const autoExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_AUTOMATE, apiChrome);
+                if (autoExistentes.length === 0) return false;
+                await apiChrome.scripting.executeScript({
+                    target: { tabId, allFrames: false },
+                    files: autoExistentes,
+                    injectImmediately: true
+                });
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        /**
          * Injeta folhas CSS anti-ampulhetas sob demanda no carregamento de uma aba compativel.
          */
         async injetarCssAmpuletasNaAba(tabId, url, config, chromeApi = null, urlsUtilOpcional = null) {
@@ -421,6 +485,70 @@
                 return true;
             } catch (_) {
                 return false;
+            }
+        }
+
+        /**
+         * Remove interfaces orfas (minipopups, barras, modais e inspetores) deixadas por
+         * versoes/contextos invalidados da extensao nas abas abertas antes da reinjecao limpa (FEAT-88).
+         */
+        async limparUisOrfasEmAbasAbertas(chromeApi = null) {
+            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+            if (!apiChrome || !apiChrome.tabs || !apiChrome.scripting) return 0;
+
+            const fnLimparOrfaos = () => {
+                let tinhaAutomateOrfao = false;
+                try {
+                    document.querySelectorAll(
+                        '#jusgov-inspetor-tempo-real, [data-jusgov-inspetor="true"], #jusgov-modal-mapeamento-regra, #jusgov-hospedeiro-top-layer, .jusgov-dialog-input-rapido, #jusgov-automate-dialog-overlay, #jusgov-flash-contour-container, .jusgov-flash-box, [data-jusgov-flash="true"], #jusgov-validacao-flutuante, #jusgov-pasted-markers-container, [data-jusgov-pasted-container="true"], #jusgov-pomodoro-backdrop-global, #jusgov-modal-produtividade-trabalho'
+                    ).forEach((el) => {
+                        try { el.remove(); } catch (_) { }
+                    });
+                    document.querySelectorAll('#jusgov-pomodoro-barra-global, [data-jusgov-pomodoro-bar="true"]').forEach((el) => {
+                        if (typeof el.__jusgovAplicarSnapshotExterno !== 'function') {
+                            try { el.remove(); } catch (_) { }
+                        }
+                    });
+                    const barraAuto = document.getElementById('jusgov-automate-pje-barra');
+                    if (barraAuto && !barraAuto.__jusgovAutomateOwner) {
+                        tinhaAutomateOrfao = true;
+                        try { barraAuto.remove(); } catch (_) { }
+                    }
+                    if (typeof CSS !== 'undefined' && CSS.highlights && typeof CSS.highlights.delete === 'function') {
+                        CSS.highlights.delete('jusgov-flash-copy');
+                    }
+                } catch (_) { }
+                return { tinhaAutomateOrfao };
+            };
+
+            try {
+                const tabs = await apiChrome.tabs.query({});
+                const tarefas = [];
+                for (let i = 0; i < tabs.length; i++) {
+                    const tab = tabs[i];
+                    if (!tab || !tab.id || !tab.url) continue;
+                    if (tab.discarded || /^(?:chrome|edge|devtools|view-source|chrome-extension):/i.test(tab.url) || (/^about:/i.test(tab.url) && tab.url !== 'about:blank')) {
+                        continue;
+                    }
+                    tarefas.push(
+                        apiChrome.scripting.executeScript({
+                            target: { tabId: tab.id },
+                            func: fnLimparOrfaos
+                        }).then((res) => {
+                            const primeiro = Array.isArray(res) ? res[0] : null;
+                            if (primeiro && primeiro.result && primeiro.result.tinhaAutomateOrfao) {
+                                return this.garantirModuloAutomateNaAba(tab.id, apiChrome).catch(() => false);
+                            }
+                            return true;
+                        }).catch(() => null)
+                    );
+                }
+                if (tarefas.length > 0) {
+                    await Promise.allSettled(tarefas);
+                }
+                return tarefas.length;
+            } catch (_) {
+                return 0;
             }
         }
     }

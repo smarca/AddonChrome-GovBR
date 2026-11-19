@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio1.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioUnidadeAtomica
  * 
  * @MAPA-IA:
@@ -28,7 +30,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.1: Estágio 1 - Unidade Atômica)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.1: Estágio 1)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-003: Bitmask O(1) e ADR-004: Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';

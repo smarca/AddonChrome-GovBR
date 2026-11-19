@@ -1,14 +1,16 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/mod-copia.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: ModuloCopia
  * 
  * @MAPA-IA:
  * - Arquivo: src/mod-copia/mod-copia.js
  * - Classe Exportada: ModuloCopia (window.JusGovModuloCopia)
- * - Métodos Públicos: simularCliqueEmTexto(texto, idxZeroBased, numCliques, ehAlt), getters das 11 instâncias POO + static get NULL_OBJECTS
- * - Dependências Injetadas: GeometriaDOM, FiltrosHtml, FeedbackVisual, ValidadoresForenses, PlaceholdersMinutas, EstagioUnidadeAtomica..EstagioTabelas, AcumuladorCopia, AvisoFlutuante
- * - Regras / Seções: Diretrizes 11/16, ADR-004/006 (Null Objects c/ setters no-op), Seção 6.47, Seção 6.64 (blindagem POO)
+ * - Métodos Públicos: simularCliqueEmTexto(texto, idxZeroBased, numCliques, ehAlt), getters das instâncias POO agregadas (geometria, filtros, filtrosTexto, filtrosHtml, padroesCopia, visual, validadores, placeholders, estagio1..6, acumulador, validadorFlutuante) + static get NULL_OBJECTS
+ * - Dependências Injetadas: GeometriaDOM, FiltrosTextoCopia, FiltrosHtmlProgressivos, FiltrosHtml, PadroesReconhecidosCopia, FeedbackVisual, ValidadoresForenses, PlaceholdersMinutas, EstagioUnidadeAtomica..EstagioTabelas, AcumuladorCopia, AvisoFlutuante
+ * - Regras / Seções: Diretrizes ENG-01/ENG-02 (Fachada Agregadora mod-<módulo>.js + libs internas lib-<módulo>-*), ADR-004/006 (Null Objects c/ setters no-op), ARQ-09 / FEAT-73
  * 
  * FINALIDADE:
  * Main / Fachada Orquestradora do Módulo de Seleção e Cópia Inteligente:
@@ -40,7 +42,7 @@
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 2: Arquitetura Global e Seção 3: 6 Estágios)
  * - docs/03_BACKLOG_TAREFAS_E_FEATURES.md (Seções 6.47 e 6.49: Separação de Módulos e POO)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004 e ADR-006: Null Object Pattern)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -160,9 +162,30 @@
         acumularSelecaoTabela() { return false; }
     });
 
+    const NULL_PADROES_COPIA = Object.freeze({
+        obterCatalogoPadroesCopia() { return []; },
+        ehTextoBlocoMultiSegmento() { return false; },
+        aplicarLimpezaNumericaComTravaAlfabetica() { return null; },
+        identificarGrupoPadraoNoTexto() { return null; },
+        verificarSeTextoEhBlocoOuPalavraUnica(t) { return Boolean(t && !/\s/.test(String(t).trim())); }
+    });
+
+    const NULL_FILTROS_TEXTO = Object.freeze({
+        converterCabecalhoPjeAtivo: true,
+        aplicarPreHigienizacaoTexto(t) { return String(t || ''); },
+        aplicarFiltro1DadosLixo(t) { return String(t || ''); },
+        unificarLinhasComEspacamentoAntiTruncamento(t) { return String(t || '').trim(); },
+        aplicarFiltro3InformacoesELinhas(t) { return String(t || '').trim(); },
+        aplicarPosLimpezaDefensiva(t) { return String(t || '').trim(); },
+        higienizarTextoParaCopia(t) { return String(t || '').trim(); }
+    });
+
     class ModuloCopia {
         #geometria;
+        #filtrosTexto;
+        #filtrosHtml;
         #filtros;
+        #padroesCopia;
         #visual;
         #validadores;
         #placeholders;
@@ -174,12 +197,19 @@
         #estagio6;
         #acumulador;
         #validadorFlutuante;
+        #comportamentoDom = null;
+        #progressao = null;
+        #copiar = null;
+        #monitorDom = null;
 
         constructor(opcoes = {}) {
             const C_EXT = (typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : {};
 
             this.#geometria = opcoes.geometria || (typeof window !== 'undefined' && window.JusGovGeometriaDOM ? new window.JusGovGeometriaDOM() : NULL_GEOMETRIA);
-            this.#filtros = opcoes.filtros || (typeof window !== 'undefined' && window.JusGovFiltrosHtml ? new window.JusGovFiltrosHtml() : NULL_FILTROS);
+            this.#filtrosTexto = opcoes.filtrosTexto || (typeof window !== 'undefined' && window.JusGovFiltrosTextoCopia ? new window.JusGovFiltrosTextoCopia() : NULL_FILTROS_TEXTO);
+            this.#filtrosHtml = opcoes.filtrosHtml || (typeof window !== 'undefined' && window.JusGovFiltrosHtmlProgressivos ? new window.JusGovFiltrosHtmlProgressivos({ filtrosTexto: this.#filtrosTexto }) : NULL_FILTROS);
+            this.#filtros = opcoes.filtros || (typeof window !== 'undefined' && window.JusGovFiltrosHtml ? new window.JusGovFiltrosHtml({ filtrosTexto: this.#filtrosTexto, filtrosHtml: this.#filtrosHtml }) : NULL_FILTROS);
+            this.#padroesCopia = opcoes.padroesCopia || (typeof window !== 'undefined' && window.JusGovPadroesCopia ? new window.JusGovPadroesCopia(C_EXT) : NULL_PADROES_COPIA);
             this.#visual = opcoes.visual || (typeof window !== 'undefined' && window.JusGovFeedbackVisual ? new window.JusGovFeedbackVisual() : NULL_VISUAL);
             this.#validadorFlutuante = opcoes.validadorFlutuante || opcoes.avisoFlutuante ||
                 (typeof window !== 'undefined' && window.JusGovValidadorAtivo) ||
@@ -207,6 +237,8 @@
             return Object.freeze({
                 geometria: NULL_GEOMETRIA,
                 filtros: NULL_FILTROS,
+                filtrosTexto: NULL_FILTROS_TEXTO,
+                padroesCopia: NULL_PADROES_COPIA,
                 visual: NULL_VISUAL,
                 validadores: NULL_VALIDADORES,
                 placeholders: NULL_PLACEHOLDERS,
@@ -221,6 +253,9 @@
 
         get geometria() { return this.#geometria; }
         get filtros() { return this.#filtros; }
+        get filtrosTexto() { return this.#filtrosTexto; }
+        get filtrosHtml() { return this.#filtrosHtml; }
+        get padroesCopia() { return this.#padroesCopia; }
         get visual() { return this.#visual; }
         get validadores() { return this.#validadores; }
         get placeholders() { return this.#placeholders; }
@@ -232,6 +267,24 @@
         get estagio6() { return this.#estagio6; }
         get acumulador() { return this.#acumulador; }
         get validadorFlutuante() { return this.#validadorFlutuante; }
+        get comportamentoDom() { return this.#comportamentoDom; }
+        get progressao() { return this.#progressao; }
+        get copiar() { return this.#copiar; }
+        get monitorDom() { return this.#monitorDom; }
+
+        registrarSubmodulosRuntime(mapa = {}) {
+            if (!mapa || typeof mapa !== 'object') return;
+            if (mapa.comportamentoDom) this.#comportamentoDom = mapa.comportamentoDom;
+            if (mapa.progressaoSelecao) this.#progressao = mapa.progressaoSelecao;
+            if (mapa.gerenciadorCopia) this.#copiar = mapa.gerenciadorCopia;
+            if (mapa.monitorDom) this.#monitorDom = mapa.monitorDom;
+        }
+
+        obterMotorIntegrado() {
+            return (typeof window !== 'undefined')
+                ? (window.JusGovCopiaSelecionar || window.JusGovMotorSelecaoTeste || null)
+                : null;
+        }
 
         /**
          * Simula o clique em texto puro avaliando os estágios de expansão contextual.

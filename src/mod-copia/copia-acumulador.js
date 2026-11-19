@@ -1,6 +1,6 @@
 /* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-acumulador.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:

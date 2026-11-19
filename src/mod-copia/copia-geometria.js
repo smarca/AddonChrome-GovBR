@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-geometria.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: GeometriaDOM
  * 
  * @MAPA-IA:
@@ -18,7 +20,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Diretrizes 11, 14 e 15)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 4: Hot-Paths DOM e Geometria)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-003: Bitmask O(1) e ADR-004: Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';

@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: mod-manut.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Privacidade e Manutenção do Navegador
+ * ARQUIVO: src/mod-manut/mod-manut.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Privacidade e Manutenção do Navegador
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-manut/mod-manut.js

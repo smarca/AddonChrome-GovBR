@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio4.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioDelimitadores
  * 
  * @MAPA-IA:
@@ -28,7 +30,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.4: Estágio 4 - Delimitadores e Aspas)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.4: Estágio 4)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -89,6 +91,7 @@
                         const charFechamento = paresAbertura[ch];
                         let nivel = 1;
                         for (let i = pos + 1; i < texto.length; i++) {
+                            if (this.eQuebraDeLinha(texto[i])) break;
                             if (texto[i] === ch) nivel++;
                             else if (texto[i] === charFechamento) {
                                 nivel--;
@@ -107,6 +110,7 @@
                         const charAbertura = paresFechamento[ch];
                         let nivel = 1;
                         for (let i = pos - 1; i >= 0; i--) {
+                            if (this.eQuebraDeLinha(texto[i])) break;
                             if (texto[i] === ch) nivel++;
                             else if (texto[i] === charAbertura) {
                                 nivel--;

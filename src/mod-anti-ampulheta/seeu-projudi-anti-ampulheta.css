@@ -1,11 +1,18 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/seeu-projudi-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/seeu-projudi-anti-ampulheta.css
+ *
 @name         Projudi / SEEU - Anti-Ampulheta
 @namespace    seeu.pje.jus.br
 @version      2.2.0
 @match        *://seeu.pje.jus.br/*
 @match        *://projudi.*.jus.br/*
-==/UserStyle== */
+ * ========================================================================== */
 
 /* ==========================================================================
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]

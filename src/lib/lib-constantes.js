@@ -1,6 +1,6 @@
 /* ==========================================================================
  * ARQUIVO: src/lib/lib-constantes.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
@@ -352,8 +352,8 @@
         ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL: /^(\d{1,7})-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/,
         ENTIDADE_NUMERICA_PONTUADA_SHIFT: /^(?:R\$\s*)?[0-9A-Z]+(?:[\/.\-\s()][0-9A-Z]+)+$/i,
         ENTIDADE_FILTRO_SHIFT: /^(?:CHAVES_FISCAIS_E_BOLETOS_CONTIGUOS|CHAVES_FISCAIS_E_BOLETOS_ESPACADOS|DOCUMENTOS_PESSOAIS_FISCAIS_E_CIDADAO|NUMERACOES_ID_E_PUBLICAS|DATA_COM_HORARIO_CONTIGUO|TELEFONES_NACIONAIS_E_INTERNACIONAIS|FINANCEIRO_E_DECIMAIS|DATAS_E_HORARIOS|GENERICOS_E_FALLBACKS|PROCESSOS_CNJ|DOCUMENTOS_PESSOAIS|DATAS_E_TEMPO|CONTATOS_E_REDES)$/,
-        SEQUENCIA_PALAVRAS_MAIUSCULAS: /(?<![\p{L}\p{N}])\p{Lu}[\p{Lu}\p{N}\u00BA\u00B0\u00AA]*(?:[\/.\-][\p{Lu}\p{N}]+)*(?:[\t \u00A0\r\n]+[\p{Lu}\p{N}][\p{Lu}\p{N}\u00BA\u00B0\u00AA]*(?:[\/.\-][\p{Lu}\p{N}]+)*)+(?![\p{L}\p{N}])/gu,
-        CONTEM_DUAS_PALAVRAS_MAIUSCULAS: /\p{Lu}[\p{Lu}\p{N}\u00BA\u00B0\u00AA\/.\-]*[\t \u00A0\r\n]+(?:[\p{Lu}\p{N}\u00BA\u00B0\u00AA\/.\-]+[\t \u00A0\r\n]+)*\p{Lu}/u,
+        SEQUENCIA_PALAVRAS_MAIUSCULAS: /(?<![\p{L}\p{N}])\p{Lu}[\p{Lu}\p{N}\u00BA\u00B0\u00AA]*(?:[\/.\-][\p{Lu}\p{N}]+)*(?:[\t \u00A0]+[\p{Lu}\p{N}][\p{Lu}\p{N}\u00BA\u00B0\u00AA]*(?:[\/.\-][\p{Lu}\p{N}]+)*)+(?![\p{L}\p{N}])/gu,
+        CONTEM_DUAS_PALAVRAS_MAIUSCULAS: /\p{Lu}[\p{Lu}\p{N}\u00BA\u00B0\u00AA\/.\-]*[\t \u00A0]+(?:[\p{Lu}\p{N}\u00BA\u00B0\u00AA\/.\-]+[\t \u00A0]+)*\p{Lu}/u,
         PREFIXO_NUMERACAO_PARAGRAFO: /^\s*(?:\d{1,3}(?:\.\d{1,3})*[.)\-\u2013]?|[IVXLCDM]{1,7}[.)\-\u2013]|[a-zA-Z]\)|\u00A7+\s*\d*)\s*/u,
         MARCADOR_NOVO_PARAGRAFO_LINHA: /^\s*(?:\d{1,3}(?:\.\d{1,3})*[.)\-\u2013]\s+|[IVXLCDM]{1,7}[.)\-\u2013]\s+|[a-zA-Z]\)\s+|\u00A7+\s*\d+)/u,
         FRONTEIRA_ENTRE_PARAGRAFOS_NUMERADOS: /[.;!?][\t \u00A0\r\n]+(?=(?:\d{1,3}(?:\.\d{1,3})*[.)\-\u2013]\s+|[IVXLCDM]{1,7}[.)\-\u2013]\s+|[a-zA-Z]\)\s+))/gu,

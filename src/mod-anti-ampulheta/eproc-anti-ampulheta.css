@@ -1,12 +1,19 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/eproc-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/eproc-anti-ampulheta.css
+ *
 @name         eproc - Anti-Ampulheta
 @namespace    eproc.jus.br
 @version      2.2.0
 @description  Remove a cortina 'Carregando...' em consultas, mantendo bloqueio em lotes.
 @match        *://eproc.*.jus.br/*
 @match        *://*.jus.br/eproc/*
-==/UserStyle== */
+ * ========================================================================== */
 
 /* ==========================================================================
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]

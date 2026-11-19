@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-visual.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: FeedbackVisual
  * 
  * @MAPA-IA:
@@ -35,7 +37,7 @@
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 4.2: Polígonos SVG e Flash Multi-Linhas)
  * - docs/03_BACKLOG_TAREFAS_E_FEATURES.md (Seções 6.105, 6.114 e 6.117)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -75,8 +77,12 @@
         #ouvinteScrollMarcadoresAtivo;
         #limparOuvinteScrollMarcadores;
         #rafScrollMarcadores;
+        #uiAncorado;
 
         constructor() {
+            this.#uiAncorado = (typeof window !== 'undefined' && typeof window.JusGovLibUiAncorado === 'function')
+                ? new window.JusGovLibUiAncorado()
+                : null;
             this.#timerFlashBorder = null;
             this.#aguardandoDesselecaoFlash = false;
             this.#timestampCriacaoFlash = 0;
@@ -264,6 +270,9 @@
          * eliminando retângulos aninhados de elementos-pai e unificando fragmentos contíguos.
          */
         calcularLinhasDoRange(rangeAlvo) {
+            if (this.#uiAncorado && typeof this.#uiAncorado.calcularLinhasDoRange === 'function') {
+                return this.#uiAncorado.calcularLinhasDoRange(rangeAlvo);
+            }
             const fragmentos = [];
             const adicionar = (r) => {
                 if (r && r.width > 0.5 && r.height > 0.5) {
@@ -354,6 +363,9 @@
          * Agrupa segmentos contíguos de linhas visuais em blocos para geração do polígono.
          */
         agruparLinhasEmBlocos(segmentos) {
+            if (this.#uiAncorado && typeof this.#uiAncorado.agruparLinhasEmBlocos === 'function') {
+                return this.#uiAncorado.agruparLinhasEmBlocos(segmentos);
+            }
             const ordenados = segmentos.slice().sort((a, b) => (a.top - b.top) || (a.left - b.left));
             const blocos = [];
             for (let i = 0; i < ordenados.length; i++) {
@@ -462,10 +474,7 @@
             return segmentos;
         }
 
-        /**
-         * Recalcula imediatamente a posição do Flash Border ativo durante rolagem ou redimensionamento (BUG-45).
-         */
-        atualizarPosicaoFlashSobRolagem() {
+        #executarAtualizacaoPosicaoFlashSincrona() {
             if (!this.#aguardandoDesselecaoFlash || !this.#rangeAtivoFlash) return;
             const container = document.getElementById('jusgov-flash-contour-container');
             if (!container) return;
@@ -474,12 +483,32 @@
         }
 
         /**
+         * Recalcula imediatamente a posição do Flash Border ativo durante rolagem ou redimensionamento (BUG-45).
+         */
+        atualizarPosicaoFlashSobRolagem() {
+            this.#executarAtualizacaoPosicaoFlashSincrona();
+        }
+
+        #agendarAtualizacaoFlash() {
+            if (!this.#aguardandoDesselecaoFlash || !this.#rangeAtivoFlash) return;
+            if (typeof requestAnimationFrame === 'function') {
+                if (this.#rafScrollFlash) return;
+                this.#rafScrollFlash = requestAnimationFrame(() => {
+                    this.#rafScrollFlash = 0;
+                    this.#executarAtualizacaoPosicaoFlashSincrona();
+                });
+            } else {
+                this.#executarAtualizacaoPosicaoFlashSincrona();
+            }
+        }
+
+        /**
          * Dispara o contorno visual temporário de Flash Border sobre o Range.
          * Ancorado fisicamente ao texto sob rolagem (BUG-45) e com suporte estrito ao modo "Até Interação" (-1).
          */
         dispararFlashBorderVisual(rangeAlvo, duracaoMs = 500, corFlashBorder = '#0d9488') {
             this.limparFlashBorderImediatamente();
-            if (duracaoMs === 0 || !rangeAlvo) return;
+            if (duracaoMs === 0 || !rangeAlvo) return false;
 
             try {
                 const rangeClonado = (typeof rangeAlvo.cloneRange === 'function') ? rangeAlvo.cloneRange() : rangeAlvo;
@@ -503,7 +532,7 @@
                 const segmentos = this.#renderizarGeometriaFlashNoContainer(container, rangeClonado, corBorda);
                 if (segmentos.length === 0) {
                     if (container.parentNode) container.parentNode.removeChild(container);
-                    return;
+                    return false;
                 }
 
                 this.#rangeAtivoFlash = rangeClonado;
@@ -570,7 +599,7 @@
                 };
 
                 const tratarScrollOuResizeFlash = () => {
-                    this.atualizarPosicaoFlashSobRolagem();
+                    this.#agendarAtualizacaoFlash();
                 };
 
                 /* Seção 6.137 / BUG-55: Observa mudanças no layout da página (DOM e redimensionamento de containers/corpo)
@@ -620,7 +649,10 @@
                         this.limparFlashBorderImediatamente();
                     }, duracaoMs);
                 }
-            } catch (_) { }
+                return true;
+            } catch (_) {
+                return false;
+            }
         }
 
         /**
@@ -773,6 +805,9 @@
         }
 
         #ehMutacaoDeOverlayVisualProprio(target) {
+            if (this.#uiAncorado && typeof this.#uiAncorado.ehMutacaoDeOverlayProprio === 'function') {
+                return this.#uiAncorado.ehMutacaoDeOverlayProprio(target);
+            }
             const el = (target && target.nodeType === Node.TEXT_NODE) ? target.parentElement : target;
             if (!el || !el.closest) return false;
             return Boolean(el.closest(
@@ -781,6 +816,9 @@
         }
 
         #iniciarObservadorLayout(estaAtivoFn, aoMudarFn) {
+            if (this.#uiAncorado && typeof this.#uiAncorado.iniciarObservadorLayoutAncorado === 'function') {
+                return this.#uiAncorado.iniciarObservadorLayoutAncorado(estaAtivoFn, aoMudarFn);
+            }
             const desconectarCallbacks = [];
             let encerrado = false;
             const desconectar = () => {
@@ -834,15 +872,11 @@
 
         #garantirOuvintesScrollMarcadoresPermanentes() {
             if (this.#ouvinteScrollMarcadoresAtivo) return;
-            const atualizarImediato = () => {
-                if (this.#marcadoresPermanentes.length === 0) return;
-                this.#renderizarTodosMarcadoresPermanentesNoDom();
-            };
             const agendar = () => this.#agendarAtualizacaoMarcadores();
             const opts = { capture: true, passive: true };
-            window.addEventListener('scroll', atualizarImediato, opts);
-            document.addEventListener('scroll', atualizarImediato, opts);
-            window.addEventListener('resize', atualizarImediato, opts);
+            window.addEventListener('scroll', agendar, opts);
+            document.addEventListener('scroll', agendar, opts);
+            window.addEventListener('resize', agendar, opts);
             window.addEventListener('hashchange', agendar, opts);
             window.addEventListener('popstate', agendar, opts);
             document.addEventListener('visibilitychange', agendar, opts);
@@ -854,9 +888,9 @@
 
             this.#ouvinteScrollMarcadoresAtivo = true;
             this.#limparOuvinteScrollMarcadores = () => {
-                window.removeEventListener('scroll', atualizarImediato, opts);
-                document.removeEventListener('scroll', atualizarImediato, opts);
-                window.removeEventListener('resize', atualizarImediato, opts);
+                window.removeEventListener('scroll', agendar, opts);
+                document.removeEventListener('scroll', agendar, opts);
+                window.removeEventListener('resize', agendar, opts);
                 window.removeEventListener('hashchange', agendar, opts);
                 window.removeEventListener('popstate', agendar, opts);
                 document.removeEventListener('visibilitychange', agendar, opts);

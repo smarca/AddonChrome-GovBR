@@ -1,11 +1,18 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/creta-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/creta-anti-ampulheta.css
+ *
 @name         Creta JEF - Anti-Ampulheta
 @namespace    jef.trf5.jus.br
 @version      2.2.0
 @match        *://*.trf5.jus.br/creta*
 @match        *://*.trf5.jus.br/jef*
-==/UserStyle== */
+ * ========================================================================== */
 
 /* ==========================================================================
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]

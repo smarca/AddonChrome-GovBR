@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: mod-anti-ampulheta.js
- * PROJETO: JusGovBR — Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 1 — ANTI-AMPULHETAS: Otimização de Performance e Desbloqueio
+ * ARQUIVO: src/mod-anti-ampulheta/mod-anti-ampulheta.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 1 — ANTI-AMPULHETAS: Otimização de Performance e Desbloqueio
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-anti-ampulheta/mod-anti-ampulheta.js
@@ -82,7 +83,7 @@
 
     /* Matriz ordenada de prioridade dos sistemas judiciais (Seção 6.103 / FEAT-20 - fallback caso JSON não carregado) */
     const MATRIZ_SISTEMAS_JUDICIAIS_FALLBACK = Object.freeze([
-        Object.freeze({ id: 'pje', nome: 'PJe', css: 'pje-anti-ampulheta.css', padrao: /\bpje\b|pje\.|\.jus\.br\/pje/i }),
+        Object.freeze({ id: 'pje', nome: 'PJe', css: 'pje-anti-ampulheta.css', padrao: /\bpje\b|pje\.|\.jus\.br\/pje|frontend\.prd\.cnj\.cloud|sso\.cloud\.pje\.jus\.br/i }),
         Object.freeze({ id: 'eproc', nome: 'Eproc', css: 'eproc-anti-ampulheta.css', padrao: /\beproc\b|eproc\./i }),
         Object.freeze({ id: 'pdpj', nome: 'PDPJ', css: 'pdpj-stf-stj-anti-ampulheta.css', padrao: /\bpdpj\b|\bprevjud\b|stf\.jus\.br|stj\.jus\.br/i }),
         Object.freeze({ id: 'projudi', nome: 'Projudi', css: 'seeu-projudi-anti-ampulheta.css', padrao: /\bprojudi\b|projudi\./i }),
@@ -112,212 +113,82 @@
     }
 
     /* =====================================================================
-     * FOLHA DE ESTILO CONSOLIDADA ANTI-AMPULHETAS (DESACOPLADA EM SEÇÃO 6.102 / ARQ-03)
+     * CARREGAMENTO DINAMICO DAS FOLHAS CSS EXTERNAS (SEM CSS HARDCODED NO JS)
+     * Cada sistema carrega o arquivo .css correspondente em src/mod-anti-ampulheta/
+     * via preload de auditoria (__JUSGOV_CSS_ANTI_AMPULHETA__) ou IPC seguro
+     * (OBTER_CSS_ANTI_AMPULHETA) no Background Service Worker.
      * ===================================================================== */
-    const TURBO_CSS = `
-        /* ANIQUILAÇÃO DOS LOADERS E SPINNERS
-           O PORQUÊ: O PJe bloqueia a tela inteira a cada requisição AJAX.
-           O 'pointer-events: none' garante que o usuário possa continuar clicando através do fantasma do spinner. */
-        [id="movimentarRegion:status.stop"],
-        [id="movimentarRegion:status.start"],
-        [id$=":status.start"],
-        [id*="mploading" i],
-        [class*="mploading" i],
-        [id*="painelAguarde" i],
-        [id*="modalAguarde" i],
-        [class*="rich-mpnl-mask" i]:not([id*="mpProgresso" i]):not([id*="lote" i]),
-        ngx-loading,
-        .ngx-loading-backdrop,
-        .loading-foreground,
-        .block-ui-wrapper:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .block-ui-overlay:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .p-blockui:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .p-blockui-document:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .p-component-overlay:not(:has([role="dialog"], [role="alertdialog"], mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .ui-blockui:not(:has(mat-progress-bar, p-progressbar, .progress-bar, [role="progressbar"])),
-        .ui-widget-overlay.ui-blockui,
-        .swal2-Delta-loading,
-        #divInfraAviso,
-        #divInfraAvisoFundo,
-        .infraAviso,
-        .infraAvisoFundo,
-        #divCarregando,
-        .blockUI.blockOverlay,
-        #disabledZone,
-        #messageZone,
-        #divAguarde,
-        #mascaraAguarde,
-        #divLoading,
-        .seeu-loading,
-        #bloqueioTela,
-        .saj-loading,
-        .k-loading-mask,
-        .loadmask,
-        pdpj-loading,
-        ngx-spinner,
-        .ngx-spinner-overlay,
-        .br-loading-mask,
-        #div_aguarde,
-        #tela_bloqueio,
-        #carregando_dados,
-        mat-progress-spinner,
-        mat-spinner,
-        mat-mdc-progress-spinner,
-        mat-mdc-spinner,
-        .mat-progress-spinner,
-        .mat-spinner,
-        .mat-mdc-progress-spinner,
-        .mat-mdc-spinner,
-        p-progressspinner,
-        p-progressSpinner,
-        .p-progress-spinner,
-        .p-progress-spinner-svg,
-        .p-progress-spinner-circle,
-        .spinner-border,
-        .spinner-grow,
-        [class*="progress-spinner" i],
-        [class*="progressspinner" i],
-        [class*="loading-spinner" i],
-        .loading-overlay:not([id*="lote" i]):not([class*="lote" i]),
-        .loader-overlay:not([id*="lote" i]):not([class*="lote" i]),
-        .spinner-overlay:not([id*="lote" i]):not([class*="lote" i]),
-        .pje-loading:not([id*="lote" i]):not([class*="lote" i]),
-        [class*="pje-loading" i]:not([id*="lote" i]):not([class*="lote" i]),
-        pdpj-spinner,
-        pje-spinner,
-        app-loading,
-        app-spinner,
-        [id*="spinner" i]:not([id*="lote" i]):not(.ui-spinner):not(.ui-spinner-input):not(p-spinner),
-        [class*="spinner" i]:not([class*="lote" i]):not(.ui-spinner):not(.ui-spinner-input):not(p-spinner),
-        [id*="carregando" i]:not([id*="lote" i]),
-        [class*="carregando" i]:not([class*="lote" i]),
-        .rf-st-mp,
-        #toast-container:not(:has(.toast-error, .toast-warning)),
-        .toast-container:not(:has(.toast-error, .toast-warning)),
-        .toastr:not(:has(.toast-error, .toast-warning)),
-        .ui-growl:not(:has(.ui-growl-message-error, .ui-growl-message-warn)),
-        .p-toast:not(:has(.p-toast-message-error, .p-toast-message-warn)),
-        .cdk-overlay-backdrop.cdk-overlay-dark-backdrop:empty {
-            pointer-events: none !important;
-            cursor: auto !important;
-            opacity: 0.01 !important;
-            z-index: -99999 !important;
+    const cacheCssPorArquivo = new Map();
+    const promessasCssPorArquivo = new Map();
+
+    function obterCssEmCacheSincrono(nomeArquivo) {
+        if (!nomeArquivo) return '';
+        if (cacheCssPorArquivo.has(nomeArquivo)) {
+            return cacheCssPorArquivo.get(nomeArquivo) || '';
+        }
+        try {
+            const g = (typeof globalThis !== 'undefined') ? globalThis : (typeof self !== 'undefined' ? self : null);
+            const mapaPreload = g && g.__JUSGOV_CSS_ANTI_AMPULHETA__;
+            if (mapaPreload && typeof mapaPreload[nomeArquivo] === 'string' && mapaPreload[nomeArquivo].length > 0) {
+                cacheCssPorArquivo.set(nomeArquivo, mapaPreload[nomeArquivo]);
+                return mapaPreload[nomeArquivo];
+            }
+        } catch (_) { }
+        return '';
+    }
+
+    async function carregarCssDeArquivo(nomeArquivo) {
+        const emCache = obterCssEmCacheSincrono(nomeArquivo);
+        if (emCache) return emCache;
+        if (!nomeArquivo || !ARQUIVOS_CSS_ESPECIALIZADOS.includes(nomeArquivo)) return '';
+        if (promessasCssPorArquivo.has(nomeArquivo)) {
+            return promessasCssPorArquivo.get(nomeArquivo);
         }
 
-        /* PRESERVAÇÃO ESTRITA DE OPERAÇÕES EM LOTE / LOOP E BARRAS DE PROGRESSO REAIS (Diretriz Root 6.21) */
-        #mpProgresso,
-        #mpProgressoContainer,
-        #mpProgressoCDiv,
-        [id*="mpProgresso" i]:not(.rich-mpnl-mask-div),
-        #divInfraProgresso,
-        .infraBarraProgresso,
-        [id*="infraProgresso" i],
-        [class*="infraProgresso" i],
-        #divInfraAviso[id*="Lote" i],
-        .infraAviso[class*="Lote" i],
-        .infraBarraProgressoContainer,
-        #modalProcessandoLote,
-        [id*="Lote" i][id*="Progresso" i],
-        .progresso-lote,
-        [id*="AssinaturaLote" i],
-        [class*="assinatura-lote" i],
-        .saj-lote-loading,
-        .k-progressbar,
-        [id*="lote" i][class*="modal" i],
-        [id*="lote" i][class*="panel" i],
-        [class*="lote" i][class*="modal" i],
-        pje-assinatura-lote,
-        pje-movimentacao-lote,
-        mat-progress-bar,
-        p-progressbar,
-        .rich-progress-bar,
-        .progress-bar,
-        progress,
-        [role="progressbar"],
-        [id*="mdMensagemConfirmacao" i],
-        [id*="mdMensagemLancamento" i],
-        [id*="mdMensagemMovimentoNaoLancado" i],
-        [id*="modalConfirmaLimpar" i],
-        [id*="modalDescricaoNaoPreenchida" i],
-        [id*="modalTipoLote" i],
-        [id*="modalErros" i],
-        .modal-anexos,
-        .modal.fade.in,
-        #divInfraDialogo,
-        .infraDialogo,
-        #divInfraMensagemConfirmacao,
-        [role="dialog"]:has(mat-progress-bar, p-progressbar, .rich-progress-bar, .progress-bar, [role="progressbar"]),
-        .rich-modalpanel:has(.rich-progress-bar, [id*="mpProgresso" i], [role="progressbar"]) {
-            pointer-events: auto !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
+        const promessa = (async () => {
+            if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                try {
+                    const resp = await new Promise((resolve) => {
+                        chrome.runtime.sendMessage({ acao: 'OBTER_CSS_ANTI_AMPULHETA', arquivo: nomeArquivo }, (r) => {
+                            if (chrome.runtime && chrome.runtime.lastError) {
+                                resolve(null);
+                                return;
+                            }
+                            resolve(r || null);
+                        });
+                    });
+                    if (resp && resp.ok && typeof resp.css === 'string' && resp.css.length > 0) {
+                        cacheCssPorArquivo.set(nomeArquivo, resp.css);
+                        return resp.css;
+                    }
+                } catch (_) { }
+            }
+            if (typeof fetch === 'function') {
+                try {
+                    const urlCss = (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function')
+                        ? chrome.runtime.getURL(`src/mod-anti-ampulheta/${nomeArquivo}`)
+                        : `../mod-anti-ampulheta/${nomeArquivo}`;
+                    const respFetch = await fetch(urlCss);
+                    if (respFetch && respFetch.ok) {
+                        const txt = await respFetch.text();
+                        if (txt && txt.length > 0) {
+                            cacheCssPorArquivo.set(nomeArquivo, txt);
+                            return txt;
+                        }
+                    }
+                } catch (_) { }
+            }
+            return '';
+        })();
 
-        #mpProgressoDiv,
-        #mpProgressoCursorDiv,
-        [id*="mpProgresso" i][class*="rich-mpnl-mask" i] {
-            pointer-events: auto !important;
-            cursor: wait !important;
-            opacity: 0.55 !important;
-            background-color: #000000 !important;
-            z-index: 10490 !important;
+        promessasCssPorArquivo.set(nomeArquivo, promessa);
+        try {
+            return await promessa;
+        } finally {
+            promessasCssPorArquivo.delete(nomeArquivo);
         }
+    }
 
-        /* ANIQUILAÇÃO TOTAL DE SPINNERS CIRCULARES MODERNOS (ANGULAR MATERIAL / PRIMENG / PJE 2.X / PREVJUD)
-           O PORQUÊ: Loaders giratórios bloqueiam a visão e travam o foco do teclado nos modais de intimação. */
-        mat-progress-spinner,
-        mat-spinner,
-        mat-mdc-progress-spinner,
-        mat-mdc-spinner,
-        .mat-progress-spinner,
-        .mat-spinner,
-        .mat-mdc-progress-spinner,
-        .mat-mdc-spinner,
-        p-progressspinner,
-        p-progressSpinner,
-        .p-progress-spinner,
-        .p-progress-spinner-svg,
-        .p-progress-spinner-circle,
-        .spinner-border,
-        .spinner-grow,
-        [class*="progress-spinner" i],
-        [class*="progressspinner" i],
-        [class*="loading-spinner" i],
-        .loading-spinner,
-        .pje-loading,
-        [class*="pje-loading" i],
-        pdpj-spinner,
-        pje-spinner,
-        app-loading,
-        app-spinner {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-
-        /* ANIQUILAÇÃO GLOBAL DE TEMPO E ANIMAÇÃO */
-        *, *::before, *::after {
-            animation-delay: 0s !important;
-            transition: none !important;
-            transition-delay: 0s !important;
-            transition-duration: 0s !important;
-        }
-
-        /* Destravamento de cursores de espera */
-        html[style*="wait" i],
-        body[style*="wait" i],
-        html[style*="progress" i],
-        body[style*="progress" i],
-        *[style*="cursor: wait" i],
-        *[style*="cursor:wait" i],
-        *[style*="cursor: progress" i],
-        *[style*="cursor:progress" i],
-        .wait-cursor,
-        .busy-cursor {
-            cursor: auto !important;
-        }
-    `;
 
     class ModuloAntiAmpulheta {
         #ativo = true;
@@ -377,6 +248,17 @@
             return ARQUIVOS_CSS_ESPECIALIZADOS;
         }
 
+        #ehDocumentoEditorRicoIsolado(documento) {
+            try {
+                if (!documento) return false;
+                if (documento.designMode === 'on') return true;
+                if (documento.body && (documento.body.isContentEditable || (documento.body.classList && documento.body.classList.contains('cke_editable')))) {
+                    return true;
+                }
+            } catch (_) { }
+            return false;
+        }
+
         /**
          * Inicializa o observador do ciclo de vida e monitoramento de overlays no DOM.
          * @param {Document} [doc]
@@ -385,6 +267,7 @@
         inicializar(doc) {
             const documento = doc || (typeof document !== 'undefined' ? document : null);
             if (!documento) return false;
+            if (this.#ehDocumentoEditorRicoIsolado(documento)) return false;
             if (this.#inicializado && this.#documentoAssociado === documento) return true;
 
             this.destruir();
@@ -454,20 +337,26 @@
             const documento = doc || this.#documentoAssociado || (typeof document !== 'undefined' ? document : null);
             if (!documento) return false;
 
-            /* REGRA 2: Se houver indicador de lote ou barra de progresso ativa, não intervém */
-            if (this.possuiOperacaoLoteEmAndamento(documento)) {
-                return false;
-            }
-
-            /* REGRA 5: Destravamento do cursor de espera órfão no html e body */
+            /* Fast-path O(1): evita querySelector custoso em toda a árvore se nenhum elemento raiz estiver com cursor wait */
             try {
                 const elHtml = documento.documentElement;
                 const elBody = documento.body;
+                const htmlWait = Boolean(elHtml && elHtml.style && elHtml.style.cursor === 'wait');
+                const bodyWait = Boolean(elBody && elBody.style && elBody.style.cursor === 'wait');
+                if (!htmlWait && !bodyWait) {
+                    return false;
+                }
 
-                if (elHtml && elHtml.style && elHtml.style.cursor === 'wait') {
+                /* REGRA 2: Se houver indicador de lote ou barra de progresso ativa, não intervém */
+                if (this.possuiOperacaoLoteEmAndamento(documento)) {
+                    return false;
+                }
+
+                /* REGRA 5: Destravamento do cursor de espera órfão no html e body */
+                if (htmlWait) {
                     elHtml.style.cursor = 'auto';
                 }
-                if (elBody && elBody.style && elBody.style.cursor === 'wait') {
+                if (bodyWait) {
                     elBody.style.cursor = 'auto';
                 }
             } catch (_) {
@@ -508,11 +397,11 @@
         }
 
         static get TURBO_CSS() {
-            return TURBO_CSS;
+            return obterCssEmCacheSincrono('pje-anti-ampulheta.css') || obterCssEmCacheSincrono('generico-anti-ampulheta.css');
         }
 
-        obterTurboCSS() {
-            return TURBO_CSS;
+        obterTurboCSS(nomeArquivo = 'pje-anti-ampulheta.css') {
+            return obterCssEmCacheSincrono(nomeArquivo);
         }
 
         /**
@@ -544,6 +433,12 @@
          */
         blindarCSS(doc) {
             const documento = doc || this.#documentoAssociado || (typeof document !== 'undefined' ? document : null);
+            if (documento && this.#ehDocumentoEditorRicoIsolado(documento)) {
+                const elCke = documento.getElementById ? documento.getElementById('pje-turbo-lock') : null;
+                if (elCke && typeof elCke.remove === 'function') elCke.remove();
+                this.#cssBlindado = false;
+                return false;
+            }
             if (this.#ativo === false) {
                 const el = documento ? documento.getElementById('pje-turbo-lock') : null;
                 if (el) el.remove();
@@ -563,6 +458,8 @@
                 this.garantirObservadorBlindagem(documento);
                 return true;
             }
+            /* Caso o marcador #pje-turbo-lock nao esteja no DOM, reseta a trava em RAM para forcar reinjecao */
+            this.#cssBlindado = false;
 
             let dominio = '';
             let urlCompleta = '';
@@ -595,6 +492,19 @@
 
             if (!ehPJeOuTribunal) return false;
 
+            const arquivoCssAlvo = sistemaIdentificado ? sistemaIdentificado.css : 'generico-anti-ampulheta.css';
+            const conteudoCss = obterCssEmCacheSincrono(arquivoCssAlvo);
+
+            if (!conteudoCss) {
+                /* Carrega assincronamente o arquivo .css correspondente via Background SW e reinjeta assim que disponivel */
+                carregarCssDeArquivo(arquivoCssAlvo).then((cssCarregado) => {
+                    if (cssCarregado && this.#ativo) {
+                        this.blindarCSS(documento);
+                    }
+                }).catch(() => { });
+                return false;
+            }
+
             /* Injeção estrita de folha única por aba (remove duplicatas residuais) */
             const tagsExtras = documento.querySelectorAll('style#pje-turbo-lock');
             for (let i = 1; i < tagsExtras.length; i++) {
@@ -604,8 +514,8 @@
             const style = tagExistente || documento.createElement('style');
             style.id = 'pje-turbo-lock';
             style.setAttribute('data-sistema-judicial', sistemaIdentificado ? sistemaIdentificado.nome : 'Judicial');
-            style.setAttribute('data-css-alvo', sistemaIdentificado ? sistemaIdentificado.css : 'generico-anti-ampulheta.css');
-            style.textContent = TURBO_CSS;
+            style.setAttribute('data-css-alvo', arquivoCssAlvo);
+            style.textContent = conteudoCss;
 
             const alvo = documento.head || documento.documentElement;
             if (alvo) {
@@ -695,6 +605,11 @@
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => instGlobal.blindarCSS(document), { once: true });
             }
+            document.addEventListener('readystatechange', () => {
+                if (document.readyState === 'complete' && !document.getElementById('pje-turbo-lock')) {
+                    instGlobal.blindarCSS(document);
+                }
+            });
             window.addEventListener('load', () => instGlobal.blindarCSS(document), { once: true });
         } catch (_) { }
     }

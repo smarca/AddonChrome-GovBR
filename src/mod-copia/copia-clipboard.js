@@ -1,18 +1,19 @@
 /* ==========================================================================
- * Nome do arquivo: copia-clipboard.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 1 - CÓPIA INTELIGENTE & FORENSE (Clipboard Interno & Colagem)
+ * ARQUIVO: src/mod-copia/copia-clipboard.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 1 - CÓPIA INTELIGENTE & FORENSE (Clipboard Interno & Proxy de Colagem)
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-copia/copia-clipboard.js
  * - Classe Exportada: GerenciadorClipboardInterno (window.JusGovClipboardInterno)
  * - Métodos Públicos: salvarClipboardInternoComBackup, registrarUltimaSelecao,
- *   gravarNaAreaDeTransferencia, emularTeclasColar, emularTeclasWinV,
- *   inserirTextoEmElemento, confirmarColagemGlobalEMarcarPermanente,
- *   executarColagemBotaoDireito
+ *   gravarNaAreaDeTransferencia; proxies de compatibilidade para copia-colar.js
+ *   (emularTeclasColar, emularTeclasWinV, inserirTextoEmElemento,
+ *   confirmarColagemGlobalEMarcarPermanente, executarColagemBotaoDireito)
  * - Regras / Seções: ADR-002 (Simulação sem readText), BLIND-01 / Seção 6.104 (512KB + ordem estrita),
- *   BUG-17 / Seções 6.110 e 6.120 (2 Slots passivos), FEAT-21 / Seção 6.105 (Marcador Permanente),
+ *   BUG-17 / Seções 6.110 e 6.120 (2 Slots passivos), ARQ-08 (Colagem isolada em copia-colar.js),
  *   Diretriz 16 (SRP + DIP + Null Object)
  *
  * DIRETIVAS DE RECONSTRUÇÃO CLEAN-ROOM:
@@ -21,8 +22,8 @@
  *    (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__) de forma idempotente quando igual.
  * 2) ORDEM ESTRITA (BLIND-01): Sempre valida e grava na memória interna (<= 512KB) ANTES
  *    de gravar no clipboard do sistema operacional via ClipboardItem / writeText / textarea.
- * 3) INSERÇÃO & COLAGEM SEGURA: Converte datas BR para input[type="date"], utiliza native setter
- *    React/Angular, execCommand e fallback TextNode + Range, e confirma marcadores permanentes.
+ * 3) SEPARAÇÃO DE COLAGEM (ARQ-08): Toda a lógica de inserção DOM, emulação de teclas e
+ *    execução de colagem reside exclusivamente em copia-colar.js (JusGovModuloColagem).
  * ========================================================================== */
 
 (function (raiz, fabrica) {
@@ -37,6 +38,7 @@
     'use strict';
 
     class GerenciadorClipboardInterno {
+        #colagem = null;
         #deps = {
             obterEstadoOpcoes: () => ({ manterFormatacaoBasica: true, nivelFiltroFormatacao: 'basico', ultimoTextoLimpo: '' }),
             normalizarNivelFiltro: (n) => n || 'basico',
@@ -46,6 +48,7 @@
             extrairTextoPuroSanitizado: (v) => String(v || ''),
             aplicarFiltro1DadosLixo: (v) => String(v || ''),
             aplicarFiltro3InformacoesELinhas: (v) => String(v || ''),
+            gerarMapaFormatosClipboard: null,
             confirmarVisualMarcador: () => null
         };
 
@@ -55,11 +58,115 @@
 
         configurarDependencias(opcoes = {}) {
             if (!opcoes || typeof opcoes !== 'object') return;
+            if (opcoes.gerenciadorColagem && typeof opcoes.gerenciadorColagem.executarColagemBotaoDireito === 'function') {
+                this.#colagem = opcoes.gerenciadorColagem;
+            }
             Object.keys(this.#deps).forEach((k) => {
                 if (typeof opcoes[k] === 'function') {
                     this.#deps[k] = opcoes[k];
                 }
             });
+            if (this.#colagem && typeof this.#colagem.configurarDependencias === 'function') {
+                this.#colagem.configurarDependencias({
+                    obterEstadoOpcoes: () => this.#deps.obterEstadoOpcoes(),
+                    confirmarVisualMarcador: (txt) => this.#deps.confirmarVisualMarcador(txt)
+                });
+            }
+        }
+
+        #obterModuloColagem() {
+            if (this.#colagem) return this.#colagem;
+            let ClasseColagem = null;
+            if (typeof window !== 'undefined' && typeof (window.JusGovModuloColar || window.JusGovModuloColagem) === 'function') {
+                ClasseColagem = window.JusGovModuloColar || window.JusGovModuloColagem;
+            } else if (typeof self !== 'undefined' && typeof (self.JusGovModuloColar || self.JusGovModuloColagem) === 'function') {
+                ClasseColagem = self.JusGovModuloColar || self.JusGovModuloColagem;
+            } else if (typeof require === 'function') {
+                try { ClasseColagem = require('../mod-colar/mod-colar.js'); } catch (_) { }
+            }
+            if (typeof ClasseColagem === 'function') {
+                this.#colagem = new ClasseColagem({
+                    obterEstadoOpcoes: () => this.#deps.obterEstadoOpcoes(),
+                    confirmarVisualMarcador: (txt) => this.#deps.confirmarVisualMarcador(txt)
+                });
+                return this.#colagem;
+            }
+            return (ClasseColagem && ClasseColagem.NULL_OBJECT) || {
+                emularTeclasColar: () => false,
+                emularTeclasWinV: () => false,
+                inserirTextoEmElemento: () => false,
+                confirmarColagemGlobalEMarcarPermanente: () => null,
+                executarColagemBotaoDireito: async () => false
+            };
+        }
+
+        #converterNivelParaIndice(nivelRaw, temHtmlFormatado) {
+            if (!temHtmlFormatado) return 0;
+            const norm = String(this.#deps.normalizarNivelFiltro(nivelRaw || 'basico') || 'basico').toLowerCase();
+            if (norm === 'texto_puro' || norm === 'somente_texto') return 0;
+            if (norm === 'intermediario') return 2;
+            if (norm === 'avancado') return 3;
+            if (norm === 'estendido' || norm === 'sem_filtro') return 4;
+            return 1;
+        }
+
+        #converterIndiceParaNivel(idx) {
+            const mapa = ['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido'];
+            return mapa[Math.max(0, Math.min(4, Number(idx) || 0))];
+        }
+
+        #normalizarItemParaSlot(novoPayload) {
+            const txt = typeof novoPayload.texto === 'string' ? novoPayload.texto : '';
+            const htmlBruto = typeof novoPayload.html === 'string' ? novoPayload.html : '';
+            const temFormatacao = Boolean(novoPayload.formatado && htmlBruto.trim());
+            const nivelIdx = this.#converterNivelParaIndice(novoPayload.nivelCopia, temFormatacao);
+            const nivelCopia = this.#converterIndiceParaNivel(nivelIdx);
+            const formatado = Boolean(nivelIdx >= 1 && htmlBruto);
+            const html = formatado ? htmlBruto : '';
+
+            const limitarStr = (v) => {
+                if (typeof v !== 'string') return '';
+                return (v.length > 65536) ? v.slice(0, 65536) : v;
+            };
+
+            const extrasOrig = (formatado && novoPayload.formatosExtras && typeof novoPayload.formatosExtras === 'object')
+                ? novoPayload.formatosExtras
+                : null;
+            let formatosExtras = null;
+            if (extrasOrig && nivelIdx >= 1) {
+                const filtrado = {
+                    uriList: limitarStr(extrasOrig.uriList),
+                    estruturadoMime: limitarStr(extrasOrig.estruturadoMime),
+                    estruturadoConteudo: limitarStr(extrasOrig.estruturadoConteudo),
+                    markdown: (nivelIdx >= 2) ? limitarStr(extrasOrig.markdown) : '',
+                    rtf: (nivelIdx >= 3) ? limitarStr(extrasOrig.rtf) : '',
+                    svgMarkup: (nivelIdx >= 4) ? limitarStr(extrasOrig.svgMarkup) : ''
+                };
+                if (Object.values(filtrado).some(Boolean)) {
+                    formatosExtras = filtrado;
+                }
+            }
+
+            const tiposDisponiveis = ['text/plain'];
+            if (formatado) {
+                tiposDisponiveis.push('text/html');
+                if (formatosExtras) {
+                    if (formatosExtras.uriList) tiposDisponiveis.push('text/uri-list');
+                    if (formatosExtras.estruturadoMime && formatosExtras.estruturadoConteudo) tiposDisponiveis.push(formatosExtras.estruturadoMime);
+                    if (formatosExtras.markdown) tiposDisponiveis.push('text/markdown');
+                    if (formatosExtras.rtf) tiposDisponiveis.push('text/rtf');
+                    if (formatosExtras.svgMarkup) tiposDisponiveis.push('image/svg+xml');
+                }
+            }
+
+            return {
+                texto: txt,
+                html,
+                formatado,
+                nivelCopia,
+                tiposDisponiveis,
+                formatosExtras
+            };
         }
 
         registrarUltimaSelecao(novoItem, itemAnteriorOpcional, historicoOpcional = null) {
@@ -67,25 +174,25 @@
             try {
                 const storageLocal = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
                 if (storageLocal) {
-                    const historicoParaSalvar = Array.isArray(historicoOpcional)
+                    const empacotarItemStorage = (it) => ({
+                        texto: it.texto || '',
+                        html: it.html || '',
+                        formatado: Boolean(it.formatado),
+                        nivelCopia: it.nivelCopia || (it.formatado && it.html ? 'basico' : 'texto_puro'),
+                        tiposDisponiveis: Array.isArray(it.tiposDisponiveis) ? it.tiposDisponiveis : ['text/plain'],
+                        formatosExtras: (it.formatado && it.formatosExtras && typeof it.formatosExtras === 'object') ? it.formatosExtras : null,
+                        timestamp: it.timestamp || Date.now()
+                    });
+                    const historicoRaw = Array.isArray(historicoOpcional)
                         ? historicoOpcional
                         : ((typeof window !== 'undefined' && Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) ? window.__JUSGOV_HISTORICO_CLIPBOARD__ : []);
+                    const historicoParaSalvar = historicoRaw.filter(Boolean).slice(0, 2).map(empacotarItemStorage);
                     const payloadStorage = {
-                        ultimoClipboardInterno: {
-                            texto: novoItem.texto || '',
-                            html: novoItem.html || '',
-                            formatado: Boolean(novoItem.formatado),
-                            timestamp: Date.now()
-                        },
+                        ultimoClipboardInterno: empacotarItemStorage(novoItem),
                         historicoClipboardInterno: historicoParaSalvar
                     };
                     if (itemAnteriorOpcional && (itemAnteriorOpcional.texto || itemAnteriorOpcional.html)) {
-                        payloadStorage.ultimoClipboardAnteriorInterno = {
-                            texto: itemAnteriorOpcional.texto || '',
-                            html: itemAnteriorOpcional.html || '',
-                            formatado: Boolean(itemAnteriorOpcional.formatado),
-                            timestamp: Date.now()
-                        };
+                        payloadStorage.ultimoClipboardAnteriorInterno = empacotarItemStorage(itemAnteriorOpcional);
                     }
                     storageLocal.set(payloadStorage);
                 }
@@ -96,8 +203,8 @@
             try {
                 if (!novoPayload || typeof novoPayload !== 'object') return false;
                 const LIMITE_BYTES_EMULACAO = 512 * 1024;
-                const txt = typeof novoPayload.texto === 'string' ? novoPayload.texto : '';
-                const html = typeof novoPayload.html === 'string' ? novoPayload.html : '';
+                const norm = this.#normalizarItemParaSlot(novoPayload);
+                const { texto: txt, html, formatado, nivelCopia, tiposDisponiveis, formatosExtras } = norm;
 
                 if (txt.length > LIMITE_BYTES_EMULACAO || html.length > LIMITE_BYTES_EMULACAO) {
                     if (Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
@@ -112,50 +219,54 @@
                 const novoTextoLimpo = txt.trim();
                 const ehConteudoIdenticoAoAtual = Boolean(textoAtualLimpo && novoTextoLimpo && textoAtualLimpo === novoTextoLimpo);
 
+                const clonarSlotAnterior = (orig) => ({
+                    texto: orig.texto || '',
+                    html: orig.html || '',
+                    formatado: Boolean(orig.formatado),
+                    nivelCopia: orig.nivelCopia || (orig.formatado && orig.html ? 'basico' : 'texto_puro'),
+                    tiposDisponiveis: Array.isArray(orig.tiposDisponiveis) ? [...orig.tiposDisponiveis] : ['text/plain'],
+                    formatosExtras: (orig.formatado && orig.formatosExtras) ? { ...orig.formatosExtras } : null
+                });
+
                 if (!Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
                     window.__JUSGOV_HISTORICO_CLIPBOARD__ = [];
                     if (atual && (atual.texto || atual.html)) {
                         window.__JUSGOV_HISTORICO_CLIPBOARD__.push({
-                            texto: atual.texto || '',
-                            html: atual.html || '',
-                            formatado: Boolean(atual.formatado),
+                            ...clonarSlotAnterior(atual),
                             timestamp: Date.now()
                         });
                     }
                 }
 
+                const registroSlot = {
+                    texto: txt,
+                    html,
+                    formatado,
+                    nivelCopia,
+                    tiposDisponiveis,
+                    formatosExtras
+                };
+
                 const preservarHistorico = Boolean(novoPayload.preservarHistorico);
                 if (!ehConteudoIdenticoAoAtual && !preservarHistorico) {
                     if (atual && (atual.texto || atual.html)) {
-                        window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = {
-                            texto: atual.texto || '',
-                            html: atual.html || '',
-                            formatado: Boolean(atual.formatado)
-                        };
+                        window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ = clonarSlotAnterior(atual);
                     }
                     window.__JUSGOV_HISTORICO_CLIPBOARD__.unshift({
-                        texto: txt,
-                        html,
-                        formatado: Boolean(novoPayload.formatado),
+                        ...registroSlot,
                         timestamp: Date.now()
                     });
                     if (window.__JUSGOV_HISTORICO_CLIPBOARD__.length > 2) {
                         window.__JUSGOV_HISTORICO_CLIPBOARD__.length = 2;
                     }
-                } else if (preservarHistorico && Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
+                } else if (Array.isArray(window.__JUSGOV_HISTORICO_CLIPBOARD__)) {
                     window.__JUSGOV_HISTORICO_CLIPBOARD__[0] = {
-                        texto: txt,
-                        html,
-                        formatado: Boolean(novoPayload.formatado),
+                        ...registroSlot,
                         timestamp: Date.now()
                     };
                 }
 
-                window.__JUSGOV_ULTIMO_CLIPBOARD__ = {
-                    texto: txt,
-                    html,
-                    formatado: Boolean(novoPayload.formatado)
-                };
+                window.__JUSGOV_ULTIMO_CLIPBOARD__ = registroSlot;
                 this.registrarUltimaSelecao(window.__JUSGOV_ULTIMO_CLIPBOARD__, window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__, window.__JUSGOV_HISTORICO_CLIPBOARD__);
                 return true;
             } catch (_) {
@@ -165,6 +276,23 @@
                     }
                 } catch (_) { }
                 return false;
+            }
+        }
+
+        #converterDataUrlParaBlob(dataUrl, mimePadrao) {
+            try {
+                if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+                const partes = dataUrl.split(',');
+                if (partes.length < 2) return null;
+                const matchMime = partes[0].match(/data:([^;]+);/i);
+                const mime = (matchMime && matchMime[1]) ? matchMime[1].toLowerCase() : mimePadrao;
+                const binStr = (typeof atob === 'function') ? atob(partes[1]) : '';
+                if (!binStr) return null;
+                const bytes = new Uint8Array(binStr.length);
+                for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+                return new Blob([bytes], { type: mime });
+            } catch (_) {
+                return null;
             }
         }
 
@@ -178,31 +306,110 @@
             if (nivelNorm === 'texto_puro') {
                 deveManterFormatacao = false;
             }
-            if (deveManterFormatacao && this.#deps.verificarSeTextoEhBlocoOuPalavraUnica(textoFinal)) {
+            const ehBlocoOuPalavraPura = this.#deps.verificarSeTextoEhBlocoOuPalavraUnica(textoFinal);
+            if (deveManterFormatacao && ehBlocoOuPalavraPura) {
                 deveManterFormatacao = false;
             }
 
             if (typeof window !== 'undefined' && window.__JUSGOV_AUDITORIA_EM_CURSO__) {
-                return Boolean(this.salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false, preservarHistorico }));
+                return Boolean(this.salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false, nivelCopia: 'texto_puro', preservarHistorico }));
             }
 
             if (deveManterFormatacao) {
-                const codigoHTML = this.#deps.aplicarFiltroHtmlPorNivel(rangeDOMOpcional, nivelNorm);
-                if (codigoHTML) {
-                    const htmlParaClipboard = this.#deps.envolverHtmlComResetDeCursorParaWord(codigoHTML);
-                    const textoPlanoMultilinha = this.#deps.extrairTextoPuroSanitizado(codigoHTML) || textoFinal;
-                    const salvouInterno = this.salvarClipboardInternoComBackup({ texto: textoPlanoMultilinha, html: htmlParaClipboard, formatado: true, preservarHistorico });
+                let mapaFormatos = null;
+                try {
+                    if (typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
+                        mapaFormatos = this.#deps.gerarMapaFormatosClipboard(rangeDOMOpcional, nivelNorm, { textoFallback: textoFinal });
+                    } else {
+                        const htmlFallback = this.#deps.aplicarFiltroHtmlPorNivel(rangeDOMOpcional, nivelNorm);
+                        mapaFormatos = {
+                            nivelNorm,
+                            nivelIdx: 1,
+                            textoPlano: htmlFallback ? (this.#deps.extrairTextoPuroSanitizado(htmlFallback) || textoFinal) : textoFinal,
+                            htmlClipboard: htmlFallback ? this.#deps.envolverHtmlComResetDeCursorParaWord(htmlFallback) : '',
+                            uriList: '',
+                            estruturado: null,
+                            markdown: '',
+                            rtf: '',
+                            imagens: { svgMarkup: '', dataUrlPng: '', dataUrlJpeg: '' }
+                        };
+                    }
+                } catch (_) {
+                    mapaFormatos = null;
+                }
+
+                const htmlParaClipboard = (mapaFormatos && mapaFormatos.htmlClipboard) ? mapaFormatos.htmlClipboard : '';
+                if (htmlParaClipboard) {
+                    const textoPlanoMultilinha = (mapaFormatos && mapaFormatos.textoPlano) || textoFinal;
+                    const formatosExtras = {
+                        uriList: (mapaFormatos && mapaFormatos.uriList) || '',
+                        markdown: (mapaFormatos && mapaFormatos.markdown) || '',
+                        rtf: (mapaFormatos && mapaFormatos.rtf) || '',
+                        estruturadoMime: (mapaFormatos && mapaFormatos.estruturado && mapaFormatos.estruturado.mime) || '',
+                        estruturadoConteudo: (mapaFormatos && mapaFormatos.estruturado && mapaFormatos.estruturado.conteudo) || '',
+                        svgMarkup: (mapaFormatos && mapaFormatos.imagens && mapaFormatos.imagens.svgMarkup) || ''
+                    };
+                    const salvouInterno = this.salvarClipboardInternoComBackup({
+                        texto: textoPlanoMultilinha,
+                        html: htmlParaClipboard,
+                        formatado: true,
+                        nivelCopia: (mapaFormatos && mapaFormatos.nivelNorm) || nivelNorm,
+                        preservarHistorico,
+                        formatosExtras
+                    });
                     if (!salvouInterno) return false;
+
+                    const extrasTexto = {};
+                    if (formatosExtras.uriList) extrasTexto['text/uri-list'] = formatosExtras.uriList;
+                    if (formatosExtras.estruturadoMime && formatosExtras.estruturadoConteudo) {
+                        extrasTexto[formatosExtras.estruturadoMime] = formatosExtras.estruturadoConteudo;
+                    }
+                    if (formatosExtras.markdown) extrasTexto['text/markdown'] = formatosExtras.markdown;
+                    if (formatosExtras.rtf) extrasTexto['text/rtf'] = formatosExtras.rtf;
+                    if (formatosExtras.svgMarkup) extrasTexto['image/svg+xml'] = formatosExtras.svgMarkup;
 
                     try {
                         const temFocoParaClip = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
                         if (temFocoParaClip && typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
-                            const dadosParaCopiar = new ClipboardItem({
+                            const blobsNucleo = {
                                 'text/html': new Blob([htmlParaClipboard], { type: 'text/html' }),
                                 'text/plain': new Blob([textoPlanoMultilinha], { type: 'text/plain' })
+                            };
+                            const blobsExtras = { ...blobsNucleo };
+                            const suportaTipo = (t) => (typeof ClipboardItem.supports === 'function') ? Boolean(ClipboardItem.supports(t)) : false;
+
+                            Object.keys(extrasTexto).forEach((mime) => {
+                                const val = extrasTexto[mime];
+                                if (!val) return;
+                                if (suportaTipo(mime)) {
+                                    blobsExtras[mime] = new Blob([val], { type: mime });
+                                } else if (suportaTipo(`web ${mime}`)) {
+                                    blobsExtras[`web ${mime}`] = new Blob([val], { type: mime });
+                                }
                             });
-                            await navigator.clipboard.write([dadosParaCopiar]);
-                            return true;
+
+                            if (mapaFormatos && mapaFormatos.imagens) {
+                                const blobPng = this.#converterDataUrlParaBlob(mapaFormatos.imagens.dataUrlPng, 'image/png');
+                                if (blobPng && (typeof ClipboardItem.supports !== 'function' || suportaTipo('image/png'))) {
+                                    blobsExtras['image/png'] = blobPng;
+                                }
+                                const blobJpg = this.#converterDataUrlParaBlob(mapaFormatos.imagens.dataUrlJpeg, 'image/jpeg');
+                                if (blobJpg) {
+                                    if (suportaTipo('image/jpeg')) {
+                                        blobsExtras['image/jpeg'] = blobJpg;
+                                    } else if (suportaTipo('web image/jpeg')) {
+                                        blobsExtras['web image/jpeg'] = blobJpg;
+                                    }
+                                }
+                            }
+
+                            try {
+                                await navigator.clipboard.write([new ClipboardItem(blobsExtras)]);
+                                return true;
+                            } catch (_) {
+                                await navigator.clipboard.write([new ClipboardItem(blobsNucleo)]);
+                                return true;
+                            }
                         }
                     } catch (_) { }
 
@@ -214,6 +421,11 @@
                             if (ev && ev.clipboardData) {
                                 ev.clipboardData.setData('text/html', htmlParaClipboard);
                                 ev.clipboardData.setData('text/plain', textoPlanoMultilinha);
+                                Object.keys(extrasTexto).forEach((mime) => {
+                                    try {
+                                        if (extrasTexto[mime]) ev.clipboardData.setData(mime, extrasTexto[mime]);
+                                    } catch (_) { }
+                                });
                                 ev.preventDefault();
                                 copiouViaEvento = true;
                             }
@@ -232,17 +444,21 @@
             }
 
             let textoPuroFinal = '';
-            if (rangeDOMOpcional && nivelNorm === 'texto_puro') {
-                textoPuroFinal = this.#deps.extrairTextoPuroSanitizado(rangeDOMOpcional);
-            }
-            if (!textoPuroFinal) {
-                textoPuroFinal = (typeof textoFinal === 'string' && (textoFinal.indexOf('<') !== -1 || textoFinal.indexOf('\r') !== -1))
-                    ? this.#deps.extrairTextoPuroSanitizado(textoFinal)
-                    : this.#deps.aplicarFiltro3InformacoesELinhas(this.#deps.aplicarFiltro1DadosLixo(textoFinal));
+            try {
+                if (rangeDOMOpcional && nivelNorm === 'texto_puro') {
+                    textoPuroFinal = this.#deps.extrairTextoPuroSanitizado(rangeDOMOpcional);
+                }
+                if (!textoPuroFinal) {
+                    textoPuroFinal = (typeof textoFinal === 'string' && (textoFinal.indexOf('<') !== -1 || textoFinal.indexOf('\r') !== -1))
+                        ? this.#deps.extrairTextoPuroSanitizado(textoFinal)
+                        : this.#deps.aplicarFiltro3InformacoesELinhas(this.#deps.aplicarFiltro1DadosLixo(textoFinal));
+                }
+            } catch (_) {
+                textoPuroFinal = String(textoFinal || '');
             }
             textoPuroFinal = (textoPuroFinal || '').replace(/[ ]{2,}/g, ' ').trim();
 
-            const salvouInternoTexto = this.salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false, preservarHistorico });
+            const salvouInternoTexto = this.salvarClipboardInternoComBackup({ texto: textoPuroFinal, html: '', formatado: false, nivelCopia: 'texto_puro', preservarHistorico });
             if (!salvouInternoTexto) return false;
 
             let gravouSistema = false;
@@ -270,269 +486,23 @@
         }
 
         emularTeclasColar(alvo, texto, html) {
-            try {
-                if (!alvo) return false;
-                if (typeof alvo.focus === 'function') {
-                    try { alvo.focus(); } catch (_) { }
-                }
-
-                alvo.dispatchEvent(new KeyboardEvent('keydown', {
-                    key: 'v', code: 'KeyV', keyCode: 86, which: 86, ctrlKey: true,
-                    bubbles: true, cancelable: true, composed: true
-                }));
-
-                let pasteTratadoPeloEditor = false;
-                const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable]:not([contenteditable="false"])')) || document.designMode === 'on');
-                try {
-                    if (typeof DataTransfer !== 'undefined') {
-                        const dt = new DataTransfer();
-                        if (html && ehEditorRico) dt.setData('text/html', html);
-                        dt.setData('text/plain', texto || '');
-                        const evtPaste = new ClipboardEvent('paste', {
-                            clipboardData: dt, bubbles: true, cancelable: true, composed: true
-                        });
-                        pasteTratadoPeloEditor = !alvo.dispatchEvent(evtPaste);
-                    }
-                } catch (_) { }
-
-                if (!pasteTratadoPeloEditor) {
-                    let colouExec = false;
-                    try { colouExec = document.execCommand('paste'); } catch (_) { }
-                    if (!colouExec && html && ehEditorRico) {
-                        try { colouExec = document.execCommand('insertHTML', false, html); } catch (_) { }
-                    }
-                    if (!colouExec) {
-                        const conteudoParaInserir = (ehEditorRico && html) ? html : (texto || '');
-                        this.inserirTextoEmElemento(alvo, conteudoParaInserir, Boolean(ehEditorRico && html));
-                    }
-                }
-
-                alvo.dispatchEvent(new KeyboardEvent('keyup', {
-                    key: 'v', code: 'KeyV', keyCode: 86, which: 86, ctrlKey: true,
-                    bubbles: true, composed: true
-                }));
-                return true;
-            } catch (_) {
-                return false;
-            }
+            return this.#obterModuloColagem().emularTeclasColar(alvo, texto, html);
         }
 
         emularTeclasWinV(alvo) {
-            try {
-                const el = alvo || (typeof document !== 'undefined' ? (document.activeElement || document.body) : null);
-                if (!el) return;
-                if (typeof el.focus === 'function') {
-                    try { el.focus(); } catch (_) { }
-                }
-                el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', keyCode: 91, which: 91, metaKey: true, bubbles: true, cancelable: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', keyCode: 86, which: 86, metaKey: true, bubbles: true, cancelable: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keyup', { key: 'v', code: 'KeyV', keyCode: 86, which: 86, metaKey: true, bubbles: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft', keyCode: 91, which: 91, metaKey: false, bubbles: true, composed: true }));
-            } catch (_) { }
+            return this.#obterModuloColagem().emularTeclasWinV(alvo);
         }
 
         inserirTextoEmElemento(alvo, texto, ehHtmlFormatado) {
-            try {
-                if (!alvo) return;
-                const alvoFoco = (alvo.tagName !== 'INPUT' && alvo.tagName !== 'TEXTAREA' && typeof alvo.closest === 'function')
-                    ? (alvo.closest('[contenteditable]:not([contenteditable="false"])') || alvo)
-                    : alvo;
-                try {
-                    if (typeof alvoFoco.focus === 'function') alvoFoco.focus({ preventScroll: true });
-                } catch (_) {
-                    try { if (typeof alvoFoco.focus === 'function') alvoFoco.focus(); } catch (__) { }
-                }
-
-                if (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA') {
-                    const tipoInput = (alvo.getAttribute('type') || alvo.type || 'text').toLowerCase();
-                    const ehTipoTemporal = ['date', 'datetime-local', 'month', 'week', 'time'].includes(tipoInput);
-
-                    if (ehTipoTemporal) {
-                        let valorData = (texto || '').trim();
-                        if (tipoInput === 'date') {
-                            const mDataBr = valorData.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
-                            if (mDataBr) {
-                                valorData = `${mDataBr[3]}-${mDataBr[2].padStart(2, '0')}-${mDataBr[1].padStart(2, '0')}`;
-                            }
-                        }
-                        this.#definirValorInputNativo(alvo, valorData);
-                        try {
-                            alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                            alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                        } catch (_) { }
-                        return;
-                    }
-
-                    let start = null;
-                    let end = null;
-                    try {
-                        start = (typeof alvo.selectionStart === 'number') ? alvo.selectionStart : null;
-                        end = (typeof alvo.selectionEnd === 'number') ? alvo.selectionEnd : null;
-                    } catch (_) { }
-
-                    let inseriuComRange = false;
-                    if (start !== null && end !== null && typeof alvo.setRangeText === 'function') {
-                        try {
-                            alvo.setRangeText(texto, start, end, 'end');
-                            inseriuComRange = true;
-                        } catch (_) { inseriuComRange = false; }
-                    }
-
-                    if (!inseriuComRange) {
-                        if (start !== null && end !== null) {
-                            alvo.value = (alvo.value || '').substring(0, start) + texto + (alvo.value || '').substring(end);
-                            try { alvo.selectionStart = alvo.selectionEnd = start + texto.length; } catch (_) { }
-                        } else {
-                            this.#definirValorInputNativo(alvo, texto);
-                        }
-                    }
-
-                    try {
-                        alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                        alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    } catch (_) { }
-                    return;
-                }
-
-                const docRef = alvoFoco.ownerDocument || (typeof document !== 'undefined' ? document : null);
-                const winRef = (docRef && docRef.defaultView) || (typeof window !== 'undefined' ? window : null);
-                if (winRef && typeof winRef.getSelection === 'function' && docRef && typeof docRef.createRange === 'function') {
-                    try {
-                        const selPre = winRef.getSelection();
-                        const selValida = Boolean(selPre && selPre.rangeCount > 0 && alvoFoco.contains && alvoFoco.contains(selPre.anchorNode));
-                        if (!selValida) {
-                            const rangeFim = docRef.createRange();
-                            rangeFim.selectNodeContents(alvoFoco);
-                            rangeFim.collapse(false);
-                            selPre.removeAllRanges();
-                            selPre.addRange(rangeFim);
-                        }
-                    } catch (_) { }
-                }
-
-                let executou = false;
-                try {
-                    if (docRef && typeof docRef.execCommand === 'function') {
-                        executou = docRef.execCommand(ehHtmlFormatado ? 'insertHTML' : 'insertText', false, texto);
-                    }
-                } catch (_) { }
-
-                if (!executou && winRef && typeof winRef.getSelection === 'function') {
-                    const sel = winRef.getSelection();
-                    if (sel && sel.rangeCount > 0 && docRef) {
-                        const range = sel.getRangeAt(0);
-                        range.deleteContents();
-                        if (ehHtmlFormatado && typeof range.createContextualFragment === 'function') {
-                            const frag = range.createContextualFragment(texto);
-                            const ultimoNo = frag.lastChild;
-                            range.insertNode(frag);
-                            if (ultimoNo) {
-                                range.setStartAfter(ultimoNo);
-                                range.setEndAfter(ultimoNo);
-                            }
-                        } else {
-                            const node = docRef.createTextNode(texto);
-                            range.insertNode(node);
-                            range.setStartAfter(node);
-                            range.setEndAfter(node);
-                        }
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    }
-                }
-                try {
-                    alvoFoco.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    alvoFoco.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                } catch (_) { }
-            } catch (_) { }
-        }
-
-        #definirValorInputNativo(alvo, valor) {
-            try {
-                const proto = (typeof HTMLTextAreaElement !== 'undefined' && (alvo instanceof HTMLTextAreaElement || (alvo.tagName && alvo.tagName.toUpperCase() === 'TEXTAREA')))
-                    ? HTMLTextAreaElement.prototype
-                    : (typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null);
-                const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
-                if (descriptor && descriptor.set) {
-                    descriptor.set.call(alvo, valor);
-                } else {
-                    alvo.value = valor;
-                }
-            } catch (_) {
-                alvo.value = valor;
-            }
+            return this.#obterModuloColagem().inserirTextoEmElemento(alvo, texto, ehHtmlFormatado);
         }
 
         confirmarColagemGlobalEMarcarPermanente(textoColado, origemRemota = false) {
-            try {
-                const estado = this.#deps.obterEstadoOpcoes() || {};
-                const txt = (typeof textoColado === 'string' && textoColado.trim().length > 0)
-                    ? textoColado.trim()
-                    : ((window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto) || estado.ultimoTextoLimpo || '');
-                const resMarcador = this.#deps.confirmarVisualMarcador(txt);
-                if (!origemRemota && txt) {
-                    const idInstancia = (typeof window !== 'undefined')
-                        ? (window.__JUSGOV_ID_INSTANCIA_FRAME__ || (window.__JUSGOV_ID_INSTANCIA_FRAME__ = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`))
-                        : 'frame';
-                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                        chrome.storage.local.set({
-                            ultimaColagemConfirmadaGlobal: {
-                                idOrigem: idInstancia,
-                                texto: txt,
-                                timestamp: Date.now()
-                            }
-                        });
-                    }
-                }
-                return resMarcador;
-            } catch (_) {
-                return null;
-            }
+            return this.#obterModuloColagem().confirmarColagemGlobalEMarcarPermanente(textoColado, origemRemota);
         }
 
-        async executarColagemBotaoDireito(alvo, modo, usarAnterior = false) {
-            try {
-                if (!alvo) return;
-                const docRef = alvo.ownerDocument || (typeof document !== 'undefined' ? document : null);
-                const hostCe = (alvo.tagName !== 'INPUT' && alvo.tagName !== 'TEXTAREA' && typeof alvo.closest === 'function')
-                    ? alvo.closest('[contenteditable]:not([contenteditable="false"]), .ck-editor__editable, .ck-content, .cke_editable, .tox-edit-area')
-                    : null;
-                const alvoEfetivo = hostCe || alvo;
-                const estado = this.#deps.obterEstadoOpcoes() || {};
-                const modoEfetivo = (modo === 'texto_puro') ? 'texto_puro' : 'normal';
-                const ehEditorRico = Boolean(
-                    alvoEfetivo.isContentEditable ||
-                    Boolean(hostCe) ||
-                    (alvoEfetivo.getAttribute && ['true', '', 'plaintext-only'].includes((alvoEfetivo.getAttribute('contenteditable') || '').toLowerCase())) ||
-                    (docRef && docRef.designMode === 'on')
-                );
-                const ehCampoTextoPuro = (alvoEfetivo.tagName === 'INPUT' || alvoEfetivo.tagName === 'TEXTAREA' || !ehEditorRico);
-
-                try {
-                    if (typeof alvoEfetivo.focus === 'function') alvoEfetivo.focus({ preventScroll: true });
-                } catch (_) {
-                    try { if (typeof alvoEfetivo.focus === 'function') alvoEfetivo.focus(); } catch (__) { }
-                }
-
-                const itemInterno = usarAnterior
-                    ? (window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ || window.__JUSGOV_ULTIMO_CLIPBOARD__)
-                    : window.__JUSGOV_ULTIMO_CLIPBOARD__;
-                const textoEmulado = (typeof itemInterno === 'string')
-                    ? itemInterno
-                    : ((itemInterno && itemInterno.texto) || (!usarAnterior ? (estado.ultimoTextoLimpo || '') : '') || '');
-                const htmlEmulado = (itemInterno && typeof itemInterno === 'object' && itemInterno.formatado && itemInterno.html) ? itemInterno.html : '';
-
-                if (textoEmulado && textoEmulado.trim().length > 0) {
-                    if (ehCampoTextoPuro || modoEfetivo === 'texto_puro') {
-                        this.inserirTextoEmElemento(alvoEfetivo, textoEmulado, false);
-                    } else if (modoEfetivo === 'normal' && ehEditorRico && htmlEmulado) {
-                        this.inserirTextoEmElemento(alvoEfetivo, htmlEmulado, true);
-                    } else {
-                        this.inserirTextoEmElemento(alvoEfetivo, textoEmulado, false);
-                    }
-                    this.confirmarColagemGlobalEMarcarPermanente(textoEmulado, false);
-                }
-            } catch (_) { }
+        async executarColagemBotaoDireito(alvo, modo, usarAnterior = false, opcoesColagem = {}) {
+            return this.#obterModuloColagem().executarColagemBotaoDireito(alvo, modo, usarAnterior, opcoesColagem);
         }
     }
 

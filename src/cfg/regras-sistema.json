@@ -135,7 +135,7 @@
     "desligado": { "gradTop": "#64748b", "gradBot": "#475569", "borda": "#334155", "raio": "#cbd5e1", "rotulo": "OFF" }
   },
   "sistemasJudiciais": [
-    { "id": "pje", "nome": "PJe", "css": "pje-anti-ampulheta.css", "padraoRegex": "\\bpje\\b|pje\\.|\\.jus\\.br/pje" },
+    { "id": "pje", "nome": "PJe", "css": "pje-anti-ampulheta.css", "padraoRegex": "\\bpje\\b|pje\\.|\\.jus\\.br/pje|frontend\\.prd\\.cnj\\.cloud|sso\\.cloud\\.pje\\.jus\\.br" },
     { "id": "eproc", "nome": "Eproc", "css": "eproc-anti-ampulheta.css", "padraoRegex": "\\beproc\\b|eproc\\." },
     { "id": "pdpj", "nome": "PDPJ", "css": "pdpj-stf-stj-anti-ampulheta.css", "padraoRegex": "\\bpdpj\\b|\\bprevjud\\b|stf\\.jus\\.br|stj\\.jus\\.br" },
     { "id": "projudi", "nome": "Projudi", "css": "seeu-projudi-anti-ampulheta.css", "padraoRegex": "\\bprojudi\\b|projudi\\." },

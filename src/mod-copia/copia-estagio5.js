@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio5.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioParagrafos
  * 
  * @MAPA-IA:
@@ -30,7 +32,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.5: Estágio 5 - Parágrafos e Triplo Clique)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.5: Estágio 5)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -64,28 +66,11 @@
             if (!texto || texto.length === 0) return null;
             const rx = this.#constantes.EXPRESSOES_REGULARES || {};
 
-            const quebraDeLinhaEhFronteiraDeParagrafo = (posQuebra) => {
-                if (posQuebra < 0 || posQuebra >= texto.length) return true;
-                if ((posQuebra + 1) < texto.length && this.eQuebraDeLinha(texto[posQuebra + 1])) return true;
-                if (posQuebra > 0 && this.eQuebraDeLinha(texto[posQuebra - 1])) return true;
-
-                const trechoApos = texto.substring(posQuebra + 1, Math.min(texto.length, posQuebra + 40));
-                if (rx.MARCADOR_NOVO_PARAGRAFO_LINHA && rx.MARCADOR_NOVO_PARAGRAFO_LINHA.test(trechoApos)) {
-                    return true;
-                }
-
-                const trechoAntes = texto.substring(Math.max(0, posQuebra - 40), posQuebra);
-                if (rx.FIM_FRASE_PARAGRAFO && rx.FIM_FRASE_PARAGRAFO.test(trechoAntes)) {
-                    if (!rx.ABREVIACAO_FINAL_LINHA || !rx.ABREVIACAO_FINAL_LINHA.test(trechoAntes)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-
+            /* BUG-83 / Seção 6.195: Toda quebra de linha ou parágrafo (\n, \r, <br>) delimita estritamente
+             * o parágrafo/linha corrente; a seleção máxima por 1, 2 ou 3 cliques é de 1 parágrafo/linha. */
             let iniPar = 0;
             for (let i = Math.min(idx, texto.length - 1); i > 0; i--) {
-                if (this.eQuebraDeLinha(texto[i - 1]) && quebraDeLinhaEhFronteiraDeParagrafo(i - 1)) {
+                if (this.eQuebraDeLinha(texto[i - 1])) {
                     iniPar = i;
                     break;
                 }
@@ -93,7 +78,7 @@
 
             let fimPar = texto.length;
             for (let i = Math.max(0, idx); i < texto.length; i++) {
-                if (this.eQuebraDeLinha(texto[i]) && quebraDeLinhaEhFronteiraDeParagrafo(i)) {
+                if (this.eQuebraDeLinha(texto[i])) {
                     fimPar = i;
                     break;
                 }

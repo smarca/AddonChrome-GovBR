@@ -6,11 +6,12 @@
   "perfilPadraoId": "padrao",
   "chavesGlobais": [
     "regrasMapeamentoElementos",
+    "urlsTurbo",
     "perfilAtivoId",
     "listaPerfis"
   ],
   "configPadrao": {
-    "modoTurbo": "global",
+    "modoTurbo": "url",
     "comportamentoCliqueIcone": "popup",
     "manterFormatacaoBasica": true,
     "nivelFiltroFormatacao": "basico",
@@ -71,27 +72,32 @@
     "tempoTrabalhoAtivoHoras": 6,
     "pomodoroAtivo": false,
     "pomodoroProporcao": 4.5,
-    "pomodoroFocoMinutos": 25,
+    "pomodoroFocoMinutos": 45,
     "pomodoroCiclos": 4,
     "pomodoroPausasAutomaticas": true,
     "pomodoroModoAviso": "completo",
     "pomodoroEstiloMinipopup": "compacto",
     "pomodoroBeepConclusaoAtivo": true,
     "pomodoroBeepIntensidade": "suave",
+    "automatePjeAtivo": false,
     "urlsTurbo": [
       "*://*.jus.br/*",
       "*://*.gov.br/*",
       "*://*.mp.br/*",
       "*://*.def.br/*",
       "*://gemini.google.com/*",
-      "*://serasa-judicial.serasaexperian.com.br/*"
+      "*://serasa-judicial.serasaexperian.com.br/*",
+      "*://frontend.prd.cnj.cloud/*",
+      "*://sso.cloud.pje.jus.br/*"
     ],
     "urlsAmpuletas": [
       "*://*.jus.br/*",
       "*://*.pje.jus.br/*",
       "*://pje.jus.br/*",
       "*://*pje*.jus.br/*",
-      "*://*pje*.*.jus.br/*"
+      "*://*pje*.*.jus.br/*",
+      "*://frontend.prd.cnj.cloud/*",
+      "*://sso.cloud.pje.jus.br/*"
     ]
   },
   "perfisPredefinidos": [
@@ -106,16 +112,46 @@
       "nome": "Trabalho",
       "predefinido": true,
       "sobrescritas": {
+        "modoTurbo": "url",
+        "ativoAmpuletas": true,
+        "converterCabecalhoPjeAtivo": true,
+        "validacaoMatematicaAtiva": true,
+        "tempoConferenciaDocumentosMs": -1,
+        "marcadorConteudoColadoAtivo": true,
+        "reutilizarAbasAbertas": true,
+        "protegerGuiasModificadas": true,
+        "atalhoF1GeminiAtivo": true,
+        "autoLimpezaCacheCookiesAtiva": true,
+        "automatePjeAtivo": false,
         "tempoTrabalhoCorridoAtivo": true,
         "tempoTrabalhoAtivoAtivo": true,
-        "pomodoroAtivo": true
+        "pomodoroAtivo": true,
+        "pomodoroPausasAutomaticas": true,
+        "pomodoroModoAviso": "completo",
+        "pomodoroBeepConclusaoAtivo": true
       }
     },
     {
       "id": "casa",
       "nome": "Casa",
       "predefinido": true,
-      "sobrescritas": {}
+      "sobrescritas": {
+        "modoTurbo": "url",
+        "converterCabecalhoPjeAtivo": false,
+        "validacaoMatematicaAtiva": false,
+        "tempoConferenciaDocumentosMs": 0,
+        "placeholdersMinutasHtmlAtivo": false,
+        "modoPlaceholdersMinutasHtml": "desabilitado",
+        "reutilizarAbasAbertas": false,
+        "descarteGuiasInativasAtivo": false,
+        "autoLimpezaCacheCookiesAtiva": false,
+        "automatePjeAtivo": false,
+        "tempoTrabalhoCorridoAtivo": false,
+        "tempoTrabalhoAtivoAtivo": false,
+        "pomodoroAtivo": true,
+        "pomodoroModoAviso": "badge_e_barra_descanso",
+        "pomodoroBeepConclusaoAtivo": false
+      }
     },
     {
       "id": "estudo",
@@ -125,9 +161,77 @@
       ],
       "predefinido": true,
       "sobrescritas": {
-        "pomodoroAtivo": true,
+        "modoTurbo": "url",
+        "manterFormatacaoBasica": false,
+        "nivelFiltroFormatacao": "texto_puro",
+        "converterCabecalhoPjeAtivo": false,
+        "validacaoMatematicaAtiva": false,
         "tempoConferenciaDocumentosMs": 0,
-        "validacaoMatematicaAtiva": false
+        "marcadorConteudoColadoAtivo": false,
+        "atalhoF1GeminiAtivo": true,
+        "reutilizarAbasAbertas": true,
+        "descarteGuiasInativasAtivo": false,
+        "automatePjeAtivo": false,
+        "tempoTrabalhoCorridoAtivo": false,
+        "tempoTrabalhoAtivoAtivo": true,
+        "pomodoroAtivo": true,
+        "pomodoroFocoMinutos": 50,
+        "pomodoroModoAviso": "completo",
+        "pomodoroBeepConclusaoAtivo": true
+      }
+    },
+    {
+      "id": "leitura",
+      "nome": "Leitura / Pesquisa",
+      "aliases": [
+        "leitura",
+        "pesquisa"
+      ],
+      "predefinido": true,
+      "sobrescritas": {
+        "modoTurbo": "url",
+        "manterFormatacaoBasica": true,
+        "nivelFiltroFormatacao": "basico",
+        "tempoExibicaoAlertaMs": 2500,
+        "tempoFlashBorderMs": 1200,
+        "modoRetirarSelecao": "sem_flash",
+        "marcadorConteudoColadoAtivo": false,
+        "validacaoMatematicaAtiva": false,
+        "tempoConferenciaDocumentosMs": 0,
+        "atalhoF1GeminiAtivo": true,
+        "descarteGuiasInativasAtivo": false,
+        "reutilizarAbasAbertas": true,
+        "automatePjeAtivo": false,
+        "pomodoroAtivo": true,
+        "pomodoroModoAviso": "badge",
+        "pomodoroBeepConclusaoAtivo": false
+      }
+    },
+    {
+      "id": "reuniao",
+      "nome": "Apresentação / Reunião",
+      "aliases": [
+        "reuniao",
+        "apresentacao"
+      ],
+      "predefinido": true,
+      "sobrescritas": {
+        "modoTurbo": "url",
+        "tempoExibicaoAlertaMs": 0,
+        "tempoFlashBorderMs": 0,
+        "modoRetirarSelecao": "nunca",
+        "marcadorConteudoColadoAtivo": false,
+        "validacaoMatematicaAtiva": false,
+        "tempoConferenciaDocumentosMs": 0,
+        "bloquearNovasJanelas": false,
+        "reutilizarAbasAbertas": false,
+        "descarteGuiasInativasAtivo": false,
+        "automatePjeAtivo": false,
+        "tempoTrabalhoCorridoAtivo": false,
+        "tempoTrabalhoAtivoAtivo": false,
+        "pomodoroAtivo": false,
+        "pomodoroModoAviso": "nunca",
+        "pomodoroBeepConclusaoAtivo": false
       }
     }
   ]

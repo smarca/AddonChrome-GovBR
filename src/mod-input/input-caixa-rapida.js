@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: input-caixa-rapida.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Entrada Rápida
+ * ARQUIVO: src/mod-input/input-caixa-rapida.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: Grupo 3 - TECLADO/MOUSE: Navegação por Teclado e Entrada Rápida
  *
  * @MAPA-IA:
  * - Arquivo: src/mod-input/input-caixa-rapida.js
@@ -74,7 +75,31 @@
         }
 
         get isAberta() {
-            return Boolean(this.#elementoDialogo && document.body.contains(this.#elementoDialogo));
+            return Boolean(this.#elementoDialogo && this.#elementoDialogo.isConnected);
+        }
+
+        #obterContextoRaizUi() {
+            const docLocal = typeof document !== 'undefined' ? document : null;
+            const winLocal = typeof window !== 'undefined' ? window : null;
+            let w = winLocal;
+            let ox = 0;
+            let oy = 0;
+            while (w && w !== w.top) {
+                try {
+                    const pDoc = w.parent && w.parent.document;
+                    const fe = w.frameElement;
+                    if (!pDoc || !pDoc.body || !fe) break;
+                    const r = fe.getBoundingClientRect();
+                    ox += r.left;
+                    oy += r.top;
+                    w = w.parent;
+                } catch (_) {
+                    break;
+                }
+            }
+            const docUi = (w && w.document && w.document.body) ? w.document : docLocal;
+            const winUi = w || winLocal;
+            return { docUi, winUi, offsetX: ox, offsetY: oy };
         }
 
         get ultimoTextoDigitado() {
@@ -150,14 +175,8 @@
             const doc = typeof document !== 'undefined' ? document : null;
             if (!doc || !doc.body) return;
 
-            let docTop = doc;
-            try {
-                if (doc.defaultView && doc.defaultView.top && doc.defaultView.top.document && doc.defaultView.top.document.body) {
-                    docTop = doc.defaultView.top.document;
-                }
-            } catch (_) {
-                docTop = doc;
-            }
+            const ctxUi = this.#obterContextoRaizUi();
+            const docTop = ctxUi.docUi || doc;
 
             const todosExistentes = Array.from(doc.querySelectorAll('.jusgov-dialog-input-rapido'));
             if (docTop !== doc) {
@@ -171,7 +190,10 @@
 
             if (!this.isAberta && todosExistentes.length > 0) {
                 for (const elOrfao of todosExistentes) {
-                    try { elOrfao.remove(); } catch (_) { }
+                    try {
+                        if (typeof elOrfao.hidePopover === 'function') elOrfao.hidePopover();
+                        elOrfao.remove();
+                    } catch (_) { }
                 }
             } else if (this.isAberta) {
                 if (this.#elementoDialogo) {
@@ -184,13 +206,21 @@
                 return;
             }
 
-            // 1. Criar container do diálogo flutuante
-            const dialog = doc.createElement('div');
+            // 1. Criar container do diálogo flutuante no documento HTML raiz
+            const dialog = docTop.createElement('div');
             dialog.className = 'jusgov-dialog-input-rapido';
             dialog.setAttribute('data-jusgov-ignore', 'true');
+            if (typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype) {
+                dialog.setAttribute('popover', 'manual');
+            }
             dialog.style.cssText = [
-                'position: fixed',
-                'z-index: 2147483646',
+                'position: fixed !important',
+                'inset: auto !important',
+                'right: auto !important',
+                'bottom: auto !important',
+                'margin: 0 !important',
+                'z-index: 2147483647 !important',
+                'isolation: isolate !important',
                 'width: 390px',
                 'background: #ffffff',
                 'border: 1px solid #94a3b8',
@@ -206,7 +236,7 @@
             ].join('; ');
 
             // 2. Barra de Título arrastável
-            const header = doc.createElement('div');
+            const header = docTop.createElement('div');
             header.className = 'jusgov-dialog-header';
             header.style.cssText = [
                 'background: #0f172a',
@@ -222,11 +252,11 @@
                 'border-bottom: 1px solid #1e293b'
             ].join('; ');
 
-            const titulo = doc.createElement('span');
+            const titulo = docTop.createElement('span');
             titulo.textContent = 'Entrada Rápida de Texto (Ins+Ins)';
             header.appendChild(titulo);
 
-            const btnFechar = doc.createElement('button');
+            const btnFechar = docTop.createElement('button');
             btnFechar.type = 'button';
             btnFechar.textContent = '×';
             btnFechar.title = 'Fechar (Esc)';
@@ -253,15 +283,15 @@
             dialog.appendChild(header);
 
             // 3. Corpo com Campo de Digitação
-            const body = doc.createElement('div');
+            const body = docTop.createElement('div');
             body.style.cssText = 'padding: 12px; background: #ffffff; display: flex; flex-direction: column; gap: 8px;';
 
-            const labelDica = doc.createElement('div');
+            const labelDica = docTop.createElement('div');
             labelDica.textContent = 'Digite ou cole manualmente para enviar à Área de Transferência:';
             labelDica.style.cssText = 'font-size: 11px; color: #64748b; line-height: 1.3; font-weight: 500;';
             body.appendChild(labelDica);
 
-            const inputTexto = doc.createElement('input');
+            const inputTexto = docTop.createElement('input');
             inputTexto.type = 'text';
             inputTexto.className = 'jusgov-input-rapido-campo';
             inputTexto.placeholder = 'Ex.: 1015306-38.2026.4.01.4002, 19/10/2026...';
@@ -290,7 +320,7 @@
             body.appendChild(inputTexto);
 
             // 3.1 Painel de Checagem e Validação Matemática Online (Seção 6.143 / FEAT-33)
-            const painelValidacaoOnline = doc.createElement('div');
+            const painelValidacaoOnline = docTop.createElement('div');
             painelValidacaoOnline.className = 'jusgov-input-rapido-validacao';
             painelValidacaoOnline.style.cssText = [
                 'display: none',
@@ -351,10 +381,10 @@
             atualizarValidacaoOnline();
 
             // 4. Rodapé com Botões de Ação
-            const footer = doc.createElement('div');
+            const footer = docTop.createElement('div');
             footer.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;';
 
-            const btnCancelar = doc.createElement('button');
+            const btnCancelar = docTop.createElement('button');
             btnCancelar.type = 'button';
             btnCancelar.textContent = 'Cancelar';
             btnCancelar.style.cssText = [
@@ -374,7 +404,7 @@
             btnCancelar.onclick = () => this.fecharCaixa();
             footer.appendChild(btnCancelar);
 
-            const btnConfirmar = doc.createElement('button');
+            const btnConfirmar = docTop.createElement('button');
             btnConfirmar.type = 'button';
             btnConfirmar.textContent = 'Copiar (Enter)';
             btnConfirmar.style.cssText = [
@@ -414,8 +444,14 @@
             // 6. Arrastabilidade (Draggable) via Header
             this.#configurarArrastabilidade(header, dialog);
 
-            // 7. Inserir no DOM
-            doc.body.appendChild(dialog);
+            // 7. Inserir no DOM raiz e promover à Top Layer
+            docTop.body.appendChild(dialog);
+            if (typeof dialog.showPopover === 'function') {
+                try {
+                    if (dialog.matches && dialog.matches(':popover-open')) dialog.hidePopover();
+                    dialog.showPopover();
+                } catch (_) { }
+            }
             this.#elementoDialogo = dialog;
 
             // 8. Posicionamento inteligente (Proxi-Mouse com clamp ou centro da tela)
@@ -438,21 +474,27 @@
          * @param {Object} [posCustom=null]
          */
         #posicionarDialogo(dialog, posCustom = null) {
-            const vw = Math.max(window.innerWidth || 0, document.documentElement ? document.documentElement.clientWidth : 0, 400);
-            const vh = Math.max(window.innerHeight || 0, document.documentElement ? document.documentElement.clientHeight : 0, 300);
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            const docUi = ctxUi.docUi || document;
+            const vw = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 400);
+            const vh = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 300);
             const largura = 390;
             const altura = 160;
 
             let targetX;
             let targetY;
 
+            const mouseXTop = this.#posicaoMouse.x > 0 ? (this.#posicaoMouse.x + ctxUi.offsetX) : 0;
+            const mouseYTop = this.#posicaoMouse.y > 0 ? (this.#posicaoMouse.y + ctxUi.offsetY) : 0;
+
             if (posCustom && typeof posCustom.x === 'number' && typeof posCustom.y === 'number') {
-                targetX = posCustom.x;
-                targetY = posCustom.y;
-            } else if (this.#posicaoMouse.x > 0 && this.#posicaoMouse.y > 0 && this.#posicaoMouse.x <= vw && this.#posicaoMouse.y <= vh) {
+                targetX = posCustom.x + ctxUi.offsetX;
+                targetY = posCustom.y + ctxUi.offsetY;
+            } else if (mouseXTop > 0 && mouseYTop > 0 && mouseXTop <= vw && mouseYTop <= vh) {
                 // Proxi-Mouse: logo abaixo do cursor
-                targetX = this.#posicaoMouse.x - 20;
-                targetY = this.#posicaoMouse.y + 16;
+                targetX = mouseXTop - 20;
+                targetY = mouseYTop + 16;
             } else {
                 // Fallback: Centro da viewport
                 targetX = Math.round((vw - largura) / 2);
@@ -473,8 +515,9 @@
          * @param {HTMLElement} dialog
          */
         #configurarArrastabilidade(header, dialog) {
-            const doc = typeof document !== 'undefined' ? document : null;
-            if (!doc) return;
+            const ctxUi = this.#obterContextoRaizUi();
+            const winUi = ctxUi.winUi || window;
+            if (!ctxUi.docUi) return;
 
             header.addEventListener('mousedown', (e) => {
                 if (e.button !== 0) return;
@@ -494,8 +537,8 @@
                 const aoMover = (ev) => {
                     if (!this.#emArrasto) return;
                     ev.preventDefault();
-                    const vw = Math.max(window.innerWidth || 0, 400);
-                    const vh = Math.max(window.innerHeight || 0, 300);
+                    const vw = Math.max(winUi.innerWidth || 0, 400);
+                    const vh = Math.max(winUi.innerHeight || 0, 300);
                     const novaX = ev.clientX - this.#arrastoOffset.x;
                     const novaY = ev.clientY - this.#arrastoOffset.y;
                     const clampX = Math.max(6, Math.min(novaX, vw - dialog.offsetWidth - 6));
@@ -512,8 +555,12 @@
                     }
                 };
 
-                window.addEventListener('mousemove', aoMover, { capture: true, signal });
-                window.addEventListener('mouseup', aoSoltar, { capture: true, signal });
+                winUi.addEventListener('mousemove', aoMover, { capture: true, signal });
+                winUi.addEventListener('mouseup', aoSoltar, { capture: true, signal });
+                if (winUi !== window) {
+                    window.addEventListener('mousemove', aoMover, { capture: true, signal });
+                    window.addEventListener('mouseup', aoSoltar, { capture: true, signal });
+                }
             });
         }
 
@@ -581,6 +628,7 @@
             }
             if (this.#elementoDialogo) {
                 try {
+                    if (typeof this.#elementoDialogo.hidePopover === 'function') this.#elementoDialogo.hidePopover();
                     this.#elementoDialogo.remove();
                 } catch (_) {}
                 this.#elementoDialogo = null;

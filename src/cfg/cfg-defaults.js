@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: cfg-defaults.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * CONFIGURAÇÃO: JusGovBR Config - Definições Padrão de Fábrica e Parâmetros do Motor
+ * ARQUIVO: src/cfg/cfg-defaults.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * CONFIGURAÇÃO: JusGovBR Config - Definições Padrão de Fábrica e Parâmetros do Motor
  *
  * @MAPA-IA:
  * - Arquivo: src/cfg/cfg-defaults.js
@@ -66,13 +67,15 @@
     const CATALOGO_PERFIS_MINIMO = Object.freeze({
         versaoEsquema: 1,
         perfilPadraoId: 'padrao',
-        chavesGlobais: Object.freeze(['regrasMapeamentoElementos', 'perfilAtivoId', 'listaPerfis']),
+        chavesGlobais: Object.freeze(['regrasMapeamentoElementos', 'urlsTurbo', 'perfilAtivoId', 'listaPerfis']),
         configPadrao: Object.freeze({}),
         perfisPredefinidos: Object.freeze([
             Object.freeze({ id: 'padrao', nome: 'Padrão', predefinido: true, sobrescritas: Object.freeze({}) }),
             Object.freeze({ id: 'trabalho', nome: 'Trabalho', predefinido: true, sobrescritas: Object.freeze({}) }),
             Object.freeze({ id: 'casa', nome: 'Casa', predefinido: true, sobrescritas: Object.freeze({}) }),
-            Object.freeze({ id: 'estudo', nome: 'Estudo', aliases: Object.freeze(['estudar']), predefinido: true, sobrescritas: Object.freeze({}) })
+            Object.freeze({ id: 'estudo', nome: 'Estudo', aliases: Object.freeze(['estudar']), predefinido: true, sobrescritas: Object.freeze({}) }),
+            Object.freeze({ id: 'leitura', nome: 'Leitura / Pesquisa', aliases: Object.freeze(['leitura', 'pesquisa']), predefinido: true, sobrescritas: Object.freeze({}) }),
+            Object.freeze({ id: 'reuniao', nome: 'Apresentação / Reunião', aliases: Object.freeze(['reuniao', 'apresentacao']), predefinido: true, sobrescritas: Object.freeze({}) })
         ])
     });
 
@@ -115,7 +118,7 @@
         const chavesGlobais = Object.freeze(
             Array.isArray(origem.chavesGlobais) && origem.chavesGlobais.length > 0
                 ? [...origem.chavesGlobais]
-                : ['regrasMapeamentoElementos', 'perfilAtivoId', 'listaPerfis']
+                : ['regrasMapeamentoElementos', 'urlsTurbo', 'perfilAtivoId', 'listaPerfis']
         );
 
         return Object.freeze({

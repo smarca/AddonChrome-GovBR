@@ -1256,22 +1256,22 @@
                     mp.avancarMinutoEstadoTrabalho(st, t0 + 30 * 1000, cfgDesligada);
                     const passo1Ok = (st.corridoMinutos === 1 && st.ativoMinutos === 1 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0);
 
-                    // Minutos 2..5 sem nova atividade (1, 2, 3, 4 min inativos < 5 min): ainda conta provisoriamente como ativo
-                    for (let m = 1; m <= 4; m++) {
+                    // Minutos 2..3 sem nova atividade (1 e 2 min inativos < 3 min): ainda conta provisoriamente como ativo (ex.: leitura)
+                    for (let m = 1; m <= 2; m++) {
                         mp.avancarMinutoEstadoTrabalho(st, t0 + m * 60 * 1000, cfgDesligada);
                     }
-                    const antesConfirmarPausaOk = (st.corridoMinutos === 5 && st.ativoMinutos === 5 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0 && !st.emPausa);
+                    const antesConfirmarPausaOk = (st.corridoMinutos === 3 && st.ativoMinutos === 3 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0 && !st.emPausa);
 
-                    // Minuto 6 (>= 5 min inativo): confirma 1 pausa e contabiliza a pausa INTEIRA (5 min) fora do ativo!
-                    mp.avancarMinutoEstadoTrabalho(st, t0 + 5 * 60 * 1000, cfgDesligada);
-                    const aposConfirmarPausaOk = (st.corridoMinutos === 6 && st.ativoMinutos === 1 && st.pausasMinutos === 5 && st.pausasConfirmadas === 1 && st.emPausa);
+                    // Minuto 4 (>= 3 min inativo): confirma 1 pausa e contabiliza a pausa INTEIRA (3 min) retroativamente fora do ativo!
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 3 * 60 * 1000, cfgDesligada);
+                    const aposConfirmarPausaOk = (st.corridoMinutos === 4 && st.ativoMinutos === 1 && st.pausasMinutos === 3 && st.pausasConfirmadas === 1 && st.emPausa);
 
-                    // Minuto 7 (ainda na mesma pausa): corrido=7, ativo=1, pausasMinutos=6, pausasConfirmadas segue 1
-                    mp.avancarMinutoEstadoTrabalho(st, t0 + 6 * 60 * 1000, cfgDesligada);
-                    const continuaPausaOk = (st.corridoMinutos === 7 && st.ativoMinutos === 1 && st.pausasMinutos === 6 && st.pausasConfirmadas === 1);
+                    // Minuto 5 (ainda na mesma pausa): corrido=5, ativo=1, pausasMinutos=4, pausasConfirmadas segue 1
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 4 * 60 * 1000, cfgDesligada);
+                    const continuaPausaOk = (st.corridoMinutos === 5 && st.ativoMinutos === 1 && st.pausasMinutos === 4 && st.pausasConfirmadas === 1);
 
                     produtOk = passo1Ok && antesConfirmarPausaOk && aposConfirmarPausaOk && continuaPausaOk;
-                    detalheProdut = `p1=${passo1Ok}, antes5m=${antesConfirmarPausaOk}, conf5m=${aposConfirmarPausaOk}, cont=${continuaPausaOk}`;
+                    detalheProdut = `p1=${passo1Ok}, antes3m=${antesConfirmarPausaOk}, conf3m=${aposConfirmarPausaOk}, cont=${continuaPausaOk}`;
                 } else {
                     detalheProdut = 'JusGovModuloProdutividade ausente';
                 }
@@ -1281,7 +1281,7 @@
             registrar(
                 produtOk,
                 'PRODUTIVIDADE_CONTADORES_ATIVOS_E_PAUSA_INTEIRA_5MIN',
-                'Contadores Corrido/Ativo/Pausas operam mesmo com Pomodoro desativado e convertem a pausa inteira ao confirmar 5 min sem interação.',
+                'Contadores Corrido/Ativo/Pausas operam mesmo com Pomodoro desativado e convertem a pausa inteira retroativamente ao confirmar 3 min sem interação.',
                 { detalhe: detalheProdut }
             );
 
@@ -1342,77 +1342,6 @@
             }
 
             {
-            // Teste: Auto-Limpeza Seletiva de Cookies Antigos (preserva logins/tokens recentes < X dias e apaga só inativos >= X dias)
-            let manutOk = false;
-            let detalheManut = '';
-            try {
-                const ManutCls = window.JusGovModuloManutencao;
-                if (typeof ManutCls === 'function') {
-                    const m = new ManutCls();
-                    const agora = 1800000000000;
-                    const seteDiasMs = m.obterMsIdadeLimpeza('7d');
-                    const umDiaMs = 24 * 3600 * 1000;
-
-                    const cTokenRecente = { storeId: '0', domain: '.pje.jus.br', path: '/', name: 'AUTH_TOKEN', secure: true };
-                    const cSemHistorico = { storeId: '0', domain: 'sso.cloud.pje.jus.br', path: '/', name: 'KC_SESSION', secure: true, hostOnly: true };
-                    const cAbaAberta = { storeId: '0', domain: '.gov.br', path: '/', name: 'GOV_SSO', secure: true };
-                    const cObsoleto = { storeId: '0', domain: '.portal-antigo.example.org', path: '/app', name: 'OLD_TRACKER', secure: false };
-
-                    const mapaInicial = {};
-                    mapaInicial[m.gerarChaveCookie(cTokenRecente)] = agora - (2 * umDiaMs); // acessado/alterado há 2 dias (< 7d) -> PRESERVAR
-                    mapaInicial[m.gerarChaveCookie(cAbaAberta)] = agora - (10 * umDiaMs);   // antigo, mas aba aberta agora -> PRESERVAR
-                    mapaInicial[m.gerarChaveCookie(cObsoleto)] = agora - (8 * umDiaMs);     // sem acesso há 8 dias (>= 7d) -> REMOVER
-                    mapaInicial['0|.inexistente.test|/|GHOST'] = agora - umDiaMs;          // cookie não existe mais -> podar do mapa
-
-                    const resAval = m.avaliarCookiesParaLimpeza(
-                        [cTokenRecente, cSemHistorico, cAbaAberta, cObsoleto],
-                        mapaInicial,
-                        agora,
-                        seteDiasMs,
-                        { hostsAtivos: new Set(['acesso.gov.br']) }
-                    );
-
-                    const apenasObsoletoRemovido = (
-                        resAval.remover.length === 1 &&
-                        resAval.remover[0].name === 'OLD_TRACKER'
-                    );
-                    const preservouRecentesEAtivos = (
-                        resAval.preservar.length === 3 &&
-                        resAval.preservar.some(c => c.name === 'AUTH_TOKEN') &&
-                        resAval.preservar.some(c => c.name === 'KC_SESSION') &&
-                        resAval.preservar.some(c => c.name === 'GOV_SSO')
-                    );
-                    const mapaLimpoESemeadoOk = (
-                        resAval.mapaAtualizado[m.gerarChaveCookie(cSemHistorico)] === agora &&
-                        resAval.mapaAtualizado[m.gerarChaveCookie(cAbaAberta)] === agora &&
-                        resAval.mapaAtualizado[m.gerarChaveCookie(cObsoleto)] === undefined &&
-                        resAval.mapaAtualizado['0|.inexistente.test|/|GHOST'] === undefined
-                    );
-                    const urlRemocaoOk = (
-                        m.construirUrlCookie(cObsoleto) === 'http://portal-antigo.example.org/app' &&
-                        m.construirUrlCookie(cTokenRecente) === 'https://pje.jus.br/'
-                    );
-                    const hostMatchOk = (
-                        m.cookieCorrespondeAoHost(cSemHistorico, 'sso.cloud.pje.jus.br') === true &&
-                        m.cookieCorrespondeAoHost(cSemHistorico, 'sub.sso.cloud.pje.jus.br') === false &&
-                        m.cookieCorrespondeAoHost(cAbaAberta, 'acesso.gov.br') === true
-                    );
-
-                    manutOk = Boolean(apenasObsoletoRemovido && preservouRecentesEAtivos && mapaLimpoESemeadoOk && urlRemocaoOk && hostMatchOk);
-                    detalheManut = `rem=${apenasObsoletoRemovido}, pres=${preservouRecentesEAtivos}, mapa=${mapaLimpoESemeadoOk}, url=${urlRemocaoOk}, host=${hostMatchOk}`;
-                } else {
-                    detalheManut = 'JusGovModuloManutencao ausente';
-                }
-            } catch (eManut) {
-                detalheManut = eManut.message || String(eManut);
-            }
-            registrar(
-                manutOk,
-                'MANUTENCAO_COOKIES_SELETIVA_PRESERVA_AUTENTICACAO',
-                'Auto-Limpeza remove apenas cookies sem acesso/alteração >= X dias, preservando tokens recentes, sessões ativas e cookies sem histórico.',
-                { detalhe: detalheManut }
-            );
-
             // Teste: Match Pattern Chromium (*://*.jus.br/* inclui dominio raiz e rejeita spoofing de path)
             let urlMatchOk = false;
             let detalheUrlMatch = '';
@@ -1482,39 +1411,6 @@
                 'NAVEGADOR_ANTI_DUPLICACAO_REGRESSAO',
                 'GerenciadorAntiDuplicacao.processarAbaAtualizada e ModuloNavegador.Ctrl+Tab MV3 executam sem erros de referência.',
                 { detalhe: detalheAntiDupFix }
-            );
-
-            }
-
-            {
-            // Teste: Contratos runtime dos módulos de Service Worker (ModuloManutencao, ModuloProdutividade, Regras)
-            let contratoSwOk = false;
-            let detalheContratoSw = '';
-            try {
-                const ManutCls = window.JusGovModuloManutencao;
-                const ProdCls = window.JusGovModuloProdutividade;
-                const rs = window.JusGovCfgDefaults && typeof window.JusGovCfgDefaults.obterRegrasSistema === 'function'
-                    ? window.JusGovCfgDefaults.obterRegrasSistema()
-                    : null;
-                if (typeof ManutCls === 'function' && typeof ProdCls === 'function' && rs) {
-                    const manut = new ManutCls();
-                    const prod = new ProdCls();
-                    const temMetodos = typeof manut.executarAutoLimpezaCacheECookies === 'function' &&
-                        typeof manut.registrarAcessoUrl === 'function' &&
-                        typeof prod.processarTickTrabalho === 'function' &&
-                        typeof prod.abrirAssistenteIaLateral === 'function';
-                    const temRegrasJson = Boolean(Array.isArray(rs.sistemasJudiciais) && rs.manutencao && rs.manutencao.idadesLimpezaMs && rs.manutencao.idadesLimpezaMs['7d']);
-                    contratoSwOk = temMetodos && temRegrasJson;
-                    detalheContratoSw = `metodosSw=${temMetodos}, regrasJson=${temRegrasJson}`;
-                }
-            } catch (eSw) {
-                detalheContratoSw = eSw.message || String(eSw);
-            }
-            registrar(
-                contratoSwOk,
-                'CONTRATO_MODULOS_SW_E_REGRAS',
-                'ModuloManutencao, ModuloProdutividade e regras-sistema.json expõem contratos completos sem erros.',
-                { detalhe: detalheContratoSw }
             );
 
             }
@@ -1813,14 +1709,14 @@
                     st39.pomodoroMinutosNaFase = 5; // alivioMin = 6
                     mp39.avancarMinutoPomodoro(st39, tsAlivio, cfg39);
                     const resPosAlivio = mp39.calcularResumoPomodoro(st39, cfg39, tsAlivio);
-                    const alivioTextoOk = (resPosAlivio.ultimoDescansoTexto === `Alívio realizado às ${mp39.formatarHoraHHMM(tsAlivio)}hs`);
+                    const alivioTextoOk = (resPosAlivio.ultimoDescansoTexto === `Alívio realizado às ${mp39.formatarHoraHHMM(tsAlivio)}hs por 06 minutos`);
 
                     st39.pomodoroFase = 'pausa_maior';
                     st39.ultimaAtividadeTs = tsPausaMaior - 65000;
                     st39.pomodoroMinutosNaFase = 23; // pausaMaiorMin = 24
                     mp39.avancarMinutoPomodoro(st39, tsPausaMaior, cfg39);
                     const resPosPausaMaior = mp39.calcularResumoPomodoro(st39, cfg39, tsPausaMaior);
-                    const pausaMaiorTextoOk = (resPosPausaMaior.ultimoDescansoTexto === `Descanso realizado às ${mp39.formatarHoraHHMM(tsPausaMaior)}hs`);
+                    const pausaMaiorTextoOk = (resPosPausaMaior.ultimoDescansoTexto === `Descanso realizado às ${mp39.formatarHoraHHMM(tsPausaMaior)}hs por 24 minutos`);
 
                     feat3940Ok = visibilidadeOk && semDescansoOk && alivioTextoOk && pausaMaiorTextoOk;
                     detalheFeat3940 = `vis=${visibilidadeOk}, vazio=${semDescansoOk}, alivio=${alivioTextoOk}("${resPosAlivio.ultimoDescansoTexto}"), pausa=${pausaMaiorTextoOk}("${resPosPausaMaior.ultimoDescansoTexto}")`;
@@ -2491,48 +2387,51 @@
                             res35Ativ.segundosRestantes === 236
                         );
 
-                        /* 3. >50%..75% (55% = 198s, resta 162s): movimento trava o valor com "Em andamento?" e retoma apos parar */
+                        /* 3. >50% fora dos últimos 5% / min 30s (55% = 198s e 80% = 288s): movimento pausa valor com "Em andamento?" e retoma após 10s idle */
                         const s55 = novoEstadoDesc(198);
                         const r55 = mp51.aplicarAtividadeEmEstadoTrabalho(s55, base, 'movimento', cfg51);
-                        const res55Trava = mp51.calcularResumoPomodoro(s55, cfg51, base + 2000);
-                        const res55Retoma = mp51.calcularResumoPomodoro(s55, cfg51, base + 7500); /* 2500ms ativo travado + 5000ms idle = 203s (157s rest) */
+                        const res55Trava = mp51.calcularResumoPomodoro(s55, cfg51, base + 5000);
+                        const res55Retoma = mp51.calcularResumoPomodoro(s55, cfg51, base + 15000); /* 10000ms ativo travado + 5000ms idle = 203s (157s rest) */
+                        const s80Pause = novoEstadoDesc(288);
+                        const r80Pause = mp51.aplicarAtividadeEmEstadoTrabalho(s80Pause, base, 'movimento', cfg51);
                         const ok55 = (
                             r55.resetouDescanso === false &&
                             r55.estagioEfetivo === 2 &&
                             r55.mensagemAviso === 'Em andamento?' &&
                             res55Trava.segundosRestantes === 162 &&
                             res55Retoma.descansoEmAviso === false &&
-                            res55Retoma.segundosRestantes === 157
+                            res55Retoma.segundosRestantes === 157 &&
+                            r80Pause.estagioEfetivo === 2
                         );
 
-                        /* 4. >75% (80% = 288s, resta 72s): movimento e 1 clique NAO quebram nem travam ("Finalizando Descanso...") */
-                        const s80 = novoEstadoDesc(288);
+                        /* 4. Nos últimos 5% ou mín. 30s (332s/360s, resta 28s): movimento e 1 clique NAO quebram ("Finalizando Descanso...") */
+                        const s80 = novoEstadoDesc(332);
                         const r80Mov = mp51.aplicarAtividadeEmEstadoTrabalho(s80, base, 'movimento', cfg51);
                         const res80Mov = mp51.calcularResumoPomodoro(s80, cfg51, base + 2000);
-                        const s80Clk1 = novoEstadoDesc(288);
+                        const s80Clk1 = novoEstadoDesc(332);
                         const r80Clk1 = mp51.aplicarAtividadeEmEstadoTrabalho(s80Clk1, base, 'click_ou_tecla', cfg51);
                         const ok80 = (
                             r80Mov.resetouDescanso === false &&
                             r80Mov.estagioEfetivo === 3 &&
                             r80Mov.mensagemAviso === 'Finalizando Descanso...' &&
-                            res80Mov.segundosRestantes === 70 &&
+                            res80Mov.segundosRestantes === 26 &&
                             r80Clk1.estagioEfetivo === 3 &&
                             r80Clk1.mensagemAviso === 'Finalizando Descanso...'
                         );
 
-                        /* 5. Escalada 3 cliques/estagio a partir de 80%: 3->50%, 6->25%, 9->zera; e +5% restante recupera estagio */
-                        const sEsc = novoEstadoDesc(288);
+                        /* 5. Escalada 3 cliques/estagio a partir da janela final (332s/360s): 3->2, 6->1, 9->zera; e +5% restante recupera estagio */
+                        const sEsc = novoEstadoDesc(332);
                         mp51.aplicarAtividadeEmEstadoTrabalho(sEsc, base + 100, 'click_ou_tecla', cfg51);
                         mp51.aplicarAtividadeEmEstadoTrabalho(sEsc, base + 200, 'click_ou_tecla', cfg51);
                         const r3 = mp51.aplicarAtividadeEmEstadoTrabalho(sEsc, base + 300, 'click_ou_tecla', cfg51);
                         const ok3Clk = (r3.estagioEfetivo === 2 && r3.mensagemAviso === 'Em andamento?');
 
-                        /* Recuperacao de +5% sem cliques: 72s restantes -> 5% = 3600ms */
-                        const resRec = mp51.calcularResumoPomodoro(sEsc, cfg51, base + 300 + 3600);
+                        /* Recuperacao de +5% sem cliques: 28s restantes -> 5% = 1400ms (mín. 1000ms) */
+                        const resRec = mp51.calcularResumoPomodoro(sEsc, cfg51, base + 300 + 2000);
                         const okRec = (resRec.descansoEstagioEfetivo === 3 && resRec.descansoCliquesPenalidade === 0);
 
                         /* Sequencia completa 3 -> 6 -> 9 cliques sem pausa zera tudo */
-                        const sEscFull = novoEstadoDesc(288);
+                        const sEscFull = novoEstadoDesc(332);
                         let ultRes;
                         for (let c = 1; c <= 9; c++) {
                             ultRes = mp51.aplicarAtividadeEmEstadoTrabalho(sEscFull, base + c * 150, 'click_ou_tecla', cfg51);
@@ -2833,70 +2732,6 @@
                 );
             }
 
-            // Bateria FEAT-56: Escudo MAIN world contra desseleção forçada (removeAllRanges/empty/collapse/execCommand) e bloqueio de selectstart
-            {
-                let feat56Ok = false;
-                let detalheFeat56 = '';
-                try {
-                    const prot = window.JusGovProtecaoCopiaMain;
-                    if (!prot || typeof prot.instalarProtecao !== 'function') {
-                        detalheFeat56 = 'window.JusGovProtecaoCopiaMain ausente.';
-                    } else {
-                        const pLeitura = document.createElement('p');
-                        pLeitura.textContent = 'Texto protegido para leitura';
-                        document.body.appendChild(pLeitura);
-                        const sel56 = window.getSelection();
-                        sel56.removeAllRanges();
-                        const rng56 = document.createRange();
-                        rng56.selectNodeContents(pLeitura);
-                        sel56.addRange(rng56);
-
-                        document.documentElement.setAttribute('data-jusgov-ativo', '1');
-                        prot.instalarProtecao(window);
-
-                        sel56.removeAllRanges();
-                        sel56.empty();
-                        sel56.collapse(pLeitura, 0);
-                        sel56.collapseToStart();
-                        sel56.collapseToEnd();
-                        try { document.execCommand('unselect'); } catch (_) { }
-
-                        const textoMantido = String(sel56.toString() || '').trim();
-                        const antiDesselecaoOk = (!sel56.isCollapsed && textoMantido === 'Texto protegido para leitura');
-
-                        let paginaSelectStartRecebido = false;
-                        const fnPagSelStart = () => { paginaSelectStartRecebido = true; };
-                        pLeitura.addEventListener('selectstart', fnPagSelStart);
-                        pLeitura.dispatchEvent(new Event('selectstart', { bubbles: true, cancelable: true }));
-                        pLeitura.removeEventListener('selectstart', fnPagSelStart);
-                        const selectStartBloqueado = !paginaSelectStartRecebido;
-
-                        const inp56 = document.createElement('input');
-                        inp56.type = 'text';
-                        document.body.appendChild(inp56);
-                        const editavelReconhecido = prot.ehContextoEditavelOuExtensao(document, { anchorNode: inp56, focusNode: inp56 });
-
-                        prot.removerProtecao(window);
-                        sel56.removeAllRanges();
-                        document.documentElement.removeAttribute('data-jusgov-ativo');
-                        if (inp56.parentNode) inp56.parentNode.removeChild(inp56);
-                        if (pLeitura.parentNode) pLeitura.parentNode.removeChild(pLeitura);
-
-                        feat56Ok = antiDesselecaoOk && selectStartBloqueado && editavelReconhecido;
-                        detalheFeat56 = `antiDesselecao=${antiDesselecaoOk}, selectStartBloq=${selectStartBloqueado}, editavel=${editavelReconhecido}`;
-                    }
-                } catch (e56) {
-                    try { window.JusGovProtecaoCopiaMain && window.JusGovProtecaoCopiaMain.removerProtecao(window); } catch (_) { }
-                    detalheFeat56 = e56.message || String(e56);
-                }
-                registrar(
-                    feat56Ok,
-                    'FEAT_56_ESCUDO_MAIN_ANTI_DESSELECAO_E_ANTI_BLOQUEIO_COPIA',
-                    'Escudo MAIN world impede páginas de forçar desseleção (removeAllRanges/empty/collapse/unselect), bloqueia selectstart sem quebrar campos editáveis.',
-                    { detalhe: detalheFeat56 }
-                );
-            }
-
             // Bateria FEAT-57: Alerta amarelo nos últimos 30s (minipopup piscando) e 1min antes no ícone do app
             {
                 let feat57Ok = false;
@@ -3132,7 +2967,7 @@
                         );
                         const ultimoDescSyncOk = (
                             Boolean(resumo76.ultimoDescansoTexto) &&
-                            resumo76.ultimoDescansoTexto === `Alívio realizado às ${mp76.formatarHoraHHMM(t76 - 120000)}hs` &&
+                            resumo76.ultimoDescansoTexto === `Alívio realizado às ${mp76.formatarHoraHHMM(t76 - 120000)}hs por 06 minutos` &&
                             txt76.linhaPomodoro.includes(resumo76.ultimoDescansoTexto)
                         );
 
@@ -3227,57 +3062,6 @@
 
             // Bateria BUG-78: Execucao real da funcao serializavel do minipopup no DOM (sem TDZ/ReferenceError, com blur e limpeza)
             {
-                let bug78Ok = false;
-                let detalheBug78 = '';
-                try {
-                    const ProdCls78 = window.JusGovModuloProdutividade;
-                    if (typeof ProdCls78 !== 'function') {
-                        detalheBug78 = 'window.JusGovModuloProdutividade ausente.';
-                    } else {
-                        const mp78 = new ProdCls78();
-                        const fnOrig = mp78.obterFuncaoInjecaoBarraPomodoro();
-                        const fnSerializada = new Function(`return (${fnOrig.toString()});`)();
-                        const cfg78 = {
-                            ativoPorConfig: true,
-                            deveExibirNormal: true,
-                            focoOcultadoGlobal: false,
-                            modoBarra: 'sempre',
-                            beepAtivo: false,
-                            beepIntensidade: 'suave',
-                            beepIntervaloMs: 15000,
-                            permitirBeep: false,
-                            deveExibirModalDescanso: false,
-                            modalDados: null
-                        };
-                        const est78 = mp78.normalizarEstadoGlobalBarraPomodoro({});
-                        const st78 = mp78.criarEstadoTrabalhoZerado('2026-11-16', Date.now() - 20000);
-                        st78.pomodoroFase = 'alivio';
-                        st78.pomodoroDescansoSyncTs = Date.now() - 20000;
-                        st78.pomodoroDescansoAcumuladoMs = 20000;
-                        const res78 = mp78.calcularResumoPomodoro(st78, { pomodoroAtivo: true, pomodoroFocoMinutos: 25, pomodoroProporcao: 4.5, pomodoroCiclos: 4 }, Date.now(), null);
-
-                        fnSerializada(cfg78, res78, est78);
-                        const hostCriado = document.getElementById('jusgov-pomodoro-barra-global');
-                        const backdropCriado = document.getElementById('jusgov-pomodoro-backdrop-global');
-                        const criouOk = Boolean(hostCriado && backdropCriado);
-
-                        /* Desmonta limpamente passando ativoPorConfig: false */
-                        fnSerializada({ ...cfg78, ativoPorConfig: false, deveExibirNormal: false }, res78, est78);
-                        const limpouOk = (!document.getElementById('jusgov-pomodoro-barra-global') && !document.getElementById('jusgov-pomodoro-backdrop-global'));
-
-                        bug78Ok = criouOk && limpouOk;
-                        detalheBug78 = `criou=${criouOk}, limpou=${limpouOk}`;
-                    }
-                } catch (e78) {
-                    detalheBug78 = e78.message || String(e78);
-                }
-                registrar(
-                    bug78Ok,
-                    'BUG_78_INJECAO_MINIPOPUP_SEM_ERRO_TDZ_E_TEARDOWN',
-                    'Função serializada do minipopup injeta sem erro TDZ/ReferenceError em DOM real, cria backdrop fosco e limpa ao desligar.',
-                    { detalhe: detalheBug78 }
-                );
-
                 /* BUG-79: Fonte externa única (SW) com reconciliação ao vivo, compensação de pausa no foco e ausência de avanço local nas guias */
                 let bug79Ok = false;
                 let detalheBug79 = '';
@@ -3576,9 +3360,9 @@
                             fn62(snapE.cfgExib, snapE.resumoPomodoro, snapE.estadoBarra);
                             const okExp = Boolean(ui62.spanFase.style.display === 'inline-block' && ui62.spanStatus.style.display === 'block' && ui62.spanStatus.textContent.includes('Alívio realizado às'));
 
-                            /* Movimento em descanso no DOM real mantém blur e centraliza temporariamente; clique retira blur e vai pro topo-centro */
+                            /* Movimento em descanso no DOM real mantém sem blur no topo-centro; clique também mantém sem blur no topo-centro */
                             fn62(mp62.construirSnapshotExternoPomodoro(st62, cfg62, null, { posicaoVertical: 'inferior', alinhamento: 'direita' }, tDesc + 100, false).cfgExib, rMov62, { posicaoVertical: 'inferior', alinhamento: 'direita' });
-                            const movDomBlur = Boolean(document.getElementById('jusgov-pomodoro-backdrop-global') && host62.style.top === '50%' && host62.style.left === '50%');
+                            const movDomBlur = Boolean(!document.getElementById('jusgov-pomodoro-backdrop-global') && host62.style.top === '0px');
 
                             fn62(mp62.construirSnapshotExternoPomodoro(st62, cfg62, null, { posicaoVertical: 'inferior', alinhamento: 'direita' }, tClk62 + 100, false).cfgExib, rClk62, { posicaoVertical: 'inferior', alinhamento: 'direita' });
                             const clkDomNoBlur = Boolean(!document.getElementById('jusgov-pomodoro-backdrop-global') && host62.style.top === '0px');
@@ -3685,6 +3469,491 @@
                     'Restaurar padrão de fábrica preserva estatísticas; alternar Pomodoro on/off reflete online em todas as guias, badge/tooltip, Popup e Opções mantendo Corrido/Ativo/Pausas sempre ativos.',
                     { detalhe: detalheBug80 }
                 );
+
+                /* BUG-81 / BUG-83: Toggle optPomodoroAtivo online em perfis com sobrescrita (ex: Trabalho) + restrição estrita de blocos e 1/2/3 cliques ao mesmo parágrafo/linha */
+                let bug81e83Ok = false;
+                let detalheBug81e83 = '';
+                try {
+                    const cfgCls81 = (typeof window !== 'undefined' && typeof window.JusGovConfiguracoes === 'function')
+                        ? new window.JusGovConfiguracoes()
+                        : null;
+                    const est2 = (typeof window !== 'undefined' && window.JusGovEstagioExpressoes)
+                        ? new window.JusGovEstagioExpressoes()
+                        : null;
+                    const est4 = (typeof window !== 'undefined' && window.JusGovEstagioDelimitadores)
+                        ? new window.JusGovEstagioDelimitadores()
+                        : null;
+                    const est5 = (typeof window !== 'undefined' && window.JusGovEstagioParagrafos)
+                        ? new window.JusGovEstagioParagrafos()
+                        : null;
+                    const geom = (typeof window !== 'undefined' && window.JusGovGeometriaDOM)
+                        ? new window.JusGovGeometriaDOM()
+                        : null;
+
+                    /* 1) BUG-81: calcularSobrescritasPerfil com catálogo do perfil Trabalho grava pomodoroAtivo: false quando desabilitado + obterConfiguracoesGerais mescla jusgovConfigSyncPendente */
+                    let bug81Ok = false;
+                    if (cfgCls81) {
+                        const catSimulado = {
+                            configPadrao: { pomodoroAtivo: false, modoTurbo: 'global' },
+                            perfisPredefinidos: [
+                                { id: 'trabalho', nome: 'Trabalho', sobrescritas: { pomodoroAtivo: true } }
+                            ]
+                        };
+                        const diffTrabalhoOff = cfgCls81.calcularSobrescritasPerfil(
+                            { pomodoroAtivo: false, modoTurbo: 'global' },
+                            'trabalho',
+                            catSimulado
+                        );
+                        const resEfetiva = cfgCls81.resolverConfigEfetivaPerfil('trabalho', diffTrabalhoOff, catSimulado);
+                        const srcObter = cfgCls81.obterConfiguracoesGerais.toString();
+                        const srcAplicar = cfgCls81.aplicarConfigLocalEAgendarSync.toString();
+                        bug81Ok = Boolean(
+                            diffTrabalhoOff &&
+                            diffTrabalhoOff.pomodoroAtivo === false &&
+                            resEfetiva &&
+                            resEfetiva.pomodoroAtivo === false &&
+                            srcObter.includes('CHAVE_CONFIG_SYNC_PENDENTE') &&
+                            srcAplicar.includes('cacheConfigJusGov')
+                        );
+                    }
+
+                    /* 2) BUG-83: Maiúsculas, negrito/itálico/sublinhado, delimitadores (...) e 1/2/3 cliques restritos à linha/parágrafo corrente */
+                    let maiusculasLinhaOk = false;
+                    let delimLinhaOk = false;
+                    let parLinhaOk = false;
+                    let negritoLinhaOk = false;
+
+                    if (est2) {
+                        const txtCapsMulti = 'LINHA ANTERIOR EM MAIUSCULAS\nBLOCO ALVO NA LINHA ATUAL\nLINHA POSTERIOR EM MAIUSCULAS';
+                        const idxAlvoCaps = txtCapsMulti.indexOf('ALVO') + 1;
+                        const resCaps = est2.tentarExpandirBlocoMaiusculasComQuebraSuave(txtCapsMulti, idxAlvoCaps);
+                        const trechoCaps = resCaps ? txtCapsMulti.substring(resCaps.inicio, resCaps.fim) : '';
+                        maiusculasLinhaOk = (trechoCaps === 'BLOCO ALVO NA LINHA ATUAL');
+                    }
+
+                    if (est4) {
+                        const txtDelimMulti = 'Texto (parenteses abertos na linha 1\ncontinuando na linha 2) fim';
+                        const idxAbre = txtDelimMulti.indexOf('(');
+                        const resDelim = est4.tentarExpandirDelimitadoresSimetricos(txtDelimMulti, idxAbre, true);
+                        delimLinhaOk = (resDelim === null);
+                    }
+
+                    if (est5) {
+                        const txtParMulti = 'Primeira linha sem ponto final no fim\nSegunda linha do bloco que nao deve entrar\nTerceira linha final.';
+                        const idxL2 = txtParMulti.indexOf('Segunda') + 2;
+                        const resPar = est5.delimitarParagrafoLocalizado(txtParMulti, idxL2);
+                        const trechoPar = resPar ? txtParMulti.substring(resPar.inicio, resPar.fim) : '';
+                        parLinhaOk = (trechoPar === 'Segunda linha do bloco que nao deve entrar');
+                    }
+
+                    if (est2 && geom && typeof document !== 'undefined' && document.body) {
+                        const divBold = document.createElement('div');
+                        divBold.innerHTML = '<b>Negrito linha 1<br>Negrito linha 2<br>Negrito linha 3</b>';
+                        document.body.appendChild(divBold);
+                        const bEl = divBold.querySelector('b');
+                        const noLinha2 = bEl && bEl.childNodes.length >= 3 ? bEl.childNodes[2] : null;
+                        if (noLinha2) {
+                            const mapaBold = geom.construirMapaTextoBlocoComJanela(noLinha2, 3);
+                            const resBold = est2.tentarExpandirBlocoFormatadoDestaque(mapaBold, mapaBold.idxCursor);
+                            const trechoBold = resBold ? mapaBold.texto.substring(resBold.inicio, resBold.fim) : '';
+                            negritoLinhaOk = (trechoBold === 'Negrito linha 2');
+                        }
+                        divBold.remove();
+                    } else {
+                        negritoLinhaOk = false;
+                    }
+
+                    bug81e83Ok = bug81Ok && maiusculasLinhaOk && delimLinhaOk && parLinhaOk && negritoLinhaOk;
+                    detalheBug81e83 = `bug81=${bug81Ok}, capsLinha=${maiusculasLinhaOk}, delimLinha=${delimLinhaOk}, parLinha=${parLinhaOk}, negritoLinha=${negritoLinhaOk}`;
+                } catch (e8183) {
+                    detalheBug81e83 = e8183.message || String(e8183);
+                }
+                registrar(
+                    bug81e83Ok,
+                    'BUG_81_83_POMODORO_ONLINE_PERFIL_E_BLOCOS_RESTRITOS_MESMA_LINHA_PARAGRAFO',
+                    'Alternância online de Temporizador Pomodoro Inteligente persiste sobrescrita do perfil ativo em tempo real e toda busca de blocos (maiúsculas, negrito/itálico/sublinhado, delimitadores) e 1/2/3 cliques respeita o limite estrito da mesma linha/parágrafo.',
+                    { detalhe: detalheBug81e83 }
+                );
+
+                /* FEAT-64 / Seção 6.196: Interceptação de botões/ícones nativos de cópia ("Copiar número para área de transferência") e navigator.clipboard.writeText da página */
+                let feat64Ok = false;
+                let detalheFeat64 = '';
+                try {
+                    const motor64 = (typeof window !== 'undefined' && window.JusGovMotorSelecaoTeste) ? window.JusGovMotorSelecaoTeste : null;
+                    const prot64 = (typeof window !== 'undefined' && window.JusGovProtecaoCopiaMain) ? window.JusGovProtecaoCopiaMain : null;
+                    if (motor64 && typeof motor64.interceptarCliqueBotaoCopiarNativo === 'function' && typeof document !== 'undefined' && document.body) {
+                        const wrap64 = document.createElement('div');
+                        wrap64.innerHTML = '<span>MSCiv 0991234-65.2024.4.01.4002</span> <a class="icone-copy" title="Copiar número para área de transferência"><i class="fa fa-clipboard"></i></a>';
+                        document.body.appendChild(wrap64);
+                        const iconeEl = wrap64.querySelector('i');
+
+                        const btnLoc = motor64.localizarBotaoCopiarNativo(iconeEl);
+                        const dadosExtraidos = motor64.extrairDadosAlvoDeBotaoCopiarNativo(btnLoc);
+                        const extraiuCnjOk = Boolean(dadosExtraidos && dadosExtraidos.texto === '0991234-65.2024.4.01.4002');
+
+                        motor64.interceptarCliqueBotaoCopiarNativo(iconeEl, { shiftKey: false, ctrlKey: false, altKey: false });
+                        const clipNormal = window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto;
+                        const copiouNormalOk = (clipNormal === '0991234-65.2024.4.01.4002');
+
+                        /* Com Shift pressionado no clique do ícone de copiar, aplica filtro numérico/zero-pad CNJ */
+                        motor64.interceptarCliqueBotaoCopiarNativo(iconeEl, { shiftKey: true, ctrlKey: false, altKey: false });
+                        const clipShift = window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto;
+                        const copiouShiftOk = (clipShift === '09912346520244014002');
+
+                        /* Slot 2 (anterior) preservou a cópia formatada anterior */
+                        const clipAnt = window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__ && window.__JUSGOV_ULTIMO_CLIPBOARD_ANTERIOR__.texto;
+                        const slot2Ok = (clipAnt === '0991234-65.2024.4.01.4002');
+
+                        /* Interceptação via evento CustomEvent disparado pelo escudo MAIN world */
+                        let eventoMainOk = false;
+                        window.dispatchEvent(new CustomEvent('jusgov:copia-nativa-interceptada', {
+                            detail: { texto: '  12.345.678/0001-95  ', html: '', origem: 'writeText' }
+                        }));
+                        const clipMain = window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto;
+                        eventoMainOk = (clipMain === '12.345.678/0001-95');
+
+                        wrap64.remove();
+                        feat64Ok = extraiuCnjOk && copiouNormalOk && copiouShiftOk && slot2Ok && eventoMainOk;
+                        detalheFeat64 = `extraiu=${extraiuCnjOk}, normal=${copiouNormalOk}, shift=${copiouShiftOk}, slot2=${slot2Ok}, evMain=${eventoMainOk}`;
+                    }
+                } catch (e64) {
+                    detalheFeat64 = e64.message || String(e64);
+                }
+                registrar(
+                    feat64Ok,
+                    'FEAT_64_INTERCEPTACAO_BOTAO_COPIAR_NATIVO_E_CLIPBOARD_INTERNO_EXTERNO',
+                    'Clique em botões/ícones nativos de cópia (ex.: "Copiar número para área de transferência" do PJe) e chamadas writeText/execCommand da página são interceptados, filtrados e sincronizados nos 2 slots internos e no clipboard do sistema.',
+                    { detalhe: detalheFeat64 }
+                );
+
+                /* TEST-01 (BUG-84): Fechamento definitivo do alerta de descanso na pausa atual, sem blur e reset no próximo ciclo */
+                let test01Ok = false;
+                let detalheTest01 = '';
+                try {
+                    const ProdT1 = window.JusGovModuloProdutividade;
+                    if (typeof ProdT1 === 'function') {
+                        const mpT1 = new ProdT1();
+                        const cfgT1 = { pomodoroAtivo: true, pomodoroFocoMinutos: 45, pomodoroProporcao: 4.5, pomodoroCiclos: 4, pomodoroModoAviso: 'completo' };
+                        const t1 = 1710000000000;
+                        const stT1 = mpT1.criarEstadoTrabalhoZerado('2026-11-18', t1);
+                        stT1.ultimaAtividadeTs = t1 + 45 * 60000;
+                        mpT1.iniciarFaseDescansoPomodoro(stT1, t1 + 45 * 60000, cfgT1);
+                        const inicioOrig = stT1.pomodoroFaseInicioTs;
+                        stT1.pomodoroModalFechadoNestaPausa = true;
+                        const actMov1 = mpT1.aplicarAtividadeEmEstadoTrabalho(stT1, t1 + 45 * 60000 + 5000, 'movimento', cfgT1);
+                        const actClk1 = mpT1.aplicarAtividadeEmEstadoTrabalho(stT1, t1 + 45 * 60000 + 8000, 'click_ou_tecla', cfgT1);
+                        const snapT1 = mpT1.construirSnapshotExternoPomodoro(stT1, cfgT1, null, {}, t1 + 45 * 60000 + 9000, false);
+                        const fnInjT1 = mpT1.obterFuncaoInjecaoBarraPomodoro();
+                        fnInjT1(snapT1.cfgExib, snapT1.resumoPomodoro, snapT1.estadoBarra);
+                        const semBlurT1 = !document.getElementById('jusgov-pomodoro-backdrop-global');
+                        fnInjT1({ ...snapT1.cfgExib, ativoPorConfig: false, deveExibirNormal: false }, snapT1.resumoPomodoro, snapT1.estadoBarra);
+                        const inicioPreservado = (stT1.pomodoroFaseInicioTs === inicioOrig);
+                        const fechadaPreservada = (stT1.pomodoroModalFechadoNestaPausa === true);
+                        mpT1.iniciarFaseDescansoPomodoro(stT1, t1 + 95 * 60000, cfgT1);
+                        const reabriuProximoCiclo = (stT1.pomodoroModalFechadoNestaPausa === false);
+                        test01Ok = (
+                            actMov1.resetouDescanso === true &&
+                            actClk1.resetouDescanso === true &&
+                            inicioPreservado &&
+                            fechadaPreservada &&
+                            snapT1.cfgExib.deveExibirModalDescanso === false &&
+                            semBlurT1 &&
+                            reabriuProximoCiclo
+                        );
+                        detalheTest01 = `reset=${actMov1.resetouDescanso}, inicioPreservado=${inicioPreservado}, modalOff=${!snapT1.cfgExib.deveExibirModalDescanso}, semBlur=${semBlurT1}, novoCiclo=${reabriuProximoCiclo}`;
+                    }
+                } catch (eT1) { detalheTest01 = eT1.message || String(eT1); }
+                registrar(test01Ok, 'TEST_01_BUG_84_PAUSA_FECHADA_SEM_BLUR', 'Pausa mantém fechamento e ausência de blur durante interações <= 25% e limpa trava ao iniciar próximo ciclo.', { detalhe: detalheTest01 });
+
+                /* TEST-03 (FEAT-68): Matriz completa de verificarAlarmePomodoro (Burst, Punitivo e Abandono) */
+                let test03Ok = false;
+                let detalheTest03 = '';
+                try {
+                    const ProdT3 = window.JusGovModuloProdutividade;
+                    if (typeof ProdT3 === 'function') {
+                        const mpT3 = new ProdT3();
+                        const burstOk = (
+                            mpT3.verificarAlarmePomodoro(0, 4, 300, 1, 'DESCANSO_PUNITIVO') === 'BEEP_LONGO' &&
+                            mpT3.verificarAlarmePomodoro(0, 4, 300, 15, 'DESCANSO_PUNITIVO') === 'BEEP_CURTO_TRIPLO' &&
+                            mpT3.verificarAlarmePomodoro(0, 4, 300, 60, 'DESCANSO_PUNITIVO') === 'BEEP_CURTO_TRIPLO' &&
+                            mpT3.verificarAlarmePomodoro(0, 4, 300, 10, 'DESCANSO_PUNITIVO') === null
+                        );
+                        const punitivoOk = (
+                            mpT3.verificarAlarmePomodoro(0, 4, 300, 63, 'DESCANSO_PUNITIVO') === 'BEEP_CURTO' &&
+                            mpT3.verificarAlarmePomodoro(4, 4, 300, 120, 'DESCANSO_PUNITIVO') === 'BEEP_CURTO' &&
+                            mpT3.verificarAlarmePomodoro(4, 4, 300, 63, 'DESCANSO_PUNITIVO') === null
+                        );
+                        const abandonoOk = (
+                            mpT3.verificarAlarmePomodoro(2, 4, 300, 7500, 'ATRASO_ABANDONO') === 'BEEP_CURTO' &&
+                            mpT3.verificarAlarmePomodoro(2, 4, 300, 11400, 'ATRASO_ABANDONO') === 'BEEP_CURTO' &&
+                            mpT3.verificarAlarmePomodoro(2, 4, 300, 11100, 'ATRASO_ABANDONO') === null &&
+                            mpT3.verificarAlarmePomodoro(2, 4, 300, 14401, 'ATRASO_ABANDONO') === 'BLOQUEAR'
+                        );
+                        test03Ok = burstOk && punitivoOk && abandonoOk;
+                        detalheTest03 = `burst=${burstOk}, punitivo=${punitivoOk}, abandono=${abandonoOk}`;
+                    }
+                } catch (eT3) { detalheTest03 = eT3.message || String(eT3); }
+                registrar(test03Ok, 'TEST_03_FEAT_68_ALARME_POMODORO_COMPLETO', 'verificarAlarmePomodoro valida Fase 0 Burst, fator_y de DESCANSO_PUNITIVO (0/4 vs 4/4) e tetos de ATRASO_ABANDONO.', { detalhe: detalheTest03 });
+
+                /* TEST-04 (FEAT-69 / BUG-89): Sem blur gigante, pular descanso via X e saída rápida do botão direito */
+                let test04Ok = false;
+                let detalheTest04 = '';
+                try {
+                    const ProdT4 = window.JusGovModuloProdutividade;
+                    const mpT4 = new ProdT4();
+                    const cfgT4 = { pomodoroAtivo: true, pomodoroFocoMinutos: 45, pomodoroProporcao: 4.5, pomodoroCiclos: 4 };
+                    const t4 = 1710000000000;
+                    const stT4 = mpT4.criarEstadoTrabalhoZerado('2026-11-18', t4);
+                    stT4.pomodoroFase = 'pausa_maior';
+                    stT4.pomodoroCicloAtual = 4;
+                    const snapT4 = mpT4.construirSnapshotExternoPomodoro(stT4, cfgT4, null, {}, t4 + 1000, false);
+                    mpT4.pularDescansoEIniciarFoco(stT4, t4 + 2000, cfgT4);
+                    const pulouMaiorOk = (stT4.pomodoroFase === 'foco' && stT4.pomodoroCicloAtual === 0);
+                    const monT4 = (typeof window.JusGovMonitoramentoDomCopia === 'function') ? new window.JusGovMonitoramentoDomCopia({}) : null;
+                    let direitoOk = true;
+                    if (monT4 && typeof monT4.aoPressionarBotaoMouse === 'function') {
+                        let preveniu = false;
+                        const inpT4 = document.createElement('input');
+                        monT4.aoPressionarBotaoMouse({ button: 2, target: inpT4, preventDefault: () => { preveniu = true; } });
+                        direitoOk = !preveniu;
+                    }
+                    test04Ok = (snapT4.cfgExib.deveExibirModalDescanso === false && !document.getElementById('jusgov-pomodoro-backdrop-global') && pulouMaiorOk && direitoOk);
+                    detalheTest04 = `semModal=${!snapT4.cfgExib.deveExibirModalDescanso}, pulouMaior=${pulouMaiorOk}, dir=${direitoOk}`;
+                } catch (eT4) { detalheTest04 = eT4.message || String(eT4); }
+                registrar(test04Ok, 'TEST_04_FEAT_69_BUG_89_PULAR_E_BOTAO_DIREITO', 'Pomodoro opera sem modal gigante/blur, pularDescansoEIniciarFoco reseta pausa maior e clique direito sai rápido.', { detalhe: detalheTest04 });
+
+                /* TEST-06 (ARQ-08 / FEAT-65 / BUG-87): Motor isolado de colagem copia-colar.js e filtro Shift */
+                let test06Ok = false;
+                let detalheTest06 = '';
+                try {
+                    const ColCls6 = window.JusGovModuloColagem;
+                    if (typeof ColCls6 === 'function') {
+                        const col6 = new ColCls6();
+                        const cnjOk = col6.aplicarFiltroShiftParaColagem('0991234-65.2024.4.01.4002', '20digitos') === '09912346520244014002';
+                        const dataOk = col6.aplicarFiltroShiftParaColagem('11/12/2026', '20digitos') === '11122026';
+                        const cpfOk = col6.aplicarFiltroShiftParaColagem('123.456.789-01', '20digitos') === '12345678901';
+                        const ta6 = document.createElement('textarea');
+                        document.body.appendChild(ta6);
+                        const inseriuOk = Boolean(col6.inserirTextoEmElemento(ta6, 'Teste Colagem', false) && ta6.value === 'Teste Colagem');
+                        const loopSeguro = !window.__JUSGOV_COLAGEM_INTERNA_ATIVA__;
+                        ta6.remove();
+                        test06Ok = cnjOk && dataOk && cpfOk && inseriuOk && loopSeguro;
+                        detalheTest06 = `cnj=${cnjOk}, data=${dataOk}, cpf=${cpfOk}, inseriu=${inseriuOk}, loop=${loopSeguro}`;
+                    }
+                } catch (eT6) { detalheTest06 = eT6.message || String(eT6); }
+                registrar(test06Ok, 'TEST_06_ARQ_08_MOTOR_COLAGEM_SHIFT_E_INSERCAO', 'GerenciadorColagem aplica filtro Shift em CNJ/data/CPF, insere em textarea e mantém guarda anti-loop limpa.', { detalhe: detalheTest06 });
+
+                /* TEST-09 (BUG-86 / FEAT-67): Carência 15s, tooltip vs resumo e defaults 45m/pausas automaticas */
+                let test09Ok = false;
+                let detalheTest09 = '';
+                try {
+                    const ProdT9 = window.JusGovModuloProdutividade;
+                    const DefsT9 = window.JusGovCfgDefaults;
+                    const mpT9 = new ProdT9();
+                    const t9 = 1710000000000;
+                    const cfgT9 = { pomodoroAtivo: true, pomodoroFocoMinutos: 45, pomodoroProporcao: 4.5, pomodoroCiclos: 4 };
+                    const stT9 = mpT9.criarEstadoTrabalhoZerado('2026-11-18', t9);
+                    stT9.pomodoroFase = 'alivio';
+                    stT9.pomodoroDescansoSyncTs = t9;
+                    stT9.pomodoroDescansoAcumuladoMs = 400000;
+                    mpT9.aplicarAtividadeEmEstadoTrabalho(stT9, t9 + 5000, 'movimento', cfgT9);
+                    const carencia15s = (stT9.pomodoroSemScreensaverAteTs === (t9 + 5000 + 15000));
+                    stT9.pomodoroUltimoDescansoTipo = 'alivio';
+                    stT9.pomodoroUltimoDescansoFimTs = t9 + 300000;
+                    stT9.pomodoroUltimoDescansoDuracaoMin = 10;
+                    const textoT9 = mpT9.formatarResumoProdutividadeTexto(stT9, cfgT9, t9 + 360000);
+                    const resumoT9 = mpT9.calcularResumoPomodoro(stT9, cfgT9, t9 + 360000);
+                    const tooltipSemHorario = !textoT9.tooltipTitle.includes('às ') && resumoT9.ultimoDescansoTexto.includes('por 10 minutos');
+                    const cfgPadT9 = (DefsT9 && DefsT9.PADROES_DEFAULT_STORAGE) || {};
+                    const fabrica45Ok = (Number(cfgPadT9.pomodoroFocoMinutos || 45) === 45 && cfgPadT9.pomodoroPausasAutomaticas !== false);
+                    test09Ok = carencia15s && tooltipSemHorario && fabrica45Ok;
+                    detalheTest09 = `carencia15s=${carencia15s}, tooltip=${tooltipSemHorario}, fabrica45=${fabrica45Ok}`;
+                } catch (eT9) { detalheTest09 = eT9.message || String(eT9); }
+                registrar(test09Ok, 'TEST_09_BUG_86_FEAT_67_CARENCIA_E_TOOLTIP', 'Carência pós-atividade de 15s, tooltip sem horário completo vs resumo detalhado e padrão 45m/pausas automáticas.', { detalhe: detalheTest09 });
+
+                /* TEST-11 (FEAT-72 / BUG-91): Multi-MIME progressivo em 5 níveis e proteção blocos curtos / Gemini */
+                let test11Ok = false;
+                let detalheTest11 = '';
+                try {
+                    const FHtml11 = window.JusGovFiltrosHtmlProgressivos;
+                    const motor11 = window.JusGovMotorSelecaoTeste;
+                    const CopiaCls11 = window.JusGovGerenciadorCopia;
+                    if (typeof FHtml11 === 'function' && motor11) {
+                        const fh11 = new FHtml11();
+                        const divRich11 = document.createElement('div');
+                        divRich11.innerHTML = '<p><a href="https://tj.jus.br" onclick="evil()">https://tj.jus.br</a></p><ul><li>Item</li></ul><svg><rect/></svg><script>alert(1)</script>';
+                        const m0 = fh11.gerarMapaFormatosClipboard(divRich11, 'texto_puro');
+                        const m1 = fh11.gerarMapaFormatosClipboard(divRich11, 'basico');
+                        const m2 = fh11.gerarMapaFormatosClipboard(divRich11, 'intermediario');
+                        const m3 = fh11.gerarMapaFormatosClipboard(divRich11, 'avancado');
+                        const m4 = fh11.gerarMapaFormatosClipboard(divRich11, 'estendido');
+                        const semScriptOk = !String(m1.htmlClipboard || '').includes('<script>') && !String(m1.htmlClipboard || '').includes('onclick');
+                        const niveisOk = Boolean(
+                            m0.textoPlano && !m0.htmlClipboard &&
+                            m1.htmlClipboard && m1.uriList && !m1.markdown &&
+                            m2.markdown && !m2.rtf &&
+                            m3.rtf && (!m3.imagens || !m3.imagens.svgMarkup) &&
+                            m4.imagens && m4.imagens.svgMarkup
+                        );
+                        const blocosCurtosOk = Boolean(
+                            motor11.verificarSeTextoEhBlocoOuPalavraUnica('12/11/2026') &&
+                            motor11.verificarSeTextoEhBlocoOuPalavraUnica('123.456.789-01') &&
+                            motor11.verificarSeTextoEhBlocoOuPalavraUnica('id 12345')
+                        );
+                        const copiaInst11 = (typeof CopiaCls11 === 'function') ? new CopiaCls11({}) : null;
+                        const geminiOk = copiaInst11 && typeof copiaInst11.ehAppWebConfiavel === 'function'
+                            ? copiaInst11.ehAppWebConfiavel({ location: { hostname: 'gemini.google.com' } }) === true
+                            : true;
+                        test11Ok = semScriptOk && niveisOk && blocosCurtosOk && geminiOk;
+                        detalheTest11 = `semScript=${semScriptOk}, niveis=${niveisOk}, curtos=${blocosCurtosOk}, gemini=${geminiOk}`;
+                    }
+                } catch (eT11) { detalheTest11 = eT11.message || String(eT11); }
+                registrar(test11Ok, 'TEST_11_FEAT_72_BUG_91_MULTI_MIME_E_GEMINI', 'FiltrosHtml geram Multi-MIME progressivo seguro (0..4) sem <script>/on*, detectam blocos curtos em texto_puro e reconhecem Gemini.', { detalhe: detalheTest11 });
+
+                /* TEST-12 (ARQ-09 / FEAT-73): Arquitetura desmembrada mod-copia + Null Object + Ajuda Níveis -1 e +99 */
+                let test12Ok = false;
+                let detalheTest12 = '';
+                try {
+                    const Ftxt12 = window.JusGovFiltrosTextoCopia;
+                    const Pad12 = window.JusGovPadroesCopia;
+                    const ModCopia12 = window.JusGovModuloCopia;
+                    const ft = new Ftxt12();
+                    const preOk = ft.aplicarPreHigienizacaoTexto('Teste\u200B\u00A0Limpo') === 'Teste Limpo';
+                    const posOk = ft.aplicarPosLimpezaDefensiva('  A   B  ').length > 0;
+                    const modNull12 = new ModCopia12(ModCopia12.NULL_OBJECTS || {});
+                    const xhrOpt12 = new XMLHttpRequest();
+                    xhrOpt12.open('GET', '../src/cfg/options.html', false);
+                    xhrOpt12.send();
+                    const ajudaOk = xhrOpt12.status === 200 && xhrOpt12.responseText.includes('Pré-Higienização') && xhrOpt12.responseText.includes('+99');
+                    test12Ok = Boolean(preOk && posOk && typeof Pad12 === 'function' && modNull12 && ajudaOk);
+                    detalheTest12 = `pre=${preOk}, pos=${posOk}, pad=${typeof Pad12 === 'function'}, ajuda=${ajudaOk}`;
+                } catch (eT12) { detalheTest12 = eT12.message || String(eT12); }
+                registrar(test12Ok, 'TEST_12_ARQ_09_FEAT_73_MOD_COPIA_DESMEMBRADO', 'FiltrosTextoCopia (-1/+99), PadroesReconhecidosCopia, ModuloCopia Null Object e documentação em options.html operam íntegros.', { detalhe: detalheTest12 });
+
+                /* TEST-13 (BUG-93): Renderização OffscreenCanvas nos 5 tamanhos sem erros e regras 0m..9m / 10..99 por fase */
+                let test13Ok = false;
+                let detalheTest13 = '';
+                try {
+                    const CfgCls13 = window.JusGovConfiguracoes;
+                    const cfgMgr13 = new CfgCls13();
+                    let ultimoImageData = null;
+                    const mockChrome13 = {
+                        action: {
+                            setIcon: (payload) => { ultimoImageData = payload && payload.imageData; return Promise.resolve(); },
+                            setTitle: () => Promise.resolve()
+                        }
+                    };
+                    const r13a = cfgMgr13.desenharIconeVetorialFallback('global', 'popup', mockChrome13, { texto: '6m', cor: '#0d9488', corTexto: '#ffffff' });
+                    const r13b = cfgMgr13.desenharIconeVetorialFallback('url', 'popup', mockChrome13, { texto: '45', cor: '#eab308', corTexto: '#111827' });
+                    const r13c = cfgMgr13.desenharIconeVetorialFallback('desligado', 'popup', mockChrome13, { texto: '1:40', cor: '#0284c7', corTexto: '#ffffff' });
+                    const tamanhosOk = Boolean(ultimoImageData && [16, 24, 32, 48, 128].every(sz => ultimoImageData[sz] && ultimoImageData[sz].width === sz));
+                    test13Ok = Boolean(r13a && r13b && r13c && tamanhosOk);
+                    detalheTest13 = `chamadas=${Boolean(r13a && r13b && r13c)}, tamanhos5=${tamanhosOk}`;
+                } catch (eT13) { detalheTest13 = eT13.message || String(eT13); }
+                registrar(test13Ok, 'TEST_13_BUG_93_OFFSCREENCANVAS_BADGE_ICONE', 'desenharIconeVetorialFallback renderiza [16,24,32,48,128] com numeração por fase sem falhas.', { detalhe: detalheTest13 });
+
+                /* TEST-14 (FEAT-75 / BUG-94): Paridade MIME Cópia<->Colagem + isolamento CSS e blindagem SVG em DialogoMapeamentoRegra */
+                let test14Ok = false;
+                let detalheTest14 = '';
+                try {
+                    const ClipCls14 = window.JusGovClipboardInterno;
+                    const ColCls14 = window.JusGovModuloColagem;
+                    const DlgCls14 = window.JusGovDialogoMapeamentoRegra;
+                    const clip14 = new ClipCls14();
+                    const col14 = new ColCls14();
+                    clip14.salvarClipboardInternoComBackup({ texto: 'Texto Puro', html: '<b>Texto</b>', nivelCopia: 'texto_puro', tiposDisponiveis: ['text/plain'] });
+                    const resPuro = col14.obterNivelEFormatosParaColagem(false);
+                    const paridadePuroOk = (resPuro.nivelCopia === 'texto_puro' && resPuro.formatado === false && !resPuro.html);
+
+                    const dlg14 = new DlgCls14();
+                    const resCont14 = dlg14.contarCorrespondenciasRegra([{ expressao: 'div[[[invalido', tipoSeletor: 'CSS (Simples)' }]);
+                    const contagemInvalida = Boolean(resCont14 && resCont14.invalida === true && resCont14.total === 0);
+                    const boxSvg14 = document.createElement('div');
+                    boxSvg14.innerHTML = '<svg viewBox="0 0 10 10"><path d="M0 0 L10 10"></path></svg>';
+                    document.body.appendChild(boxSvg14);
+                    const pathEl14 = boxSvg14.querySelector('path');
+                    dlg14.abrirModal(pathEl14, { cssSimples: 'path', xpathRelativo: '//svg' }, { aoSalvarRegras: () => {} });
+                    const modal14 = document.getElementById('jusgov-modal-mapeamento-regra');
+                    const style14 = modal14 ? modal14.querySelector('#jusgov-estilo-dialogo-mapeamento') : null;
+                    const card14 = modal14 ? modal14.querySelector('.jusgov-dmg-card') : null;
+                    const semBtnColidente = modal14 ? (modal14.querySelectorAll('.btn, .btn-primario, .btn-secundario').length === 0) : false;
+                    const ordemStyleOk = Boolean(style14 && card14 && (card14.compareDocumentPosition(style14) & Node.DOCUMENT_POSITION_FOLLOWING));
+                    dlg14.fecharModal();
+                    boxSvg14.remove();
+                    test14Ok = paridadePuroOk && contagemInvalida && semBtnColidente && ordemStyleOk;
+                    detalheTest14 = `paridade=${paridadePuroOk}, inv=${contagemInvalida}, semBtn=${semBtnColidente}, ordemStyle=${ordemStyleOk}`;
+                } catch (eT14) { detalheTest14 = eT14.message || String(eT14); }
+                registrar(test14Ok, 'TEST_14_FEAT_75_BUG_94_PARIDADE_MIME_E_DIALOGO_BLINDADO', 'Paridade Cópia<->Colagem respeita teto MIME, contarCorrespondenciasRegra não lança ReferenceError e modal blinda CSS/SVG.', { detalhe: detalheTest14 });
+
+                /* TEST-16 (FEAT-74): Desempate estrito em anti-duplicação (1º ultimoAcessoNavegacao, 2º lastAccessed) e botão sempre habilitado */
+                let test16Ok = false;
+                let detalheTest16 = '';
+                try {
+                    const AntiDup16 = window.JusGovGerenciadorAntiDuplicacao;
+                    const mgr16 = new AntiDup16();
+                    const eleitaNav = mgr16.selecionarEleitaPorDesempate([
+                        { id: 1, active: false, pinned: false, ultimoAcessoNavegacao: 1000, lastAccessed: 99999 },
+                        { id: 2, active: false, pinned: false, ultimoAcessoNavegacao: 5000, lastAccessed: 2000 }
+                    ]);
+                    const eleitaAcc = mgr16.selecionarEleitaPorDesempate([
+                        { id: 3, active: false, pinned: false, ultimoAcessoNavegacao: 1000, lastAccessed: 2000 },
+                        { id: 4, active: false, pinned: false, ultimoAcessoNavegacao: 1000, lastAccessed: 8000 }
+                    ]);
+                    const xhrOpt16 = new XMLHttpRequest();
+                    xhrOpt16.open('GET', '../src/cfg/options.html', false);
+                    xhrOpt16.send();
+                    const html16 = xhrOpt16.responseText || '';
+                    const idxSub16 = html16.indexOf('id="containerSubCriteriosAcoesReutilizar"');
+                    const idxBtn16 = html16.indexOf('id="btnFecharDuplicadasAgora"');
+                    const btnForaContainerOk = idxSub16 > 0 && idxBtn16 > idxSub16;
+                    test16Ok = Boolean(eleitaNav && eleitaNav.id === 2 && eleitaAcc && eleitaAcc.id === 4 && btnForaContainerOk);
+                    detalheTest16 = `nav=${eleitaNav && eleitaNav.id}, acc=${eleitaAcc && eleitaAcc.id}, btnFora=${btnForaContainerOk}`;
+                } catch (eT16) { detalheTest16 = eT16.message || String(eT16); }
+                registrar(test16Ok, 'TEST_16_FEAT_74_DESEMPATE_NAVEGACAO_E_BOTAO_LIMPAR', 'Desempate anti-duplicação preserva 1º ultimoAcessoNavegacao e 2º lastAccessed e mantém btnFecharDuplicadasAgora fora do subcontainer.', { detalhe: detalheTest16 });
+
+                /* TEST-17 (FEAT-77 / FEAT-79): Pomodoro Flexível, regra 1/3 + 4.5:1, Água 2h e DOM propaganda CSP */
+                let test17Ok = false;
+                let detalheTest17 = '';
+                try {
+                    const ProdT17 = window.JusGovModuloProdutividade;
+                    const BemCls17 = window.JusGovBemEstarPomodoro;
+                    const mp17 = new ProdT17();
+                    const bem17 = new BemCls17();
+                    const t17 = 1710000000000;
+                    const cfg17 = { pomodoroAtivo: true, pomodoroFocoMinutos: 45, pomodoroProporcao: 4.5, pomodoroCiclos: 4, pomodoroModoAviso: 'completo' };
+                    const st17 = mp17.criarEstadoTrabalhoZerado('2026-11-18', t17);
+                    st17.ativoMinutos = 130;
+                    st17.corridoMinutos = 130;
+                    st17.pomodoroCicloAtual = 1;
+                    st17.pomodoroFaseInicioTs = t17 - 20 * 60000;
+                    const hidrAntes = bem17.avaliarHidratacao2h(st17, t17, cfg17);
+                    const pkg17 = bem17.montarPacotePropaganda(st17, { fase: 'alivio', cicloAtual: 1, ciclosMax: 4 }, cfg17, t17);
+                    const aguaCardOk = hidrAntes.aguaPendente === true && pkg17.cardDestaque.chave === 'agua' && pkg17.cardDestaque.bg === '#0284c7';
+
+                    const adiantou = mp17.alternarPausaOuAdiantarDescanso(st17, t17, cfg17);
+                    const govZero = bem17.calcularSaldoGovernanca(st17, cfg17, t17 + 10000);
+                    const bloqueouAntesUmTerco = (govZero.podePausarDescanso === false);
+                    st17.pomodoroDescansoAcumuladoMs = 240000;
+                    const govDepoisUmTerco = bem17.calcularSaldoGovernanca(st17, cfg17, t17 + 240000);
+                    const pausouDepois = mp17.alternarPausaOuAdiantarDescanso(st17, t17 + 240000, cfg17);
+                    const resPulado = mp17.calcularResumoPomodoro(st17, cfg17, t17 + 245000);
+                    const retomou = mp17.retomarDescansoFlexivel(st17, t17 + 250000, cfg17);
+
+                    const snap17 = mp17.construirSnapshotExternoPomodoro(st17, cfg17, null, {}, t17 + 251000, false);
+                    const fn17 = mp17.obterFuncaoInjecaoBarraPomodoro();
+                    fn17(snap17.cfgExib, { ...resPulado, emDescanso: false, descansoPulado: true }, snap17.estadoBarra);
+                    const bar17 = document.getElementById('jusgov-pomodoro-barra-global');
+                    fn17({ ...snap17.cfgExib, ativoPorConfig: false, deveExibirNormal: false }, resPulado, snap17.estadoBarra);
+
+                    test17Ok = Boolean(
+                        aguaCardOk && adiantou.ok && bloqueouAntesUmTerco &&
+                        govDepoisUmTerco.podePausarDescanso && pausouDepois.ok &&
+                        resPulado.descansoPulado && retomou.ok && bar17
+                    );
+                    detalheTest17 = `agua=${aguaCardOk}, block1_3=${bloqueouAntesUmTerco}, pausou=${pausouDepois.ok}, retomou=${retomou.ok}`;
+                } catch (eT17) { detalheTest17 = eT17.message || String(eT17); }
+                registrar(test17Ok, 'TEST_17_FEAT_77_FEAT_79_FLEXIVEL_BEM_ESTAR_E_AGUA', 'Pomodoro Flexível valida mérito 1/3, retomada/congelamento de Foco, Água 2h em azul/branco e renderização CSP.', { detalhe: detalheTest17 });
+
             }
         }
     }

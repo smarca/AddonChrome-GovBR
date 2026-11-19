@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio2.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioExpressoes
  * 
  * @MAPA-IA:
@@ -29,7 +31,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.2: Estágio 2 - Expressões Compostas)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.2: Estágio 2)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
@@ -109,15 +111,29 @@
         }
 
         tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idx) {
+            if (!texto || typeof idx !== 'number' || idx < 0 || idx > texto.length) return null;
+
+            /* BUG-83 / Seção 6.195: Toda procura de blocos (maiúsculas, negrito, etc.) é restrita
+             * estritamente à linha ou parágrafo corrente, parando imediatamente em qualquer quebra de linha antes ou depois. */
+            let iniLinha = Math.min(idx, texto.length);
+            while (iniLinha > 0 && !this.eQuebraDeLinha(texto[iniLinha - 1])) {
+                iniLinha--;
+            }
+            let fimLinha = Math.max(0, Math.min(idx, texto.length));
+            while (fimLinha < texto.length && !this.eQuebraDeLinha(texto[fimLinha])) {
+                fimLinha++;
+            }
+
             const rx = this.#constantes.EXPRESSOES_REGULARES || {};
             if (rx.SEQUENCIA_PALAVRAS_MAIUSCULAS) {
                 const regexSeqMaiusculas = new RegExp(rx.SEQUENCIA_PALAVRAS_MAIUSCULAS.source, 'gu');
                 let mSeq;
                 while ((mSeq = regexSeqMaiusculas.exec(texto)) !== null) {
-                    const iniSeq = mSeq.index;
-                    const fimSeq = iniSeq + mSeq[0].length;
+                    const iniSeq = Math.max(iniLinha, mSeq.index);
+                    const fimSeq = Math.min(fimLinha, mSeq.index + mSeq[0].length);
+                    if (fimSeq <= iniSeq) continue;
                     if (idx >= (iniSeq - 1) && idx <= (fimSeq + 1)) {
-                        const trecho = mSeq[0].trim();
+                        const trecho = texto.substring(iniSeq, fimSeq).trim();
                         const temPeloMenosDuasLetrasSeguidas = rx.CONTEM_DUAS_PALAVRAS_MAIUSCULAS
                             ? rx.CONTEM_DUAS_PALAVRAS_MAIUSCULAS.test(trecho)
                             : trecho.indexOf(' ') !== -1;
@@ -134,52 +150,13 @@
                 }
             }
 
-            let iniLinha = idx;
-            while (iniLinha > 0 && !this.eQuebraDeLinha(texto[iniLinha - 1])) {
-                iniLinha--;
-            }
-            let fimLinha = idx;
-            while (fimLinha < texto.length && !this.eQuebraDeLinha(texto[fimLinha])) {
-                fimLinha++;
-            }
-
             const linhaAtual = texto.substring(iniLinha, fimLinha);
             if (!this.linhaEhTodaMaiuscula(linhaAtual)) {
                 return null;
             }
 
             let iniBloco = iniLinha;
-            while (iniBloco > 0 && this.eQuebraDeLinha(texto[iniBloco - 1])) {
-                let fimLinhaAnt = iniBloco - 1;
-                while (fimLinhaAnt > 0 && texto[fimLinhaAnt - 1] === '\r') fimLinhaAnt--;
-                let iniLinhaAnt = fimLinhaAnt;
-                while (iniLinhaAnt > 0 && !this.eQuebraDeLinha(texto[iniLinhaAnt - 1])) {
-                    iniLinhaAnt--;
-                }
-                const linhaAnt = texto.substring(iniLinhaAnt, fimLinhaAnt);
-                if (this.linhaEhTodaMaiuscula(linhaAnt)) {
-                    iniBloco = iniLinhaAnt;
-                } else {
-                    break;
-                }
-            }
-
             let fimBloco = fimLinha;
-            while (fimBloco < texto.length && this.eQuebraDeLinha(texto[fimBloco])) {
-                let iniLinhaProx = fimBloco + 1;
-                while (iniLinhaProx < texto.length && texto[iniLinhaProx] === '\n') iniLinhaProx++;
-                let fimLinhaProx = iniLinhaProx;
-                while (fimLinhaProx < texto.length && !this.eQuebraDeLinha(texto[fimLinhaProx])) {
-                    fimLinhaProx++;
-                }
-                const linhaProx = texto.substring(iniLinhaProx, fimLinhaProx);
-                if (this.linhaEhTodaMaiuscula(linhaProx)) {
-                    fimBloco = fimLinhaProx;
-                } else {
-                    break;
-                }
-            }
-
             while (iniBloco < fimBloco && this.eEspacoBranco(texto[iniBloco])) iniBloco++;
             while (fimBloco > iniBloco && this.eEspacoBranco(texto[fimBloco - 1])) fimBloco--;
 
@@ -256,13 +233,9 @@
             };
 
             const segmentoEhApenasEspacoConector = (seg) => {
-                if (!seg) return false;
-                if (seg.ehBr) {
-                    const comp = seg.comprimento || 0;
-                    return comp === 1;
-                }
-                if (!seg.no) return false;
+                if (!seg || seg.ehBr || !seg.no) return false;
                 const v = seg.no.nodeValue || '';
+                if (v.indexOf('\n') !== -1 || v.indexOf('\r') !== -1) return false;
                 return v.trim().length === 0;
             };
 
@@ -337,6 +310,19 @@
             let iniLocal = Math.max(0, mapa.segmentos[segIni].inicioGlobal - mapa.deslocamentoJanela);
             let fimLocal = Math.min(mapa.texto.length, mapa.segmentos[segFim].fimGlobal - mapa.deslocamentoJanela);
 
+            /* BUG-83 / Seção 6.195: Restringir qualquer bloco formatado (negrito, itálico, sublinhado, combinações)
+             * estritamente à linha/parágrafo corrente do clique, sem atravessar quebras de linha antes ou depois. */
+            let iniLinha = Math.min(Math.max(0, idx), mapa.texto.length);
+            while (iniLinha > 0 && !this.eQuebraDeLinha(mapa.texto[iniLinha - 1])) {
+                iniLinha--;
+            }
+            let fimLinha = Math.max(0, Math.min(idx, mapa.texto.length));
+            while (fimLinha < mapa.texto.length && !this.eQuebraDeLinha(mapa.texto[fimLinha])) {
+                fimLinha++;
+            }
+            if (iniLocal < iniLinha) iniLocal = iniLinha;
+            if (fimLocal > fimLinha) fimLocal = fimLinha;
+
             while (iniLocal < fimLocal && (this.eEspacoBranco(mapa.texto[iniLocal]) || this.eQuebraDeLinha(mapa.texto[iniLocal]))) {
                 iniLocal++;
             }
@@ -366,9 +352,20 @@
             const clicouEmRotuloInicial = palavraSobCursor.length > 0 && rx.PALAVRA_ROTULO_INICIAL && rx.PALAVRA_ROTULO_INICIAL.test(palavraSobCursor);
             const clicouEmConectorIntervalo = palavraSobCursor.length > 0 && rx.PALAVRA_CONECTORA_INTERVALO && rx.PALAVRA_CONECTORA_INTERVALO.test(palavraSobCursor);
 
+            let iniLinhaPadrao = Math.min(Math.max(0, idx), texto.length);
+            while (iniLinhaPadrao > 0 && !this.eQuebraDeLinha(texto[iniLinhaPadrao - 1])) {
+                iniLinhaPadrao--;
+            }
+            let fimLinhaPadrao = Math.max(0, Math.min(idx, texto.length));
+            while (fimLinhaPadrao < texto.length && !this.eQuebraDeLinha(texto[fimLinhaPadrao])) {
+                fimLinhaPadrao++;
+            }
+
             const finalizarMatchSemTransbordo = (iniBruto, fimBruto, nomeGrupo, supShift) => {
-                let ini = iniBruto;
-                let fim = fimBruto;
+                /* BUG-83 / Seção 6.195: Toda procura de blocos (verificáveis numericamente ou não) é restrita
+                 * estritamente à mesma linha ou parágrafo, parando na nova linha antes ou depois. */
+                let ini = Math.max(iniLinhaPadrao, iniBruto);
+                let fim = Math.min(fimLinhaPadrao, fimBruto);
                 while (ini < fim && (this.eEspacoBranco(texto[ini]) || this.eQuebraDeLinha(texto[ini]))) {
                     ini++;
                 }

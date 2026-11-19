@@ -1,6 +1,6 @@
 /* ==========================================================================
- * Nome do arquivo: editor_demo.js
- * PROJETO: JusGovBR - Copia Inteligente & PJe Turbo
+ * ARQUIVO: src/cfg/editor_demo.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:

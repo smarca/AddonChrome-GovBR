@@ -1,6 +1,7 @@
 /* ==========================================================================
- * PROJETO: JusGovBR - Catalogo Estruturado de Exemplos Homologados
  * ARQUIVO: src/cfg/exemplos.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
  *
  * @MAPA-IA:
  * - Arquivo: src/cfg/exemplos.js

@@ -1,12 +1,19 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/saj-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/saj-anti-ampulheta.css
+ *
 @name         SAJ / e-SAJ - Anti-Ampulheta
 @namespace    esaj.jus.br
 @version      2.2.0
 @match        *://esaj.*.jus.br/*
 @match        *://*.jus.br/esaj/*
 @match        *://*.jus.br/saj/*
-==/UserStyle== */
+ * ========================================================================== */
 
 /* ==========================================================================
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]

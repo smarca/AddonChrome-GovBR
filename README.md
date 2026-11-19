@@ -91,6 +91,17 @@ Sempre que um documento ou data é selecionado, o aplicativo audita sua validade
 5. Selecione a pasta raiz do projeto (`AddonChrome-GovBR`, onde está localizado o arquivo `manifest.json`).
 6. Pronto! O ícone da extensão aparecerá na barra do navegador. Clique nele para controle rápido ou acesse as **Opções** para personalizar os recursos, consultar a **Central de Ajuda** detalhada e testar todas as funcionalidades no **Laboratório Interativo**.
 
+### 💻 Preparação do Ambiente de Desenvolvimento em Outro Computador
+Ao baixar ou clonar a pasta em uma nova máquina para desenvolvimento/auditoria com a IA, execute na raiz do projeto:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File util/configurar_ambiente.ps1
+```
+- **Pré-requisito de busca ultrarrápida (`ripgrep`):** caso o comando `rg` não exista na máquina, o script tenta instalá-lo automaticamente; se necessário instalar manualmente no Windows, execute:
+  ```powershell
+  winget install BurntSushi.ripgrep.MSVC
+  ```
+- **Consulte também:** Seção 4 de `docs/06_PLANO_DE_TESTES_E_AUDITORIA.md` e `IA-03.7` em `docs/AGENTS.md`.
+
 ---
 
 ## 📁 Estrutura Básica do Projeto

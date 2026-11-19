@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "JusGovBR — Seleção/Cópia Inteligente",
+  "name": "JusGovBR",
   "short_name": "JusGovBR",
-  "version": "261116.22.5",
-  "version_name": "261116.22.5",
-  "description": "JusGovBR — Seleção/Cópia Inteligente",
+  "version": "261119.17",
+  "version_name": "2026.11.19.070524-v17",
+  "description": "JusGovBR - Seleção/Cópia Inteligente",
   "author": "smarca@gmail.com",
   "minimum_chrome_version": "116",
   "permissions": [

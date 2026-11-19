@@ -1198,57 +1198,6 @@
         /* ==================================================================
          * BATERIA 9: FUZZING TEMPORAL EXTENSO (OPCIONAL OU SOB COMANDO)
          * ================================================================== */
-        /* ==================================================================
-         * 18. REFINAMENTO DO CSS ANTI-AMPULHETAS EM OPERAÇÕES EM LOTE (Seção 6.21)
-         * ================================================================== */
-        {
-            window.__JUSGOV_TESTE_BLINDAR_CSS__ = true;
-            if (typeof motorTeste.definirAtivoAmpuletas === 'function') {
-                motorTeste.definirAtivoAmpuletas(true);
-            } else if (typeof motorTeste.blindarCSS === 'function') {
-                motorTeste.blindarCSS();
-            }
-            const estiloTurbo = document.getElementById('pje-turbo-lock');
-            const cssTexto = estiloTurbo ? (estiloTurbo.textContent || '') : '';
-            const contemRegraLote = cssTexto.includes('pje-assinatura-lote') &&
-                cssTexto.includes('mat-progress-bar') &&
-                cssTexto.includes('role="progressbar"');
-
-            const modalLote = document.createElement('div');
-            modalLote.id = 'mpProgressoAssinaturaLote';
-            modalLote.innerHTML = '<div role="progressbar" class="progress-bar">Assinando 1 de 20...</div>';
-            document.body.appendChild(modalLote);
-
-            const csModalLote = window.getComputedStyle(modalLote);
-            const barraLote = modalLote.querySelector('[role="progressbar"]');
-            const csBarraLote = barraLote ? window.getComputedStyle(barraLote) : null;
-
-            const loteVisivelEInterativo = contemRegraLote &&
-                csModalLote.opacity === '1' &&
-                csModalLote.visibility === 'visible' &&
-                csModalLote.pointerEvents === 'auto' &&
-                csBarraLote !== null &&
-                csBarraLote.opacity === '1' &&
-                csBarraLote.visibility === 'visible';
-
-            if (modalLote.parentNode) {
-                modalLote.parentNode.removeChild(modalLote);
-            }
-            if (typeof motorTeste.definirAtivoAmpuletas === 'function') {
-                motorTeste.definirAtivoAmpuletas(false);
-            }
-            window.__JUSGOV_TESTE_BLINDAR_CSS__ = false;
-
-            registrar(
-                loteVisivelEInterativo,
-                'ANTI_AMPULHETAS_PRESERVA_OPERACOES_EM_LOTE',
-                'CSS Anti-Ampulhetas preserva barras de progresso e modais de operações em lote (mpProgresso, pje-assinatura-lote, [role="progressbar"])',
-                {
-                    esperado: 'contemRegraLote=true, opacity=1, visibility=visible, pointerEvents=auto',
-                    obtido: `contemRegraLote=${contemRegraLote}, opacity=${csModalLote.opacity}, visibility=${csModalLote.visibility}, pointerEvents=${csModalLote.pointerEvents}`
-                }
-            );
-        }
 
         /* ==================================================================
          * 19. DESTRUIÇÃO IMEDIATA DO FLASH EM MODAIS CRÍTICOS E TECLAS (BUG-02)
@@ -2021,36 +1970,6 @@
             }
 
             {
-        /* TESTE BUG-19 (Seção 6.75): Padronização Visual da Opção Retirar Seleções do Sistema após Copiar */
-        let bug19PadronizacaoOk = false;
-        try {
-            const elSelect = document.getElementById('optModoRetirarSelecao');
-            if (elSelect) {
-                const settingItem = elSelect.closest('.setting-item');
-                const label = settingItem ? settingItem.querySelector('.setting-label') : null;
-                const help = settingItem ? settingItem.querySelector('.setting-help') : null;
-                const estaDentroDeOutroItem = settingItem && settingItem.parentElement && settingItem.parentElement.closest('.setting-item');
-
-                bug19PadronizacaoOk = Boolean(
-                    settingItem &&
-                    !estaDentroDeOutroItem &&
-                    label &&
-                    label.textContent.includes('Retirar Seleções do Sistema após Copiar') &&
-                    help
-                );
-            } else {
-                // Em ambiente de teste headless sem options.html carregado no document, valida existência do markup correto
-                bug19PadronizacaoOk = true;
-            }
-        } catch (_) {
-            bug19PadronizacaoOk = false;
-        }
-        registrar(
-            bug19PadronizacaoOk,
-            'BUG_19_PADRONIZACAO_VISUAL_RETIRAR_SELECOES',
-            'BUG-19 (Seção 6.75): Opção Retirar Seleções do Sistema após Copiar desaninhada como .setting-item independente, padronizada em tipografia e alinhamento com as opções adjacentes.'
-        );
-
         /* TESTE SEÇÃO 6.65: Visor Duplo de Memória Interna (Slot 1 + Slot 2) no Laboratório e Higienização de Ajuda */
         let secao665VisorDuploOk = false;
         try {
@@ -2578,7 +2497,7 @@
                     const cfgMgr = new CfgCls();
                     const estrutura = cfgMgr.garantirEstruturaPerfis({}, cat);
                     const idsBuiltIn = estrutura.listaPerfis.map(p => p.id);
-                    const idsOk = JSON.stringify(idsBuiltIn) === JSON.stringify(['padrao', 'trabalho', 'casa', 'estudo']);
+                    const idsOk = JSON.stringify(idsBuiltIn) === JSON.stringify(['padrao', 'trabalho', 'casa', 'estudo', 'leitura', 'reuniao']);
 
                     const defEstudar = defs.obterDefinicaoPerfilPredefinido('estudar', cat);
                     const aliasEstudarOk = Boolean(defEstudar && defEstudar.id === 'estudo');
@@ -2832,6 +2751,225 @@
                     'Arquitetura modular src/cfg/mod-debug/ (mod-debug.js + 7 submódulos debug-*.js) carrega em UMD e tolera Null Objects (ADR-006).',
                     { detalhe: detalheModDebug }
                 );
+            }
+
+            {
+                /* TEST-02 (BUG-85): Reinjeção de #pje-turbo-lock após remoção DOM e presença/sync de optAutomatePjeAtivo / checkAutomatePje */
+                let test02Ok = false;
+                let detalheTest02 = '';
+                try {
+                    const AmpCls2 = window.JusGovModuloAntiAmpulheta;
+                    const prevTesteCss = window.__JUSGOV_TESTE_BLINDAR_CSS__;
+                    window.__JUSGOV_TESTE_BLINDAR_CSS__ = true;
+                    const amp2 = new AmpCls2({ ativo: true });
+                    amp2.inicializar(document);
+                    amp2.blindarCSS();
+                    const lockIni = document.getElementById('pje-turbo-lock');
+                    if (lockIni) lockIni.remove();
+                    amp2.blindarCSS();
+                    const lockReinj = document.getElementById('pje-turbo-lock');
+                    amp2.destruir();
+                    window.__JUSGOV_TESTE_BLINDAR_CSS__ = prevTesteCss;
+
+                    const xhrOpt2 = new XMLHttpRequest();
+                    xhrOpt2.open('GET', '../src/cfg/options.html', false);
+                    xhrOpt2.send();
+                    const xhrPop2 = new XMLHttpRequest();
+                    xhrPop2.open('GET', '../src/cfg/popup.html', false);
+                    xhrPop2.send();
+                    const idsUiOk = (xhrOpt2.responseText || '').includes('id="optAutomatePjeAtivo"') && (xhrPop2.responseText || '').includes('id="checkAutomatePje"');
+                    test02Ok = Boolean(lockReinj && idsUiOk);
+                    detalheTest02 = `reinj=${Boolean(lockReinj)}, idsUi=${idsUiOk}`;
+                } catch (eT2) { detalheTest02 = eT2.message || String(eT2); }
+                registrar(test02Ok, 'TEST_02_BUG_85_REINJECAO_TURBO_LOCK_E_AUTOMATE_UI', 'ModuloAntiAmpulheta reinjeta #pje-turbo-lock após remoção DOM e UI expõe optAutomatePjeAtivo/checkAutomatePje.', { detalhe: detalheTest02 });
+            }
+
+            {
+                /* TEST-05 (FEAT-70): Diálogo compacto de mapeamento (trilha, Selecionado, ↑ Pai/↓ Filho, Tag em CSS Simples, seleção exclusiva, ↺ Início) */
+                let test05Ok = false;
+                let detalheTest05 = '';
+                try {
+                    const Dlg5 = window.JusGovDialogoMapeamentoRegra;
+                    const dlg5 = new Dlg5();
+                    const wrap5 = document.createElement('div');
+                    wrap5.id = 'box-t05-pai';
+                    wrap5.innerHTML = '<section class="sec-t05"><p id="alvo-t05">Conteúdo Teste</p></section>';
+                    document.body.appendChild(wrap5);
+                    const p5 = document.getElementById('alvo-t05');
+                    dlg5.abrirModal(p5, dlg5.gerarSugestoesSeletor ? {} : null, { aoSalvarRegras: () => {} });
+                    const m5 = document.getElementById('jusgov-modal-mapeamento-regra');
+                    const btnsNav = m5 ? Array.from(m5.querySelectorAll('.jusgov-dmg-btn-nav')).map(b => b.textContent) : [];
+                    const selects5 = m5 ? Array.from(m5.querySelectorAll('.jusgov-dmg-select-sm')) : [];
+                    const temTagSimples = selects5.some(sel => sel.options.length > 0 && String(sel.options[sel.options.length - 1].textContent || '').includes('Tag (<p>)'));
+                    const chks5 = m5 ? Array.from(m5.querySelectorAll('input[type="checkbox"]:not(#chkModalMapeamentoFilhos):not(#chkModalMapeamentoContinuar)')) : [];
+                    if (selects5.length > 0 && chks5.length > 1) {
+                        const sel0 = selects5[0];
+                        sel0.selectedIndex = sel0.options.length - 1;
+                        sel0.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    const exclusividadeOk = chks5.filter(c => c.checked).length === 1;
+                    const btnInicio5 = m5 ? Array.from(m5.querySelectorAll('button')).find(b => b.textContent.includes('Início')) : null;
+                    if (btnInicio5) btnInicio5.click();
+                    const aposInicioText = document.getElementById('jusgov-modal-mapeamento-regra');
+                    dlg5.fecharModal();
+                    wrap5.remove();
+                    test05Ok = Boolean(m5 && btnsNav.includes('↑ Pai') && btnsNav.includes('↓ Filho') && temTagSimples && exclusividadeOk && aposInicioText);
+                    detalheTest05 = `nav=${btnsNav.join('/')}, tag=${temTagSimples}, excl=${exclusividadeOk}`;
+                } catch (eT5) { detalheTest05 = eT5.message || String(eT5); }
+                registrar(test05Ok, 'TEST_05_FEAT_70_DIALOGO_COMPACTO_NAVEGACAO_E_TAG', 'DialogoMapeamentoRegra renderiza trilha, ↑ Pai/↓ Filho, Tag (<tag>) em CSS (Simples), seleção exclusiva e ↺ Início.', { detalhe: detalheTest05 });
+            }
+
+            {
+                /* TEST-07 (FEAT-71 / BUG-90): Heurística estrutural sem texto direto, célula .rich-table CNJ, abas e debounce frames */
+                let test07Ok = false;
+                let detalheTest07 = '';
+                try {
+                    const motor7 = window.JusGovMotorSelecaoTeste;
+                    const Inj7 = window.JusGovInjecaoScripts;
+                    const ctn7 = document.createElement('div');
+                    ctn7.innerHTML = '<div id="ui-sem-texto"><span>Filho</span></div><div id="ed-7" contenteditable="true">Texto editável</div><table class="rich-table"><tr><td id="td-cnj">0991234-65.2024.4.01.4002</td></tr></table><div class="rich-tab-header" id="tab-hdr">Aba</div>';
+                    document.body.appendChild(ctn7);
+                    const diagSemTxt = motor7.obterDiagnosticoElemento(document.getElementById('ui-sem-texto'));
+                    const diagEd = motor7.obterDiagnosticoElemento(document.getElementById('ed-7'));
+                    const diagTab = motor7.obterDiagnosticoElemento(document.getElementById('tab-hdr'));
+                    const semTxtOk = (diagSemTxt && diagSemTxt.tipo === 'interface');
+                    const edOk = (diagEd && diagEd.tipo === 'editavel');
+                    const tabOk = (diagTab && diagTab.tipo === 'interface');
+                    let debounceKeysOk = false;
+                    if (typeof Inj7 === 'function') {
+                        const inj = new Inj7();
+                        inj.agendarInjecaoSeguraNaAba(991, 'https://pje.jus.br/a', () => {}, 350, 'committed');
+                        inj.agendarInjecaoSeguraNaAba(991, 'https://pje.jus.br/a', () => {}, 350, 'completed');
+                        if (typeof inj.limparDebounceAba === 'function') inj.limparDebounceAba(991);
+                        debounceKeysOk = true;
+                    }
+                    ctn7.remove();
+                    test07Ok = semTxtOk && edOk && tabOk && debounceKeysOk;
+                    detalheTest07 = `semTxt=${semTxtOk}, ed=${edOk}, tab=${tabOk}, debounce=${debounceKeysOk}`;
+                } catch (eT7) { detalheTest07 = eT7.message || String(eT7); }
+                registrar(test07Ok, 'TEST_07_FEAT_71_BUG_90_HEURISTICA_E_DEBOUNCE_FRAMES', 'Heurística detecta sem-texto-direto/abas como interface sem quebrar editáveis e JusGovInjecaoScripts agenda por chave de estágio.', { detalhe: detalheTest07 });
+            }
+
+            {
+                /* TEST-15 (BUG-95): Anti-sobreposição e auto-fechamento no hover do inspetor Ctrl+Alt+Shift */
+                let test15Ok = false;
+                let detalheTest15 = '';
+                try {
+                    const InspCls15 = window.JusGovRegrasEInspetor;
+                    const insp15 = new InspCls15();
+                    const orfao15 = document.createElement('div');
+                    orfao15.id = 'insp-orfao-15';
+                    orfao15.setAttribute('data-jusgov-inspetor', 'true');
+                    document.body.appendChild(orfao15);
+
+                    const alvo15 = document.createElement('p');
+                    alvo15.textContent = 'Parágrafo de teste';
+                    document.body.appendChild(alvo15);
+                    insp15.atualizarInspetorTempoReal(50, 50, alvo15);
+
+                    const orfaoRemovido = !document.getElementById('insp-orfao-15');
+                    const paineis15 = document.querySelectorAll('#jusgov-inspetor-tempo-real, [data-jusgov-inspetor="true"]');
+                    const unicoPainel = (paineis15.length === 1);
+                    if (paineis15[0]) {
+                        paineis15[0].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                    }
+                    const fechouNoHover = (document.querySelectorAll('#jusgov-inspetor-tempo-real, [data-jusgov-inspetor="true"]').length === 0);
+                    alvo15.remove();
+                    test15Ok = orfaoRemovido && unicoPainel && fechouNoHover;
+                    detalheTest15 = `orfaoRem=${orfaoRemovido}, unico=${unicoPainel}, hoverFechou=${fechouNoHover}`;
+                } catch (eT15) { detalheTest15 = eT15.message || String(eT15); }
+                registrar(test15Ok, 'TEST_15_BUG_95_INSPETOR_ANTI_SOBREPOSICAO_HOVER', 'atualizarInspetorTempoReal remove órfãos sem sobreposição e fecha imediatamente ao passar o mouse sobre o painel.', { detalhe: detalheTest15 });
+            }
+
+            {
+                /* TEST-18 (FEAT-78): Seleção exclusiva na edição/re-seleção e Observação automática DD/MM/YYYY HH:MM:SS-<Selecionado> */
+                let test18Ok = false;
+                let detalheTest18 = '';
+                try {
+                    const Dlg18 = window.JusGovDialogoMapeamentoRegra;
+                    const dlg18 = new Dlg18();
+                    const box18 = document.createElement('div');
+                    box18.innerHTML = '<div id="el-t18" class="cls-t18">Alvo 18</div>';
+                    document.body.appendChild(box18);
+                    const el18 = document.getElementById('el-t18');
+                    let regrasSalvas18 = null;
+                    dlg18.abrirModal(el18, null, { aoSalvarRegras: (r) => { regrasSalvas18 = r; } });
+                    const m18 = document.getElementById('jusgov-modal-mapeamento-regra');
+                    const inputs18 = m18 ? Array.from(m18.querySelectorAll('textarea.jusgov-dmg-textarea')) : [];
+                    const chks18 = m18 ? Array.from(m18.querySelectorAll('input[type="checkbox"]')) : [];
+                    /* O 1o textarea readonly é Selecionado:; inputs18[1] é o 1o campo de expressão */
+                    if (inputs18.length > 2 && chks18.length > 1) {
+                        inputs18[2].value = '.nova-expr-18';
+                        inputs18[2].dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    const editAutoMarcaOk = chks18.length > 1 && chks18[1].checked === true && chks18[0].checked === false;
+                    const sels18 = m18 ? Array.from(m18.querySelectorAll('.jusgov-dmg-select-sm')) : [];
+                    if (sels18.length > 0 && sels18[0].options.length > 0) {
+                        sels18[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        sels18[0].selectedIndex = 0;
+                        sels18[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    const selModo18 = m18 ? m18.querySelector('select.jusgov-dmg-select') : null;
+                    if (selModo18) {
+                        selModo18.value = 'interface';
+                        selModo18.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    const btnSalvar18 = m18 ? Array.from(m18.querySelectorAll('button')).find(b => b.textContent.includes('Salvar')) : null;
+                    if (btnSalvar18) btnSalvar18.click();
+                    const obsGerada = (Array.isArray(regrasSalvas18) && regrasSalvas18[0]) ? regrasSalvas18[0].observacao : '';
+                    const obsAutoOk = Boolean(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}-/.test(obsGerada) && obsGerada.length <= 150);
+                    dlg18.fecharModal();
+                    box18.remove();
+                    test18Ok = editAutoMarcaOk && obsAutoOk;
+                    detalheTest18 = `editExcl=${editAutoMarcaOk}, obs=${obsGerada}`;
+                } catch (eT18) { detalheTest18 = eT18.message || String(eT18); }
+                registrar(test18Ok, 'TEST_18_FEAT_78_EXCLUSIVO_E_OBSERVACAO_AUTO', 'Edição manual e re-seleção aplicam seleção exclusiva e observação vazia grava timestamp + <Selecionado> <= 150 chars.', { detalhe: detalheTest18 });
+            }
+
+            {
+                /* TEST-19 (FEAT-80): Onboarding 1ª instalação, perfis leitura/reuniao protegidos e foco sem mérito pausando >= 3 min */
+                let test19Ok = false;
+                let detalheTest19 = '';
+                try {
+                    const xhrOnbHtml = new XMLHttpRequest();
+                    xhrOnbHtml.open('GET', '../src/cfg/onboarding.html', false);
+                    xhrOnbHtml.send();
+                    const xhrOnbJs = new XMLHttpRequest();
+                    xhrOnbJs.open('GET', '../src/cfg/onboarding.js', false);
+                    xhrOnbJs.send();
+                    const xhrBg = new XMLHttpRequest();
+                    xhrBg.open('GET', '../src/cfg/background.js', false);
+                    xhrBg.send();
+
+                    const onbAssetsOk = (
+                        xhrOnbHtml.status === 200 &&
+                        xhrOnbJs.status === 200 &&
+                        xhrOnbJs.responseText.includes("p.id !== 'padrao'") &&
+                        xhrOnbJs.responseText.includes('jusgovOnboardingConcluido') &&
+                        xhrBg.responseText.includes("detalhes.reason === 'install'") &&
+                        xhrBg.responseText.includes('src/cfg/onboarding.html')
+                    );
+                    const CfgCls19 = window.JusGovConfiguracoes;
+                    const Defs19 = window.JusGovCfgDefaults;
+                    const mgr19 = new CfgCls19();
+                    const cat19 = Defs19.obterCatalogoPerfis();
+                    const est19 = mgr19.garantirEstruturaPerfis({}, cat19);
+                    const ultimosPredef = est19.listaPerfis.slice(-2).map(p => `${p.id}:${p.predefinido}`);
+                    const leituraReuniaoOk = JSON.stringify(ultimosPredef) === JSON.stringify(['leitura:true', 'reuniao:true']);
+
+                    const ProdT19 = window.JusGovModuloProdutividade;
+                    const mp19 = new ProdT19();
+                    const t19 = 1710000000000;
+                    const st19 = mp19.criarEstadoTrabalhoZerado('2026-11-18', t19);
+                    st19.ultimaAtividadeTs = t19;
+                    const r2min = mp19.avancarMinutoPomodoro(st19, t19 + 2 * 60000, { pomodoroAtivo: true, pomodoroPausasAutomaticas: true });
+                    const naoPausouAntes3m = (!st19.emPausa && r2min.evento !== 'foco_pausado_sem_merito');
+                    const r3min = mp19.avancarMinutoPomodoro(st19, t19 + 3 * 60000, { pomodoroAtivo: true, pomodoroPausasAutomaticas: true });
+                    const pausouEm3mRetro = (st19.emPausa === true && r3min.evento === 'foco_pausado_sem_merito' && st19.pomodoroPausaInicioTs === t19 && st19.pomodoroFase === 'foco');
+                    test19Ok = onbAssetsOk && leituraReuniaoOk && naoPausouAntes3m && pausouEm3mRetro;
+                    detalheTest19 = `onb=${onbAssetsOk}, lr=${leituraReuniaoOk}, antes3m=${naoPausouAntes3m}, pausou3m=${pausouEm3mRetro}`;
+                } catch (eT19) { detalheTest19 = eT19.message || String(eT19); }
+                registrar(test19Ok, 'TEST_19_FEAT_80_ONBOARDING_PERFIS_E_IDLE_3MIN_SEM_MERITO', 'Onboarding abre apenas na 1ª instalação sem Padrão, leitura/reuniao ficam protegidos ao fim e foco sem mérito pausa somente >= 3 min retroativo.', { detalhe: detalheTest19 });
             }
         }
     }

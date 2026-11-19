@@ -165,9 +165,9 @@
     {
         "id": "interna_nav_toolbars",
         "tipoSeletor": "CSS (Simples)",
-        "expressao": ".rich-toolbar, .rich-menu-list-border, .navbar, .nav-tabs, .nav-topo, .action-bar, .toolbar, .sidebar, .topbar, .breadcrumb",
+        "expressao": ".rich-toolbar, .rich-menu-list-border, .rich-tab-header, .rich-tab-label, .rich-tabpanel-header, .rf-tab-hdr, .rf-tab-hdr-act, .rf-tab-hdr-inact, .ui-tabs-nav, .ui-tabs-header, .ui-tabmenuitem, .p-tabview-nav, .p-tabview-nav-link, .mat-tab-label, .mat-tab-header, .mat-mdc-tab, .mat-mdc-tab-header, .navbar, .nav-tabs, .nav-item, .nav-link, .nav-topo, .action-bar, .toolbar, .sidebar, .topbar, .breadcrumb",
         "tipo": "interface",
-        "observacao": "Barras de navegação, menus e cabeçalhos de sistema",
+        "observacao": "Barras de navegação, abas (RichFaces, PrimeNG, Material, Bootstrap), menus e cabeçalhos de sistema",
         "herdarFilhos": true,
         "ativo": true,
         "continuarProxima": false

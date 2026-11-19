@@ -1,12 +1,19 @@
 @charset "UTF-8";
-/* ==UserStyle==
+/* ==========================================================================
+ * ARQUIVO: src/mod-anti-ampulheta/pdpj-stf-stj-anti-ampulheta.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/mod-anti-ampulheta/pdpj-stf-stj-anti-ampulheta.css
+ *
 @name         PDPJ-Br / STF / STJ - Anti-Ampulheta
 @namespace    pdpj.jus.br
 @version      2.2.0
 @match        *://*.pdpj.jus.br/*
 @match        *://*.stf.jus.br/*
 @match        *://*.stj.jus.br/*
-==/UserStyle== */
+ * ========================================================================== */
 
 /* ==========================================================================
  * [ESPECIFICACAO FUNCIONAL E REGRAS DE NEGOCIO -- HELP BLUEPRINT PERPETUO]

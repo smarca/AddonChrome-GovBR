@@ -1,8 +1,9 @@
 /* ==========================================================================
- * Nome do arquivo: lib-geradores.js
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
- * BIBLIOTECA: JusGovBR Libs - Biblioteca Matemática de Geradores Algorítmicos e Mutações
+ * ARQUIVO: src/lib/lib-geradores.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * BIBLIOTECA: JusGovBR Libs - Biblioteca Matemática de Geradores Algorítmicos e Mutações
  *
  * @MAPA-IA:
  * - Arquivo: src/lib/lib-geradores.js

@@ -1,6 +1,8 @@
-/**
- * PROJETO: JusGovBR - Cópia Inteligente & PJe Turbo
+/* ==========================================================================
  * ARQUIVO: src/mod-copia/copia-estagio3.js
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
  * CLASSE: EstagioSentencas
  * 
  * @MAPA-IA:
@@ -27,7 +29,7 @@
  * - docs/01_DIRETRIZES_E_REGRAS_ROOT.md (Regra 2.3: Estágio 3 - Sentenças e Dois-Pontos)
  * - docs/02_ARQUITETURA_E_AS_BUILT.md (Seção 3.3: Estágio 3)
  * - docs/05_DECISOES_ARQUITETURAIS_ADR.md (ADR-004: Modularização em Classes POO)
- */
+ * ========================================================================== */
 
 (function () {
     'use strict';
