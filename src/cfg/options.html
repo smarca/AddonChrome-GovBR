@@ -512,6 +512,52 @@
                                 linhas em branco redundantes consecutivas e apara espaços supérfluos no
                                 início e fim de cada linha.</span>
                         </p>
+                        <div id="blocoPadraoFonteCopiaWrap" style="margin-top: -4px; padding-top: 8px; border-top: 1px dashed var(--borda); display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; user-select: none;">
+                                <input type="checkbox" id="optPadronizarFonteCopiaAtivo">
+                                <span>Mudar/Adicionar padrão de formatação (opcional)</span>
+                            </label>
+                            <div id="blocoPadraoFonteCopiaCampos" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; transition: opacity 0.2s ease;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px;">
+                                    <span>Fonte:</span>
+                                    <input type="text" id="optFontePadraoCopia" list="listaFontesPadraoCopia" value="Arial" autocomplete="off"
+                                        placeholder="Digite ou pesquise a fonte..."
+                                        style="width: 220px; padding: 5px 8px; border: 1px solid var(--borda); border-radius: 6px; font-size: 12.5px; background: var(--bg-card); color: var(--texto-primario);">
+                                    <datalist id="listaFontesPadraoCopia">
+                                        <option value="Arial"></option>
+                                        <option value="Arial Narrow"></option>
+                                        <option value="Times New Roman"></option>
+                                        <option value="Calibri"></option>
+                                        <option value="Courier New"></option>
+                                        <option value="Tahoma"></option>
+                                        <option value="Verdana"></option>
+                                    </datalist>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px;">
+                                    <span>Tamanho (pt):</span>
+                                    <input type="text" id="optTamanhoFontePadraoCopia" list="listaTamanhosFontePadraoCopia" value="12" autocomplete="off"
+                                        placeholder="Ex.: 12"
+                                        style="width: 82px; padding: 5px 8px; border: 1px solid var(--borda); border-radius: 6px; font-size: 12.5px; background: var(--bg-card); color: var(--texto-primario);">
+                                    <datalist id="listaTamanhosFontePadraoCopia">
+                                        <option value="8"></option>
+                                        <option value="9"></option>
+                                        <option value="10"></option>
+                                        <option value="11"></option>
+                                        <option value="12"></option>
+                                        <option value="14"></option>
+                                        <option value="16"></option>
+                                        <option value="18"></option>
+                                        <option value="20"></option>
+                                        <option value="22"></option>
+                                        <option value="24"></option>
+                                        <option value="26"></option>
+                                    </datalist>
+                                </label>
+                            </div>
+                            <span style="font-size: 11.5px; color: var(--texto-secundario); line-height: 1.45;">
+                                Quando ativado, filtra todas as fontes e tamanhos originais do texto copiado e associa a fonte e o tamanho escolhidos acima a todo o texto formatado.
+                            </span>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -918,7 +964,7 @@
                 <div class="setting-item">
                     <div>
                         <div class="setting-label">Tempo de Atividade (Meta Diária)</div>
-                        <div class="setting-help">Conta apenas minutos com atividade real no navegador (qualquer movimentação de mouse ou teclado). <strong>Regra:</strong> inatividade &lt; 5 min segue como Tempo Ativo; com <strong>5 min seguidos</strong> sem interação confirma <strong>Pausa</strong> e todo o intervalo vai para <em>Pausas</em>.</div>
+                        <div class="setting-help">Conta apenas minutos com atividade real no navegador (qualquer movimentação de mouse ou teclado). Regra: inatividade &lt; 5 min segue como Tempo Ativo; com 5 min seguidos sem interação confirma a pausa e todo o intervalo é computado.</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <select id="optTempoTrabalhoAtivoHoras" class="input-select" style="padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
@@ -941,11 +987,11 @@
                         </label>
                     </div>
                 </div>
-                <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px;">
                         <div>
                             <div class="setting-label">Temporizador Pomodoro Inteligente</div>
-                            <div class="setting-help">Calcula automaticamente o tempo de Alívio e a Pausa Maior com base na proporção Foco:Pausa e quantidade de ciclos.</div>
+                            <div class="setting-help">Calcula automaticamente o tempo de Alívio e o Descanso com base na proporção Foco:Pausa e quantidade de ciclos.</div>
                         </div>
                         <label class="switch" title="Ativar ciclos Pomodoro com notificação modal entre janelas">
                             <input type="checkbox" id="optPomodoroAtivo">
@@ -1000,8 +1046,10 @@
                             </select>
                         </label>
                         <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
-                            Pausa Maior: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">40 min</span>
+                            Descanso: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">40 min</span>
                         </span>
+                    </div>
+                    <div id="painelAparenciaPomodoro" style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave);">
                         <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);" title="Define o estilo do minipopup no ciclo ativo de Foco (sincronizado com 1 clique no minipopup)">
                             Estilo:
                             <select id="optPomodoroEstiloMinipopup" class="input-select" style="padding: 4px 8px; font-size: 12px;">
@@ -1019,20 +1067,18 @@
                                 <option value="oculto">Oculto no Ativo (Só no Descanso)</option>
                             </select>
                         </label>
-                    </div>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-                    <div style="display: flex; flex-direction: column; gap: 3px;">
-                        <div id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;"></div>
-                        <div id="lblStatusPomodoroDetalhado" class="setting-help" style="margin: 0; font-size: 12px; display: none; flex-wrap: wrap; align-items: center; gap: 6px;"></div>
-                    </div>
-                    <div style="margin-left: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end;">
                         <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-principal); cursor: pointer;" title="Quando marcado, silencia todos os beeps sonoros progressivos após concluir o tempo de descanso">
                             <input type="checkbox" id="optPomodoroBeepConclusaoAtivo">
                             Desativar Beeps
                         </label>
-                        <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 12px; padding: 4px 10px;">🔄 Reiniciar Contadores de Hoje</button>
                     </div>
+                </div>
+                <div id="painelEstatisticasTrabalho" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: rgba(15, 23, 42, 0.025); flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+                        <div id="lblStatusProdutividadeTrabalho" class="setting-help" style="margin: 0; font-size: 12px;"></div>
+                        <div id="lblStatusPomodoroDetalhado" class="setting-help" style="margin: 0; font-size: 12px; display: none; flex-wrap: wrap; align-items: center; gap: 6px;"></div>
+                    </div>
+                    <button type="button" id="btnResetarContadoresTrabalho" class="btn btn-secundario" style="font-size: 11.5px; padding: 3px 9px; margin-left: auto; flex-shrink: 0;">🔄 Reiniciar Contadores de Hoje</button>
                 </div>
             </section>
 
@@ -1149,7 +1195,7 @@
                             Alternância circular contínua entre abas através dos botões
                             laterais físicos do mouse (Botão 4 Voltar e Botão 5 Avançar),
                             colagem direta em campos editáveis com o botão do meio (scroll click) usando a
-                            Última Seleção (sem ler o clipboard do sistema),
+                            Última Seleção (sem ler o clipboard do sistema) via <code>execCommand('insertText')</code> / <code>execCommand('insertHTML')</code> preservando o <strong>Desfazer nativo (<code>Ctrl+Z</code>)</strong> — em editores CKEditor/PJe a colagem usa <code>insertText</code> seguro dentro do parágrafo ativo para impedir travamentos do editor,
                             navegação vertical entre campos de entrada (<code>&lt;input&gt;</code>) pelas
                             setas do teclado (↑/↓) e colagem da penúltima seleção
                             via <code>Ctrl + Botão do Meio</code> (Memória Interna de 2 Níveis).

@@ -322,6 +322,17 @@
 
             /* PRIORIDADE 1: Elementos clássicos de formulário (INPUT e TEXTAREA) */
             if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                /* Prioridade nativa Blink (Desfazer Ctrl+Z preservado via execCommand 'insertText'):
+                 * Comandos antigos (mantidos abaixo como fallback):
+                 *   elEditavel.setRangeText(texto, inicio, fim, 'end');
+                 *   elEditavel.value = valorAnterior.slice(0, inicio) + texto + valorAnterior.slice(fim); */
+                try {
+                    this.#focarElementoSeguro(elEditavel);
+                    if (doc && typeof doc.execCommand === 'function' && doc.execCommand('insertText', false, texto)) {
+                        return true;
+                    }
+                } catch (_) { }
+
                 try {
                     let inicio = typeof elEditavel.selectionStart === 'number' ? elEditavel.selectionStart : null;
                     let fim = typeof elEditavel.selectionEnd === 'number' ? elEditavel.selectionEnd : null;

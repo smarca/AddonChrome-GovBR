@@ -36,6 +36,9 @@
 
     class FiltrosHtmlProgressivos {
         #filtrosTexto;
+        #padraoFonteAtivo = false;
+        #fontePadrao = 'Arial';
+        #tamanhoFontePadrao = '12';
 
         constructor(opcoes = {}) {
             this.#filtrosTexto = opcoes.filtrosTexto ||
@@ -58,6 +61,75 @@
         definirSeparadorTabela(sep) {
             if (typeof sep === 'string' && sep.trim().length > 0) {
                 this.separadorTabela = sep;
+            }
+        }
+
+        definirPadraoFonteCopia(opcoes = {}) {
+            if (!opcoes || typeof opcoes !== 'object') return;
+            if (typeof opcoes.ativo === 'boolean') {
+                this.#padraoFonteAtivo = opcoes.ativo;
+            }
+            if (typeof opcoes.fonte === 'string' && opcoes.fonte.trim().length > 0) {
+                this.#fontePadrao = opcoes.fonte.trim().replace(/[;"'\r\n<>]/g, '').slice(0, 80) || 'Arial';
+            }
+            if (opcoes.tamanho !== undefined && opcoes.tamanho !== null && String(opcoes.tamanho).trim().length > 0) {
+                const tamLimpo = String(opcoes.tamanho).trim().replace(/[;"'\r\n<>]/g, '').slice(0, 16);
+                if (tamLimpo) this.#tamanhoFontePadrao = tamLimpo;
+            }
+        }
+
+        gerarHtmlTextoPuroComFontePadrao(textoPlano) {
+            if (!this.#padraoFonteAtivo || !textoPlano || typeof textoPlano !== 'string') return '';
+            const fonteLimpa = (this.#fontePadrao || 'Arial').trim();
+            const fonteCss = /\s/.test(fonteLimpa) ? `'${fonteLimpa}'` : fonteLimpa;
+            const tamRaw = String(this.#tamanhoFontePadrao || '12').trim();
+            const tamCss = /^\d+(?:\.\d+)?$/.test(tamRaw) ? `${tamRaw}pt` : tamRaw;
+            const escapado = textoPlano
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\r?\n/g, '<br>');
+            return `<span style="font-family: ${fonteCss}; font-size: ${tamCss};">${escapado}</span>`;
+        }
+
+        #aplicarPadraoFonteNoHtml(htmlBruto) {
+            if (!this.#padraoFonteAtivo || !htmlBruto || typeof htmlBruto !== 'string') return htmlBruto;
+            const fonteLimpa = (this.#fontePadrao || 'Arial').trim();
+            const fonteCss = /\s/.test(fonteLimpa) ? `'${fonteLimpa}'` : fonteLimpa;
+            const tamRaw = String(this.#tamanhoFontePadrao || '12').trim();
+            const tamCss = /^\d+(?:\.\d+)?$/.test(tamRaw) ? `${tamRaw}pt` : tamRaw;
+            const estiloPadrao = `font-family: ${fonteCss}; font-size: ${tamCss};`;
+
+            try {
+                const body = this._parsearHtmlSeguro(htmlBruto);
+                if (!body) {
+                    return `<span style="${estiloPadrao}">${htmlBruto}</span>`;
+                }
+                /* Passo 1: Remover atributos legados <font face/size> e qualquer font-family/font-size remanescente */
+                const todos = body.querySelectorAll('*');
+                const tagsBloco = new Set(['P', 'DIV', 'TD', 'TH', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'DT', 'DD']);
+                let temBloco = false;
+                for (let i = 0; i < todos.length; i++) {
+                    const el = todos[i];
+                    if (el.hasAttribute('face')) el.removeAttribute('face');
+                    if (el.hasAttribute('size')) el.removeAttribute('size');
+                    if (el.style) {
+                        el.style.removeProperty('font-family');
+                        el.style.removeProperty('font-size');
+                    }
+                    if (tagsBloco.has(el.tagName)) {
+                        temBloco = true;
+                        el.style.setProperty('font-family', fonteCss);
+                        el.style.setProperty('font-size', tamCss);
+                    }
+                }
+                const htmlLimpo = body.innerHTML;
+                if (!temBloco) {
+                    return `<span style="${estiloPadrao}">${htmlLimpo}</span>`;
+                }
+                return `<div style="${estiloPadrao}">${htmlLimpo}</div>`;
+            } catch (_) {
+                return `<span style="${estiloPadrao}">${htmlBruto}</span>`;
             }
         }
 
@@ -1014,11 +1086,13 @@
         aplicarFiltroHtmlPorNivel(origem, nivel) {
             const nivelNorm = this.normalizarNivelFiltro(nivel);
             if (nivelNorm === 'texto_puro') return this.extrairTextoPuroSanitizado(origem);
-            if (nivelNorm === 'basico') return this.construirHtmlNivel1Basico(origem);
-            if (nivelNorm === 'intermediario') return this.construirHtmlNivel2Intermediario(origem);
-            if (nivelNorm === 'avancado') return this.construirHtmlNivel3Avancado(origem);
-            if (nivelNorm === 'estendido') return this.construirHtmlNivel4Estendido(origem);
-            return this.construirHtmlNivel1Basico(origem);
+            let htmlResultado = '';
+            if (nivelNorm === 'basico') htmlResultado = this.construirHtmlNivel1Basico(origem);
+            else if (nivelNorm === 'intermediario') htmlResultado = this.construirHtmlNivel2Intermediario(origem);
+            else if (nivelNorm === 'avancado') htmlResultado = this.construirHtmlNivel3Avancado(origem);
+            else if (nivelNorm === 'estendido') htmlResultado = this.construirHtmlNivel4Estendido(origem);
+            else htmlResultado = this.construirHtmlNivel1Basico(origem);
+            return this.#padraoFonteAtivo ? this.#aplicarPadraoFonteNoHtml(htmlResultado) : htmlResultado;
         }
 
         envolverHtmlComResetDeCursorParaWord(codigoHTML) {

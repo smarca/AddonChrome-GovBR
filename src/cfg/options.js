@@ -172,6 +172,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const containerNivelFiltroEstilos = document.getElementById('containerNivelFiltroEstilos');
     const optNivelFiltroEstilos = document.getElementById('optNivelFiltroEstilos');
     const lblValorNivelFiltro = document.getElementById('lblValorNivelFiltro');
+    const optPadronizarFonteCopiaAtivo = document.getElementById('optPadronizarFonteCopiaAtivo');
+    const optFontePadraoCopia = document.getElementById('optFontePadraoCopia');
+    const optTamanhoFontePadraoCopia = document.getElementById('optTamanhoFontePadraoCopia');
+    const blocoPadraoFonteCopiaCampos = document.getElementById('blocoPadraoFonteCopiaCampos');
     const textoUrlsTurbo = document.getElementById('textoUrlsTurbo');
 
     /* Controles da Secao Avancada Categorizada */
@@ -978,6 +982,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 optNivelFiltroEstilos.style.cursor = 'pointer';
             }
         }
+        const fonteAtiva = Boolean(optPadronizarFonteCopiaAtivo && optPadronizarFonteCopiaAtivo.checked);
+        if (optPadronizarFonteCopiaAtivo) optPadronizarFonteCopiaAtivo.disabled = false;
+        if (optFontePadraoCopia) optFontePadraoCopia.disabled = !fonteAtiva;
+        if (optTamanhoFontePadraoCopia) optTamanhoFontePadraoCopia.disabled = !fonteAtiva;
+        if (blocoPadraoFonteCopiaCampos) blocoPadraoFonteCopiaCampos.style.opacity = fonteAtiva ? '1' : '0.5';
     }
 
     function atualizarVisibilidadeSubOpcoesReutilizar() {
@@ -1183,6 +1192,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (checkOpcaoRemoverFormatacoes) {
                 checkOpcaoRemoverFormatacoes.checked = (dados.manterFormatacaoBasica === false);
+            }
+            if (optPadronizarFonteCopiaAtivo) {
+                optPadronizarFonteCopiaAtivo.checked = (dados.padronizarFonteCopiaAtivo === true);
+            }
+            if (optFontePadraoCopia) {
+                optFontePadraoCopia.value = (typeof dados.fontePadraoCopia === 'string' && dados.fontePadraoCopia.trim()) ? dados.fontePadraoCopia.trim() : 'Arial';
+            }
+            if (optTamanhoFontePadraoCopia) {
+                optTamanhoFontePadraoCopia.value = (dados.tamanhoFontePadraoCopia !== undefined && String(dados.tamanhoFontePadraoCopia).trim()) ? String(dados.tamanhoFontePadraoCopia).trim() : '12';
             }
             atualizarRotuloNivelFiltro();
             atualizarEstadoOfuscamentoNivelFiltro();
@@ -1502,6 +1520,13 @@ document.addEventListener('DOMContentLoaded', () => {
             comportamentoCliqueIcone: selectComportamentoIcone ? selectComportamentoIcone.value : 'popup',
             manterFormatacaoBasica: manterBasica,
             nivelFiltroFormatacao: optNivelFiltroEstilos ? converterIndiceParaNivelFiltro(optNivelFiltroEstilos.value) : 'basico',
+            padronizarFonteCopiaAtivo: optPadronizarFonteCopiaAtivo ? Boolean(optPadronizarFonteCopiaAtivo.checked) : false,
+            fontePadraoCopia: (optFontePadraoCopia && (optFontePadraoCopia.value.trim() || (optFontePadraoCopia.dataset && optFontePadraoCopia.dataset.valorAnterior)))
+                ? (optFontePadraoCopia.value.trim() || optFontePadraoCopia.dataset.valorAnterior)
+                : 'Arial',
+            tamanhoFontePadraoCopia: (optTamanhoFontePadraoCopia && (optTamanhoFontePadraoCopia.value.trim() || (optTamanhoFontePadraoCopia.dataset && optTamanhoFontePadraoCopia.dataset.valorAnterior)))
+                ? (optTamanhoFontePadraoCopia.value.trim() || optTamanhoFontePadraoCopia.dataset.valorAnterior)
+                : '12',
             ativoAmpuletas: checkOpcaoAmpuletas ? checkOpcaoAmpuletas.checked : true,
             automatePjeAtivo: optAutomatePjeAtivo ? optAutomatePjeAtivo.checked : false,
             selecaoEditavelAtiva: selectModoPlaceholdersMinutasHtml ? (selectModoPlaceholdersMinutasHtml.value !== 'desabilitado') : true,
@@ -1630,6 +1655,42 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarRotuloNivelFiltro();
         salvarConfiguracoes();
     });
+    adicionarOuvinteSeguro(optPadronizarFonteCopiaAtivo, 'change', () => {
+        atualizarEstadoOfuscamentoNivelFiltro();
+        salvarConfiguracoes();
+    });
+    function vincularComboboxPesquisavelDatalist(elInput, valorPadrao) {
+        if (!elInput) return;
+        adicionarOuvinteSeguro(elInput, 'focus', () => {
+            const atual = elInput.value.trim();
+            if (atual) {
+                elInput.dataset.valorAnterior = atual;
+                elInput.placeholder = atual;
+                elInput.value = '';
+            }
+        });
+        adicionarOuvinteSeguro(elInput, 'blur', () => {
+            if (!elInput.value.trim()) {
+                elInput.value = elInput.dataset.valorAnterior || valorPadrao;
+            }
+        });
+        adicionarOuvinteSeguro(elInput, 'input', () => {
+            if (elInput.value.trim()) {
+                elInput.dataset.valorAnterior = elInput.value.trim();
+                salvarConfiguracoesDebounced(300);
+            }
+        });
+        adicionarOuvinteSeguro(elInput, 'change', () => {
+            if (!elInput.value.trim()) {
+                elInput.value = elInput.dataset.valorAnterior || valorPadrao;
+            } else {
+                elInput.dataset.valorAnterior = elInput.value.trim();
+            }
+            salvarConfiguracoes();
+        });
+    }
+    vincularComboboxPesquisavelDatalist(optFontePadraoCopia, 'Arial');
+    vincularComboboxPesquisavelDatalist(optTamanhoFontePadraoCopia, '12');
     adicionarOuvinteSeguro(textoUrlsTurbo, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(checkOpcaoAmpuletas, 'change', salvarConfiguracoes);
     adicionarOuvinteSeguro(optAutomatePjeAtivo, 'change', salvarConfiguracoes);
@@ -2522,6 +2583,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (changes.nivelFiltroFormatacao !== undefined && optNivelFiltroEstilos) {
                     optNivelFiltroEstilos.value = String(converterNivelFiltroParaIndice(changes.nivelFiltroFormatacao.newValue));
                     atualizarRotuloNivelFiltro();
+                }
+                if (changes.padronizarFonteCopiaAtivo !== undefined && optPadronizarFonteCopiaAtivo) {
+                    optPadronizarFonteCopiaAtivo.checked = (changes.padronizarFonteCopiaAtivo.newValue === true);
+                    atualizarEstadoOfuscamentoNivelFiltro();
+                }
+                if (changes.fontePadraoCopia !== undefined && optFontePadraoCopia) {
+                    optFontePadraoCopia.value = String(changes.fontePadraoCopia.newValue || 'Arial');
+                }
+                if (changes.tamanhoFontePadraoCopia !== undefined && optTamanhoFontePadraoCopia) {
+                    optTamanhoFontePadraoCopia.value = String(changes.tamanhoFontePadraoCopia.newValue || '12');
                 }
                 if (changes.ativoAmpuletas !== undefined && checkOpcaoAmpuletas) {
                     checkOpcaoAmpuletas.checked = (changes.ativoAmpuletas.newValue !== false);

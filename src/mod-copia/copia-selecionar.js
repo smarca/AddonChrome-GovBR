@@ -308,6 +308,9 @@
     let listaUrlsPermitidas = [];
     let manterFormatacaoBasica = false;
     let nivelFiltroFormatacao = 'basico';
+    let padronizarFonteCopiaAtivo = false;
+    let fontePadraoCopia = 'Arial';
+    let tamanhoFontePadraoCopia = '12';
     let selecaoEditavelAtiva = true;
     let placeholdersMinutasHtmlAtivo = true;
     let modoPlaceholdersMinutasHtml = 'placeholders';
@@ -605,6 +608,9 @@
                 validacaoMatematicaAtiva,
                 manterFormatacaoBasica,
                 nivelFiltroFormatacao,
+                padronizarFonteCopiaAtivo,
+                fontePadraoCopia,
+                tamanhoFontePadraoCopia,
                 ultimoTextoSelecionadoLimpo,
                 ultimoRangeSelecionadoSimples
             }),
@@ -1055,6 +1061,9 @@
             obterEstadoOpcoes: () => ({
                 manterFormatacaoBasica,
                 nivelFiltroFormatacao,
+                padronizarFonteCopiaAtivo,
+                fontePadraoCopia,
+                tamanhoFontePadraoCopia,
                 ultimoTextoLimpo: ultimoTextoSelecionadoLimpo
             }),
             normalizarNivelFiltro,
@@ -1067,6 +1076,9 @@
             gerarMapaFormatosClipboard: (origem, nivel, op) => (filtros && typeof filtros.gerarMapaFormatosClipboard === 'function')
                 ? filtros.gerarMapaFormatosClipboard(origem, nivel, op)
                 : null,
+            gerarHtmlTextoPuroComFontePadrao: (txt) => (filtros && typeof filtros.gerarHtmlTextoPuroComFontePadrao === 'function')
+                ? filtros.gerarHtmlTextoPuroComFontePadrao(txt)
+                : '',
             confirmarVisualMarcador: (txt) => (visual && typeof visual.confirmarColagemEMarcarPermanente === 'function')
                 ? visual.confirmarColagemEMarcarPermanente(txt)
                 : null
@@ -3496,6 +3508,18 @@
         if (typeof cfg.manterFormatacaoBasica === 'boolean') manterFormatacaoBasica = cfg.manterFormatacaoBasica;
         if (typeof cfg.nivelFiltroFormatacao === 'string' && ['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido', 'sem_filtro'].includes(cfg.nivelFiltroFormatacao)) {
             nivelFiltroFormatacao = cfg.nivelFiltroFormatacao;
+        }
+        if (cfg.padronizarFonteCopiaAtivo !== undefined || cfg.fontePadraoCopia !== undefined || cfg.tamanhoFontePadraoCopia !== undefined) {
+            if (typeof cfg.padronizarFonteCopiaAtivo === 'boolean') padronizarFonteCopiaAtivo = cfg.padronizarFonteCopiaAtivo;
+            if (typeof cfg.fontePadraoCopia === 'string' && cfg.fontePadraoCopia.trim()) fontePadraoCopia = cfg.fontePadraoCopia.trim();
+            if (cfg.tamanhoFontePadraoCopia !== undefined && String(cfg.tamanhoFontePadraoCopia).trim()) tamanhoFontePadraoCopia = String(cfg.tamanhoFontePadraoCopia).trim();
+            if (filtros && typeof filtros.definirPadraoFonteCopia === 'function') {
+                filtros.definirPadraoFonteCopia({
+                    ativo: padronizarFonteCopiaAtivo,
+                    fonte: fontePadraoCopia,
+                    tamanho: tamanhoFontePadraoCopia
+                });
+            }
         }
         if (typeof cfg.modoPlaceholdersMinutasHtml === 'string' && ['desabilitado', 'placeholders', 'ctrl_avancado', 'avancado'].includes(cfg.modoPlaceholdersMinutasHtml)) {
             modoPlaceholdersMinutasHtml = cfg.modoPlaceholdersMinutasHtml;

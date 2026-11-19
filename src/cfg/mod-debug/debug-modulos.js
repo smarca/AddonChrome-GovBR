@@ -1256,19 +1256,19 @@
                     mp.avancarMinutoEstadoTrabalho(st, t0 + 30 * 1000, cfgDesligada);
                     const passo1Ok = (st.corridoMinutos === 1 && st.ativoMinutos === 1 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0);
 
-                    // Minutos 2..3 sem nova atividade (1 e 2 min inativos < 3 min): ainda conta provisoriamente como ativo (ex.: leitura)
-                    for (let m = 1; m <= 2; m++) {
+                    // Minutos 2..5 sem nova atividade (1..4 min inativos < 5 min): ainda conta provisoriamente como ativo (ex.: leitura)
+                    for (let m = 1; m <= 4; m++) {
                         mp.avancarMinutoEstadoTrabalho(st, t0 + m * 60 * 1000, cfgDesligada);
                     }
-                    const antesConfirmarPausaOk = (st.corridoMinutos === 3 && st.ativoMinutos === 3 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0 && !st.emPausa);
+                    const antesConfirmarPausaOk = (st.corridoMinutos === 5 && st.ativoMinutos === 5 && st.pausasMinutos === 0 && st.pausasConfirmadas === 0 && !st.emPausa);
 
-                    // Minuto 4 (>= 3 min inativo): confirma 1 pausa e contabiliza a pausa INTEIRA (3 min) retroativamente fora do ativo!
-                    mp.avancarMinutoEstadoTrabalho(st, t0 + 3 * 60 * 1000, cfgDesligada);
-                    const aposConfirmarPausaOk = (st.corridoMinutos === 4 && st.ativoMinutos === 1 && st.pausasMinutos === 3 && st.pausasConfirmadas === 1 && st.emPausa);
+                    // Minuto 6 (>= 5 min inativo): confirma 1 pausa e contabiliza a pausa INTEIRA (5 min) retroativamente fora do ativo!
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 5 * 60 * 1000, cfgDesligada);
+                    const aposConfirmarPausaOk = (st.corridoMinutos === 6 && st.ativoMinutos === 1 && st.pausasMinutos === 5 && st.pausasConfirmadas === 1 && st.emPausa);
 
-                    // Minuto 5 (ainda na mesma pausa): corrido=5, ativo=1, pausasMinutos=4, pausasConfirmadas segue 1
-                    mp.avancarMinutoEstadoTrabalho(st, t0 + 4 * 60 * 1000, cfgDesligada);
-                    const continuaPausaOk = (st.corridoMinutos === 5 && st.ativoMinutos === 1 && st.pausasMinutos === 4 && st.pausasConfirmadas === 1);
+                    // Minuto 7 (ainda na mesma pausa): corrido=7, ativo=1, pausasMinutos=6, pausasConfirmadas segue 1
+                    mp.avancarMinutoEstadoTrabalho(st, t0 + 6 * 60 * 1000, cfgDesligada);
+                    const continuaPausaOk = (st.corridoMinutos === 7 && st.ativoMinutos === 1 && st.pausasMinutos === 6 && st.pausasConfirmadas === 1);
 
                     produtOk = passo1Ok && antesConfirmarPausaOk && aposConfirmarPausaOk && continuaPausaOk;
                     detalheProdut = `p1=${passo1Ok}, antes3m=${antesConfirmarPausaOk}, conf3m=${aposConfirmarPausaOk}, cont=${continuaPausaOk}`;
@@ -1808,11 +1808,10 @@
                     stZero.pomodoroMinutosNaFase = 13;
                     const rIgual = mp43.formatarResumoProdutividadeTexto(stZero, cfg43, tsIni);
                     const naoDuplicaOk = (
-                        rIgual.linhaDataInicio === '🕒 Ligado 15/11/2026 desde 01:14hs' &&
-                        rIgual.linhaTempos === '👉 Corrido 00h:12m' &&
-                        !rIgual.linhaTempos.includes('Ativo') &&
+                        rIgual.linhaDataInicio === '🕒 Ligado 15/11/2026 desde 01:14hs (00h:12m)' &&
+                        rIgual.linhaTempos === '👉 Tempo de Atividade: 00h:12m' &&
                         !rIgual.linhaTempos.includes('Pausas') &&
-                        rIgual.linhaPomodoro === '🍅 Pomodoro: Foco 13/25 min • Ciclo 1/4' &&
+                        rIgual.linhaPomodoro === '🍅 Pomodoro: Foco 13/25m • Ciclo 1/4' &&
                         rIgual.tooltipTitle.split('\n').length === 3
                     );
 
@@ -1820,7 +1819,7 @@
                     stZero.ativoMinutos = 20;
                     stZero.pausasConfirmadas = 2;
                     const rDiff = mp43.formatarResumoProdutividadeTexto(stZero, cfg43, tsIni);
-                    const completoOk = rDiff.linhaTempos === '👉 Corrido 00h:35m • Ativo 00h:20m • Pausas 2';
+                    const completoOk = rDiff.linhaDataInicio.includes('(00h:35m)') && rDiff.linhaTempos === '👉 Tempo de Atividade: 00h:20m • Pausas: 2';
 
                     feat43Ok = zeroOmitidoOk && naoDuplicaOk && completoOk;
                     detalheFeat43 = `zero=${zeroOmitidoOk}, naoDuplica=${naoDuplicaOk}, completo=${completoOk}`;
@@ -1926,9 +1925,9 @@
                         const divs = Array.from(boxUi.querySelectorAll('div')).map(d => d.textContent.trim());
                         const uiOk = (
                             divs.length === 3 &&
-                            divs[0] === '🕒 Ligado 15/11/2026 desde 01:34hs' &&
-                            divs[1] === '👉 Corrido 00h:11m' &&
-                            divs[2].startsWith('🍅 Pomodoro: Foco 12/25 min')
+                            divs[0] === '🕒 Ligado 15/11/2026 desde 01:34hs (00h:11m)' &&
+                            divs[1] === '👉 Tempo de Atividade: 00h:11m' &&
+                            divs[2].includes('🍅 Pomodoro:') && divs[2].includes('Foco 12/25m')
                         );
 
                         const stLocal = mp45.criarEstadoTrabalhoZerado('2026-11-15', tsIni45);
@@ -2051,8 +2050,8 @@
                         const intercaladoOk = (
                             mescIntercalado.nuvemMeta.outrosCorridoMin === 45 &&
                             mescIntercalado.nuvemMeta.multiplosComputadoresSimultaneos === false &&
-                            somaIntercalada.linhaTempos.includes('Corrido 01h:05m') &&
-                            somaIntercalada.linhaTempos.includes('Ativo 00h:45m') &&
+                            somaIntercalada.linhaDataInicio.includes('(01h:05m)') &&
+                            somaIntercalada.linhaTempos.includes('Tempo de Atividade: 00h:45m') &&
                             !somaIntercalada.alertaMultiplosComputadores
                         );
 
@@ -2963,7 +2962,7 @@
                             resumo76.minutosNaFase === 2 &&
                             resumo76.minutosRestantes === 23 &&
                             resumo76.segundosDecorridos === 125 &&
-                            txt76.linhaPomodoro.includes('Foco 2/25 min')
+                            txt76.linhaPomodoro.includes('Foco 2/25m')
                         );
                         const ultimoDescSyncOk = (
                             Boolean(resumo76.ultimoDescansoTexto) &&
@@ -2978,7 +2977,7 @@
                             resReset76.minutosNaFase === 0 &&
                             resReset76.minutosRestantes === 25 &&
                             resReset76.ultimoDescansoTexto === '' &&
-                            txtReset76.linhaPomodoro.includes('Foco 0/25 min')
+                            txtReset76.linhaPomodoro.includes('Foco 0/25m')
                         );
 
                         bug76Ok = tempoVivoSyncOk && ultimoDescSyncOk && resetSyncOk;
@@ -3419,9 +3418,9 @@
                         const infoOn = mp80.formatarResumoProdutividadeTexto(st80, cfgOn, t80 + 60000, null);
                         const infoOff = mp80.formatarResumoProdutividadeTexto(st80, cfgOff, t80 + 60000, null);
                         const statsSempreOk = Boolean(
-                            infoOn.linhaTempos.includes('Corrido 00h:48m') &&
-                            infoOn.linhaTempos.includes('Ativo 00h:32m') &&
-                            infoOn.linhaTempos.includes('Pausas 3') &&
+                            infoOn.linhaDataInicio.includes('(00h:48m)') &&
+                            infoOn.linhaTempos.includes('Tempo de Atividade: 00h:32m') &&
+                            infoOn.linhaTempos.includes('Pausas: 3') &&
                             infoOff.linhaTempos === infoOn.linhaTempos &&
                             !infoOff.tooltipTitle.includes('Pomodoro') &&
                             infoOn.tooltipTitle.includes('Pomodoro') &&
@@ -3450,7 +3449,7 @@
                             const contMain = document.createElement('div');
                             const contPom = document.createElement('div');
                             mp80.renderizarResumoProdutividadeDom(contMain, st80, cfgOff, t80 + 60000, { containerPomodoro: contPom, ocultarPomodoroQuandoInativo: true });
-                            const domOffStatsOk = Boolean(contMain.textContent.includes('Corrido 00h:48m') && contMain.textContent.includes('Pausas 3') && contPom.style.display === 'none');
+                            const domOffStatsOk = Boolean(contMain.textContent.includes('(00h:48m)') && contMain.textContent.includes('Pausas: 3') && contPom.style.display === 'none');
                             mp80.renderizarResumoProdutividadeDom(contMain, st80, cfgOn, t80 + 60000, { containerPomodoro: contPom, ocultarPomodoroQuandoInativo: true });
                             const domOnPomOk = Boolean(contPom.style.display === 'flex' && contPom.textContent.includes('Pomodoro'));
 

@@ -121,7 +121,16 @@
             if (alvo) {
                 try {
                     alvo.focus();
-                    if (typeof alvo.select === 'function') {
+                    /* Prioridade nativa Blink via execCommand('selectAll'):
+                     * Comando antigo (mantido como fallback): alvo.select(); */
+                    const docAlvo = alvo.ownerDocument || (typeof document !== 'undefined' ? document : null);
+                    let selecionouNativo = false;
+                    try {
+                        if (docAlvo && typeof docAlvo.execCommand === 'function') {
+                            selecionouNativo = Boolean(docAlvo.execCommand('selectAll', false, null));
+                        }
+                    } catch (_) { }
+                    if (!selecionouNativo && typeof alvo.select === 'function') {
                         alvo.select();
                     }
                     return true;

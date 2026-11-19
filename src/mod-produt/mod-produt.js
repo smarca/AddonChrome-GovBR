@@ -1007,6 +1007,8 @@
             estado.pomodoroDescansoMinCumprido = false;
             estado.pomodoroDescansoRealizadoNoCiclo = false;
             estado.pomodoroDescansoPendente = true;
+            estado.pomodoroBancoOrigemFoco = '';
+            estado.pomodoroBancoOrigemDescanso = '';
             estado.pomodoroDescansoAcumuladoMs = 0;
             estado.pomodoroDescansoSyncTs = agora;
             estado.pomodoroDescansoAtividadeAteTs = agora + 2500;
@@ -1071,6 +1073,8 @@
             estado.pomodoroDescansoMinCumprido = false;
             estado.pomodoroDescansoRealizadoNoCiclo = false;
             estado.pomodoroDescansoPendente = true;
+            estado.pomodoroBancoOrigemFoco = '';
+            estado.pomodoroBancoOrigemDescanso = '';
             estado.pomodoroDescansoAcumuladoMs = 0;
             estado.pomodoroDescansoSyncTs = agora;
             estado.pomodoroDescansoAtividadeAteTs = agora + 2500;
@@ -1395,12 +1399,58 @@
                 ? `${ultimoDescansoTipo === 'pausa_maior' ? 'Descanso' : 'Alívio'} realizado às ${horaFimDescanso}hs por ${formatarDuracaoDescanso(ultimoDescansoDuracaoMin)}`
                 : '';
             const descansoRealizado = Boolean((ultimoDescansoTexto || descansoMinCumprido) && !descansoPendente);
-            const faseLabel = fase === 'pausa_maior' ? 'Descanso Maior' : (fase === 'alivio' ? 'Alívio' : 'Foco');
+            const faseLabel = fase === 'pausa_maior' ? 'Descanso' : (fase === 'alivio' ? 'Alívio' : 'Foco');
+
+            /* Meritocracia estrita (±1 / ciclo corrente) + alertas visuais de empréstimo no minipopup */
+            const bancoOrigemFoco = String(stEfetivo.pomodoroBancoOrigemFoco || '');
+            const bancoOrigemDescanso = String(stEfetivo.pomodoroBancoOrigemDescanso || '');
+            const forcarMicroPorEmprestimoFoco = Boolean(
+                !emDescanso &&
+                !descansoPendente &&
+                (bancoOrigemFoco === 'anterior' || bancoOrigemFoco === 'posterior') &&
+                segRestantes > 0
+            );
+            let pctConsumoEmprestimo = 0;
+            let alertaEmprestimoTexto = '';
+            let alertaEmprestimoCritico = false;
+            if (emDescanso) {
+                const metaAtualSeg = Math.max(60, Math.round(metaFaseMsEfetiva / 1000));
+                if (bancoOrigemDescanso === 'posterior') {
+                    pctConsumoEmprestimo = Math.min(100, Math.round((segDecorridos / metaAtualSeg) * 100));
+                    alertaEmprestimoCritico = pctConsumoEmprestimo >= 75;
+                    const nomeAlvo = (fase === 'pausa_maior') ? 'Descanso' : 'Alívio';
+                    alertaEmprestimoTexto = alertaEmprestimoCritico
+                        ? `⚠️ Quase sem saldo p/ o próximo ${nomeAlvo} (${pctConsumoEmprestimo}%)!`
+                        : `⏳ Empréstimo do próximo ${nomeAlvo} (${pctConsumoEmprestimo}%)`;
+                } else if (descansoMinCumprido) {
+                    const extraSeg = Math.max(0, segDecorridos - metaAtualSeg);
+                    if (extraSeg >= 60) {
+                        if (fase === 'alivio' && cicloAtual < ciclosMax) {
+                            const tetoCicloSeg = Math.max(60, pausaMaiorMin * 60);
+                            pctConsumoEmprestimo = Math.min(100, Math.round((extraSeg / tetoCicloSeg) * 100));
+                            alertaEmprestimoCritico = pctConsumoEmprestimo >= 75;
+                            alertaEmprestimoTexto = alertaEmprestimoCritico
+                                ? `⚠️ Descanso do ciclo quase esgotado (${pctConsumoEmprestimo}%)!`
+                                : `⏳ Consumindo Descanso do ciclo (${pctConsumoEmprestimo}%)`;
+                        } else {
+                            pctConsumoEmprestimo = 100;
+                            alertaEmprestimoCritico = true;
+                            alertaEmprestimoTexto = '⚠️ Saldo do ciclo esgotado (sem empréstimo externo)';
+                        }
+                    }
+                }
+            }
 
             return {
                 ativo,
                 fase,
                 faseLabel,
+                bancoOrigemFoco,
+                bancoOrigemDescanso,
+                forcarMicroPorEmprestimoFoco,
+                pctConsumoEmprestimo,
+                alertaEmprestimoTexto,
+                alertaEmprestimoCritico,
                 focoMin,
                 alivioMin,
                 pausaMaiorMin,
@@ -1477,29 +1527,77 @@
             }
 
             const horaInicio = this.formatarHoraHHMM(inicioCombinado);
-            const linhaDataInicio = `🕒 Ligado ${dataBR}${horaInicio ? ` desde ${horaInicio}hs` : ''}`;
-
             const fmtHM = (min) => {
                 const m = Math.max(0, Math.floor(Number(min) || 0));
                 return `${String(Math.floor(m / 60)).padStart(2, '0')}h:${String(m % 60).padStart(2, '0')}m`;
             };
 
+            const duracaoCorridoStr = corridoTotalMin > 0 ? ` (${fmtHM(corridoTotalMin)})` : '';
+            const linhaDataInicio = `🕒 Ligado ${dataBR}${horaInicio ? ` desde ${horaInicio}hs` : ''}${duracaoCorridoStr}`;
+
             const partesTempo = [];
-            if (corridoTotalMin > 0) partesTempo.push(`Corrido ${fmtHM(corridoTotalMin)}`);
-            if (ativoTotalMin > 0 && ativoTotalMin !== corridoTotalMin) partesTempo.push(`Ativo ${fmtHM(ativoTotalMin)}`);
-            if (pausasTotais > 0) partesTempo.push(`Pausas ${pausasTotais}`);
-            const linhaTempos = partesTempo.length > 0 ? `👉 ${partesTempo.join(' • ')}` : '';
+            if (ativoTotalMin > 0) partesTempo.push(`${fmtHM(ativoTotalMin)}`);
+            if (pausasTotais > 0) partesTempo.push(`Pausas: ${pausasTotais}`);
+            const linhaTempos = partesTempo.length > 0 ? `👉 Tempo de Atividade: ${partesTempo.join(' • ')}` : '';
 
             const resumo = this.calcularResumoPomodoro(stEfetivo, config, agora, meta);
             const segmentosPomodoro = [];
+            const unirSegmentosPomodoro = (lista) => {
+                let out = '';
+                for (let i = 0; i < lista.length; i++) {
+                    const seg = lista[i];
+                    if (i === 0) {
+                        out = seg.texto;
+                    } else if (lista[i - 1] && lista[i - 1].semSeparadorApos) {
+                        out += ` ${seg.texto}`;
+                    } else {
+                        out += ` • ${seg.texto}`;
+                    }
+                }
+                return out;
+            };
             let linhaPomodoro = '';
+            const fmtParBanco = (atual, metaVal, origem) => {
+                if (origem === 'anterior') return `${atual}*/${metaVal}m`;
+                if (origem === 'posterior') return `${atual}/${metaVal}*m`;
+                return `${atual}/${metaVal}m`;
+            };
+            const origemFoco = String(stEfetivo.pomodoroBancoOrigemFoco || '');
+            const origemDesc = String(stEfetivo.pomodoroBancoOrigemDescanso || '');
             if (resumo.ativo) {
-                const focoParte = resumo.fase === 'foco' ? `${resumo.minutosNaFase}/${resumo.focoMin}` : `${resumo.focoMin}/${resumo.focoMin}`;
-                segmentosPomodoro.push({ texto: `🍅 Pomodoro: Foco ${focoParte} min`, destaque: 'foco' });
-                if (resumo.fase === 'alivio') {
-                    segmentosPomodoro.push({ texto: `Alívio em andamento: ${resumo.minutosNaFase}/${resumo.alivioMin} min`, destaque: 'descanso' });
-                } else if (resumo.fase === 'pausa_maior') {
-                    segmentosPomodoro.push({ texto: `Descanso em andamento: ${resumo.minutosNaFase}/${resumo.pausaMaiorMin} min`, destaque: 'descanso' });
+                segmentosPomodoro.push({ texto: '🍅 Pomodoro:', destaque: 'prefixo', semSeparadorApos: true });
+                if (resumo.fase === 'foco') {
+                    segmentosPomodoro.push({
+                        texto: `Foco ${fmtParBanco(resumo.minutosNaFase, resumo.focoMin, origemFoco)}`,
+                        destaque: stEfetivo.emPausa ? 'pausado' : 'foco'
+                    });
+                    const saldoRestMs = Number(stEfetivo.pomodoroDescansoSaldoRestanteMs || 0);
+                    if (stEfetivo.pomodoroDescansoPulado && saldoRestMs > 0) {
+                        const ehPausaMaiorPausada = stEfetivo.pomodoroDescansoSaldoTipo === 'pausa_maior';
+                        const rotuloPausado = ehPausaMaiorPausada ? 'Descanso' : 'Alívio';
+                        const metaPausadoMin = ehPausaMaiorPausada ? resumo.pausaMaiorMin : resumo.alivioMin;
+                        const restanteMin = Math.ceil(saldoRestMs / 60000);
+                        const feitoPausadoMin = Math.max(0, metaPausadoMin - restanteMin);
+                        segmentosPomodoro.push({
+                            texto: `${rotuloPausado} ${fmtParBanco(feitoPausadoMin, metaPausadoMin, origemDesc)}`,
+                            destaque: 'pausado'
+                        });
+                    }
+                } else {
+                    const focoSalvoMs = Number(stEfetivo.pomodoroFocoAcumuladoAntesPausaMs || 0);
+                    const focoSalvoMin = Math.floor(focoSalvoMs / 60000);
+                    if (focoSalvoMin > 0 && focoSalvoMin < resumo.focoMin) {
+                        segmentosPomodoro.push({
+                            texto: `Foco ${fmtParBanco(focoSalvoMin, resumo.focoMin, origemFoco)}`,
+                            destaque: 'pausado'
+                        });
+                    }
+                    const rotuloDesc = (resumo.fase === 'pausa_maior') ? 'Descanso' : 'Alívio';
+                    const metaDescMin = (resumo.fase === 'pausa_maior') ? resumo.pausaMaiorMin : resumo.alivioMin;
+                    segmentosPomodoro.push({
+                        texto: `${rotuloDesc} ${fmtParBanco(resumo.minutosNaFase, metaDescMin, origemDesc)}`,
+                        destaque: 'descanso'
+                    });
                 }
                 segmentosPomodoro.push({ texto: `Ciclo ${resumo.cicloAtual}/${resumo.ciclosMax}`, destaque: 'normal' });
                 if (resumo.descansoPendente) {
@@ -1507,12 +1605,11 @@
                 } else if (resumo.ultimoDescansoTexto) {
                     segmentosPomodoro.push({ texto: `${resumo.ultimoDescansoTexto}`, destaque: 'realizado' });
                 }
-                linhaPomodoro = segmentosPomodoro.map(s => s.texto).join(' • ');
+                linhaPomodoro = unirSegmentosPomodoro(segmentosPomodoro);
             }
-            const linhaPomodoroTooltip = segmentosPomodoro
-                .filter(s => s && s.destaque !== 'realizado')
-                .map(s => s.texto)
-                .join(' • ');
+            const linhaPomodoroTooltip = unirSegmentosPomodoro(
+                segmentosPomodoro.filter(s => s && s.destaque !== 'realizado')
+            );
 
             const alertaMultiplosComputadores = (meta && meta.multiplosComputadoresSimultaneos)
                 ? '⚠️ Múltiplos computadores em uso simultâneo.'
@@ -1570,7 +1667,7 @@
                 }
                 const filhos = [];
                 for (let i = 0; i < info.segmentosPomodoro.length; i++) {
-                    if (i > 0) {
+                    if (i > 0 && !(info.segmentosPomodoro[i - 1] && info.segmentosPomodoro[i - 1].semSeparadorApos)) {
                         const sep = document.createElement('span');
                         sep.textContent = '•';
                         sep.style.opacity = '0.5';
@@ -1579,8 +1676,9 @@
                     const seg = info.segmentosPomodoro[i];
                     const sp = document.createElement('span');
                     sp.textContent = seg.texto;
-                    if (seg.destaque === 'foco') sp.style.cssText = 'font-weight:600;';
+                    if (seg.destaque === 'prefixo' || seg.destaque === 'foco') sp.style.cssText = 'font-weight:600;';
                     else if (seg.destaque === 'descanso') sp.style.cssText = 'font-weight:600;color:#0284c7;';
+                    else if (seg.destaque === 'pausado') sp.style.cssText = 'font-weight:500;color:#94a3b8;';
                     else if (seg.destaque === 'pendente') sp.style.cssText = 'font-weight:700;color:#dc2626;';
                     else if (seg.destaque === 'realizado') sp.style.cssText = 'font-weight:700;color:#0d9488;';
                     filhos.push(sp);
@@ -2168,13 +2266,15 @@
          * @returns {Object}
          */
         avancarMinutoEstadoTrabalho(estado, agora = Date.now(), config = {}) {
-            const TEMPO_MINIMO_PAUSA_MS = 3 * 60 * 1000;
+            const TEMPO_MINIMO_PAUSA_MS = 5 * 60 * 1000;
             const msDesdeAtividade = Math.max(0, agora - Number(estado.ultimaAtividadeTs || 0));
             const usuarioAtivoNaJanela = msDesdeAtividade < TEMPO_MINIMO_PAUSA_MS;
 
             estado.corridoMinutos = Number(estado.corridoMinutos || 0) + 1;
 
-            if (usuarioAtivoNaJanela && !estado.emPausa) {
+            if (usuarioAtivoNaJanela) {
+                /* BUG-129: Se houve atividade dentro da janela ativa, garante saída imediata de emPausa */
+                estado.emPausa = false;
                 if (msDesdeAtividade >= 60 * 1000) {
                     estado.minutosInativosPendentes = Number(estado.minutosInativosPendentes || 0) + 1;
                 } else {
@@ -2185,7 +2285,10 @@
                 const pendentes = Math.min(Number(estado.ativoMinutos || 0), Number(estado.minutosInativosPendentes || 0));
                 estado.ativoMinutos = Math.max(0, Number(estado.ativoMinutos || 0) - pendentes);
                 estado.pausasMinutos = Number(estado.pausasMinutos || 0) + pendentes + 1;
-                estado.pausasConfirmadas = Number(estado.pausasConfirmadas || 0) + 1;
+                /* BUG-129: Contabiliza exatamente +1 pausa confirmada ao atingir >= 5 min contínuos em idle */
+                if (pendentes > 0 || msDesdeAtividade >= TEMPO_MINIMO_PAUSA_MS) {
+                    estado.pausasConfirmadas = Number(estado.pausasConfirmadas || 0) + 1;
+                }
                 estado.emPausa = true;
                 estado.pomodoroPausaInicioTs = agora;
                 estado.minutosInativosPendentes = 0;
@@ -2247,6 +2350,8 @@
             estado.pomodoroDescansoMinCumprido = false;
             estado.pomodoroDescansoRealizadoNoCiclo = false;
             estado.pomodoroDescansoPendente = true;
+            estado.pomodoroBancoOrigemFoco = '';
+            estado.pomodoroBancoOrigemDescanso = '';
             estado.pomodoroBarraOcultadaChave = '';
             estado.pomodoroDescansoAcumuladoMs = idlePrevioMs;
             estado.pomodoroDescansoSyncTs = agora;
@@ -2446,8 +2551,65 @@
             const msInativo = Math.max(0, agora - Number(estado.ultimaAtividadeTs || agora));
             const minInativo = Math.floor(msInativo / 60000);
 
+            /* Limiares dinâmicos proporcionais ao tempo da própria fase atual + governança (privilegiando quem cumpre prazos) */
+            const baseIdleFocoMin = Math.max(2, Math.min(alivioMin, Math.round(focoMin * 0.12)));
+            const fatorGovFoco = (govAuto && govAuto.temMeritoAutoPausa && !estado.pomodoroDescansoPulado) ? 1.15 : 0.85;
+            const limiarIdleFocoMin = Math.max(2, Math.min(alivioMin, Math.round(baseIdleFocoMin * fatorGovFoco)));
+            const limiarIdleFocoMs = limiarIdleFocoMin * 60000;
+
+            const metaDescAtualMin = (estado.pomodoroFase === 'pausa_maior') ? pausaMaiorMin : alivioMin;
+            const limiarAtivoDescMin = Math.max(2, Math.min(8, Math.round(metaDescAtualMin * 0.25)));
+            const limiarAtivoDescMs = limiarAtivoDescMin * 60000;
+
+            /* Banco de minutos estrito (±1): em Foco, se ficar idle >= limiar proporcional do Foco,
+             * consome somente o Alívio/Descanso imediatamente anterior (incompleto) ou o imediatamente posterior (futuro),
+             * marcando origem ('anterior' -> * no atual, 'posterior' -> * na meta) e bloqueando empréstimo em cascata (> ±1). */
+            if (estado.pomodoroFase === 'foco' && msInativo >= limiarIdleFocoMs) {
+                const saldoPausadoMs = Number(estado.pomodoroDescansoSaldoRestanteMs || 0);
+                const origemDescAtual = String(estado.pomodoroBancoOrigemDescanso || '');
+                if (estado.pomodoroDescansoPulado && saldoPausadoMs > 0 && origemDescAtual !== 'posterior') {
+                    const ret = this.retomarDescansoPuladoPomodoro(estado, agora, config);
+                    if (ret && ret.ok) {
+                        estado.pomodoroBancoOrigemDescanso = 'anterior';
+                        estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), limiarIdleFocoMs);
+                        estado.pomodoroMinutosNaFase = Math.floor(estado.pomodoroDescansoAcumuladoMs / 60000);
+                        estado.pomodoroMinutosAtivoEmDescanso = 0;
+                        return { evento: 'auto_retomou_descanso_incompleto', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
+                    }
+                } else if (origemDescAtual !== 'posterior' && govAuto.temMeritoAutoPausa && Number(estado.pomodoroMinutosNaFase || 0) > 0 && typeof this.pausarOuAdiantarDescansoPomodoro === 'function') {
+                    const retProx = this.pausarOuAdiantarDescansoPomodoro(estado, agora, config);
+                    if (retProx && retProx.ok) {
+                        estado.pomodoroBancoOrigemDescanso = 'posterior';
+                        estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), limiarIdleFocoMs);
+                        estado.pomodoroMinutosNaFase = Math.floor(estado.pomodoroDescansoAcumuladoMs / 60000);
+                        estado.pomodoroMinutosAtivoEmDescanso = 0;
+                        return { evento: 'auto_iniciou_proximo_descanso', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
+                    }
+                }
+            }
+
+            const tentarAutoRetomarFocoEmDescanso = () => {
+                const origemFocoAtual = String(estado.pomodoroBancoOrigemFoco || '');
+                if (origemFocoAtual === 'posterior') {
+                    /* Regra estrita ±1: já está consumindo foco emprestado do futuro — não empresta de ciclos adicionais (regra antiga) */
+                    return null;
+                }
+                const focoSalvoMs = Number(estado.pomodoroFocoAcumuladoAntesPausaMs || 0);
+                const temFocoAnteriorIncompleto = (focoSalvoMs >= 60000 && focoSalvoMs < Math.max(60000, focoMin * 60000 - 5000));
+                const retFoco = this.pularDescansoEIniciarFoco(estado, agora, config);
+                if (retFoco && retFoco.ok) {
+                    estado.pomodoroBancoOrigemFoco = temFocoAnteriorIncompleto ? 'anterior' : 'posterior';
+                    estado.pomodoroFaseInicioTs = Math.max(0, Number(estado.pomodoroFaseInicioTs || agora) - limiarAtivoDescMs);
+                    estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + limiarAtivoDescMin;
+                    return { evento: 'auto_retomou_foco_em_descanso', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
+                }
+                return null;
+            };
+
             if (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') {
                 if (estado.pomodoroDescansoMinCumprido) {
+                    estado.pomodoroMinutosAtivoEmDescanso = 0;
+                    estado.pomodoroBancoOrigemDescanso = '';
                     const progLiveCumpr = this.calcularProgressoDescanso(estado, agora, config, { mutar: false });
                     const acumLiveCumpr = Math.max(
                         Number(progLiveCumpr && progLiveCumpr.acumuladoMs || 0),
@@ -2457,9 +2619,25 @@
                     estado.pomodoroDescansoSyncTs = agora;
                     estado.pomodoroMinutosNaFase = Math.floor(acumLiveCumpr / 60000);
                 } else if (Number(estado.pomodoroDescansoSyncTs || 0) > 0) {
+                    if (minInativo < 1) {
+                        estado.pomodoroMinutosAtivoEmDescanso = Number(estado.pomodoroMinutosAtivoEmDescanso || 0) + 1;
+                    } else {
+                        estado.pomodoroMinutosAtivoEmDescanso = 0;
+                    }
+                    if (estado.pomodoroMinutosAtivoEmDescanso >= limiarAtivoDescMin) {
+                        estado.pomodoroMinutosAtivoEmDescanso = 0;
+                        const autoFocoRes = tentarAutoRetomarFocoEmDescanso();
+                        if (autoFocoRes) return autoFocoRes;
+                    }
                     this.calcularProgressoDescanso(estado, agora, config, { mutar: true });
                     estado.pomodoroMinutosNaFase = Math.floor(Number(estado.pomodoroDescansoAcumuladoMs || 0) / 60000);
                 } else if (minInativo < 1) {
+                    estado.pomodoroMinutosAtivoEmDescanso = Number(estado.pomodoroMinutosAtivoEmDescanso || 0) + 1;
+                    if (estado.pomodoroMinutosAtivoEmDescanso >= limiarAtivoDescMin) {
+                        estado.pomodoroMinutosAtivoEmDescanso = 0;
+                        const autoFocoRes = tentarAutoRetomarFocoEmDescanso();
+                        if (autoFocoRes) return autoFocoRes;
+                    }
                     /* BUG-70 / BUG-84: Usuário continuou trabalhando antes de 25% -> aguarda idle e reinicia contagem do descanso sem alterar pomodoroFaseInicioTs para não reabrir o modal fechado */
                     estado.pomodoroMinutosNaFase = 0;
                     estado.pomodoroDescansoMinCumprido = false;
@@ -2472,6 +2650,7 @@
                     estado.pomodoroDescansoUltimoCliqueTs = 0;
                     return { evento: 'aguardando_idle', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                 } else {
+                    estado.pomodoroMinutosAtivoEmDescanso = 0;
                     estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
                     estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), estado.pomodoroMinutosNaFase * 60000);
                 }
@@ -2559,7 +2738,52 @@
 
                 const estado = await this.obterOuIniciarEstadoTrabalhoHoje();
                 const agora = Date.now();
-                const res = this.avancarMinutoEstadoTrabalho(estado, agora, config);
+
+                /* BUG-129: Consultar estado nativo de ociosidade do SO (chrome.idle.queryState)
+                 * para reconhecer atividade real mesmo quando o usuário trabalha fora das abas web
+                 * (VS Code, Word, PDFs, opções ou outras janelas do Windows), evitando falsas pausas
+                 * e perda de minutos no Tempo Ativo. */
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.idle && typeof chrome.idle.queryState === 'function') {
+                        const consultarIdle = (seg) => new Promise((resolve) => {
+                            try {
+                                chrome.idle.queryState(seg, (st) => resolve(st || ''));
+                            } catch (_) {
+                                resolve('');
+                            }
+                        });
+                        const estadoIdle60 = await consultarIdle(60);
+                        if (estadoIdle60 === 'active') {
+                            estado.ultimaAtividadeTs = agora;
+                            estado.emPausa = false;
+                            estado.minutosInativosPendentes = 0;
+                        } else {
+                            const estadoIdle5m = await consultarIdle(295);
+                            if (estadoIdle5m === 'active' && (agora - Number(estado.ultimaAtividadeTs || 0)) >= (5 * 60 * 1000)) {
+                                estado.ultimaAtividadeTs = agora - (60 * 1000);
+                                estado.emPausa = false;
+                            }
+                        }
+                    }
+                } catch (_) { }
+
+                /* Compensação exata de atraso do alarme MV3 (garante Corrido = Ativo + Pausas sem perder minutos) */
+                const prevTickTs = Number(estado.ultimoTickTrabalhoTs || 0);
+                let passosTick = 1;
+                if (prevTickTs > 0 && agora > prevTickTs) {
+                    const deltaMin = Math.floor((agora - prevTickTs) / 60000);
+                    if (deltaMin >= 2 && deltaMin <= 180) {
+                        passosTick = deltaMin;
+                    }
+                }
+                let res = { estado, disparoCorrido: false, disparoAtivo: false };
+                for (let k = 1; k <= passosTick; k++) {
+                    const tsPasso = (passosTick > 1 && prevTickTs > 0) ? Math.min(agora, prevTickTs + k * 60000) : agora;
+                    const rPasso = this.avancarMinutoEstadoTrabalho(estado, tsPasso, config);
+                    if (rPasso.disparoCorrido) res.disparoCorrido = true;
+                    if (rPasso.disparoAtivo) res.disparoAtivo = true;
+                }
+                estado.ultimoTickTrabalhoTs = agora;
 
                 const prefsAviso = this.resolverPreferenciasAvisoPomodoro(config);
 
@@ -4815,6 +5039,26 @@
                                         : (Math.max(1, Number((d && d.metaFaseMin) || 1)) * 60000);
                                     const cumpridoAoVivo = Boolean(d && d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
 
+                                    if (d.emDescanso && d.alertaEmprestimoTexto) {
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = d.alertaEmprestimoTexto;
+                                        if (d.alertaEmprestimoCritico) {
+                                            spanStatus.style.background = '#ef4444';
+                                            spanStatus.style.color = '#ffffff';
+                                            spanStatus.style.fontWeight = '700';
+                                            const piscaOn = (Math.floor(Date.now() / 650) % 2) === 0;
+                                            spanStatus.style.opacity = piscaOn ? '1' : '0.45';
+                                            pill.style.borderColor = piscaOn ? '#ef4444' : '#f59e0b';
+                                        } else {
+                                            spanStatus.style.background = '#f59e0b';
+                                            spanStatus.style.color = '#111827';
+                                            spanStatus.style.fontWeight = '700';
+                                            spanStatus.style.opacity = '1';
+                                            pill.style.borderColor = '#f59e0b';
+                                        }
+                                        return;
+                                    }
+                                    spanStatus.style.opacity = '1';
                                     if (d.emDescanso && !cumpridoAoVivo && d.descansoEmAviso && d.descansoAvisoTexto) {
                                         spanStatus.style.display = 'block';
                                         spanStatus.textContent = d.descansoAvisoTexto;
@@ -4866,9 +5110,9 @@
                                     const nivelDet = Math.floor(Number(estAtual.nivelDetalhe) || 0);
                                     const temAvisoOuDescanso = Boolean(d && (d.emDescanso || d.descansoPendente || d.descansoEmAviso));
                                     const mostrarMicro = Boolean(
-                                        estAtual.minimizadoMicro &&
+                                        (estAtual.minimizadoMicro || Boolean(d && d.forcarMicroPorEmprestimoFoco)) &&
                                         !host.__jusgovModoOculto &&
-                                        (!d || (!d.emDescanso && !d.descansoEmAviso)) &&
+                                        (!d || (!d.emDescanso && !d.descansoEmAviso && !d.descansoPendente)) &&
                                         (!host.__jusgovHoverPill || host.__jusgovArrastando)
                                     );
                                     if (mostrarMicro) {

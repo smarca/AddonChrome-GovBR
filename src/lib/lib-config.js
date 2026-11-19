@@ -48,7 +48,8 @@
     /* Lista canonica de chaves sincronizaveis (perfilAtivoId permanece estritamente local por dispositivo — ARQ-07 / FEAT-48) */
     const CHAVES_CONFIGURACAO_SINCRONIZAVEL = Object.freeze([
         'urlsTurbo', 'urlsAmpuletas', 'modoTurbo', 'comportamentoCliqueIcone', 'ativoAmpuletas',
-        'manterFormatacaoBasica', 'nivelFiltroFormatacao', 'selecaoEditavelAtiva',
+        'manterFormatacaoBasica', 'nivelFiltroFormatacao', 'padronizarFonteCopiaAtivo',
+        'fontePadraoCopia', 'tamanhoFontePadraoCopia', 'selecaoEditavelAtiva',
         'modoPlaceholdersMinutasHtml', 'placeholdersMinutasHtmlAtivo', 'colagemBotaoDireitoAtiva',
         'capturaBotoesMouse4e5Ativa', 'colarBotaoMeioAtivo', 'navegacaoTecladoCamposAtiva',
         'bloquearNovasJanelas', 'preservarJanelasAutenticacao', 'abaEmPrimeiroPlano', 'abaEmSegundoPlano',

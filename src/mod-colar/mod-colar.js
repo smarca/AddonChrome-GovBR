@@ -628,6 +628,21 @@
                         end = (typeof alvo.selectionEnd === 'number') ? alvo.selectionEnd : null;
                     } catch (_) { }
 
+                    /* Prioridade nativa Blink (Desfazer Ctrl+Z preservado via execCommand 'insertText'):
+                     * Comando antigo (mantido como fallback caso execCommand não seja suportado no tipo de input):
+                     *   this.#definirValorInputNativo(alvo, valAnt.substring(0, start) + texto + valAnt.substring(end));
+                     *   alvo.setSelectionRange(novaPos, novaPos); / alvo.setRangeText(texto, start, end, 'end'); */
+                    let inseriuViaExecCommand = false;
+                    try {
+                        if (docRef && typeof docRef.execCommand === 'function') {
+                            inseriuViaExecCommand = Boolean(docRef.execCommand('insertText', false, texto));
+                        }
+                    } catch (_) { }
+
+                    if (inseriuViaExecCommand) {
+                        return true;
+                    }
+
                     if (start !== null && end !== null) {
                         const valAnt = String(alvo.value || '');
                         const novoVal = valAnt.substring(0, start) + texto + valAnt.substring(end);

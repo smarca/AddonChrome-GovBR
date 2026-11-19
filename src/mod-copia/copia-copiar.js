@@ -625,12 +625,21 @@
                     const verifBlocoFn = this.#deps.verificarSeTextoEhBlocoOuPalavraUnica;
                     const ehBlocoPuro = (typeof verifBlocoFn === 'function') ? Boolean(verifBlocoFn(textoLimpoCtrlC)) : false;
                     const podeFormatar = Boolean(!veioDeInputPuro && estado.manterFormatacaoBasica !== false && nivelCfg !== 'texto_puro' && !ehBlocoPuro);
+                    const forcarFonteCtrlC = Boolean(!podeFormatar && estado.padronizarFonteCopiaAtivo === true);
 
                     let htmlFinal = '';
                     let formatosExtras = null;
                     let nivelCopia = 'texto_puro';
 
-                    if (podeFormatar && typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
+                    if (forcarFonteCtrlC) {
+                        const fonteLimpa = String(estado.fontePadraoCopia || 'Arial').trim().replace(/[;"'\r\n<>]/g, '') || 'Arial';
+                        const fonteCss = /\s/.test(fonteLimpa) ? `'${fonteLimpa}'` : fonteLimpa;
+                        const tamRaw = String(estado.tamanhoFontePadraoCopia || '12').trim().replace(/[;"'\r\n<>]/g, '') || '12';
+                        const tamCss = /^\d+(?:\.\d+)?$/.test(tamRaw) ? `${tamRaw}pt` : tamRaw;
+                        const esc = textoLimpoCtrlC.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>');
+                        htmlFinal = `<span style="font-family: ${fonteCss}; font-size: ${tamCss};">${esc}</span>`;
+                        nivelCopia = 'basico';
+                    } else if (podeFormatar && typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
                         try {
                             const origemMapa = rangeCtrlC || htmlCtrlC;
                             if (origemMapa) {
@@ -656,6 +665,14 @@
                     } else if (podeFormatar && !rangeCtrlC && htmlCtrlC && htmlCtrlC.length <= 250000) {
                         htmlFinal = htmlCtrlC;
                         nivelCopia = nivelCfg;
+                    }
+
+                    if (estado.padronizarFonteCopiaAtivo === true && htmlFinal && evCopyOpt && evCopyOpt.clipboardData && typeof evCopyOpt.clipboardData.setData === 'function') {
+                        try {
+                            evCopyOpt.clipboardData.setData('text/html', htmlFinal);
+                            evCopyOpt.clipboardData.setData('text/plain', textoLimpoCtrlC);
+                            if (typeof evCopyOpt.preventDefault === 'function') evCopyOpt.preventDefault();
+                        } catch (_) { }
                     }
 
                     this.#deps.salvarClipboardInternoComBackup({

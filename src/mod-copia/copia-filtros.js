@@ -40,6 +40,8 @@
     const NULL_HTML = Object.freeze({
         separadorTabela: ';',
         definirSeparadorTabela() { },
+        definirPadraoFonteCopia() { },
+        gerarHtmlTextoPuroComFontePadrao() { return ''; },
         obterSeparadorTabela() { return ';'; },
         escaparTextoHtmlBasico(s) { return String(s || ''); },
         obterAncestralBlocoLinhaFormatacao(el) { return el; },
@@ -96,6 +98,8 @@
         }
 
         definirSeparadorTabela(sep) { return this.#html.definirSeparadorTabela(sep); }
+        definirPadraoFonteCopia(cfg) { return (typeof this.#html.definirPadraoFonteCopia === 'function') ? this.#html.definirPadraoFonteCopia(cfg) : undefined; }
+        gerarHtmlTextoPuroComFontePadrao(txt) { return (typeof this.#html.gerarHtmlTextoPuroComFontePadrao === 'function') ? this.#html.gerarHtmlTextoPuroComFontePadrao(txt) : ''; }
         obterSeparadorTabela() { return this.#html.obterSeparadorTabela(); }
 
         aplicarPreHigienizacaoTexto(t) { return this.#texto.aplicarPreHigienizacaoTexto(t); }

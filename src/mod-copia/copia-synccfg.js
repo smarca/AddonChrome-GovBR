@@ -42,6 +42,7 @@
 
     const CHAVES_SYNC_COPIA = Object.freeze([
         'modoTurbo', 'urlsTurbo', 'manterFormatacaoBasica', 'nivelFiltroFormatacao',
+        'padronizarFonteCopiaAtivo', 'fontePadraoCopia', 'tamanhoFontePadraoCopia',
         'selecaoEditavelAtiva', 'modoPlaceholdersMinutasHtml', 'placeholdersMinutasHtmlAtivo',
         'colagemBotaoDireitoAtiva', 'capturaBotoesMouse4e5Ativa', 'colarBotaoMeioAtivo',
         'navegacaoTecladoCamposAtiva', 'caixaEntradaRapidaAtiva', 'validacaoMatematicaAtiva',
@@ -112,6 +113,9 @@
                 return;
             }
             if (area === 'local') {
+                if (changes.jusgovConfigSyncPendente && changes.jusgovConfigSyncPendente.newValue && typeof changes.jusgovConfigSyncPendente.newValue === 'object') {
+                    this.aplicarPacoteConfig(changes.jusgovConfigSyncPendente.newValue);
+                }
                 if (changes.ultimoClipboardInterno && changes.ultimoClipboardInterno.newValue) {
                     window.__JUSGOV_ULTIMO_CLIPBOARD__ = changes.ultimoClipboardInterno.newValue;
                 }
@@ -180,6 +184,14 @@
                     chrome.storage.sync.get(CHAVES_SYNC_COPIA, (cfg) => {
                         if (chrome.runtime && chrome.runtime.lastError) return;
                         if (cfg) this.aplicarPacoteConfig(cfg);
+                        if (chrome.storage.local) {
+                            chrome.storage.local.get(['jusgovConfigSyncPendente'], (resPend) => {
+                                if (chrome.runtime && chrome.runtime.lastError) return;
+                                if (resPend && resPend.jusgovConfigSyncPendente && typeof resPend.jusgovConfigSyncPendente === 'object') {
+                                    this.aplicarPacoteConfig(resPend.jusgovConfigSyncPendente);
+                                }
+                            });
+                        }
                     });
                 }
                 this.registrarOuvintesIpc(

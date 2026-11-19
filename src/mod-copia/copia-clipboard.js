@@ -315,10 +315,29 @@
                 return Boolean(this.salvarClipboardInternoComBackup({ texto: textoFinal, html: '', formatado: false, nivelCopia: 'texto_puro', preservarHistorico }));
             }
 
-            if (deveManterFormatacao) {
+            const forcarFonteEmTextoPuro = Boolean(!deveManterFormatacao && estado.padronizarFonteCopiaAtivo === true);
+
+            if (deveManterFormatacao || forcarFonteEmTextoPuro) {
                 let mapaFormatos = null;
                 try {
-                    if (typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
+                    if (forcarFonteEmTextoPuro) {
+                        const htmlFontePura = (typeof this.#deps.gerarHtmlTextoPuroComFontePadrao === 'function')
+                            ? this.#deps.gerarHtmlTextoPuroComFontePadrao(textoFinal)
+                            : '';
+                        if (htmlFontePura) {
+                            mapaFormatos = {
+                                nivelNorm: 'basico',
+                                nivelIdx: 1,
+                                textoPlano: textoFinal,
+                                htmlClipboard: htmlFontePura,
+                                uriList: '',
+                                estruturado: null,
+                                markdown: '',
+                                rtf: '',
+                                imagens: { svgMarkup: '', dataUrlPng: '', dataUrlJpeg: '' }
+                            };
+                        }
+                    } else if (typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
                         mapaFormatos = this.#deps.gerarMapaFormatosClipboard(rangeDOMOpcional, nivelNorm, { textoFallback: textoFinal });
                     } else {
                         const htmlFallback = this.#deps.aplicarFiltroHtmlPorNivel(rangeDOMOpcional, nivelNorm);
