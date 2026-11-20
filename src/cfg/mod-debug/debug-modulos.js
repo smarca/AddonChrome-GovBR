@@ -3953,6 +3953,59 @@
                 } catch (eT17) { detalheTest17 = eT17.message || String(eT17); }
                 registrar(test17Ok, 'TEST_17_FEAT_77_FEAT_79_FLEXIVEL_BEM_ESTAR_E_AGUA', 'Pomodoro Flexível valida mérito 1/3, retomada/congelamento de Foco, Água 2h em azul/branco e renderização CSP.', { detalhe: detalheTest17 });
 
+                /* TEST-20: Consolidação FEAT-95..FEAT-105, ARQ-10 e BUG-122..BUG-130 */
+                let test20Ok = false;
+                let detalheTest20 = '';
+                try {
+                    const cat20 = (typeof window.JusGovCfgDefaults !== 'undefined' && typeof window.JusGovCfgDefaults.obterCatalogoPerfis === 'function')
+                        ? window.JusGovCfgDefaults.obterCatalogoPerfis()
+                        : null;
+                    const cfgPad20 = cat20 && cat20.configPadrao ? cat20.configPadrao : {};
+                    const perfisOk20 = Boolean(
+                        cfgPad20.automatePjeAtivo === false &&
+                        cfgPad20.modoTurbo === 'url' &&
+                        Array.isArray(cat20 && cat20.chavesGlobais) &&
+                        cat20.chavesGlobais.includes('urlsTurbo') &&
+                        Array.isArray(cfgPad20.urlsTurbo) &&
+                        cfgPad20.urlsTurbo.includes('*://frontend.prd.cnj.cloud/*') &&
+                        cfgPad20.urlsTurbo.includes('*://sso.cloud.pje.jus.br/*') &&
+                        cfgPad20.tipoContornoFlashBorder === 'solido'
+                    );
+
+                    const urls20 = (typeof window.JusGovUrls === 'function') ? new window.JusGovUrls() : null;
+                    const pjeCloudOk20 = Boolean(
+                        urls20 &&
+                        urls20.ehDominioPjeOuJusGov('https://frontend.prd.cnj.cloud/painel') &&
+                        urls20.ehDominioPjeOuJusGov('https://sso.cloud.pje.jus.br/auth')
+                    );
+
+                    const filt20 = (typeof window.JusGovFiltrosHtmlProgressivos === 'function') ? new window.JusGovFiltrosHtmlProgressivos() : null;
+                    let fonteHtmlOk20 = false;
+                    if (filt20 && typeof filt20.definirPadraoFonteCopia === 'function' && typeof filt20.gerarHtmlTextoPuroComFontePadrao === 'function') {
+                        filt20.definirPadraoFonteCopia({ ativo: true, fonte: 'Times New Roman', tamanho: '14' });
+                        const htmlFonte20 = filt20.gerarHtmlTextoPuroComFontePadrao('Texto');
+                        fonteHtmlOk20 = htmlFonte20.includes('Times New Roman') && htmlFonte20.includes('14pt');
+                    }
+
+                    const modsPooOk20 = Boolean(
+                        typeof window.JusGovBaseModulo === 'function' &&
+                        typeof window.JusGovBaseSyncCfg === 'function' &&
+                        typeof window.JusGovBaseDomListeners === 'function' &&
+                        typeof window.JusGovModuloColar === 'function'
+                    );
+
+                    test20Ok = Boolean(perfisOk20 && pjeCloudOk20 && fonteHtmlOk20 && modsPooOk20);
+                    detalheTest20 = `perfis=${perfisOk20}, pjeCloud=${pjeCloudOk20}, fonteHtml=${fonteHtmlOk20}, modsPoo=${modsPooOk20}`;
+                } catch (eT20) {
+                    detalheTest20 = eT20.message || String(eT20);
+                }
+                registrar(
+                    test20Ok,
+                    'TEST_20_FEAT_95_A_105_E_BUG_122_A_130_CONSOLIDADO',
+                    'Valida perfis.json, domínios PJe Cloud, injeção de fonte padrão, contrato POO (ARQ-10/FEAT-102/FEAT-104/FEAT-105).',
+                    { detalhe: detalheTest20 }
+                );
+
             }
         }
     }

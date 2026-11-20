@@ -52,6 +52,7 @@
     "tempoExibicaoAlertaMs": -1,
     "tempoFlashBorderMs": -1,
     "corFlashBorder": "#0d9488",
+    "tipoContornoFlashBorder": "solido",
     "marcadorConteudoColadoAtivo": true,
     "presetMarcadorColado": "verde_forense",
     "corContornoMarcadorColado": "#0d9488",

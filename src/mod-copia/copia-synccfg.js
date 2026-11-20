@@ -47,7 +47,7 @@
         'colagemBotaoDireitoAtiva', 'capturaBotoesMouse4e5Ativa', 'colarBotaoMeioAtivo',
         'navegacaoTecladoCamposAtiva', 'caixaEntradaRapidaAtiva', 'validacaoMatematicaAtiva',
         'tempoConferenciaDocumentosMs', 'modoExibicaoValidacao', 'posicaoAvisosValidacao',
-        'tempoFlashBorderMs', 'corFlashBorder', 'marcadorConteudoColadoAtivo',
+        'tempoFlashBorderMs', 'corFlashBorder', 'tipoContornoFlashBorder', 'marcadorConteudoColadoAtivo',
         'presetMarcadorColado', 'corContornoMarcadorColado', 'corFundoMarcadorColado',
         'opacidadeFundoMarcadorColado', 'estiloBadgeMarcadorColado', 'tipoContornoMarcadorColado',
         'modoRetirarSelecao', 'minimoCaracteresInterface', 'separadorAcumulador',

@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const optSentidoOrdenacaoGuias = document.getElementById('optSentidoOrdenacaoGuias');
     const optSentidoOrdenacaoGuiasSwitch = document.getElementById('optSentidoOrdenacaoGuiasSwitch');
     const lblSentidoOrdenacaoGuias = document.getElementById('lblSentidoOrdenacaoGuias');
-    const optOrdenarGuiasFixadas = document.getElementById('optOrdenarGuiasFixadas');
+    const containerSentidoOrdenacaoGuias = document.getElementById('containerSentidoOrdenacaoGuias');
     const optFecharHierarquiaEmCascata = document.getElementById('optFecharHierarquiaEmCascata');
     const containerFecharHierarquiaCascata = document.getElementById('containerFecharHierarquiaCascata');
     const btnRestaurarOrdemGuiasPadrao = document.getElementById('btnRestaurarOrdemGuiasPadrao');
@@ -232,12 +232,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const optConverterCabecalhoPje = document.getElementById('optConverterCabecalhoPje');
     const optTempoFlashMs = document.getElementById('optTempoFlashMs');
     const optCorFlashBorder = document.getElementById('optCorFlashBorder');
+    const optTipoContornoFlashBorder = document.getElementById('optTipoContornoFlashBorder');
+    const btnContornoFlashVisual = document.getElementById('btnContornoFlashVisual');
+    const popoverContornoFlashVisual = document.getElementById('popoverContornoFlashVisual');
     const previewFlashBorderExemplo = document.getElementById('previewFlashBorderExemplo');
     const lblValorTempoFlash = document.getElementById('lblValorTempoFlash');
     const optMarcadorConteudoColadoAtivo = document.getElementById('optMarcadorConteudoColadoAtivo');
     const painelCustomizacaoMarcadorColado = document.getElementById('painelCustomizacaoMarcadorColado');
     const optPresetMarcadorColado = document.getElementById('optPresetMarcadorColado');
+    const btnTemaMarcadorVisual = document.getElementById('btnTemaMarcadorVisual');
+    const popoverTemaMarcadorVisual = document.getElementById('popoverTemaMarcadorVisual');
     const optTipoContornoMarcadorColado = document.getElementById('optTipoContornoMarcadorColado');
+    const btnContornoMarcadorVisual = document.getElementById('btnContornoMarcadorVisual');
+    const popoverContornoMarcadorVisual = document.getElementById('popoverContornoMarcadorVisual');
     const optCorContornoMarcadorColado = document.getElementById('optCorContornoMarcadorColado');
     const optCorFundoMarcadorColado = document.getElementById('optCorFundoMarcadorColado');
     const optEstiloBadgeMarcadorColado = document.getElementById('optEstiloBadgeMarcadorColado');
@@ -679,12 +686,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function atualizarPreviewsVisuaisMarcadorEFlash() {
         const corFlash = optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : '#0d9488';
+        const tipoContornoFlash = optTipoContornoFlashBorder ? normalizarTipoContornoMarcadorColado(optTipoContornoFlashBorder.value) : 'solido';
         if (previewFlashBorderExemplo) {
-            previewFlashBorderExemplo.style.borderColor = corFlash;
             const r = parseInt(corFlash.slice(1, 3), 16) || 13;
             const g = parseInt(corFlash.slice(3, 5), 16) || 148;
             const b = parseInt(corFlash.slice(5, 7), 16) || 136;
             previewFlashBorderExemplo.style.background = `rgba(${r}, ${g}, ${b}, 0.14)`;
+            previewFlashBorderExemplo.style.textDecoration = tipoContornoFlash === 'taxado' ? `line-through 2px ${corFlash}` : (tipoContornoFlash === 'ondulado' ? `underline wavy ${corFlash}` : 'none');
+            if (tipoContornoFlash === 'sem_borda' || tipoContornoFlash === 'ondulado' || tipoContornoFlash === 'taxado') {
+                previewFlashBorderExemplo.style.border = '2px solid transparent';
+            } else if (tipoContornoFlash === 'tracejado') {
+                previewFlashBorderExemplo.style.border = `2px dashed ${corFlash}`;
+            } else {
+                previewFlashBorderExemplo.style.border = `2px solid ${corFlash}`;
+            }
         }
         const corBorda = optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : '#0d9488';
         const corFundo = optCorFundoMarcadorColado ? normalizarCorHexFundoMarcador(optCorFundoMarcadorColado.value) : '#ccfbf1';
@@ -752,12 +767,170 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        if (typeof atualizarBotoesSeletoresVisuais === 'function') {
+            atualizarBotoesSeletoresVisuais();
+        }
     }
+
+    const OPCOES_CONTORNO_VISUAL = [
+        { valor: 'solido', rotulo: 'Sólido' },
+        { valor: 'tracejado', rotulo: 'Tracejado' },
+        { valor: 'ondulado', rotulo: 'Ondulado' },
+        { valor: 'taxado', rotulo: 'Taxado' },
+        { valor: 'sem_borda', rotulo: 'Sem Borda' }
+    ];
+
+    function criarAmostraContornoDom(tipo, corHex) {
+        const sp = document.createElement('span');
+        sp.textContent = 'Abc';
+        sp.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;min-width:30px;box-sizing:border-box;';
+        const r = parseInt(corHex.slice(1, 3), 16) || 13;
+        const g = parseInt(corHex.slice(3, 5), 16) || 148;
+        const b = parseInt(corHex.slice(5, 7), 16) || 136;
+        sp.style.background = `rgba(${r}, ${g}, ${b}, 0.14)`;
+        if (tipo === 'tracejado') sp.style.border = `1.5px dashed ${corHex}`;
+        else if (tipo === 'ondulado') {
+            sp.style.border = '1.5px solid transparent';
+            sp.style.textDecoration = `underline wavy ${corHex}`;
+        } else if (tipo === 'taxado') {
+            sp.style.border = '1.5px solid transparent';
+            sp.style.textDecoration = `line-through 2px ${corHex}`;
+        } else if (tipo === 'sem_borda') {
+            sp.style.border = '1.5px solid transparent';
+        } else {
+            sp.style.border = `1.5px solid ${corHex}`;
+        }
+        return sp;
+    }
+
+    function criarAmostraTemaDom(chavePreset) {
+        const p = PRESETS_MARCADOR_CONTEUDO_COLADO[chavePreset] || PRESETS_MARCADOR_CONTEUDO_COLADO.verde_forense;
+        const sp = document.createElement('span');
+        sp.textContent = '1';
+        sp.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:800;border:2px solid ${p.corContorno};background:${p.corFundo};color:${p.corContorno};box-sizing:border-box;flex-shrink:0;`;
+        return sp;
+    }
+
+    function atualizarBotoesSeletoresVisuais() {
+        const corFlash = optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : '#0d9488';
+        const tipoFlash = optTipoContornoFlashBorder ? normalizarTipoContornoMarcadorColado(optTipoContornoFlashBorder.value) : 'solido';
+        if (btnContornoFlashVisual) {
+            const caret = document.createElement('span');
+            caret.textContent = '▾';
+            caret.style.fontSize = '10px';
+            btnContornoFlashVisual.replaceChildren(criarAmostraContornoDom(tipoFlash, corFlash), caret);
+        }
+        const corMarcador = optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : '#0d9488';
+        const tipoMarcador = optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido';
+        if (btnContornoMarcadorVisual) {
+            const caret = document.createElement('span');
+            caret.textContent = '▾';
+            caret.style.fontSize = '10px';
+            btnContornoMarcadorVisual.replaceChildren(criarAmostraContornoDom(tipoMarcador, corMarcador), caret);
+        }
+        const presetAtual = optPresetMarcadorColado ? normalizarPresetMarcadorColado(optPresetMarcadorColado.value) : 'verde_forense';
+        if (btnTemaMarcadorVisual) {
+            const nomesTema = {
+                verde_forense: 'Verde Forense',
+                marca_texto_classico: 'Marca-Texto',
+                azul_indigo: 'Azul Índigo',
+                ambar_suave: 'Âmbar Suave',
+                alto_contraste: 'Alto Contraste'
+            };
+            const lbl = document.createElement('span');
+            lbl.textContent = nomesTema[presetAtual] || 'Tema';
+            const caret = document.createElement('span');
+            caret.textContent = '▾';
+            caret.style.fontSize = '10px';
+            btnTemaMarcadorVisual.replaceChildren(criarAmostraTemaDom(presetAtual), lbl, caret);
+        }
+    }
+
+    function fecharTodosPopoversVisuais() {
+        [popoverContornoFlashVisual, popoverContornoMarcadorVisual, popoverTemaMarcadorVisual].forEach((p) => {
+            if (p) p.style.display = 'none';
+        });
+    }
+
+    function vincularPopoverContornoVisual(btn, popover, selectBacking, obterCorFn) {
+        if (!btn || !popover || !selectBacking) return;
+        adicionarOuvinteSeguro(btn, 'click', (e) => {
+            e.stopPropagation();
+            const estavaAberto = popover.style.display === 'flex';
+            fecharTodosPopoversVisuais();
+            if (estavaAberto) return;
+            const cor = obterCorFn();
+            const atual = normalizarTipoContornoMarcadorColado(selectBacking.value);
+            const itens = OPCOES_CONTORNO_VISUAL.map((op) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = `item-seletor-visual${op.valor === atual ? ' ativo' : ''}`;
+                const txt = document.createElement('span');
+                txt.textContent = op.rotulo;
+                item.appendChild(criarAmostraContornoDom(op.valor, cor));
+                item.appendChild(txt);
+                item.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    selectBacking.value = op.valor;
+                    selectBacking.dispatchEvent(new Event('change', { bubbles: true }));
+                    fecharTodosPopoversVisuais();
+                });
+                return item;
+            });
+            popover.replaceChildren(...itens);
+            popover.style.display = 'flex';
+        });
+    }
+
+    vincularPopoverContornoVisual(btnContornoFlashVisual, popoverContornoFlashVisual, optTipoContornoFlashBorder, () => (optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : '#0d9488'));
+    vincularPopoverContornoVisual(btnContornoMarcadorVisual, popoverContornoMarcadorVisual, optTipoContornoMarcadorColado, () => (optCorContornoMarcadorColado ? normalizarCorHex(optCorContornoMarcadorColado.value) : '#0d9488'));
+
+    if (btnTemaMarcadorVisual && popoverTemaMarcadorVisual && optPresetMarcadorColado) {
+        adicionarOuvinteSeguro(btnTemaMarcadorVisual, 'click', (e) => {
+            e.stopPropagation();
+            const estavaAberto = popoverTemaMarcadorVisual.style.display === 'flex';
+            fecharTodosPopoversVisuais();
+            if (estavaAberto) return;
+            const atual = normalizarPresetMarcadorColado(optPresetMarcadorColado.value);
+            const opcoesTema = [
+                { valor: 'verde_forense', rotulo: 'Verde Esmeralda Forense' },
+                { valor: 'marca_texto_classico', rotulo: 'Marca-Texto Clássico' },
+                { valor: 'azul_indigo', rotulo: 'Azul Índigo' },
+                { valor: 'ambar_suave', rotulo: 'Âmbar Suave' },
+                { valor: 'alto_contraste', rotulo: 'Alto Contraste' }
+            ];
+            const itens = opcoesTema.map((op) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = `item-seletor-visual${op.valor === atual ? ' ativo' : ''}`;
+                const txt = document.createElement('span');
+                txt.textContent = op.rotulo;
+                item.appendChild(criarAmostraTemaDom(op.valor));
+                item.appendChild(txt);
+                item.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    optPresetMarcadorColado.value = op.valor;
+                    optPresetMarcadorColado.dispatchEvent(new Event('change', { bubbles: true }));
+                    fecharTodosPopoversVisuais();
+                });
+                return item;
+            });
+            popoverTemaMarcadorVisual.replaceChildren(...itens);
+            popoverTemaMarcadorVisual.style.display = 'flex';
+        });
+    }
+    adicionarOuvinteSeguro(document, 'click', fecharTodosPopoversVisuais);
+    adicionarOuvinteSeguro(optTipoContornoFlashBorder, 'change', () => {
+        atualizarPreviewsVisuaisMarcadorEFlash();
+        salvarConfiguracoes();
+    });
 
     function atualizarVisibilidadeSubOpcoesMarcadorColado() {
         const ativo = optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true;
         if (optPresetMarcadorColado) optPresetMarcadorColado.disabled = !ativo;
+        if (btnTemaMarcadorVisual) btnTemaMarcadorVisual.disabled = !ativo;
         if (optTipoContornoMarcadorColado) optTipoContornoMarcadorColado.disabled = !ativo;
+        if (btnContornoMarcadorVisual) btnContornoMarcadorVisual.disabled = !ativo;
         if (optCorContornoMarcadorColado) optCorContornoMarcadorColado.disabled = !ativo;
         if (optCorFundoMarcadorColado) optCorFundoMarcadorColado.disabled = !ativo;
         if (optEstiloBadgeMarcadorColado) optEstiloBadgeMarcadorColado.disabled = !ativo;
@@ -1068,8 +1241,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function atualizarVisibilidadeSubOpcoesOrdenacaoGuias() {
         const crit = optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore';
         const ativo = crit !== 'nenhum';
-        if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.disabled = !ativo;
-        if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.disabled = !ativo;
+        const sentidoAtivo = ativo && crit !== 'hierarquia_arvore';
+        if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.disabled = !sentidoAtivo;
+        if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.disabled = !sentidoAtivo;
+        if (containerSentidoOrdenacaoGuias) {
+            containerSentidoOrdenacaoGuias.style.opacity = sentidoAtivo ? '1' : '0.45';
+            containerSentidoOrdenacaoGuias.style.pointerEvents = sentidoAtivo ? 'auto' : 'none';
+        }
         if (containerFecharHierarquiaCascata) {
             containerFecharHierarquiaCascata.style.display = (crit === 'hierarquia_arvore') ? 'inline-flex' : 'none';
         }
@@ -1107,6 +1285,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ms = optTempoFlashMs ? Number(optTempoFlashMs.value) : 5250;
         const ativo = ms > 0;
         if (optCorFlashBorder) optCorFlashBorder.disabled = !ativo;
+        if (optTipoContornoFlashBorder) optTipoContornoFlashBorder.disabled = !ativo;
+        if (btnContornoFlashVisual) btnContornoFlashVisual.disabled = !ativo;
         sincronizarOpcaoRetirarComFlash(porInteracaoFlash);
     }
 
@@ -1248,12 +1428,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 optReutilizarAcaoManter.checked = true;
             }
             atualizarVisibilidadeSubOpcoesReutilizar();
-            if (optCriterioOrdenacaoGuias) optCriterioOrdenacaoGuias.value = dados.criterioOrdenacaoGuias || 'hierarquia_arvore';
+            if (optCriterioOrdenacaoGuias) {
+                const critSalvo = dados.criterioOrdenacaoGuias || 'hierarquia_arvore';
+                optCriterioOrdenacaoGuias.value = (critSalvo === 'dominio') ? 'dominio_criacao' : critSalvo;
+            }
             const sentidoEfetivo = dados.sentidoOrdenacaoGuias || 'esq_dir';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = sentidoEfetivo;
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (sentidoEfetivo === 'esq_dir');
             aplicarRotuloSentidoOrdenacao(sentidoEfetivo === 'esq_dir');
-            if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = Boolean(dados.ordenarGuiasFixadas);
             if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = Boolean(dados.fecharHierarquiaEmCascata);
             if (optDescarteGuiasInativas) optDescarteGuiasInativas.checked = false;
             if (optTempoInatividadeDescarteMinutos) {
@@ -1296,6 +1478,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (optCorFlashBorder) {
                 optCorFlashBorder.value = normalizarCorHex(dados.corFlashBorder);
+            }
+            if (optTipoContornoFlashBorder) {
+                optTipoContornoFlashBorder.value = normalizarTipoContornoMarcadorColado(dados.tipoContornoFlashBorder);
             }
             if (optMarcadorConteudoColadoAtivo) {
                 optMarcadorConteudoColadoAtivo.checked = (dados.marcadorConteudoColadoAtivo !== false);
@@ -1505,6 +1690,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optValidacaoMatematicaAtiva) optValidacaoMatematicaAtiva.checked = validacaoAtivaEfetiva;
         const tempoFlashMs = optTempoFlashMs ? normalizarTempoFlashMs(optTempoFlashMs.value) : 0;
         const corFlash = optCorFlashBorder ? normalizarCorHex(optCorFlashBorder.value) : COR_PADRAO_FLASH_BORDER;
+        const tipoContornoFlash = optTipoContornoFlashBorder ? normalizarTipoContornoMarcadorColado(optTipoContornoFlashBorder.value) : 'solido';
         const marcadorColadoAtivo = optMarcadorConteudoColadoAtivo ? optMarcadorConteudoColadoAtivo.checked : true;
         const presetMarcador = optPresetMarcadorColado ? normalizarPresetMarcadorColado(optPresetMarcadorColado.value) : 'verde_forense';
         const tipoContornoMarcador = optTipoContornoMarcadorColado ? normalizarTipoContornoMarcadorColado(optTipoContornoMarcadorColado.value) : 'solido';
@@ -1556,7 +1742,7 @@ document.addEventListener('DOMContentLoaded', () => {
             monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
             criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
             sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
-            ordenarGuiasFixadas: optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false,
+            ordenarGuiasFixadas: false,
             fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
             descarteGuiasInativasAtivo: false,
             tempoInatividadeDescarteMinutos: optTempoInatividadeDescarteMinutos ? Number(optTempoInatividadeDescarteMinutos.value) : 20,
@@ -1570,6 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tempoExibicaoAlertaMs: -1,
             tempoFlashBorderMs: tempoFlashMs,
             corFlashBorder: corFlash,
+            tipoContornoFlashBorder: tipoContornoFlash,
             marcadorConteudoColadoAtivo: marcadorColadoAtivo,
             presetMarcadorColado: presetMarcador,
             tipoContornoMarcadorColado: tipoContornoMarcador,
@@ -1750,13 +1937,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const crit = optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'nenhum';
         if (crit && crit !== 'nenhum') {
             const sent = optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir';
-            const fix = optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false;
             try {
                 chrome.runtime.sendMessage({
                     acao: 'ordenarGuiasAgora',
                     criterio: crit,
                     sentido: sent,
-                    ordenarFixadas: fix
+                    ordenarFixadas: false
                 }, () => {
                     if (feedbackAcoesGuias) {
                         feedbackAcoesGuias.textContent = 'Guias ordenadas imediatamente!';
@@ -1782,16 +1968,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = isEsqDir ? 'esq_dir' : 'dir_esq';
         aplicarRotuloSentidoOrdenacao(isEsqDir);
         salvarConfiguracoes();
-        if (reordenarSeAtivo && optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum') {
+        if (reordenarSeAtivo && optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum' && optCriterioOrdenacaoGuias.value !== 'hierarquia_arvore') {
             const crit = optCriterioOrdenacaoGuias.value;
             const sent = optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir';
-            const fix = optOrdenarGuiasFixadas ? optOrdenarGuiasFixadas.checked : false;
             try {
                 chrome.runtime.sendMessage({
                     acao: 'ordenarGuiasAgora',
                     criterio: crit,
                     sentido: sent,
-                    ordenarFixadas: fix
+                    ordenarFixadas: false
                 }, () => {
                     if (feedbackAcoesGuias) {
                         feedbackAcoesGuias.textContent = 'Sentido atualizado e guias reordenadas!';
@@ -1804,32 +1989,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     adicionarOuvinteSeguro(optSentidoOrdenacaoGuiasSwitch, 'change', () => {
+        if (optSentidoOrdenacaoGuiasSwitch && optSentidoOrdenacaoGuiasSwitch.disabled) return;
         atualizarSentidoOrdenacao(optSentidoOrdenacaoGuiasSwitch.checked, true);
     });
 
     adicionarOuvinteSeguro(lblSentidoOrdenacaoGuias, 'click', () => {
-        if (optSentidoOrdenacaoGuiasSwitch) {
+        if (optSentidoOrdenacaoGuiasSwitch && !optSentidoOrdenacaoGuiasSwitch.disabled) {
             optSentidoOrdenacaoGuiasSwitch.checked = !optSentidoOrdenacaoGuiasSwitch.checked;
             atualizarSentidoOrdenacao(optSentidoOrdenacaoGuiasSwitch.checked, true);
         }
     });
 
     adicionarOuvinteSeguro(optSentidoOrdenacaoGuias, 'change', () => {
+        if (optSentidoOrdenacaoGuias && optSentidoOrdenacaoGuias.disabled) return;
         atualizarSentidoOrdenacao(optSentidoOrdenacaoGuias.value === 'esq_dir', true);
-    });
-
-    adicionarOuvinteSeguro(optOrdenarGuiasFixadas, 'change', () => {
-        salvarConfiguracoes();
-        if (optCriterioOrdenacaoGuias && optCriterioOrdenacaoGuias.value !== 'nenhum') {
-            try {
-                chrome.runtime.sendMessage({
-                    acao: 'ordenarGuiasAgora',
-                    criterio: optCriterioOrdenacaoGuias.value,
-                    sentido: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
-                    ordenarFixadas: optOrdenarGuiasFixadas.checked
-                });
-            } catch (_) { }
-        }
     });
 
     adicionarOuvinteSeguro(optFecharHierarquiaEmCascata, 'change', salvarConfiguracoes);
@@ -1916,7 +2089,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = 'esq_dir';
             if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = true;
             aplicarRotuloSentidoOrdenacao(true);
-            if (optOrdenarGuiasFixadas) optOrdenarGuiasFixadas.checked = false;
             if (optFecharHierarquiaEmCascata) optFecharHierarquiaEmCascata.checked = false;
             atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
             salvarConfiguracoes();
@@ -2674,16 +2846,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     optMonitorarUrlAtual.checked = (changes.monitorarUrlAtualPagina.newValue !== false);
                 }
                 if (changes.criterioOrdenacaoGuias !== undefined && optCriterioOrdenacaoGuias) {
-                    optCriterioOrdenacaoGuias.value = changes.criterioOrdenacaoGuias.newValue || 'nenhum';
+                    const novoCrit = changes.criterioOrdenacaoGuias.newValue || 'nenhum';
+                    optCriterioOrdenacaoGuias.value = (novoCrit === 'dominio') ? 'dominio_criacao' : novoCrit;
+                    atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
                 }
                 if (changes.sentidoOrdenacaoGuias !== undefined && optSentidoOrdenacaoGuias) {
                     const novoSentido = changes.sentidoOrdenacaoGuias.newValue || 'esq_dir';
                     optSentidoOrdenacaoGuias.value = novoSentido;
                     if (optSentidoOrdenacaoGuiasSwitch) optSentidoOrdenacaoGuiasSwitch.checked = (novoSentido === 'esq_dir');
                     aplicarRotuloSentidoOrdenacao(novoSentido === 'esq_dir');
-                }
-                if (changes.ordenarGuiasFixadas !== undefined && optOrdenarGuiasFixadas) {
-                    optOrdenarGuiasFixadas.checked = Boolean(changes.ordenarGuiasFixadas.newValue);
                 }
                 if (changes.descarteGuiasInativasAtivo !== undefined && optDescarteGuiasInativas) {
                     optDescarteGuiasInativas.checked = Boolean(changes.descarteGuiasInativasAtivo.newValue);
@@ -2721,6 +2892,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (changes.corFlashBorder !== undefined && optCorFlashBorder) {
                     optCorFlashBorder.value = normalizarCorHex(changes.corFlashBorder.newValue);
+                }
+                if (changes.tipoContornoFlashBorder !== undefined && optTipoContornoFlashBorder) {
+                    optTipoContornoFlashBorder.value = normalizarTipoContornoMarcadorColado(changes.tipoContornoFlashBorder.newValue);
                 }
                 if (changes.marcadorConteudoColadoAtivo !== undefined && optMarcadorConteudoColadoAtivo) {
                     optMarcadorConteudoColadoAtivo.checked = (changes.marcadorConteudoColadoAtivo.newValue !== false);

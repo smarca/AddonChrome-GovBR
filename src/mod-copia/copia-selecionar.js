@@ -329,6 +329,7 @@
     let tempoConferenciaDocumentosMs = -1;
     let tempoFlashBorderMs = -1;
     let corFlashBorder = '#0d9488';
+    let tipoContornoFlashBorder = 'solido';
     let marcadorConteudoColadoAtivo = true;
     let presetMarcadorColado = 'verde_forense';
     let corContornoMarcadorColado = '#0d9488';
@@ -1341,126 +1342,70 @@
         return estagio3 ? estagio3.expandirSentencaCompletaAtePonto(texto, idx) : null;
     }
 
+    /* Delegação Modular POO (ARQ-10 Fase 2A): Política de Expansão e Seleção Global (src/mod-copia/copia-politica-selecao.js) */
+    const politicaSelecao = (typeof window !== 'undefined' && typeof window.JusGovCopiaPoliticaSelecao === 'function')
+        ? new window.JusGovCopiaPoliticaSelecao({
+            resolverSelecaoTriploClique,
+            eEspacoBranco,
+            eAlfanumericoUnicode,
+            eDelimitadorPar,
+            eCaractereAspas,
+            tentarExpandirDelimitadoresSimetricos,
+            tentarExpandirPadraoComposto,
+            tentarExpandirBlocoMaiusculasComQuebraSuave,
+            tentarExpandirBlocoFormatadoDestaque,
+            expandirSentencaCompletaAtePonto,
+            expandirFraseAtePontuacaoEstagio3,
+            tentarExpandirSentencaPorDoisPontos,
+            expandirUnidadeAtomicaEstagio1,
+            obterPontoDoClique,
+            construirMapaTextoBlocoComJanela,
+            criarRangeDOMAPartirDeIndices,
+            ehDocumentoEditorRicoIsolado,
+            isAreaLeituraOuPdfConteudo,
+            isSelecaoOuElementoEmCampoEditavel,
+            verificarUrlPermitida,
+            classificarContextoElementoAlvo,
+            isComponenteBotaoOuFormularioEstrito,
+            isComponenteSelecaoOuDropdown,
+            isElementoInterativoClicavelDireto,
+            localizarBlocoForenseAutoSelecionavelEmInterface,
+            verificarProtecaoTamanhoMinimoInterface,
+            aplicarSelecaoECopiar,
+            getEstado: () => ({
+                selecaoSendoAplicadaPeloAddon,
+                timerDebounceSelecaoGlobal,
+                isMousePressionado,
+                teclasPressionadasAtivas,
+                ultimoRangeAssinaturaGlobal,
+                ultimaSelecaoManualTexto,
+                ultimoTimestampSelecaoManual
+            }),
+            setEstado: (patch) => {
+                if (!patch) return;
+                if (Object.prototype.hasOwnProperty.call(patch, 'selecaoSendoAplicadaPeloAddon')) selecaoSendoAplicadaPeloAddon = patch.selecaoSendoAplicadaPeloAddon;
+                if (Object.prototype.hasOwnProperty.call(patch, 'timerDebounceSelecaoGlobal')) timerDebounceSelecaoGlobal = patch.timerDebounceSelecaoGlobal;
+                if (Object.prototype.hasOwnProperty.call(patch, 'ultimoRangeAssinaturaGlobal')) ultimoRangeAssinaturaGlobal = patch.ultimoRangeAssinaturaGlobal;
+                if (Object.prototype.hasOwnProperty.call(patch, 'ultimaSelecaoManualTexto')) ultimaSelecaoManualTexto = patch.ultimaSelecaoManualTexto;
+                if (Object.prototype.hasOwnProperty.call(patch, 'ultimoTimestampSelecaoManual')) ultimoTimestampSelecaoManual = patch.ultimoTimestampSelecaoManual;
+            }
+        })
+        : ((typeof window !== 'undefined' && window.JusGovCopiaPoliticaSelecao && window.JusGovCopiaPoliticaSelecao.NULL_OBJECT) || {
+            resolverIndicesExpansaoBase: () => null,
+            obterRangePalavraOuBlocoNoPonto: () => null,
+            calcularAssinaturaSelecao: () => '',
+            tratarMudancaSelecaoGlobal: () => undefined
+        });
+
     function resolverIndicesExpansaoBase(mapa, idxCursor, numCliques = 1, opcoes = {}) {
-        if (!mapa || typeof mapa.texto !== 'string' || typeof idxCursor !== 'number') return null;
-        const texto = mapa.texto;
-        const apenasBlocoOuAtomica = Boolean(opcoes && opcoes.apenasBlocoOuAtomica);
-
-        if (numCliques >= 3 && !apenasBlocoOuAtomica) {
-            const resTriplo = resolverSelecaoTriploClique(mapa, idxCursor);
-            return {
-                resultadoIndices: resTriplo,
-                ehBlocoCompostoSelecionado: false
-            };
-        }
-
-        const charNoCursor = texto[idxCursor] || '';
-        const charAnterior = idxCursor > 0 ? texto[idxCursor - 1] : '';
-        const clicouEmEspaco = eEspacoBranco(charNoCursor) ||
-            (eEspacoBranco(charAnterior) && !eAlfanumericoUnicode(charNoCursor));
-        const clicouEmDelimitadorOuAspas = eDelimitadorPar(charNoCursor) || eDelimitadorPar(charAnterior) ||
-            eCaractereAspas(charNoCursor) || eCaractereAspas(charAnterior);
-
-        const expandirComoDuplo = !apenasBlocoOuAtomica && (
-            numCliques === 2 ||
-            (Boolean(opcoes && opcoes.ehAlt) && numCliques === 1 && (clicouEmEspaco || clicouEmDelimitadorOuAspas))
-        );
-
-        let resultadoIndices = null;
-        let ehBlocoCompostoSelecionado = false;
-
-        if (expandirComoDuplo) {
-            const blocoCompostoPrevio = opcoes ? opcoes.blocoCompostoPrevio : null;
-            if (clicouEmDelimitadorOuAspas || clicouEmEspaco) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
-            }
-            if (!resultadoIndices && !blocoCompostoPrevio) {
-                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, true);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, true);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = expandirSentencaCompletaAtePonto(texto, idxCursor) || expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
-            }
-        } else if (!apenasBlocoOuAtomica && clicouEmDelimitadorOuAspas) {
-            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
-            /* BUG-39: Se clicou exatamente no caractere delimitador/aspas (ex.: ')' ao final de citação),
-             * só mantém match composto se ele efetivamente cobrir idxCursor (ex.: '(61) 3300-1000');
-             * se o match composto terminou ANTES de idxCursor (dropou ')'), delega aos delimitadores simétricos. */
-            if (
-                resultadoIndices &&
-                (eDelimitadorPar(charNoCursor) || eCaractereAspas(charNoCursor)) &&
-                !(resultadoIndices.inicio <= idxCursor && idxCursor < resultadoIndices.fim)
-            ) {
-                resultadoIndices = null;
-            }
-            if (resultadoIndices) ehBlocoCompostoSelecionado = true;
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
-            }
-        } else if (!apenasBlocoOuAtomica && clicouEmEspaco) {
-            /* Regra de bloco: espaco logo apos ":" liga o rotulo ao que vem depois -> sentenca inteira */
-            resultadoIndices = tentarExpandirSentencaPorDoisPontos(texto, idxCursor);
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, true, false);
-                if (resultadoIndices) ehBlocoCompostoSelecionado = true;
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoMaiusculasComQuebraSuave(texto, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirBlocoFormatadoDestaque(mapa, idxCursor);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = tentarExpandirDelimitadoresSimetricos(texto, idxCursor, false);
-            }
-            if (!resultadoIndices) {
-                resultadoIndices = expandirFraseAtePontuacaoEstagio3(texto, idxCursor);
-            }
-        } else {
-            resultadoIndices = tentarExpandirPadraoComposto(texto, idxCursor, false, false);
-            if (resultadoIndices) ehBlocoCompostoSelecionado = true;
-            if (!resultadoIndices) {
-                resultadoIndices = expandirUnidadeAtomicaEstagio1(texto, idxCursor);
-            }
-        }
-
-        return {
-            resultadoIndices,
-            ehBlocoCompostoSelecionado
-        };
+        return politicaSelecao.resolverIndicesExpansaoBase(mapa, idxCursor, numCliques, opcoes);
     }
 
     /* ==========================================================================
      * SECAO 8: SELECAO EM TABELAS E ORQUESTRADOR ELASTICO (CTRL OU ALT: CLIQUE E ARRASTO)
      * ========================================================================== */
     function obterRangePalavraOuBlocoNoPonto(clientX, clientY) {
-        const ponto = obterPontoDoClique(clientX, clientY);
-        if (!ponto) return null;
-
-        const mapa = construirMapaTextoBlocoComJanela(ponto.no, ponto.offset);
-        if (!mapa) return null;
-
-        const base = resolverIndicesExpansaoBase(mapa, mapa.idxCursor, 1, { apenasBlocoOuAtomica: true });
-        const resultadoIndices = base ? base.resultadoIndices : null;
-        if (!resultadoIndices) return null;
-
-        const range = criarRangeDOMAPartirDeIndices(mapa, resultadoIndices.inicio, resultadoIndices.fim);
-        if (!range) return null;
-
-        return {
-            range,
-            mapa,
-            inicio: resultadoIndices.inicio,
-            fim: resultadoIndices.fim
-        };
+        return politicaSelecao.obterRangePalavraOuBlocoNoPonto(clientX, clientY);
     }
 
     /* Delegação Modular POO: ProgressaoAtalhosSelecao (src/mod-copia/copia-progressao.js) */
@@ -3037,154 +2982,8 @@
      * OBJETIVO: Gerar uma assinatura unica (offsets + texto) da selecao atual, usada para saber se
      * aquela selecao exata ja foi copiada (por qualquer caminho: clique, arraste, teclado ou sistema).
      */
-    function calcularAssinaturaSelecao(sel) {
-        try {
-            if (!sel || sel.isCollapsed || sel.rangeCount === 0) return '';
-            const r = sel.getRangeAt(0);
-            const txt = (sel.toString() || '').trim();
-            if (!txt) return '';
-            return `${r.startOffset}_${r.endOffset}_${txt}`;
-        } catch (_) {
-            return '';
-        }
-    }
-
-    /*
-     * FUNCAO: tratarMudancaSelecaoGlobal
-     * DIRETRIZ ROOT: Identifica globalmente selecoes de texto ativas na pagina ou em
-     * visualizadores de PDF (criadas por teclado Shift+Setas, selecoes nativas, mouseup)
-     * e garante a aplicacao imediata da formatacao, copia para a Area de Transferencia
-     * e contorno visual, sem quebrar o fluxo do usuario.
-     * Regra: toda selecao (do sistema ou feita pelo addon) que ainda nao foi copiada e copiada agora.
-     */
-    function tratarMudancaSelecaoGlobal(winAlvo) {
-        const win = winAlvo || window;
-        if (!win || typeof win.getSelection !== 'function') return;
-
-        /* BUG-128 (Seção 6.258): Saída imediata O(1) durante colagem interna ou dentro de documento
-         * iframe de editor rico (CKEditor body.cke_editable / designMode), eliminando loops de
-         * selectionchange e impedindo aplicarSelecaoECopiar cross-frame. */
-        if (window.__JUSGOV_COLAGEM_INTERNA_ATIVA__ || (win && win.__JUSGOV_COLAGEM_INTERNA_ATIVA__)) return;
-        const agoraSelGlobal = Date.now();
-        if (window.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__ && (agoraSelGlobal - window.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__) < 450) return;
-        if (win && win.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__ && (agoraSelGlobal - win.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__) < 450) return;
-        const docAlvo = (win && win.document) ? win.document : (typeof document !== 'undefined' ? document : null);
-        if (ehDocumentoEditorRicoIsolado(docAlvo)) return;
-
-        // Se o foco atual esta em um IFRAME ou EMBED nao-PDF, a selecao e de responsabilidade exclusiva do subframe.
-        // Se for um visualizador de PDF embutido (ex.: embed#plugin type="application/x-google-chrome-pdf"),
-        // a mudanca de selecao deve ser processada normalmente para permitir copia com flash no PDF.
-        if (document.activeElement) {
-            const tagAtiva = document.activeElement.tagName;
-            if (tagAtiva === 'IFRAME') {
-                return;
-            }
-            if (tagAtiva === 'EMBED' && !isAreaLeituraOuPdfConteudo(document.activeElement)) {
-                return;
-            }
-        }
-
-        // Se for um subframe que ja possui seu proprio motor de selecao ativo, o frame pai nunca intercepta
-        if (winAlvo && winAlvo !== window && winAlvo.__JUSGOV_MOTOR_SELECAO_ATIVO__) {
-            return;
-        }
-
-        /* Selecao desfeita: libera a assinatura imediatamente (mesmo com o mouse pressionado), para que
-         * selecionar novamente o MESMO texto (ex.: duplo clique na mesma palavra) volte a ser copiado. */
-        try {
-            const selReset = win.getSelection();
-            if (!selReset || selReset.rangeCount === 0 || selReset.isCollapsed) {
-                ultimoRangeAssinaturaGlobal = '';
-            }
-        } catch (_) { }
-
-        if (selecaoSendoAplicadaPeloAddon) return;
-        if (typeof document !== 'undefined' && isSelecaoOuElementoEmCampoEditavel(document.activeElement)) return;
-        if (docAlvo && docAlvo !== document && isSelecaoOuElementoEmCampoEditavel(docAlvo.activeElement)) return;
-
-        // Guarda de reentrancia no topo da hierarquia de janelas
-        let topWin = window;
-        try { if (window.top && window.top.document) topWin = window.top; } catch (_) { }
-        if (topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__) return;
-
-        if (timerDebounceSelecaoGlobal) {
-            clearTimeout(timerDebounceSelecaoGlobal);
-        }
-        timerDebounceSelecaoGlobal = setTimeout(async () => {
-            timerDebounceSelecaoGlobal = null;
-            if (selecaoSendoAplicadaPeloAddon) return;
-        if (typeof document !== 'undefined' && isSelecaoOuElementoEmCampoEditavel(document.activeElement)) return;
-            if (topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__) return;
-            if (isMousePressionado) return; // Se mouse ainda esta sendo arrastado, aguarda mouseup
-            if (!verificarUrlPermitida()) return;
-
-            const sel = (win && typeof win.getSelection === 'function') ? win.getSelection() : window.getSelection();
-            if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-                ultimoRangeAssinaturaGlobal = '';
-                return;
-            }
-            const textoSel = (sel.toString() || '').trim();
-            if (textoSel.length === 0) return;
-
-            const range = sel.getRangeAt(0);
-            if (!range) return;
-
-            // Nao intercepta campos de entrada simples ou editores para respeitar a Regra de Ouro
-            if (isSelecaoOuElementoEmCampoEditavel(range) || isSelecaoOuElementoEmCampoEditavel(document.activeElement)) {
-                return;
-            }
-            const ctx = classificarContextoElementoAlvo(range.commonAncestorContainer);
-            if (ctx === 'CAMPO_SIMPLES_EDITAVEL' || ctx === 'EDITOR_MULTILINHA_EDITAVEL') return;
-
-            // Em controles estritos de interface ('interface'), nunca seleciona nem copia via selectionchange sem teclas modificadoras
-            if (isComponenteBotaoOuFormularioEstrito(range.commonAncestorContainer)) {
-                return;
-            }
-            // BUG-16: Em caixas de seleção / dropdowns / select2, zero cópia automática via selectionchange sem Alt
-            if (!teclasPressionadasAtivas.has('alt') && isComponenteSelecaoOuDropdown(range.commonAncestorContainer)) {
-                return;
-            }
-            if (isElementoInterativoClicavelDireto(range.commonAncestorContainer)) {
-                const resBlocoSel = localizarBlocoForenseAutoSelecionavelEmInterface(textoSel, 0, 1, true);
-                if (!resBlocoSel || resBlocoSel.inicio !== 0 || resBlocoSel.fim < textoSel.length) {
-                    return;
-                }
-            }
-
-            // Assinatura única para evitar re-execução em loop da mesma seleção exata
-            const assinatura = `${range.startOffset}_${range.endOffset}_${textoSel}`;
-            if (assinatura === ultimoRangeAssinaturaGlobal) return;
-            ultimoRangeAssinaturaGlobal = assinatura;
-
-            // Blindagem anti-loop de selecao manual (Diretriz 6.39)
-            if (textoSel === ultimaSelecaoManualTexto && (Date.now() - ultimoTimestampSelecaoManual) < 1500) {
-                return;
-            }
-            ultimaSelecaoManualTexto = textoSel;
-            ultimoTimestampSelecaoManual = Date.now();
-
-            const rangeClone = range.cloneRange();
-            const ehSistemaEstrito = isTelaSistemaEstritaParaDesselecao(range.commonAncestorContainer);
-            if (!teclasPressionadasAtivas.has('alt') && !teclasPressionadasAtivas.has('control')) {
-                if (!verificarProtecaoTamanhoMinimoInterface(textoSel, range.commonAncestorContainer, false)) {
-                    return;
-                }
-            }
-
-            topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__ = true;
-            selecaoSendoAplicadaPeloAddon = true;
-            try {
-                await aplicarSelecaoECopiar(rangeClone, false, null, {
-                    eraArrasto: false
-                });
-            } finally {
-                setTimeout(() => {
-                    selecaoSendoAplicadaPeloAddon = false;
-                    topWin.__JUSGOV_MUTEX_SELECAO_GLOBAL__ = false;
-                }, 300);
-            }
-        }, 120);
-    }
+    function calcularAssinaturaSelecao(sel) { return politicaSelecao.calcularAssinaturaSelecao(sel); }
+    function tratarMudancaSelecaoGlobal(winAlvo) { return politicaSelecao.tratarMudancaSelecaoGlobal(winAlvo); }
 
     /* ==========================================================================
      * REGISTRO DETERMINISTICO DE CICLO DE VIDA DE SUBFRAMES (BUG-01 / SECAO 6.47)
@@ -3560,6 +3359,7 @@
             tempoFlashBorderMs = cfg.flashBorderAtivo ? -1 : 0;
         }
         if (typeof cfg.corFlashBorder === 'string' && /^#[0-9a-fA-F]{6}$/.test(cfg.corFlashBorder.trim())) corFlashBorder = cfg.corFlashBorder.trim().toLowerCase();
+        if (typeof cfg.tipoContornoFlashBorder === 'string' && ['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(cfg.tipoContornoFlashBorder)) tipoContornoFlashBorder = cfg.tipoContornoFlashBorder;
         let mudouMarcador = false;
         if (typeof cfg.marcadorConteudoColadoAtivo === 'boolean') { marcadorConteudoColadoAtivo = cfg.marcadorConteudoColadoAtivo; mudouMarcador = true; }
         if (typeof cfg.presetMarcadorColado === 'string' && cfg.presetMarcadorColado.trim()) { presetMarcadorColado = cfg.presetMarcadorColado.trim(); mudouMarcador = true; }

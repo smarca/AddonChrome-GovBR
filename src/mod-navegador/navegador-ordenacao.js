@@ -43,14 +43,17 @@
     'use strict';
 
     class GerenciadorOrdenacaoGuias {
-        #criterio = 'hierarquia_arvore'; // 'nenhum', 'hierarquia_arvore', 'dominio', 'dominio_titulo', 'url', 'titulo', 'dominio_criacao', 'dominio_acesso'
+        #criterio = 'hierarquia_arvore'; // 'nenhum', 'hierarquia_arvore', 'dominio_criacao', 'url', 'dominio_titulo', 'dominio_acesso', 'dominio_ativacao', 'ordem_criacao', 'tempo_acesso', 'ultima_ativacao', 'titulo'
         #sentido = 'esq_dir';  // 'esq_dir' (A-Z / Novo-Antigo), 'dir_esq' (Z-A / Antigo-Novo)
-        #ordenarGuiasFixadas = false;
+        #ordenarGuiasFixadas = false; // Mantido apenas para compatibilidade retroativa (guias fixadas nunca entram na ordenação)
         #timerOrdenacaoAbas = null;
         #estaOrdenandoGuias = false;
         #arvoreOpener = new Map();
         #desvinculadasManualmente = new Set();
         #criacaoPorAba = new Map();
+        #navegacaoPorAba = new Map();
+        #ativacaoPorAba = new Map();
+        #dominioAnteriorPorAba = new Map();
         #seqCriacao = 0;
         #arvoreHidratada = false;
         #promessaHidratacaoArvore = null;
@@ -66,6 +69,33 @@
             if (typeof opcoes.criterio === 'string') this.#criterio = opcoes.criterio;
             if (typeof opcoes.sentido === 'string') this.#sentido = opcoes.sentido;
             if (typeof opcoes.ordenarGuiasFixadas === 'boolean') this.#ordenarGuiasFixadas = opcoes.ordenarGuiasFixadas;
+        }
+
+        normalizarCriterio(c) {
+            const v = String(c || 'nenhum');
+            return (v === 'dominio') ? 'dominio_criacao' : v;
+        }
+
+        ehCriterioDominio(c = this.#criterio) {
+            const v = this.normalizarCriterio(c);
+            return v === 'dominio_criacao' || v === 'url' || v === 'dominio_titulo' || v === 'dominio_acesso' || v === 'dominio_ativacao';
+        }
+
+        ehUrlExtensao(urlStr = '') {
+            return /^chrome-extension:/i.test(String(urlStr || '').trim());
+        }
+
+        ehUrlNovaGuiaEmBranco(urlStr = '') {
+            const u = String(urlStr || '').trim().toLowerCase();
+            return !u || u === 'about:blank' || u === 'chrome://newtab/' || u === 'chrome://newtab' || u === 'edge://newtab/' || u === 'edge://newtab';
+        }
+
+        registrarNavegacaoAba(tabId, ts = Date.now()) {
+            if (typeof tabId === 'number') this.#navegacaoPorAba.set(tabId, ts);
+        }
+
+        registrarAtivacaoAba(tabId, ts = Date.now()) {
+            if (typeof tabId === 'number') this.#ativacaoPorAba.set(tabId, ts);
         }
 
         get criterio() { return this.#criterio; }
@@ -158,37 +188,64 @@
          * @returns {number}
          */
         compararAbasParaOrdenacao(a, b, criterio = this.#criterio, sentido = this.#sentido, mapa = null) {
+            const crit = this.normalizarCriterio(criterio);
+            const urlA = a.url || a.pendingUrl || '';
+            const urlB = b.url || b.pendingUrl || '';
+
+            // Regra Absoluta: guias chrome-extension: sempre em primeiro (na primeira guia não fixada)
+            const extA = this.ehUrlExtensao(urlA);
+            const extB = this.ehUrlExtensao(urlB);
+            if (extA && !extB) return -1;
+            if (!extA && extB) return 1;
+            if (extA && extB) {
+                return -this.compararPorCriacaoCronologica(a, b, mapa);
+            }
+
             const regA = mapa ? mapa.get(a.id) : null;
             const regB = mapa ? mapa.get(b.id) : null;
 
             const extrairTimestampNavegacao = (tab, reg) => {
+                const navLocal = this.#navegacaoPorAba.get(tab.id);
+                if (typeof navLocal === 'number' && navLocal > 0) return navLocal;
                 if (reg && reg.ultimoAcessoNavegacao) return reg.ultimoAcessoNavegacao;
                 if (reg && reg.modificadaEm) return reg.modificadaEm;
                 if (reg && reg.criadaEm) return reg.criadaEm;
                 return tab.lastAccessed || 0;
             };
 
-            if (criterio === 'titulo') {
+            const extrairTimestampAtivacao = (tab) => {
+                const ativLocal = this.#ativacaoPorAba.get(tab.id);
+                if (typeof ativLocal === 'number' && ativLocal > 0) return ativLocal;
+                return tab.lastAccessed || 0;
+            };
+
+            if (crit === 'titulo') {
                 const titA = (a.title || '').toLowerCase();
                 const titB = (b.title || '').toLowerCase();
                 const cmp = titA.localeCompare(titB);
                 return (sentido === 'dir_esq') ? -cmp : cmp;
             }
 
-            if (criterio === 'ordem_criacao') {
+            if (crit === 'ordem_criacao') {
                 const cmpCriacao = this.compararPorCriacaoCronologica(a, b, mapa);
                 return (sentido === 'dir_esq') ? cmpCriacao : -cmpCriacao;
             }
 
-            if (criterio === 'tempo_acesso') {
+            if (crit === 'tempo_acesso') {
                 const tA = extrairTimestampNavegacao(a, regA);
                 const tB = extrairTimestampNavegacao(b, regB);
                 return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
             }
 
-            // Critérios baseados em Domínio: 'dominio', 'url', 'dominio_criacao', 'dominio_acesso'
-            const infoA = this.extrairInfoDominio(a.url || a.pendingUrl || '');
-            const infoB = this.extrairInfoDominio(b.url || b.pendingUrl || '');
+            if (crit === 'ultima_ativacao') {
+                const tA = extrairTimestampAtivacao(a);
+                const tB = extrairTimestampAtivacao(b);
+                return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
+            }
+
+            // Critérios baseados em Domínio: 'dominio_criacao', 'url', 'dominio_titulo', 'dominio_acesso', 'dominio_ativacao'
+            const infoA = this.extrairInfoDominio(urlA);
+            const infoB = this.extrairInfoDominio(urlB);
 
             // 1. Agrupamento pelo Base Domínio (ex: 'trf1.jus.br' agrupado)
             const cmpBase = infoA.baseDominio.localeCompare(infoB.baseDominio);
@@ -196,41 +253,41 @@
                 return (sentido === 'dir_esq') ? -cmpBase : cmpBase;
             }
 
-            // 2. Mesmo Domínio: O Domínio Puro SEMPRE vem em primeiro lugar!
-            if (infoA.ehPuro && !infoB.ehPuro) return -1;
-            if (!infoA.ehPuro && infoB.ehPuro) return 1;
-
-            // 3. Sub-critérios subordinados ao Domínio:
-            if (criterio === 'dominio_titulo') {
+            // 2. Sub-critérios subordinados ao Domínio:
+            if (crit === 'dominio_titulo') {
                 const titA = (a.title || '').toLowerCase();
                 const titB = (b.title || '').toLowerCase();
                 const cmpTit = titA.localeCompare(titB);
                 return (sentido === 'dir_esq') ? -cmpTit : cmpTit;
             }
 
-            if (criterio === 'dominio_criacao') {
+            if (crit === 'dominio_criacao') {
                 const cmpDomCriacao = this.compararPorCriacaoCronologica(a, b, mapa);
                 return (sentido === 'dir_esq') ? cmpDomCriacao : -cmpDomCriacao;
             }
 
-            if (criterio === 'dominio_acesso') {
+            if (crit === 'dominio_acesso') {
                 const tA = extrairTimestampNavegacao(a, regA);
                 const tB = extrairTimestampNavegacao(b, regB);
                 return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
             }
 
-            if (criterio === 'url') {
-                const cmpSub = infoA.subDominio.localeCompare(infoB.subDominio);
-                if (cmpSub !== 0) {
-                    return (sentido === 'dir_esq') ? -cmpSub : cmpSub;
-                }
-                const cmpCam = infoA.caminho.localeCompare(infoB.caminho);
-                return (sentido === 'dir_esq') ? -cmpCam : cmpCam;
+            if (crit === 'dominio_ativacao') {
+                const tA = extrairTimestampAtivacao(a);
+                const tB = extrairTimestampAtivacao(b);
+                return (sentido === 'dir_esq') ? (tA - tB) : (tB - tA);
             }
 
-            // Critério padrão 'dominio': compara subdomínios
+            // 3. URL Completa: Domínio Puro antes dos subdomínios, seguido pelo caminho completo
+            if (infoA.ehPuro && !infoB.ehPuro) return (sentido === 'dir_esq') ? 1 : -1;
+            if (!infoA.ehPuro && infoB.ehPuro) return (sentido === 'dir_esq') ? -1 : 1;
+
             const cmpSub = infoA.subDominio.localeCompare(infoB.subDominio);
-            return (sentido === 'dir_esq') ? -cmpSub : cmpSub;
+            if (cmpSub !== 0) {
+                return (sentido === 'dir_esq') ? -cmpSub : cmpSub;
+            }
+            const cmpCam = infoA.caminho.localeCompare(infoB.caminho);
+            return (sentido === 'dir_esq') ? -cmpCam : cmpCam;
         }
 
         /**
@@ -457,6 +514,9 @@
             this.#desvinculadasManualmente.delete(tabId);
             this.#posicionadasInicialmente.delete(tabId);
             this.#criacaoPorAba.delete(tabId);
+            this.#navegacaoPorAba.delete(tabId);
+            this.#ativacaoPorAba.delete(tabId);
+            this.#dominioAnteriorPorAba.delete(tabId);
             for (const [filhaId, paiId] of this.#arvoreOpener.entries()) {
                 if (paiId === tabId) {
                     if (avoId !== undefined && avoId !== filhaId) {
@@ -578,8 +638,11 @@
         }
 
         /**
-         * Posiciona imediatamente uma aba recém-criada na árvore "Baralho" sem desfazer movimentos manuais
-         * existentes na janela (BUG-71).
+         * Posiciona imediatamente uma aba na árvore hierárquica (100% por ordem de criação, sem Sentido):
+         * - Guias fixadas nunca são ordenadas; filhos de guias fixadas viram "pais natos" na 1ª guia não fixada.
+         * - Regra absoluta: guias chrome-extension: vão SEMPRE na 1ª guia não fixada.
+         * - Novas guias em branco (newtab / about:blank sem pai) são pais puros na última posição (padrão do Chrome).
+         * - Filhas de um pai vivo não fixado vão SEMPRE imediatamente à direita do pai (mais novos primeiro).
          * @param {Object} tab
          * @param {Object} [config]
          * @param {Object} [chromeApi]
@@ -587,10 +650,11 @@
         async posicionarNovaAbaHierarquia(tab, config = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (!tab || !tab.id || !tab.windowId || !chromeApi || !chromeApi.tabs) return;
             await this.garantirArvoreHidratada(chromeApi);
-            const sentido = config.sentidoOrdenacaoGuias || this.#sentido || 'esq_dir';
-            const ordenarFixadas = (config.ordenarGuiasFixadas !== undefined) ? Boolean(config.ordenarGuiasFixadas) : this.#ordenarGuiasFixadas;
             const urlTab = tab.url || tab.pendingUrl || '';
-            const ehRaizForcada = this.ehUrlRaizAlienOuInterna(urlTab) || this.#desvinculadasManualmente.has(tab.id);
+            const ehExtensao = this.ehUrlExtensao(urlTab);
+            const ehNewTabExplicita = /^(?:chrome|edge):\/\/newtab\/?$/i.test(String(urlTab || '').trim());
+            const ehBrancoSemPai = this.ehUrlNovaGuiaEmBranco(urlTab) && (ehNewTabExplicita || typeof tab.openerTabId !== 'number');
+            const ehRaizForcada = ehExtensao || ehBrancoSemPai || this.ehUrlRaizAlienOuInterna(urlTab) || this.#desvinculadasManualmente.has(tab.id);
 
             this.#estaMovendoBloco = true;
             try {
@@ -598,25 +662,18 @@
                 if (!abas || abas.length <= 1) return;
                 abas.sort((a, b) => a.index - b.index);
                 const atual = abas.find(t => t.id === tab.id) || tab;
-                if (!ordenarFixadas && atual.pinned) return;
+                if (atual.pinned) return;
 
-                const paiId = ehRaizForcada ? undefined : (this.#arvoreOpener.get(tab.id) ?? tab.openerTabId);
-                const paiTab = (paiId !== undefined && paiId !== tab.id) ? abas.find(t => t.id === paiId) : null;
+                const primeiroNaoFixado = Math.max(0, abas.findIndex(t => !t.pinned));
 
-                if (!paiTab) {
-                    /* Nova aba PAI/raiz (ex.: Nova Guia, Opções ou aba alienígena): 1ª posição não-fixada em esq_dir, fim em dir_esq */
-                    const primeiroLivre = ordenarFixadas ? 0 : Math.max(0, abas.findIndex(t => !t.pinned));
-                    let idxAlvo = (sentido === 'dir_esq') ? (abas.length - 1) : primeiroLivre;
-                    /* Garante nunca cair no meio de um grupo/família caso primeiroLivre esteja dentro de grupo */
-                    if (sentido !== 'dir_esq' && abas[idxAlvo] && typeof abas[idxAlvo].groupId === 'number' && abas[idxAlvo].groupId > 0 && atual.groupId !== abas[idxAlvo].groupId) {
-                        const grpId = abas[idxAlvo].groupId;
-                        const foraGrupo = abas.findIndex((t, i) => i >= primeiroLivre && (!t.groupId || t.groupId <= 0 || t.groupId !== grpId));
-                        if (foraGrupo >= 0 && atual.index > foraGrupo) {
-                            idxAlvo = Math.min(idxAlvo, foraGrupo);
-                        }
+                /* Regra Absoluta: chrome-extension: sempre na 1ª guia não fixada, fora de grupos */
+                if (ehExtensao) {
+                    this.#arvoreOpener.delete(tab.id);
+                    if (typeof atual.groupId === 'number' && atual.groupId > 0 && typeof chromeApi.tabs.ungroup === 'function') {
+                        await chromeApi.tabs.ungroup([tab.id]).catch(() => { });
                     }
-                    if (atual.index !== idxAlvo && typeof chromeApi.tabs.move === 'function') {
-                        const movOk = await this.#moverAbaComRetry(tab.id, idxAlvo, chromeApi);
+                    if (atual.index !== primeiroNaoFixado && typeof chromeApi.tabs.move === 'function') {
+                        const movOk = await this.#moverAbaComRetry(tab.id, primeiroNaoFixado, chromeApi);
                         if (movOk) this.#posicionadasInicialmente.add(tab.id);
                     } else {
                         this.#posicionadasInicialmente.add(tab.id);
@@ -624,26 +681,64 @@
                     return;
                 }
 
-                /* Aba FILHA: herda Tab Group do pai se houver e posiciona logo à direita do pai (esq_dir) ou ao final da subárvore (dir_esq) */
+                /* Calcula 1ª posição livre após eventuais chrome-extension: */
+                let primeiroAposExt = primeiroNaoFixado;
+                for (let i = primeiroNaoFixado; i < abas.length; i++) {
+                    if (abas[i].id !== tab.id && this.ehUrlExtensao(abas[i].url || abas[i].pendingUrl || '')) {
+                        primeiroAposExt = i + 1;
+                    } else if (abas[i].id !== tab.id) {
+                        break;
+                    }
+                }
+                if (atual.index < primeiroAposExt) primeiroAposExt = Math.max(primeiroNaoFixado, primeiroAposExt - 1);
+
+                /* Nova guia em branco: pai puro na última posição (padrão do Chrome) */
+                if (ehBrancoSemPai) {
+                    this.#arvoreOpener.delete(tab.id);
+                    const idxUltimo = abas.length - 1;
+                    if (atual.index !== idxUltimo && typeof chromeApi.tabs.move === 'function') {
+                        const movOk = await this.#moverAbaComRetry(tab.id, idxUltimo, chromeApi);
+                        if (movOk) this.#posicionadasInicialmente.add(tab.id);
+                    } else {
+                        this.#posicionadasInicialmente.add(tab.id);
+                    }
+                    return;
+                }
+
+                const paiId = ehRaizForcada ? undefined : (this.#arvoreOpener.get(tab.id) ?? tab.openerTabId);
+                const paiTab = (paiId !== undefined && paiId !== tab.id) ? abas.find(t => t.id === paiId) : null;
+
+                /* Filho de guia fixada -> vira "pai nato" na 1ª guia não fixada (após chrome-extension:) */
+                if (paiTab && paiTab.pinned) {
+                    this.#arvoreOpener.delete(tab.id);
+                    if (atual.index !== primeiroAposExt && typeof chromeApi.tabs.move === 'function') {
+                        const movOk = await this.#moverAbaComRetry(tab.id, primeiroAposExt, chromeApi);
+                        if (movOk) this.#posicionadasInicialmente.add(tab.id);
+                    } else {
+                        this.#posicionadasInicialmente.add(tab.id);
+                    }
+                    return;
+                }
+
+                if (!paiTab) {
+                    /* Nova guia raiz avulsa: última posição (padrão do Chrome) */
+                    const idxUltimo = abas.length - 1;
+                    if (atual.index !== idxUltimo && typeof chromeApi.tabs.move === 'function') {
+                        const movOk = await this.#moverAbaComRetry(tab.id, idxUltimo, chromeApi);
+                        if (movOk) this.#posicionadasInicialmente.add(tab.id);
+                    } else {
+                        this.#posicionadasInicialmente.add(tab.id);
+                    }
+                    return;
+                }
+
+                /* Aba FILHA de pai não fixado: herda Tab Group do pai se houver e vai IMEDIATAMENTE à direita do pai (mais novos primeiro) */
                 if (typeof paiTab.groupId === 'number' && paiTab.groupId > 0 && (!atual.groupId || atual.groupId <= 0) && typeof chromeApi.tabs.group === 'function') {
                     await chromeApi.tabs.group({ groupId: paiTab.groupId, tabIds: [tab.id] }).catch(() => { });
                 }
 
-                let idxDestino;
-                if (sentido === 'dir_esq') {
-                    const descPai = new Set(this.obterDescendentesDaAba(paiTab.id));
-                    descPai.delete(tab.id);
-                    let ultimoIdx = paiTab.index;
-                    for (const t of abas) {
-                        if (descPai.has(t.id) && t.index > ultimoIdx) {
-                            ultimoIdx = t.index;
-                        }
-                    }
-                    idxDestino = (atual.index < ultimoIdx) ? ultimoIdx : (ultimoIdx + 1);
-                } else {
-                    idxDestino = (atual.index < paiTab.index) ? paiTab.index : (paiTab.index + 1);
-                }
-                idxDestino = Math.max(0, Math.min(abas.length - 1, idxDestino));
+                let idxDestino = (atual.index < paiTab.index) ? paiTab.index : (paiTab.index + 1);
+                idxDestino = Math.max(primeiroNaoFixado, Math.min(abas.length - 1, idxDestino));
                 if (atual.index !== idxDestino && typeof chromeApi.tabs.move === 'function') {
                     const movOk = await this.#moverAbaComRetry(tab.id, idxDestino, chromeApi);
                     if (movOk) this.#posicionadasInicialmente.add(tab.id);
@@ -733,6 +828,333 @@
         }
 
         /**
+         * Extrai o baseDominio agrupável de uma URL web. Retorna '' para extensões, newtab e páginas internas.
+         * @param {string} urlStr
+         * @returns {string}
+         */
+        extrairDominioAgrupavel(urlStr = '') {
+            const u = String(urlStr || '').trim();
+            if (!u || this.ehUrlExtensao(u) || this.ehUrlNovaGuiaEmBranco(u)) return '';
+            if (/^(?:chrome|edge|devtools|view-source|about):/i.test(u)) return '';
+            const info = this.extrairInfoDominio(u);
+            return info && info.baseDominio ? info.baseDominio : '';
+        }
+
+        /**
+         * Calcula cor determinística da paleta para um domínio, evitando piscar/trocar cores de grupos existentes.
+         * @param {string} dominio
+         * @returns {string}
+         */
+        #obterCorDeterministicaDominio(dominio) {
+            const rsPal = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
+                ? JusGovCfgDefaults.obterRegrasSistema()
+                : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
+            const cores = (rsPal && rsPal.ordenacaoGuias && Array.isArray(rsPal.ordenacaoGuias.paletaGrupos) && rsPal.ordenacaoGuias.paletaGrupos.length > 0)
+                ? rsPal.ordenacaoGuias.paletaGrupos
+                : ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'purple', 'pink'];
+            let hash = 0;
+            const s = String(dominio || '');
+            for (let i = 0; i < s.length; i++) {
+                hash = ((hash << 5) - hash) + s.charCodeAt(i);
+                hash |= 0;
+            }
+            return cores[Math.abs(hash) % cores.length];
+        }
+
+        /**
+         * Mantém online os Tab Groups nativos do Chrome para todas as guias que compartilham o mesmo domínio base (>= 2 guias).
+         * - Retira automaticamente do grupo qualquer guia que saiu do domínio ou ficou sozinha sem pares.
+         * - Reutiliza grupos existentes do mesmo domínio sem recriar/piscar cores.
+         * - Nunca agrupa guias fixadas, chrome-extension:, newtab ou páginas internas.
+         * @param {number} windowId
+         * @param {Object} chromeApi
+         */
+        async sincronizarGruposDominioOnline(windowId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!windowId || !chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.group !== 'function') return;
+            const prevBloq = this.#estaMovendoBloco;
+            this.#estaMovendoBloco = true;
+            try {
+                const abas = await chromeApi.tabs.query({ windowId }).catch(() => []);
+                if (!abas || abas.length === 0) return;
+                abas.sort((a, b) => a.index - b.index);
+
+                const porDominio = new Map();
+                const idsParaDesagrupar = [];
+
+                for (const t of abas) {
+                    if (t.pinned) continue;
+                    const u = t.url || t.pendingUrl || '';
+                    const dom = this.extrairDominioAgrupavel(u);
+                    if (!dom) {
+                        if (typeof t.groupId === 'number' && t.groupId > 0) {
+                            idsParaDesagrupar.push(t.id);
+                        }
+                        continue;
+                    }
+                    if (!porDominio.has(dom)) porDominio.set(dom, []);
+                    porDominio.get(dom).push(t);
+                }
+
+                /* Desagrupa abas solitárias (sem pares no mesmo domínio) e internas */
+                for (const [dom, lista] of porDominio.entries()) {
+                    if (lista.length < 2) {
+                        for (const t of lista) {
+                            if (typeof t.groupId === 'number' && t.groupId > 0) {
+                                idsParaDesagrupar.push(t.id);
+                            }
+                        }
+                    }
+                }
+
+                if (idsParaDesagrupar.length > 0 && typeof chromeApi.tabs.ungroup === 'function') {
+                    await chromeApi.tabs.ungroup(idsParaDesagrupar).catch(async () => {
+                        for (const id of idsParaDesagrupar) {
+                            await chromeApi.tabs.ungroup(id).catch(() => { });
+                        }
+                    });
+                }
+
+                /* Mapeia grupos já existentes para reutilização limpa */
+                const gruposEmUso = new Set();
+                for (const [dom, lista] of porDominio.entries()) {
+                    if (lista.length < 2) continue;
+                    const contagemGrupo = new Map();
+                    for (const t of lista) {
+                        if (typeof t.groupId === 'number' && t.groupId > 0 && !gruposEmUso.has(t.groupId)) {
+                            contagemGrupo.set(t.groupId, (contagemGrupo.get(t.groupId) || 0) + 1);
+                        }
+                    }
+                    let groupIdAlvo = null;
+                    let maxCount = 0;
+                    for (const [gId, cnt] of contagemGrupo.entries()) {
+                        if (cnt > maxCount) {
+                            maxCount = cnt;
+                            groupIdAlvo = gId;
+                        }
+                    }
+
+                    const tabIds = lista.map(t => t.id);
+                    const jaTodasNoGrupo = groupIdAlvo !== null && lista.every(t => t.groupId === groupIdAlvo);
+                    if (jaTodasNoGrupo) {
+                        gruposEmUso.add(groupIdAlvo);
+                        continue;
+                    }
+
+                    try {
+                        let gIdFinal = groupIdAlvo;
+                        if (groupIdAlvo !== null) {
+                            const faltantes = lista.filter(t => t.groupId !== groupIdAlvo).map(t => t.id);
+                            if (faltantes.length > 0) {
+                                gIdFinal = await chromeApi.tabs.group({ groupId: groupIdAlvo, tabIds: faltantes });
+                            }
+                        } else {
+                            gIdFinal = await chromeApi.tabs.group({ tabIds });
+                        }
+                        if (typeof gIdFinal === 'number' && gIdFinal > 0) {
+                            gruposEmUso.add(gIdFinal);
+                            if (chromeApi.tabGroups && typeof chromeApi.tabGroups.update === 'function') {
+                                await chromeApi.tabGroups.update(gIdFinal, {
+                                    title: dom.toUpperCase(),
+                                    color: this.#obterCorDeterministicaDominio(dom)
+                                }).catch(() => { });
+                            }
+                        }
+                    } catch (_) { }
+                }
+            } finally {
+                if (!prevBloq) {
+                    setTimeout(() => { this.#estaMovendoBloco = false; }, 120);
+                }
+            }
+        }
+
+        /**
+         * Move uma aba específica para a extremidade (1ª posição não fixada após chrome-extension:, ou última)
+         * globalmente ou dentro do bloco contíguo do seu domínio.
+         * @param {Object} tab
+         * @param {{ sentido?: string, apenasDentroDoDominio?: boolean }} [opcoes]
+         * @param {Object} chromeApi
+         */
+        async #moverAbaParaExtremidade(tab, opcoes = {}, chromeApi = null) {
+            if (!tab || !tab.id || !tab.windowId || !chromeApi || !chromeApi.tabs) return;
+            const sentido = opcoes.sentido || this.#sentido || 'esq_dir';
+            const noInicio = (sentido !== 'dir_esq'); // esq_dir (Novo-Antigo) -> 1ª posição; dir_esq (Antigo-Novo) -> última posição
+            const prevBloq = this.#estaMovendoBloco;
+            this.#estaMovendoBloco = true;
+            try {
+                const abas = await chromeApi.tabs.query({ windowId: tab.windowId }).catch(() => []);
+                if (!abas || abas.length <= 1) return;
+                abas.sort((a, b) => a.index - b.index);
+                const atual = abas.find(t => t.id === tab.id);
+                if (!atual || atual.pinned) return;
+
+                const primeiroNaoFixado = Math.max(0, abas.findIndex(t => !t.pinned));
+
+                if (opcoes.apenasDentroDoDominio) {
+                    const domAlvo = this.extrairDominioAgrupavel(atual.url || atual.pendingUrl || '');
+                    if (!domAlvo) return;
+                    const mesmas = abas.filter(t => !t.pinned && this.extrairDominioAgrupavel(t.url || t.pendingUrl || '') === domAlvo);
+                    if (mesmas.length <= 1) return;
+                    const idxMin = Math.min(...mesmas.map(t => t.index));
+                    const idxMax = Math.max(...mesmas.map(t => t.index));
+                    const idxAlvo = noInicio ? idxMin : idxMax;
+                    if (atual.index !== idxAlvo) {
+                        await this.#moverAbaComRetry(atual.id, idxAlvo, chromeApi);
+                    }
+                    return;
+                }
+
+                let primeiroAposExt = primeiroNaoFixado;
+                for (let i = primeiroNaoFixado; i < abas.length; i++) {
+                    if (abas[i].id !== atual.id && this.ehUrlExtensao(abas[i].url || abas[i].pendingUrl || '')) {
+                        primeiroAposExt = i + 1;
+                    } else if (abas[i].id !== atual.id) {
+                        break;
+                    }
+                }
+                if (atual.index < primeiroAposExt) primeiroAposExt = Math.max(primeiroNaoFixado, primeiroAposExt - 1);
+
+                const idxAlvo = noInicio ? primeiroAposExt : (abas.length - 1);
+                if (atual.index !== idxAlvo) {
+                    await this.#moverAbaComRetry(atual.id, idxAlvo, chromeApi);
+                }
+            } finally {
+                if (!prevBloq) {
+                    setTimeout(() => { this.#estaMovendoBloco = false; }, 120);
+                }
+            }
+        }
+
+        /**
+         * Manipulador cirúrgico online para todos os eventos de aba (criada, url_mudou, titulo_mudou, ativada, desafixada),
+         * respeitando exatamente a semântica de cada critério sem reordenar abas indevidamente.
+         * @param {Object} tab
+         * @param {'criada'|'url_mudou'|'titulo_mudou'|'ativada'|'desafixada'} evento
+         * @param {Object} [config]
+         * @param {Object} [chromeApi]
+         * @param {Map|null} [mapaAbasUrls]
+         */
+        async sincronizarAbaNoCriterio(tab, evento, config = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), mapaAbasUrls = null) {
+            if (!tab || !tab.id || !tab.windowId || !chromeApi || !chromeApi.tabs) return;
+            if (tab.pinned) return;
+
+            const crit = this.normalizarCriterio(config.criterioOrdenacaoGuias || this.#criterio);
+            if (!crit || crit === 'nenhum') return;
+
+            const sentido = config.sentidoOrdenacaoGuias || this.#sentido || 'esq_dir';
+            const urlTab = tab.url || tab.pendingUrl || '';
+
+            /* Regra Absoluta: chrome-extension: sempre na 1ª guia não fixada em qualquer critério ativo */
+            if (this.ehUrlExtensao(urlTab) && (evento === 'criada' || evento === 'url_mudou' || evento === 'desafixada')) {
+                const prevBloq = this.#estaMovendoBloco;
+                this.#estaMovendoBloco = true;
+                try {
+                    const abas = await chromeApi.tabs.query({ windowId: tab.windowId }).catch(() => []);
+                    abas.sort((a, b) => a.index - b.index);
+                    const atual = abas.find(t => t.id === tab.id) || tab;
+                    if (typeof atual.groupId === 'number' && atual.groupId > 0 && typeof chromeApi.tabs.ungroup === 'function') {
+                        await chromeApi.tabs.ungroup([tab.id]).catch(() => { });
+                    }
+                    const primeiroNaoFixado = Math.max(0, abas.findIndex(t => !t.pinned));
+                    if (atual.index !== primeiroNaoFixado) {
+                        await this.#moverAbaComRetry(tab.id, primeiroNaoFixado, chromeApi);
+                    }
+                } finally {
+                    if (!prevBloq) setTimeout(() => { this.#estaMovendoBloco = false; }, 120);
+                }
+                return;
+            }
+
+            if (crit === 'hierarquia_arvore') {
+                if (evento === 'criada' || evento === 'desafixada') {
+                    await this.posicionarNovaAbaHierarquia(tab, config, chromeApi);
+                }
+                return;
+            }
+
+            /* Bloco "Acesso": ordem_criacao, tempo_acesso, ultima_ativacao */
+            if (crit === 'ordem_criacao') {
+                if (evento === 'criada' || evento === 'desafixada') {
+                    await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: false }, chromeApi);
+                }
+                return;
+            }
+
+            if (crit === 'tempo_acesso') {
+                if (evento === 'url_mudou' || evento === 'criada' || evento === 'desafixada') {
+                    this.registrarNavegacaoAba(tab.id);
+                    await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: false }, chromeApi);
+                }
+                return;
+            }
+
+            if (crit === 'ultima_ativacao') {
+                if (evento === 'ativada' || evento === 'criada' || evento === 'desafixada') {
+                    this.registrarAtivacaoAba(tab.id);
+                    await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: false }, chromeApi);
+                }
+                return;
+            }
+
+            if (crit === 'titulo') {
+                if (evento === 'criada' || evento === 'url_mudou' || evento === 'titulo_mudou' || evento === 'desafixada') {
+                    this.agendarOrdenacaoAbas(tab.windowId, config, chromeApi, mapaAbasUrls);
+                }
+                return;
+            }
+
+            /* Bloco "Domínio do Site": agrupamento online permanente + 5 subcritérios */
+            if (this.ehCriterioDominio(crit)) {
+                const novoDom = this.extrairDominioAgrupavel(urlTab);
+                const domAnterior = this.#dominioAnteriorPorAba.get(tab.id);
+                const mudouDominio = (domAnterior !== undefined && domAnterior !== novoDom);
+                if (novoDom || domAnterior !== undefined) {
+                    this.#dominioAnteriorPorAba.set(tab.id, novoDom);
+                }
+
+                if (crit === 'dominio_criacao') {
+                    if (evento === 'criada' || evento === 'desafixada' || (evento === 'url_mudou' && (mudouDominio || domAnterior === undefined))) {
+                        await this.sincronizarGruposDominioOnline(tab.windowId, chromeApi);
+                        await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: true }, chromeApi);
+                    }
+                    return;
+                }
+
+                if (crit === 'url') {
+                    if (evento === 'criada' || evento === 'url_mudou' || evento === 'desafixada') {
+                        this.agendarOrdenacaoAbas(tab.windowId, config, chromeApi, mapaAbasUrls);
+                    }
+                    return;
+                }
+
+                if (crit === 'dominio_titulo') {
+                    if (evento === 'criada' || evento === 'url_mudou' || evento === 'titulo_mudou' || evento === 'desafixada') {
+                        this.agendarOrdenacaoAbas(tab.windowId, config, chromeApi, mapaAbasUrls);
+                    }
+                    return;
+                }
+
+                if (crit === 'dominio_acesso') {
+                    if (evento === 'url_mudou' || evento === 'criada' || evento === 'desafixada') {
+                        this.registrarNavegacaoAba(tab.id);
+                        await this.sincronizarGruposDominioOnline(tab.windowId, chromeApi);
+                        await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: true }, chromeApi);
+                    }
+                    return;
+                }
+
+                if (crit === 'dominio_ativacao') {
+                    if (evento === 'ativada' || evento === 'criada' || evento === 'desafixada' || (evento === 'url_mudou' && mudouDominio)) {
+                        if (evento === 'ativada') this.registrarAtivacaoAba(tab.id);
+                        await this.sincronizarGruposDominioOnline(tab.windowId, chromeApi);
+                        await this.#moverAbaParaExtremidade(tab, { sentido, apenasDentroDoDominio: true }, chromeApi);
+                    }
+                    return;
+                }
+            }
+        }
+
+        /**
          * Agenda ordenação de abas com debouncing
          * @param {number} windowId
          * @param {Object} [config]
@@ -740,7 +1162,7 @@
          * @param {Map} [mapaAbasUrls]
          */
         agendarOrdenacaoAbas(windowId, config = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), mapaAbasUrls = null) {
-            const criterio = config.criterioOrdenacaoGuias || this.#criterio;
+            const criterio = this.normalizarCriterio(config.criterioOrdenacaoGuias || this.#criterio);
             if (!windowId || !criterio || criterio === 'nenhum') return;
             if (this.#timerOrdenacaoAbas) clearTimeout(this.#timerOrdenacaoAbas);
             this.#timerOrdenacaoAbas = setTimeout(async () => {
@@ -748,18 +1170,18 @@
                 try {
                     await this.executarOrdenacaoGuias(windowId, config, chromeApi, mapaAbasUrls);
                 } catch (_) { }
-            }, 450);
+            }, 350);
         }
 
         /**
-         * Executa a reordenação das abas na janela
+         * Executa a reordenação das abas na janela (guias fixadas nunca são ordenadas).
          * @param {number} windowId
          * @param {Object} [config]
          * @param {Object} [chromeApi]
          * @param {Map} [mapaAbasUrls]
          */
         async executarOrdenacaoGuias(windowId, config = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), mapaAbasUrls = null) {
-            const criterio = config.criterioOrdenacaoGuias || this.#criterio;
+            const criterio = this.normalizarCriterio(config.criterioOrdenacaoGuias || this.#criterio);
             if (!windowId || !criterio || criterio === 'nenhum') return;
             if (this.#estaOrdenandoGuias) return;
             this.#estaOrdenandoGuias = true;
@@ -767,7 +1189,6 @@
             try {
                 await this.garantirArvoreHidratada(chromeApi);
                 const sentido = config.sentidoOrdenacaoGuias || this.#sentido || 'esq_dir';
-                const ordenarFixadas = (config.ordenarGuiasFixadas !== undefined) ? Boolean(config.ordenarGuiasFixadas) : this.#ordenarGuiasFixadas;
 
                 if (criterio === 'agrupar_dominio') {
                     await this.agruparPorDominio(windowId, chromeApi);
@@ -779,7 +1200,8 @@
                 let abas = await chromeApi.tabs.query({ windowId: windowId });
                 if (!abas || abas.length <= 1) return;
 
-                let abasAlvo = abas.filter(t => (ordenarFixadas ? true : !t.pinned));
+                /* Guias fixadas nunca fazem parte da ordenação */
+                let abasAlvo = abas.filter(t => !t.pinned);
                 if (abasAlvo.length <= 1) return;
 
                 if (criterio === 'hierarquia_arvore') {
@@ -795,18 +1217,18 @@
                             } catch (_) { }
                         }
                     }
-                } else {
-                    /* Demais critérios dissolvem grupos existentes para permitir ordenação global livre */
+                } else if (!this.ehCriterioDominio(criterio)) {
+                    /* Critérios fora de Hierarquia e Domínio do Site dissolvem grupos para ordenação global livre */
                     const temGrupos = abasAlvo.some(t => t.groupId !== undefined && t.groupId > 0);
                     if (temGrupos) {
                         await this.desagruparTodas(windowId, chromeApi);
                         abas = await chromeApi.tabs.query({ windowId: windowId });
-                        abasAlvo = abas.filter(t => (ordenarFixadas ? true : !t.pinned));
+                        abasAlvo = abas.filter(t => !t.pinned);
                     }
                 }
 
                 const abasOrdenadas = (criterio === 'hierarquia_arvore')
-                    ? this.ordenarPorHierarquiaArvore(abasAlvo, sentido, mapaAbasUrls)
+                    ? this.ordenarPorHierarquiaArvore(abasAlvo, 'esq_dir', mapaAbasUrls)
                     : [...abasAlvo].sort((a, b) => this.compararAbasParaOrdenacao(a, b, criterio, sentido, mapaAbasUrls));
 
                 const indexInicial = Math.min(...abasAlvo.map(t => (typeof t.index === 'number' ? t.index : 0)));
@@ -818,6 +1240,11 @@
                     try {
                         await chromeApi.tabs.move(t.id, { index: novoIdx });
                     } catch (_) { }
+                }
+
+                /* Para qualquer subopção de "Domínio do Site", mantém Tab Groups agrupados online após ordenar */
+                if (this.ehCriterioDominio(criterio)) {
+                    await this.sincronizarGruposDominioOnline(windowId, chromeApi);
                 }
             } finally {
                 setTimeout(() => {

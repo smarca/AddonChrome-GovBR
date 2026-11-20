@@ -18,6 +18,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Opções, Central de Ajuda e Testes | JusGovBR</title>
     <link rel="icon" type="image/png" href="../ico/icon128.png">
+    <link rel="stylesheet" href="global.css">
     <link rel="stylesheet" href="options.css">
 </head>
 
@@ -150,18 +151,32 @@
                         <div class="setting-help">Exibe um discreto contorno colorido ancorado ao texto selecionado ao copiar um trecho simples
                             para confirmar a captura sem balões intrusivos.</div>
                     </div>
-                    <div class="controle-slider-composto" style="flex-wrap: wrap;">
-                        <span id="previewFlashBorderExemplo" style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; border: 2px solid #0d9488; background: rgba(13, 148, 136, 0.12); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
-                        <div class="paleta-cores-basicas" data-target-color="optCorFlashBorder" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de cores básicas">
-                            <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #0d9488; cursor: pointer; padding: 0;" title="Verde Esmeralda"></button>
-                            <button type="button" class="btn-swatch-cor" data-cor="#16a34a" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #16a34a; cursor: pointer; padding: 0;" title="Verde"></button>
-                            <button type="button" class="btn-swatch-cor" data-cor="#2563eb" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #2563eb; cursor: pointer; padding: 0;" title="Azul"></button>
-                            <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #d97706; cursor: pointer; padding: 0;" title="Âmbar"></button>
-                            <button type="button" class="btn-swatch-cor" data-cor="#dc2626" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #dc2626; cursor: pointer; padding: 0;" title="Vermelho"></button>
-                            <button type="button" class="btn-swatch-cor" data-cor="#7c3aed" style="width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #7c3aed; cursor: pointer; padding: 0;" title="Roxo"></button>
+                    <div class="controle-slider-composto" style="flex-wrap: wrap; gap: 8px;">
+                        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 600;">
+                            <span>Borda:</span>
+                            <input type="color" id="optCorFlashBorder" class="input-cor-compacto" value="#0d9488" title="Cor do contorno e destaque do Flash">
+                            <div class="paleta-cores-basicas" data-target-color="optCorFlashBorder" title="Paleta rápida de cores básicas">
+                                <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="background: #0d9488;" title="Verde Esmeralda"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#16a34a" style="background: #16a34a;" title="Verde"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#2563eb" style="background: #2563eb;" title="Azul"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="background: #d97706;" title="Âmbar"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#dc2626" style="background: #dc2626;" title="Vermelho"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#7c3aed" style="background: #7c3aed;" title="Roxo"></button>
+                            </div>
                         </div>
-                        <input type="color" id="optCorFlashBorder" class="input-cor-compacto" value="#0d9488"
-                            title="Cor do contorno e destaque do Flash">
+                        <div class="seletor-visual-wrap">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Contorno:</span>
+                            <button type="button" id="btnContornoFlashVisual" class="btn-seletor-visual" title="Escolher tipo de contorno do Flash"></button>
+                            <select id="optTipoContornoFlashBorder" style="display: none;">
+                                <option value="solido" selected>Sólido</option>
+                                <option value="tracejado">Tracejado</option>
+                                <option value="ondulado">Ondulado</option>
+                                <option value="taxado">Taxado</option>
+                                <option value="sem_borda">Sem Borda</option>
+                            </select>
+                            <div id="popoverContornoFlashVisual" class="popover-seletor-visual" style="display: none;"></div>
+                        </div>
+                        <span id="previewFlashBorderExemplo" style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; border: 2px solid #0d9488; background: rgba(13, 148, 136, 0.12); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
                         <input type="range" id="optTempoFlashMs" class="input-range-custom" min="0" max="5250"
                             step="250" value="5250">
                         <span id="lblValorTempoFlash" class="badge-valor-slider">Até Interação</span>
@@ -196,48 +211,54 @@
                             <span class="slider"></span>
                         </label>
                     </div>
-                    <div id="painelCustomizacaoMarcadorColado" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <label for="optPresetMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Tema:</label>
-                            <select id="optPresetMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                    <div id="painelCustomizacaoMarcadorColado" style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); transition: opacity 0.2s ease;">
+                        <div class="seletor-visual-wrap">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Tema:</span>
+                            <button type="button" id="btnTemaMarcadorVisual" class="btn-seletor-visual" title="Escolher tema visual do marcador"></button>
+                            <select id="optPresetMarcadorColado" style="display: none;">
                                 <option value="verde_forense" selected>Verde Esmeralda Forense</option>
                                 <option value="marca_texto_classico">Marca-Texto Clássico</option>
                                 <option value="azul_indigo">Azul Índigo</option>
                                 <option value="ambar_suave">Âmbar Suave</option>
                                 <option value="alto_contraste">Alto Contraste</option>
                             </select>
-                            <label for="optTipoContornoMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Contorno:</label>
-                            <select id="optTipoContornoMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
+                            <div id="popoverTemaMarcadorVisual" class="popover-seletor-visual" style="display: none;"></div>
+                        </div>
+                        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 600;">
+                            <span>Borda:</span>
+                            <input type="color" id="optCorContornoMarcadorColado" class="input-cor-compacto" value="#0d9488" title="Cor da borda do marcador permanente">
+                            <div class="paleta-cores-basicas" data-target-color="optCorContornoMarcadorColado" title="Paleta rápida de borda">
+                                <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="background: #0d9488;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#eab308" style="background: #eab308;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#4f46e5" style="background: #4f46e5;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="background: #d97706;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#1e293b" style="background: #1e293b;"></button>
+                            </div>
+                        </div>
+                        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 600;">
+                            <span>Fundo:</span>
+                            <input type="color" id="optCorFundoMarcadorColado" class="input-cor-compacto" value="#ccfbf1" title="Cor de preenchimento suave do marcador permanente">
+                            <div class="paleta-cores-basicas" data-target-color="optCorFundoMarcadorColado" title="Paleta rápida de fundo">
+                                <button type="button" class="btn-swatch-cor" data-cor="#ccfbf1" style="background: #ccfbf1;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#fef08a" style="background: #fef08a;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#e0e7ff" style="background: #e0e7ff;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#fde68a" style="background: #fde68a;"></button>
+                                <button type="button" class="btn-swatch-cor" data-cor="#facc15" style="background: #facc15;"></button>
+                            </div>
+                        </div>
+                        <div class="seletor-visual-wrap">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Contorno:</span>
+                            <button type="button" id="btnContornoMarcadorVisual" class="btn-seletor-visual" title="Escolher tipo de contorno do marcador"></button>
+                            <select id="optTipoContornoMarcadorColado" style="display: none;">
                                 <option value="solido" selected>Sólido</option>
                                 <option value="tracejado">Tracejado</option>
-                                <option value="sem_borda">Sem Borda (Só Fundo)</option>
                                 <option value="ondulado">Ondulado</option>
                                 <option value="taxado">Taxado</option>
+                                <option value="sem_borda">Sem Borda (Só Fundo)</option>
                             </select>
+                            <div id="popoverContornoMarcadorVisual" class="popover-seletor-visual" style="display: none;"></div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                            <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
-                                <span>Borda:</span>
-                                <input type="color" id="optCorContornoMarcadorColado" class="input-cor-compacto" value="#0d9488" title="Cor da borda do marcador permanente">
-                                <div class="paleta-cores-basicas" data-target-color="optCorContornoMarcadorColado" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de borda">
-                                    <button type="button" class="btn-swatch-cor" data-cor="#0d9488" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #0d9488; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#eab308" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #eab308; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#4f46e5" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #4f46e5; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#d97706" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #d97706; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#1e293b" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #1e293b; cursor: pointer; padding: 0;"></button>
-                                </div>
-                            </div>
-                            <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--texto-secundario); font-weight: 500;">
-                                <span>Fundo:</span>
-                                <input type="color" id="optCorFundoMarcadorColado" class="input-cor-compacto" value="#ccfbf1" title="Cor de preenchimento suave do marcador permanente">
-                                <div class="paleta-cores-basicas" data-target-color="optCorFundoMarcadorColado" style="display: inline-flex; align-items: center; gap: 3px;" title="Paleta rápida de fundo">
-                                    <button type="button" class="btn-swatch-cor" data-cor="#ccfbf1" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #ccfbf1; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#fef08a" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #fef08a; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#e0e7ff" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #e0e7ff; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#fde68a" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #fde68a; cursor: pointer; padding: 0;"></button>
-                                    <button type="button" class="btn-swatch-cor" data-cor="#facc15" style="width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); background: #facc15; cursor: pointer; padding: 0;"></button>
-                                </div>
-                            </div>
+                        <div style="display: inline-flex; align-items: center; gap: 5px;">
                             <label for="optEstiloBadgeMarcadorColado" style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Etiqueta:</label>
                             <select id="optEstiloBadgeMarcadorColado" class="input-select" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--borda-suave); background: var(--fundo-input); color: var(--texto-principal);">
                                 <option value="sobrescrito" selected>Sobrescrito Discreto Circular</option>
@@ -249,11 +270,11 @@
                                 <option value="apenas_numeral">Apenas Numeral</option>
                                 <option value="sem_etiqueta">Sem Etiqueta</option>
                             </select>
-                            <span id="previewMarcadorColadoExemploWrap" style="position: relative; display: inline-flex; align-items: center; margin: 4px 10px 0 6px;">
-                                <span id="previewMarcadorColadoExemplo" style="display: inline-block; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #0d9488; background: rgba(204, 251, 241, 0.35); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
-                                <span id="previewMarcadorColadoBadge" style="position: absolute; top: -7px; right: -8px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #0d9488; background: rgba(255,255,255,0.88); border: 1px solid #0d9488; border-radius: 999px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box;">1</span>
-                            </span>
                         </div>
+                        <span id="previewMarcadorColadoExemploWrap" style="position: relative; display: inline-flex; align-items: center; margin: 4px 10px 0 auto;">
+                            <span id="previewMarcadorColadoExemplo" style="display: inline-block; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #0d9488; background: rgba(204, 251, 241, 0.35); font-size: 12px; font-weight: 600; color: var(--texto-principal); user-select: none;">Exemplo</span>
+                            <span id="previewMarcadorColadoBadge" style="position: absolute; top: -7px; right: -8px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #0d9488; background: rgba(255,255,255,0.88); border: 1px solid #0d9488; border-radius: 999px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box;">1</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -847,20 +868,23 @@
                             title="Critério para reorganizar as guias da janela ativa">
                             <option value="nenhum">Nenhum (Desativado)</option>
                             <option value="hierarquia_arvore" selected>Por Hierarquia (em Formato de Árvore)</option>
-                            <option value="dominio" style="font-weight: 600;">Domínio Site</option>
-                            <option value="dominio_titulo">&nbsp;&nbsp;&nbsp;&nbsp;↳ Título da Página</option>
-                            <option value="url">&nbsp;&nbsp;&nbsp;&nbsp;↳ URL Completa (com Caminho)</option>
-                            <option value="dominio_criacao">&nbsp;&nbsp;&nbsp;&nbsp;↳ Abertura / Criação (Cronológica)</option>
-                            <option value="dominio_acesso">&nbsp;&nbsp;&nbsp;&nbsp;↳ Último Acesso (Navegação)</option>
+                            <optgroup label="Domínio do Site">
+                                <option value="dominio_criacao">↳ Abertura / Criação Cronológica</option>
+                                <option value="url">↳ URL Completa</option>
+                                <option value="dominio_titulo">↳ Título da Página</option>
+                                <option value="dominio_acesso">↳ Último Acesso (Navegação)</option>
+                                <option value="dominio_ativacao">↳ Última Ativação</option>
+                            </optgroup>
                             <optgroup label="Acesso">
-                                <option value="ordem_criacao">↳ Abertura / Criação (Cronológica)</option>
+                                <option value="ordem_criacao">↳ Abertura / Criação Cronológica</option>
                                 <option value="tempo_acesso">↳ Último Acesso (Navegação)</option>
+                                <option value="ultima_ativacao">↳ Última Ativação</option>
                             </optgroup>
                             <option value="titulo">Título da Página (Geral)</option>
                         </select>
                     </div>
                     <div id="containerSubControlesOrdenacao" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; transition: opacity 0.2s ease;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div id="containerSentidoOrdenacaoGuias" style="display: flex; align-items: center; gap: 8px; transition: opacity 0.2s ease;">
                             <span style="font-size: 12px; font-weight: 600; color: var(--texto-secundario);">Sentido:</span>
                             <label class="switch" for="optSentidoOrdenacaoGuiasSwitch" style="flex-shrink: 0; user-select: none; cursor: pointer;" title="Alternar Sentido: Da Esquerda para a Direita (A-Z ou Novo-Antigo) ou Da Direita para a Esquerda (Z-A ou Antigo-Novo)">
                                 <input type="checkbox" id="optSentidoOrdenacaoGuiasSwitch" checked>
@@ -872,12 +896,6 @@
                                 <option value="dir_esq">Da Direita para a Esquerda (Z-A ou Antigo-Novo)</option>
                             </select>
                         </div>
-                        <label
-                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-secundario); cursor: pointer;"
-                            title="Quando marcado, move e ordena também as guias fixadas no início da barra">
-                            <input type="checkbox" id="optOrdenarGuiasFixadas">
-                            <span>Ordenar guias fixadas</span>
-                        </label>
                         <label id="containerFecharHierarquiaCascata"
                             style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #f59e0b; font-weight: 600; cursor: pointer;"
                             title="No modo Por Hierarquia, fechar uma guia pai fecha automaticamente todas as guias filhas e descendentes abertas a partir dela">
@@ -998,10 +1016,11 @@
                             <span class="slider"></span>
                         </label>
                     </div>
-                    <div id="painelConfigPomodoro" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave);">
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                    <div class="subgrupos-lado-a-lado">
+                    <div id="painelConfigPomodoro" class="subgrupo-painel">
+                        <label class="jg-inline-rotulo">
                             Proporção:
-                            <select id="optPomodoroProporcao" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                            <select id="optPomodoroProporcao" class="input-select jg-select-compacto">
                                 <option value="5">5:1</option>
                                 <option value="4.5" selected>4.5:1</option>
                                 <option value="4">4:1</option>
@@ -1009,9 +1028,9 @@
                                 <option value="3">3:1</option>
                             </select>
                         </label>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                        <label class="jg-inline-rotulo">
                             Foco:
-                            <select id="optPomodoroFocoMinutos" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                            <select id="optPomodoroFocoMinutos" class="input-select jg-select-compacto">
                                 <option value="25">25 min</option>
                                 <option value="30">30 min</option>
                                 <option value="35">35 min</option>
@@ -1031,9 +1050,9 @@
                         <span style="font-size: 12px; color: var(--texto-principal); font-weight: 600;">
                             Alívio: <span id="lblPomodoroAlivioCalculado" style="color: #0d9488;">10 min</span>
                         </span>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);">
+                        <label class="jg-inline-rotulo">
                             Ciclos:
-                            <select id="optPomodoroCiclos" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                            <select id="optPomodoroCiclos" class="input-select jg-select-compacto">
                                 <option value="2">2 ciclos</option>
                                 <option value="3">3 ciclos</option>
                                 <option value="4" selected>4 ciclos</option>
@@ -1049,19 +1068,19 @@
                             Descanso: <span id="lblPomodoroPausaMaiorCalculada" style="color: #0d9488;">40 min</span>
                         </span>
                     </div>
-                    <div id="painelAparenciaPomodoro" style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: rgba(15, 23, 42, 0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave);">
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);" title="Define o estilo do minipopup no ciclo ativo de Foco (sincronizado com 1 clique no minipopup)">
+                    <div id="painelAparenciaPomodoro" class="subgrupo-painel">
+                        <label class="jg-inline-rotulo" title="Define o estilo do minipopup no ciclo ativo de Foco (sincronizado com 1 clique no minipopup)">
                             Estilo:
-                            <select id="optPomodoroEstiloMinipopup" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                            <select id="optPomodoroEstiloMinipopup" class="input-select jg-select-compacto">
                                 <option value="micro">Micro (Bolinha)</option>
                                 <option value="compacto" selected>Mini (MM:SS)</option>
                                 <option value="normal">Normal (🍅 Foco x/x MM:SS)</option>
                                 <option value="expandido">Expandido (+ Último Alívio)</option>
                             </select>
                         </label>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-secundario);" title="Define o comportamento do minipopup flutuante em sincronia com o cadeado e o fechar do próprio minipopup">
+                        <label class="jg-inline-rotulo" title="Define o comportamento do minipopup flutuante em sincronia com o cadeado e o fechar do próprio minipopup">
                             Minipopup:
-                            <select id="optPomodoroComportamentoBarra" class="input-select" style="padding: 4px 8px; font-size: 12px;">
+                            <select id="optPomodoroComportamentoBarra" class="input-select jg-select-compacto">
                                 <option value="fixo" selected>Fixo (Cadeado Amarelo)</option>
                                 <option value="movel">Móvel (Cadeado Cinza)</option>
                                 <option value="oculto">Oculto no Ativo (Só no Descanso)</option>
@@ -1071,6 +1090,7 @@
                             <input type="checkbox" id="optPomodoroBeepConclusaoAtivo">
                             Desativar Beeps
                         </label>
+                    </div>
                     </div>
                 </div>
                 <div id="painelEstatisticasTrabalho" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--borda-suave); background: rgba(15, 23, 42, 0.025); flex-wrap: wrap;">
@@ -2509,6 +2529,7 @@
     <script src="../mod-copia/copia-synccfg.js"></script>
     <script src="../mod-copia/copia-dom.js"></script>
     <script src="../mod-copia/copia-teclado.js"></script>
+    <script src="../mod-copia/copia-politica-selecao.js"></script>
     <script src="../mod-copia/lib-copia-padroes.js"></script>
     <script src="../mod-copia/lib-copia-filtros-texto.js"></script>
     <script src="../mod-copia/copia-aviso-flutuante.js"></script>
@@ -2560,6 +2581,7 @@
     <script src="options-mapeamento.js"></script>
     <script src="options-laboratorio.js"></script>
     <script src="../mod-produt/lib-produt-bem-estar.js"></script>
+    <script src="../mod-produt/produt-resumo-ui.js"></script>
     <script src="../mod-produt/mod-produt.js"></script>
     <script src="options.js"></script>
     <script src="editor_demo.js"></script>

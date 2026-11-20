@@ -99,8 +99,15 @@
         set sentido(_) { },
         get ordenarGuiasFixadas() { return false; },
         set ordenarGuiasFixadas(_) { },
+        normalizarCriterio: (c) => String(c || 'nenhum'),
+        ehCriterioDominio: () => false,
+        ehUrlExtensao: () => false,
+        ehUrlNovaGuiaEmBranco: () => false,
+        registrarNavegacaoAba: () => { },
+        registrarAtivacaoAba: () => { },
         extrairDominio: () => 'desconhecido',
         extrairInfoDominio: () => ({ baseDominio: '', subDominio: '', ehPuro: true, caminho: '', urlNormalizada: '' }),
+        extrairDominioAgrupavel: () => '',
         compararAbasParaOrdenacao: () => 0,
         compararPorCriacaoCronologica: () => 0,
         registrarCriacaoAba: () => { },
@@ -117,6 +124,8 @@
         foiPosicionadaInicialmente: () => false,
         posicionarNovaAbaHierarquia: async () => { },
         tratarAbaMovidaManual: async () => { },
+        sincronizarGruposDominioOnline: async () => { },
+        sincronizarAbaNoCriterio: async () => { },
         agendarOrdenacaoAbas: () => { },
         executarOrdenacaoGuias: async () => { },
         agruparPorDominio: async () => 0,
@@ -556,9 +565,11 @@
             }
 
             const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || (this.#ordenacao && this.#ordenacao.criterio);
+            const ehExtensao = Boolean(this.#ordenacao && typeof this.#ordenacao.ehUrlExtensao === 'function' && this.#ordenacao.ehUrlExtensao(urlTab));
+            const ehNewTabExplicita = /^(?:chrome|edge):\/\/newtab\/?$/i.test(String(urlTab || '').trim());
             const ehAlienOuSistema = Boolean(
-                this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' &&
-                this.#ordenacao.ehUrlRaizAlienOuInterna(urlTab)
+                ehExtensao || ehNewTabExplicita ||
+                (this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(urlTab))
             );
 
             if (this.#ordenacao) {
@@ -576,6 +587,11 @@
                     }
                 }
 
+                const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
+                if (typeof this.#ordenacao.sincronizarAbaNoCriterio === 'function') {
+                    await this.#ordenacao.sincronizarAbaNoCriterio(tab, 'criada', this.#configuracoes, chromeApi, mapa);
+                    return;
+                }
                 if (critAtual === 'hierarquia_arvore' && typeof this.#ordenacao.posicionarNovaAbaHierarquia === 'function') {
                     await this.#ordenacao.posicionarNovaAbaHierarquia(tab, this.#configuracoes, chromeApi);
                     return;
@@ -601,13 +617,22 @@
                 if (res && res.duplicada) return;
             }
 
+            const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
+
+            /* Ao liberar (desafixar) uma guia, tenta ordená-la imediatamente conforme o critério ativo */
+            if (changeInfo && changeInfo.pinned === false && tab && this.#ordenacao && typeof this.#ordenacao.sincronizarAbaNoCriterio === 'function') {
+                await this.#ordenacao.sincronizarAbaNoCriterio(tab, 'desafixada', this.#configuracoes, chromeApi, mapa);
+                return;
+            }
+
             const critAtual = (this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || (this.#ordenacao && this.#ordenacao.criterio);
             if (critAtual === 'hierarquia_arvore') {
                 const novaUrl = (changeInfo && changeInfo.url) || (tab && tab.url) || '';
-                const ehAlien = Boolean(this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(novaUrl));
+                const ehExt = Boolean(this.#ordenacao && typeof this.#ordenacao.ehUrlExtensao === 'function' && this.#ordenacao.ehUrlExtensao(novaUrl));
+                const ehAlien = Boolean(ehExt || (this.#ordenacao && typeof this.#ordenacao.ehUrlRaizAlienOuInterna === 'function' && this.#ordenacao.ehUrlRaizAlienOuInterna(novaUrl)));
                 if (ehAlien) {
                     const paiAtual = typeof this.#ordenacao.obterPaiRegistrado === 'function' ? this.#ordenacao.obterPaiRegistrado(tabId) : undefined;
-                    if (paiAtual !== undefined) {
+                    if (paiAtual !== undefined || (ehExt && changeInfo && changeInfo.url)) {
                         if (typeof this.#ordenacao.desvincularPaiDaAba === 'function') {
                             this.#ordenacao.desvincularPaiDaAba(tabId, chromeApi);
                         }
@@ -630,12 +655,33 @@
                 return;
             }
 
-            if (tab && tab.windowId && (changeInfo.status === 'complete' || changeInfo.title || changeInfo.url)) {
-                if (this.#ordenacao && typeof this.#ordenacao.agendarOrdenacaoAbas === 'function') {
-                    const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
-                    this.#ordenacao.agendarOrdenacaoAbas(tab.windowId, this.#configuracoes, chromeApi, mapa);
+            if (tab && tab.windowId && this.#ordenacao && typeof this.#ordenacao.sincronizarAbaNoCriterio === 'function') {
+                if (changeInfo && changeInfo.url) {
+                    await this.#ordenacao.sincronizarAbaNoCriterio(tab, 'url_mudou', this.#configuracoes, chromeApi, mapa);
+                } else if (changeInfo && (changeInfo.title || changeInfo.status === 'complete')) {
+                    await this.#ordenacao.sincronizarAbaNoCriterio(tab, 'titulo_mudou', this.#configuracoes, chromeApi, mapa);
                 }
             }
+        }
+
+        /**
+         * Trata o evento chrome.tabs.onActivated para critérios de Última Ativação (Domínio ou Acesso).
+         * @param {Object} activeInfo
+         * @param {Object} [chromeApi]
+         */
+        async tratarAbaAtivada(activeInfo, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            if (!activeInfo || !activeInfo.tabId || !this.#ordenacao || typeof this.#ordenacao.sincronizarAbaNoCriterio !== 'function') return;
+            const critAtual = typeof this.#ordenacao.normalizarCriterio === 'function'
+                ? this.#ordenacao.normalizarCriterio((this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio)
+                : ((this.#configuracoes && this.#configuracoes.criterioOrdenacaoGuias) || this.#ordenacao.criterio);
+            if (critAtual !== 'ultima_ativacao' && critAtual !== 'dominio_ativacao') return;
+            if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.get !== 'function') return;
+            try {
+                const tab = await chromeApi.tabs.get(activeInfo.tabId);
+                if (!tab || tab.pinned) return;
+                const mapa = this.#antiDuplicacao.obterMapaAbasUrls ? this.#antiDuplicacao.obterMapaAbasUrls() : null;
+                await this.#ordenacao.sincronizarAbaNoCriterio(tab, 'ativada', this.#configuracoes, chromeApi, mapa);
+            } catch (_) { }
         }
 
         /**

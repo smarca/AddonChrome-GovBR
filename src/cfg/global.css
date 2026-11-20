@@ -1,0 +1,214 @@
+@charset "UTF-8";
+/* ==========================================================================
+ * ARQUIVO: src/cfg/global.css
+ * PROJETO: JusGovBR - Seleção/Cópia Inteligente
+ * AUTOR/CONTATO: smarca@gmail.com
+ *
+ * MÓDULO: CFG — FOLHA DE ESTILOS GLOBAL PADRONIZADA & BASE DE TEMAS (ARQ-11)
+ *
+ * @MAPA-IA:
+ * - Arquivo: src/cfg/global.css
+ * - Responsabilidade: Centralizar variáveis de temas, reset base, botões, inputs,
+ *   badges, seletores visuais, subgrupos responsivos (ENG-12) e utilitários
+ *   compartilhados entre todas as páginas da extensão (options, popup, onboarding).
+ * - Diretrizes: ARQ-11 (Compactação visual global; exceção não-compacta em options.css),
+ *   ENG-04 (@charset UTF-8), ENG-05 (Cabeçalho padronizado), ENG-12 (Subgrupos lado a lado).
+ * ========================================================================== */
+
+:root {
+    --azul-jusgov: #1a73e8;
+    --azul-primario: #1a73e8;
+    --cor-primaria: #1a73e8;
+    --azul-escuro: #1557b0;
+    --azul-claro: #eff6ff;
+    --fundo-pagina: #f1f5f9;
+    --fundo-cartao: #ffffff;
+    --bg-card: #ffffff;
+    --fundo-input: #ffffff;
+    --texto-principal: #0f172a;
+    --texto-primario: #0f172a;
+    --texto-forte: #0f172a;
+    --texto-secundario: #475569;
+    --texto-medio: #475569;
+    --texto-suave: #64748b;
+    --borda: #cbd5e1;
+    --borda-padrao: #cbd5e1;
+    --borda-suave: #e2e8f0;
+    --verde-sucesso: #10b981;
+    --verde-ativo: #10b981;
+    --verde-fundo: #ecfdf5;
+    --verde-texto: #065f46;
+    --amarelo-alerta: #f59e0b;
+    --amarelo-aviso: #f59e0b;
+    --amarelo-fundo: #fffbeb;
+    --amarelo-texto: #78350f;
+    --vermelho-erro: #ef4444;
+    --vermelho-perigo: #ef4444;
+    --fonte-padrao-ui: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+}
+
+/* Base pronta para futuros temas (ARQ-11) */
+:root[data-tema="escuro"] {
+    --fundo-pagina: #0f172a;
+    --fundo-cartao: #1e293b;
+    --bg-card: #1e293b;
+    --fundo-input: #0f172a;
+    --texto-principal: #f8fafc;
+    --texto-primario: #f8fafc;
+    --texto-forte: #f8fafc;
+    --texto-secundario: #cbd5e1;
+    --texto-medio: #cbd5e1;
+    --texto-suave: #94a3b8;
+    --borda: #334155;
+    --borda-padrao: #334155;
+    --borda-suave: #1e293b;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--fonte-padrao-ui);
+    background-color: var(--fundo-pagina);
+    color: var(--texto-principal);
+}
+
+/* Subgrupos adjacentes lado a lado com quebra responsiva (ENG-12) */
+.subgrupos-lado-a-lado {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+}
+
+.subgrupo-painel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: rgba(15, 23, 42, 0.03);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--borda-suave);
+    flex: 1 1 auto;
+}
+
+/* Seletores visuais compactos de Contorno e Tema (FEAT-105 / ARQ-11) */
+.seletor-visual-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-seletor-visual {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--borda-suave);
+    background: var(--fundo-input);
+    color: var(--texto-principal);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 28px;
+}
+
+.btn-seletor-visual:hover:not(:disabled) {
+    border-color: var(--cor-primaria);
+}
+
+.btn-seletor-visual:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.popover-seletor-visual {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 9999;
+    min-width: 170px;
+    padding: 5px;
+    border-radius: 8px;
+    border: 1px solid var(--borda-suave);
+    background: var(--fundo-cartao);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.item-seletor-visual {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--texto-principal);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+}
+
+.item-seletor-visual:hover,
+.item-seletor-visual.ativo {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.25);
+    font-weight: 600;
+}
+
+/* Utilitários reutilizáveis para eliminação de estilos inline nos HTMLs (ARQ-11) */
+.paleta-cores-basicas {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.btn-swatch-cor {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    padding: 0;
+}
+
+.jg-icone-arredondado {
+    border-radius: 8px;
+}
+
+.jg-oculto {
+    display: none;
+}
+
+.jg-flex-linha {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.jg-inline-rotulo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--texto-secundario);
+}
+
+.jg-select-compacto {
+    padding: 4px 8px;
+    font-size: 12px;
+}

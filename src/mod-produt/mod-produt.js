@@ -45,6 +45,12 @@
             ? (() => { try { return require('./lib-produt-bem-estar.js'); } catch (_) { return null; } })()
             : null);
 
+    const ResumoUiCls = (typeof self !== 'undefined' && typeof self.JusGovProdutResumoUi === 'function')
+        ? self.JusGovProdutResumoUi
+        : (typeof require === 'function'
+            ? (() => { try { return require('./produt-resumo-ui.js'); } catch (_) { return null; } })()
+            : null);
+
     class ModuloProdutividade {
         constructor(opcoes = {}) {
             this._obterConfig = (opcoes && typeof opcoes.obterConfiguracoes === 'function')
@@ -53,6 +59,19 @@
             this._bemEstar = (opcoes && opcoes.bemEstar)
                 ? opcoes.bemEstar
                 : (BemEstarCls ? new BemEstarCls() : null);
+            this._resumoUi = (opcoes && opcoes.resumoUi)
+                ? opcoes.resumoUi
+                : (ResumoUiCls ? new ResumoUiCls() : null);
+        }
+
+        obterResumoUi() {
+            if (!this._resumoUi) {
+                const Cls = (typeof self !== 'undefined' && typeof self.JusGovProdutResumoUi === 'function')
+                    ? self.JusGovProdutResumoUi
+                    : ResumoUiCls;
+                if (Cls) this._resumoUi = new Cls();
+            }
+            return this._resumoUi || (ResumoUiCls && ResumoUiCls.NULL_OBJECT) || null;
         }
 
         obterGerenciadorBemEstar() {
@@ -1515,126 +1534,25 @@
          * @returns {{ dataBR: string, horaInicio: string, linhaDataInicio: string, linhaTempos: string, linhaPomodoro: string, segmentosPomodoro: Array<{texto: string, destaque: string}>, alertaMultiplosComputadores: string, tooltipTitle: string }}
          */
         formatarResumoProdutividadeTexto(estado = {}, config = {}, agora = Date.now(), nuvemMeta = null) {
-            const { stEfetivo, meta, inicioCombinado, corridoTotalMin, ativoTotalMin, pausasTotais } = this.mesclarEstadoComNuvemMeta(estado, nuvemMeta, agora);
-
-            let dataBR = '';
-            if (typeof stEfetivo.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(stEfetivo.data)) {
-                const [ano, mes, dia] = stEfetivo.data.split('-');
-                dataBR = `${dia}/${mes}/${ano}`;
-            } else {
-                const d = new Date(agora);
-                dataBR = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            const ui = this.obterResumoUi();
+            if (ui && typeof ui.formatarResumoProdutividadeTexto === 'function') {
+                return ui.formatarResumoProdutividadeTexto(this, estado, config, agora, nuvemMeta);
             }
-
-            const horaInicio = this.formatarHoraHHMM(inicioCombinado);
-            const fmtHM = (min) => {
-                const m = Math.max(0, Math.floor(Number(min) || 0));
-                return `${String(Math.floor(m / 60)).padStart(2, '0')}h:${String(m % 60).padStart(2, '0')}m`;
-            };
-
-            const duracaoCorridoStr = corridoTotalMin > 0 ? ` (${fmtHM(corridoTotalMin)})` : '';
-            const linhaDataInicio = `🕒 Ligado ${dataBR}${horaInicio ? ` desde ${horaInicio}hs` : ''}${duracaoCorridoStr}`;
-
-            const partesTempo = [];
-            if (ativoTotalMin > 0) partesTempo.push(`${fmtHM(ativoTotalMin)}`);
-            if (pausasTotais > 0) partesTempo.push(`Pausas: ${pausasTotais}`);
-            const linhaTempos = partesTempo.length > 0 ? `👉 Tempo de Atividade: ${partesTempo.join(' • ')}` : '';
-
-            const resumo = this.calcularResumoPomodoro(stEfetivo, config, agora, meta);
-            const segmentosPomodoro = [];
-            const unirSegmentosPomodoro = (lista) => {
-                let out = '';
-                for (let i = 0; i < lista.length; i++) {
-                    const seg = lista[i];
-                    if (i === 0) {
-                        out = seg.texto;
-                    } else if (lista[i - 1] && lista[i - 1].semSeparadorApos) {
-                        out += ` ${seg.texto}`;
-                    } else {
-                        out += ` • ${seg.texto}`;
-                    }
-                }
-                return out;
-            };
-            let linhaPomodoro = '';
-            const fmtParBanco = (atual, metaVal, origem) => {
-                if (origem === 'anterior') return `${atual}*/${metaVal}m`;
-                if (origem === 'posterior') return `${atual}/${metaVal}*m`;
-                return `${atual}/${metaVal}m`;
-            };
-            const origemFoco = String(stEfetivo.pomodoroBancoOrigemFoco || '');
-            const origemDesc = String(stEfetivo.pomodoroBancoOrigemDescanso || '');
-            if (resumo.ativo) {
-                segmentosPomodoro.push({ texto: '🍅 Pomodoro:', destaque: 'prefixo', semSeparadorApos: true });
-                if (resumo.fase === 'foco') {
-                    segmentosPomodoro.push({
-                        texto: `Foco ${fmtParBanco(resumo.minutosNaFase, resumo.focoMin, origemFoco)}`,
-                        destaque: stEfetivo.emPausa ? 'pausado' : 'foco'
-                    });
-                    const saldoRestMs = Number(stEfetivo.pomodoroDescansoSaldoRestanteMs || 0);
-                    if (stEfetivo.pomodoroDescansoPulado && saldoRestMs > 0) {
-                        const ehPausaMaiorPausada = stEfetivo.pomodoroDescansoSaldoTipo === 'pausa_maior';
-                        const rotuloPausado = ehPausaMaiorPausada ? 'Descanso' : 'Alívio';
-                        const metaPausadoMin = ehPausaMaiorPausada ? resumo.pausaMaiorMin : resumo.alivioMin;
-                        const restanteMin = Math.ceil(saldoRestMs / 60000);
-                        const feitoPausadoMin = Math.max(0, metaPausadoMin - restanteMin);
-                        segmentosPomodoro.push({
-                            texto: `${rotuloPausado} ${fmtParBanco(feitoPausadoMin, metaPausadoMin, origemDesc)}`,
-                            destaque: 'pausado'
-                        });
-                    }
-                } else {
-                    const focoSalvoMs = Number(stEfetivo.pomodoroFocoAcumuladoAntesPausaMs || 0);
-                    const focoSalvoMin = Math.floor(focoSalvoMs / 60000);
-                    if (focoSalvoMin > 0 && focoSalvoMin < resumo.focoMin) {
-                        segmentosPomodoro.push({
-                            texto: `Foco ${fmtParBanco(focoSalvoMin, resumo.focoMin, origemFoco)}`,
-                            destaque: 'pausado'
-                        });
-                    }
-                    const rotuloDesc = (resumo.fase === 'pausa_maior') ? 'Descanso' : 'Alívio';
-                    const metaDescMin = (resumo.fase === 'pausa_maior') ? resumo.pausaMaiorMin : resumo.alivioMin;
-                    segmentosPomodoro.push({
-                        texto: `${rotuloDesc} ${fmtParBanco(resumo.minutosNaFase, metaDescMin, origemDesc)}`,
-                        destaque: 'descanso'
-                    });
-                }
-                segmentosPomodoro.push({ texto: `Ciclo ${resumo.cicloAtual}/${resumo.ciclosMax}`, destaque: 'normal' });
-                if (resumo.descansoPendente) {
-                    segmentosPomodoro.push({ texto: 'Descanso do ciclo: Pendente', destaque: 'pendente' });
-                } else if (resumo.ultimoDescansoTexto) {
-                    segmentosPomodoro.push({ texto: `${resumo.ultimoDescansoTexto}`, destaque: 'realizado' });
-                }
-                linhaPomodoro = unirSegmentosPomodoro(segmentosPomodoro);
-            }
-            const linhaPomodoroTooltip = unirSegmentosPomodoro(
-                segmentosPomodoro.filter(s => s && s.destaque !== 'realizado')
-            );
-
-            const alertaMultiplosComputadores = (meta && meta.multiplosComputadoresSimultaneos)
-                ? '⚠️ Múltiplos computadores em uso simultâneo.'
-                : '';
-
-            const tooltipTitle = [linhaDataInicio, linhaTempos, linhaPomodoroTooltip, alertaMultiplosComputadores]
-                .filter(Boolean)
-                .join('\n');
             return {
-                dataBR,
-                horaInicio,
-                linhaDataInicio,
-                linhaTempos,
-                linhaPomodoro,
-                segmentosPomodoro,
-                alertaMultiplosComputadores,
-                tooltipTitle
+                dataBR: '',
+                horaInicio: '',
+                linhaDataInicio: '',
+                linhaTempos: '',
+                linhaPomodoro: '',
+                segmentosPomodoro: [],
+                alertaMultiplosComputadores: '',
+                tooltipTitle: ''
             };
         }
 
         /**
          * Renderizador DOM compartilhado entre Popup, Opções e demais telas (SRP / Reúso UI).
-         * Constrói linhas empilhadas com .textContent seguro (zero innerHTML):
-         * Linha 1: 🕒 Data desde HH:MMhs | Linha 2: 👉 Tempo Corrido ... | Linha 3 (opcional): 🍅 Pomodoro ...
-         * + Alerta condicional: ⚠️ Múltiplos computadores em uso simultâneo.
+         * Delega para ProdutResumoUi (src/mod-produt/produt-resumo-ui.js — ARQ-10).
          * @param {HTMLElement|null} containerPrincipal
          * @param {Object} [estado]
          * @param {Object} [config]
@@ -1642,78 +1560,11 @@
          * @param {{ containerPomodoro?: HTMLElement|null, ocultarPomodoroQuandoInativo?: boolean, nuvemMeta?: Object|null }} [opcoes]
          */
         renderizarResumoProdutividadeDom(containerPrincipal, estado = {}, config = {}, agora = Date.now(), opcoes = {}) {
-            if (!containerPrincipal || typeof document === 'undefined') return null;
-            const nuvemMeta = (opcoes && opcoes.nuvemMeta) ? opcoes.nuvemMeta : null;
-            const info = this.formatarResumoProdutividadeTexto(estado, config, agora, nuvemMeta);
-
-            const divData = document.createElement('div');
-            divData.textContent = info.linhaDataInicio;
-            const nosTrabalho = [divData];
-            if (info.linhaTempos) {
-                const divTempos = document.createElement('div');
-                divTempos.style.marginTop = '2px';
-                divTempos.textContent = info.linhaTempos;
-                nosTrabalho.push(divTempos);
+            const ui = this.obterResumoUi();
+            if (ui && typeof ui.renderizarResumoProdutividadeDom === 'function') {
+                return ui.renderizarResumoProdutividadeDom(this, containerPrincipal, estado, config, agora, opcoes);
             }
-
-            const construirLinhaPomodoro = (destinoEl) => {
-                if (!destinoEl) return;
-                if (info.segmentosPomodoro.length === 0) {
-                    destinoEl.replaceChildren();
-                    if (opcoes && opcoes.ocultarPomodoroQuandoInativo) {
-                        destinoEl.style.display = 'none';
-                    }
-                    return;
-                }
-                const filhos = [];
-                for (let i = 0; i < info.segmentosPomodoro.length; i++) {
-                    if (i > 0 && !(info.segmentosPomodoro[i - 1] && info.segmentosPomodoro[i - 1].semSeparadorApos)) {
-                        const sep = document.createElement('span');
-                        sep.textContent = '•';
-                        sep.style.opacity = '0.5';
-                        filhos.push(sep);
-                    }
-                    const seg = info.segmentosPomodoro[i];
-                    const sp = document.createElement('span');
-                    sp.textContent = seg.texto;
-                    if (seg.destaque === 'prefixo' || seg.destaque === 'foco') sp.style.cssText = 'font-weight:600;';
-                    else if (seg.destaque === 'descanso') sp.style.cssText = 'font-weight:600;color:#0284c7;';
-                    else if (seg.destaque === 'pausado') sp.style.cssText = 'font-weight:500;color:#94a3b8;';
-                    else if (seg.destaque === 'pendente') sp.style.cssText = 'font-weight:700;color:#dc2626;';
-                    else if (seg.destaque === 'realizado') sp.style.cssText = 'font-weight:700;color:#0d9488;';
-                    filhos.push(sp);
-                }
-                destinoEl.replaceChildren(...filhos);
-                if (opcoes && opcoes.containerPomodoro) {
-                    destinoEl.style.display = 'flex';
-                }
-            };
-
-            const appendAlertaSimultaneo = (nosDestino) => {
-                if (!info.alertaMultiplosComputadores) return;
-                const divAlerta = document.createElement('div');
-                divAlerta.setAttribute('data-jusgov-alerta-simultaneo', 'true');
-                divAlerta.style.cssText = 'margin-top:3px;color:#b45309;font-weight:700;font-size:11px;';
-                divAlerta.textContent = info.alertaMultiplosComputadores;
-                nosDestino.push(divAlerta);
-            };
-
-            const contPom = (opcoes && opcoes.containerPomodoro) ? opcoes.containerPomodoro : null;
-            if (contPom) {
-                construirLinhaPomodoro(contPom);
-                appendAlertaSimultaneo(nosTrabalho);
-                containerPrincipal.replaceChildren(...nosTrabalho);
-            } else {
-                if (info.segmentosPomodoro.length > 0) {
-                    const divPom = document.createElement('div');
-                    divPom.style.cssText = 'margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:5px;';
-                    construirLinhaPomodoro(divPom);
-                    nosTrabalho.push(divPom);
-                }
-                appendAlertaSimultaneo(nosTrabalho);
-                containerPrincipal.replaceChildren(...nosTrabalho);
-            }
-            return info;
+            return null;
         }
 
         /**
@@ -3129,14 +2980,52 @@
             return (cfgExib, dadosResumo, estadoBarra) => {
                             const idHost = 'jusgov-pomodoro-barra-global';
                             const idBackdrop = 'jusgov-pomodoro-backdrop-global';
+                            const idBackdropStyle = 'jusgov-pomodoro-backdrop-style';
                             const idModal = 'jusgov-modal-produtividade-trabalho';
 
                             const removerBackdropBlur = () => {
                                 const bd = document.getElementById(idBackdrop);
                                 if (bd) bd.remove();
+                                const stBd = document.getElementById(idBackdropStyle);
+                                if (stBd) stBd.remove();
+                            };
+                            const garantirBackdropStyle = () => {
+                                if (document.getElementById(idBackdropStyle)) return;
+                                const st = document.createElement('style');
+                                st.id = idBackdropStyle;
+                                st.textContent = [
+                                    '@keyframes jusgov-descanso-fade-lento{0%,100%{background:rgba(2,18,38,0.14);box-shadow:inset 0 0 40px rgba(56,189,248,0.08)}50%{background:rgba(2,24,52,0.44);box-shadow:inset 0 0 90px rgba(56,189,248,0.22)}}',
+                                    '@keyframes jusgov-retorno-blink-tela{0%,100%{background:rgba(22,163,74,0.06);box-shadow:inset 0 0 28px rgba(74,222,128,0.25)}50%{background:rgba(34,197,94,0.34);box-shadow:inset 0 0 110px rgba(74,222,128,0.82)}}',
+                                    '@keyframes jusgov-retorno-rajada{0%,100%{background:rgba(22,163,74,0.10);box-shadow:inset 0 0 40px rgba(74,222,128,0.35)}45%{background:rgba(134,239,172,0.48);box-shadow:inset 0 0 140px rgba(255,255,255,0.88)}70%{background:rgba(34,197,94,0.42);box-shadow:inset 0 0 120px rgba(74,222,128,0.92)}}'
+                                ].join('');
+                                (document.head || document.documentElement).appendChild(st);
+                            };
+                            const atualizarBackdropTelaCheia = (modo = 'nenhum') => {
+                                if (!modo || modo === 'nenhum') {
+                                    removerBackdropBlur();
+                                    return;
+                                }
+                                garantirBackdropStyle();
+                                let bd = document.getElementById(idBackdrop);
+                                if (!bd) {
+                                    bd = document.createElement('div');
+                                    bd.id = idBackdrop;
+                                    bd.setAttribute('data-jusgov-ignore', 'true');
+                                    bd.style.cssText = 'position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;pointer-events:none !important;z-index:2147483646 !important;margin:0 !important;padding:0 !important;border:0 !important;';
+                                    (document.body || document.documentElement).appendChild(bd);
+                                }
+                                if (bd.getAttribute('data-modo') === modo) return;
+                                bd.setAttribute('data-modo', modo);
+                                if (modo === 'descanso_calmo') {
+                                    bd.style.animation = 'jusgov-descanso-fade-lento 8s ease-in-out infinite';
+                                } else if (modo === 'retorno_rajada') {
+                                    bd.style.animation = 'jusgov-retorno-rajada 0.55s ease-in-out infinite';
+                                } else if (modo === 'retorno_trabalho') {
+                                    bd.style.animation = 'jusgov-retorno-blink-tela 1.8s ease-in-out infinite';
+                                }
                             };
                             const garantirBackdropBlur = () => {
-                                removerBackdropBlur();
+                                atualizarBackdropTelaCheia('descanso_calmo');
                             };
 
                             const gerenciarModalDescanso = () => {
@@ -3479,7 +3368,7 @@
                                 host.style.cssText = 'position:fixed !important;top:0px !important;bottom:auto !important;left:0px !important;right:auto !important;transform:none !important;margin:0 !important;padding:0 !important;border:0 !important;line-height:1 !important;width:auto !important;height:auto !important;z-index:2147483647 !important;pointer-events:none !important;font-family:"Segoe UI",system-ui,-apple-system,sans-serif !important;transition:none !important;';
                                 const shadow = host.attachShadow({ mode: 'closed' });
                                 const styleAnim = document.createElement('style');
-                                styleAnim.textContent = '@keyframes jusgov-piscar-crono{0%,49%{opacity:1}50%,100%{opacity:0.22}}@keyframes jusgov-piscar-icone{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.42;transform:scale(1.12)}}.jg-piscar{animation:jusgov-piscar-icone 0.9s ease-in-out infinite;transform-origin:center;}';
+                                styleAnim.textContent = '@keyframes jusgov-piscar-crono{0%,49%{opacity:1}50%,100%{opacity:0.22}}@keyframes jusgov-piscar-icone{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.42;transform:scale(1.12)}}@keyframes jusgov-pill-retorno{0%,100%{background:#065f46;border-color:#4ade80;box-shadow:0 0 22px rgba(74,222,128,0.85),0 6px 18px rgba(0,0,0,0.45)}50%{background:#15803d;border-color:#fef08a;box-shadow:0 0 36px rgba(134,239,172,1),0 6px 22px rgba(0,0,0,0.5)}}.jg-piscar{animation:jusgov-piscar-icone 0.9s ease-in-out infinite;transform-origin:center;}';
                                 shadow.appendChild(styleAnim);
                                 const pill = document.createElement('div');
                                 pill.style.cssText = 'pointer-events:auto;display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:1px 6px;border-radius:7px;background:#0f172a;color:#f8fafc;font-size:11px;line-height:1.1;font-weight:600;box-shadow:0 4px 14px rgba(15,23,42,0.34);border:1px solid #0d9488;white-space:nowrap;cursor:grab;user-select:none;touch-action:none;margin:0;';
@@ -4879,56 +4768,107 @@
                                     return null;
                                 };
 
-                                const tocarBeepConclusao = (intensidade = 'suave', padraoAlarme = 'BEEP_CURTO') => {
+                                const tocarBeepPcSpeakerLocal = (intensidade = 'suave', padraoAlarme = 'BEEP_CURTO') => {
                                     try {
-                                        if (padraoAlarme === 'BLOQUEAR' || padraoAlarme === 'SILENCIO') return;
                                         const AudioCtx = window.AudioContext || window.webkitAudioContext;
                                         if (!AudioCtx) return;
-                                        if (!host.__jusgovAudioCtx) {
+                                        if (!host.__jusgovAudioCtx || host.__jusgovAudioCtx.state === 'closed') {
                                             host.__jusgovAudioCtx = new AudioCtx();
+                                            host.__jusgovEstaloBuf = null;
                                         }
                                         const ctx = host.__jusgovAudioCtx;
                                         if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
                                             ctx.resume().catch(() => { });
                                         }
-                                        const t0 = ctx.currentTime + 0.01;
-                                        const emitirNota = (freq, iniOffset, dur, ganhoMax, tipo = 'sine') => {
-                                            const osc = ctx.createOscillator();
-                                            const gain = ctx.createGain();
-                                            osc.type = tipo;
-                                            osc.frequency.setValueAtTime(freq, t0 + iniOffset);
-                                            gain.gain.setValueAtTime(0.0001, t0 + iniOffset);
-                                            gain.gain.exponentialRampToValueAtTime(ganhoMax, t0 + iniOffset + 0.02);
-                                            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + iniOffset + dur);
-                                            osc.connect(gain);
-                                            gain.connect(ctx.destination);
-                                            osc.start(t0 + iniOffset);
-                                            osc.stop(t0 + iniOffset + dur + 0.02);
+                                        if (!host.__jusgovEstaloBuf) {
+                                            try {
+                                                const n = Math.max(32, Math.floor(ctx.sampleRate * 0.0045));
+                                                const b = ctx.createBuffer(1, n, ctx.sampleRate);
+                                                const d = b.getChannelData(0);
+                                                for (let i = 0; i < n; i++) {
+                                                    const dec = Math.exp(-i / (n * 0.28));
+                                                    d[i] = ((i < 6) ? 1.0 : ((Math.random() * 2 - 1) * 0.85)) * dec;
+                                                }
+                                                host.__jusgovEstaloBuf = b;
+                                            } catch (_) { }
+                                        }
+                                        const emitirEstalo = (tAt, gEst) => {
+                                            if (!host.__jusgovEstaloBuf) return;
+                                            try {
+                                                const src = ctx.createBufferSource();
+                                                src.buffer = host.__jusgovEstaloBuf;
+                                                const flt = ctx.createBiquadFilter();
+                                                flt.type = 'bandpass';
+                                                flt.frequency.setValueAtTime(2800, tAt);
+                                                flt.Q.setValueAtTime(1.1, tAt);
+                                                const g = ctx.createGain();
+                                                g.gain.setValueAtTime(gEst, tAt);
+                                                src.connect(flt);
+                                                flt.connect(g);
+                                                g.connect(ctx.destination);
+                                                src.start(tAt);
+                                            } catch (_) { }
                                         };
-                                        const ganhoBase = intensidade === 'grave' ? 0.16 : (intensidade === 'moderado' ? 0.11 : 0.06);
-                                        const tipoBase = intensidade === 'grave' ? 'triangle' : 'sine';
-                                        const freqBase = intensidade === 'grave' ? 987 : (intensidade === 'moderado' ? 740 : 523.25);
-
+                                        const emitirPulsoPcSpeaker = (tIni, freqHz, durMs, ganhoMax) => {
+                                            const dur = Math.max(0.03, durMs / 1000);
+                                            const osc = ctx.createOscillator();
+                                            const flt = ctx.createBiquadFilter();
+                                            const gain = ctx.createGain();
+                                            osc.type = 'square';
+                                            osc.frequency.setValueAtTime(freqHz, tIni);
+                                            flt.type = 'bandpass';
+                                            flt.frequency.setValueAtTime(1750, tIni);
+                                            flt.Q.setValueAtTime(0.65, tIni);
+                                            gain.gain.setValueAtTime(0.0001, tIni);
+                                            gain.gain.linearRampToValueAtTime(ganhoMax, tIni + 0.0015);
+                                            gain.gain.setValueAtTime(ganhoMax, tIni + Math.max(0.004, dur - 0.002));
+                                            gain.gain.linearRampToValueAtTime(0.0001, tIni + dur);
+                                            osc.connect(flt);
+                                            flt.connect(gain);
+                                            gain.connect(ctx.destination);
+                                            emitirEstalo(tIni, Math.min(0.55, ganhoMax * 1.45));
+                                            emitirEstalo(tIni + dur, Math.min(0.45, ganhoMax * 1.15));
+                                            osc.start(tIni);
+                                            osc.stop(tIni + dur + 0.005);
+                                        };
+                                        const t0 = ctx.currentTime + 0.015;
+                                        const ganhoBase = intensidade === 'grave' ? 0.36 : (intensidade === 'moderado' ? 0.30 : 0.24);
                                         if (padraoAlarme === 'BEEP_LONGO') {
-                                            emitirNota(freqBase, 0, 0.45, ganhoBase, tipoBase);
+                                            for (let i = 0; i < 5; i++) emitirPulsoPcSpeaker(t0 + (i * 0.5), 1000, 300, ganhoBase);
                                             return;
                                         }
                                         if (padraoAlarme === 'BEEP_CURTO_TRIPLO') {
-                                            emitirNota(freqBase, 0, 0.09, ganhoBase, tipoBase);
-                                            emitirNota(freqBase, 0.14, 0.09, ganhoBase, tipoBase);
-                                            emitirNota(freqBase, 0.28, 0.09, ganhoBase, tipoBase);
+                                            for (let i = 0; i < 3; i++) emitirPulsoPcSpeaker(t0 + (i * 0.38), 1000, 220, ganhoBase);
                                             return;
                                         }
                                         if (intensidade === 'grave') {
-                                            emitirNota(987, 0, 0.11, 0.16, 'triangle');
-                                            emitirNota(740, 0.13, 0.13, 0.16, 'triangle');
-                                        } else if (intensidade === 'moderado') {
-                                            emitirNota(740, 0, 0.09, 0.11, 'sine');
-                                            emitirNota(880, 0.11, 0.11, 0.11, 'sine');
+                                            emitirPulsoPcSpeaker(t0, 1000, 300, ganhoBase);
+                                            emitirPulsoPcSpeaker(t0 + 0.5, 1000, 300, ganhoBase);
                                         } else {
-                                            emitirNota(523.25, 0, 0.14, 0.06, 'sine');
+                                            emitirPulsoPcSpeaker(t0, 1000, 300, ganhoBase);
                                         }
                                     } catch (_) { }
+                                };
+
+                                const tocarBeepConclusao = (intensidade = 'suave', padraoAlarme = 'BEEP_CURTO') => {
+                                    try {
+                                        if (padraoAlarme === 'BLOQUEAR' || padraoAlarme === 'SILENCIO') return;
+                                        if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                                            chrome.runtime.sendMessage({
+                                                acao: 'TOCAR_BEEP_POMODORO',
+                                                intensidade,
+                                                padraoAlarme
+                                            }, (resp) => {
+                                                if ((chrome.runtime && chrome.runtime.lastError) || !(resp && resp.ok)) {
+                                                    tocarBeepPcSpeakerLocal(intensidade, padraoAlarme);
+                                                }
+                                            });
+                                            return;
+                                        }
+                                        tocarBeepPcSpeakerLocal(intensidade, padraoAlarme);
+                                    } catch (_) {
+                                        tocarBeepPcSpeakerLocal(intensidade, padraoAlarme);
+                                    }
                                 };
                                 host.__jusgovTocarBeep = tocarBeepConclusao;
 
@@ -5067,14 +5007,32 @@
                                         spanStatus.style.fontWeight = '700';
                                         return;
                                     }
+                                    const restaurarVisualPadraoPillRetorno = () => {
+                                        if (pill.getAttribute('data-retorno-ativo') === 'true') {
+                                            pill.removeAttribute('data-retorno-ativo');
+                                            pill.style.background = '#0f172a';
+                                            pill.style.borderWidth = '1px';
+                                            pill.style.padding = '1px 6px';
+                                            pill.style.animation = 'none';
+                                            pill.style.boxShadow = '0 4px 14px rgba(15,23,42,0.34)';
+                                        }
+                                    };
+
                                     if (d.emDescanso && cumpridoAoVivo) {
+                                        pill.setAttribute('data-retorno-ativo', 'true');
+                                        pill.style.background = '#065f46';
+                                        pill.style.borderWidth = '3px';
+                                        pill.style.borderColor = '#4ade80';
+                                        pill.style.padding = '4px 12px';
+                                        pill.style.animation = 'jusgov-pill-retorno 1.2s ease-in-out infinite';
                                         spanStatus.style.display = 'block';
-                                        spanStatus.textContent = 'Concluído!';
-                                        spanStatus.style.background = '#16a34a';
-                                        spanStatus.style.color = '#ffffff';
-                                        spanStatus.style.fontWeight = '700';
+                                        spanStatus.textContent = '✅ VOLTAR AO TRABALHO!';
+                                        spanStatus.style.background = '#4ade80';
+                                        spanStatus.style.color = '#052e16';
+                                        spanStatus.style.fontWeight = '800';
                                         return;
                                     }
+                                    restaurarVisualPadraoPillRetorno();
                                     if (d.emDescanso && !d.aguardandoOciosidade) {
                                         spanStatus.style.display = 'block';
                                         spanStatus.textContent = 'Em andamento...';
@@ -5455,27 +5413,40 @@
                                             }
                                         }
 
+                                        if (cumpridoAoVivo && !d.aguardandoOciosidade) {
+                                            const emRajadaVisual = Boolean(host.__jusgovRajadaVisualAteTs && agoraNow < host.__jusgovRajadaVisualAteTs);
+                                            atualizarBackdropTelaCheia(emRajadaVisual ? 'retorno_rajada' : 'retorno_trabalho');
+                                        } else if (!d.aguardandoOciosidade && !host.__jusgovModoOculto) {
+                                            atualizarBackdropTelaCheia('descanso_calmo');
+                                        } else {
+                                            atualizarBackdropTelaCheia('nenhum');
+                                        }
+
                                         if (cumpridoAoVivo && !document.hidden && !host.__jusgovAlarmeBloqueado) {
                                             const cfgBeep = host.__jusgovConfigBeep || {};
-                                            if (cfgBeep.ativo && cfgBeep.permitirBeep) {
-                                                const extraSegAlarme = Math.max(1, Math.floor(Math.max(0, Number(d.descansoAcumuladoMs || 0) - metaMs) / 1000));
-                                                if (host.__jusgovUltimoSegAlarme !== extraSegAlarme) {
-                                                    host.__jusgovUltimoSegAlarme = extraSegAlarme;
-                                                    const metaSegAlarme = Math.max(60, Math.round(metaMs / 1000));
-                                                    const faseAlarme = (extraSegAlarme <= metaSegAlarme) ? 'DESCANSO_PUNITIVO' : 'ATRASO_ABANDONO';
-                                                    const tempoFaseAlarme = (faseAlarme === 'DESCANSO_PUNITIVO')
-                                                        ? extraSegAlarme
-                                                        : Math.max(1, extraSegAlarme - metaSegAlarme);
-                                                    const acaoAlarme = verificarAlarmePomodoroLocal(
-                                                        Math.max(0, Number(d.cicloAtual || 0)),
-                                                        Math.max(1, Number(d.ciclosMax || 4)),
-                                                        metaSegAlarme,
-                                                        tempoFaseAlarme,
-                                                        faseAlarme
-                                                    );
-                                                    if (acaoAlarme === 'BLOQUEAR') {
-                                                        host.__jusgovAlarmeBloqueado = true;
-                                                    } else if (acaoAlarme) {
+                                            const extraSegAlarme = Math.max(1, Math.floor(Math.max(0, Number(d.descansoAcumuladoMs || 0) - metaMs) / 1000));
+                                            if (host.__jusgovUltimoSegAlarme !== extraSegAlarme) {
+                                                host.__jusgovUltimoSegAlarme = extraSegAlarme;
+                                                const metaSegAlarme = Math.max(60, Math.round(metaMs / 1000));
+                                                const faseAlarme = (extraSegAlarme <= metaSegAlarme) ? 'DESCANSO_PUNITIVO' : 'ATRASO_ABANDONO';
+                                                const tempoFaseAlarme = (faseAlarme === 'DESCANSO_PUNITIVO')
+                                                    ? extraSegAlarme
+                                                    : Math.max(1, extraSegAlarme - metaSegAlarme);
+                                                const acaoAlarme = verificarAlarmePomodoroLocal(
+                                                    Math.max(0, Number(d.cicloAtual || 0)),
+                                                    Math.max(1, Number(d.ciclosMax || 4)),
+                                                    metaSegAlarme,
+                                                    tempoFaseAlarme,
+                                                    faseAlarme
+                                                );
+                                                if (acaoAlarme === 'BLOQUEAR') {
+                                                    host.__jusgovAlarmeBloqueado = true;
+                                                } else if (acaoAlarme) {
+                                                    /* Rajada visual de tela cheia durante os beeps e +3.5s depois de terminarem (independente de som ativo) */
+                                                    const durRajadaMs = (acaoAlarme === 'BEEP_LONGO') ? 6000 : ((acaoAlarme === 'BEEP_CURTO_TRIPLO') ? 4800 : 3800);
+                                                    host.__jusgovRajadaVisualAteTs = agoraNow + durRajadaMs;
+                                                    atualizarBackdropTelaCheia('retorno_rajada');
+                                                    if (cfgBeep.ativo && cfgBeep.permitirBeep) {
                                                         host.__jusgovUltimoBeepTs = agoraNow;
                                                         tocarBeepConclusao(cfgBeep.intensidade || 'suave', acaoAlarme);
                                                     }
@@ -5483,10 +5454,9 @@
                                             }
                                         } else if (!cumpridoAoVivo) {
                                             host.__jusgovUltimoBeepTs = 0;
-                                    host.__jusgovUltimoSegAlarme = -1;
-                                    host.__jusgovAlarmeBloqueado = false;
                                             host.__jusgovUltimoSegAlarme = -1;
                                             host.__jusgovAlarmeBloqueado = false;
+                                            host.__jusgovRajadaVisualAteTs = 0;
                                         }
 
                                         const excedeuTempoDescanso = Boolean(
@@ -5503,6 +5473,8 @@
                                     host.__jusgovUltimoBeepTs = 0;
                                     host.__jusgovUltimoSegAlarme = -1;
                                     host.__jusgovAlarmeBloqueado = false;
+                                    host.__jusgovRajadaVisualAteTs = 0;
+                                    atualizarBackdropTelaCheia('nenhum');
                                     /* Contador de Ativo/Foco é progressivo; em trabalho normal sem hover omite '+' para compactação, mantendo '+'/'-' em hover, compensações e alertas */
                                     const segFoco = (typeof d.segundosDecorridos === 'number' && Number.isFinite(d.segundosDecorridos))
                                         ? Math.max(0, Math.floor(d.segundosDecorridos))

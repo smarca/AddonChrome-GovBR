@@ -58,7 +58,7 @@
         'criterioOrdenacaoGuias', 'sentidoOrdenacaoGuias', 'ordenarGuiasFixadas',
         'fecharHierarquiaEmCascata', 'descarteGuiasInativasAtivo',
         'tempoInatividadeDescarteMinutos', 'validacaoMatematicaAtiva', 'tempoConferenciaDocumentosMs',
-        'modoExibicaoValidacao', 'posicaoAvisosValidacao', 'tempoFlashBorderMs', 'corFlashBorder',
+        'modoExibicaoValidacao', 'posicaoAvisosValidacao', 'tempoFlashBorderMs', 'corFlashBorder', 'tipoContornoFlashBorder',
         'marcadorConteudoColadoAtivo', 'presetMarcadorColado', 'corContornoMarcadorColado',
         'corFundoMarcadorColado', 'opacidadeFundoMarcadorColado', 'estiloBadgeMarcadorColado',
         'tipoContornoMarcadorColado', 'minimoCaracteresInterface', 'converterCabecalhoPjeAtivo',

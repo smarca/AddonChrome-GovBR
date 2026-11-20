@@ -4,37 +4,13 @@
  * PROJETO: JusGovBR - Seleção/Cópia Inteligente
  * AUTOR/CONTATO: smarca@gmail.com
  *
- * MÓDULO: CFG — ESTILOS DA PÁGINA DE OPÇÕES (options.html)
+ * MÓDULO: CFG — ESTILOS ESPECÍFICOS DA PÁGINA DE OPÇÕES (options.html)
  *
  * @MAPA-IA:
  * - Arquivo: src/cfg/options.css
- * - Responsabilidade: Folha de estilos dedicada extraída de options.html (ENG-00)
+ * - Responsabilidade: Folha de estilos específica de options.html (herda tokens,
+ *   reset e componentes padronizados de src/cfg/global.css — ARQ-11)
  * ========================================================================== */
-:root {
-    --azul-jusgov: #1a73e8;
-    --azul-escuro: #1557b0;
-    --azul-claro: #eff6ff;
-    --fundo-pagina: #f1f5f9;
-    --fundo-cartao: #ffffff;
-    --texto-principal: #0f172a;
-    --texto-secundario: #475569;
-    --texto-suave: #64748b;
-    --borda-padrao: #cbd5e1;
-    --borda-suave: #e2e8f0;
-    --verde-sucesso: #10b981;
-    --verde-fundo: #ecfdf5;
-    --verde-texto: #065f46;
-    --amarelo-alerta: #f59e0b;
-    --amarelo-fundo: #fffbeb;
-    --amarelo-texto: #78350f;
-    --vermelho-erro: #ef4444;
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
 
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
@@ -1326,3 +1302,5 @@ table.tabela-teste tr:hover {
     transform: translateY(0);
     opacity: 1;
 }
+
+/* Regras compartilhadas (.seletor-visual-wrap, .subgrupos-lado-a-lado, .subgrupo-painel) movidas para src/cfg/global.css (ARQ-11) */

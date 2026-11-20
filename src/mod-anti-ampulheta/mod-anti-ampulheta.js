@@ -190,7 +190,14 @@
     }
 
 
-    class ModuloAntiAmpulheta {
+    const BaseModuloRef = (typeof self !== 'undefined' && typeof self.JusGovBaseModulo === 'function')
+        ? self.JusGovBaseModulo
+        : class BaseModuloFallback {
+            constructor(nome) { this._nome = nome || 'ModuloAntiAmpulheta'; }
+            aplicarConfig() { return true; }
+        };
+
+    class ModuloAntiAmpulheta extends BaseModuloRef {
         #ativo = true;
         #urls = [];
         #inicializado = false;
@@ -207,12 +214,18 @@
          * @param {string[]} [opcoes.urls=[]]
          */
         constructor(opcoes = {}) {
+            super('ModuloAntiAmpulheta');
             if (opcoes.ativo !== undefined) {
                 this.#ativo = Boolean(opcoes.ativo);
             }
             if (Array.isArray(opcoes.urls)) {
                 this.#urls = [...opcoes.urls];
             }
+        }
+
+        aplicarConfig(cfg = {}) {
+            this.atualizarConfiguracoes(cfg);
+            return true;
         }
 
         get ativo() {

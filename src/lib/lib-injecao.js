@@ -53,6 +53,7 @@
         'src/mod-copia/copia-synccfg.js',
         'src/mod-copia/copia-dom.js',
         'src/mod-copia/copia-teclado.js',
+        'src/mod-copia/copia-politica-selecao.js',
         'src/mod-copia/lib-copia-padroes.js',
         'src/mod-copia/lib-copia-filtros-texto.js',
         'src/mod-copia/copia-aviso-flutuante.js',

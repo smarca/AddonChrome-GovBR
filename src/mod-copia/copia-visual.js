@@ -506,9 +506,10 @@
          * Dispara o contorno visual temporário de Flash Border sobre o Range.
          * Ancorado fisicamente ao texto sob rolagem (BUG-45) e com suporte estrito ao modo "Até Interação" (-1).
          */
-        dispararFlashBorderVisual(rangeAlvo, duracaoMs = 500, corFlashBorder = '#0d9488') {
+        dispararFlashBorderVisual(rangeAlvo, duracaoMs = 500, corFlashBorder = '#0d9488', tipoContorno = 'solido') {
             this.limparFlashBorderImediatamente();
             if (duracaoMs === 0 || !rangeAlvo) return false;
+            const tipoContornoFlash = ['solido', 'tracejado', 'sem_borda', 'ondulado', 'taxado'].includes(tipoContorno) ? tipoContorno : 'solido';
 
             try {
                 const rangeClonado = (typeof rangeAlvo.cloneRange === 'function') ? rangeAlvo.cloneRange() : rangeAlvo;
