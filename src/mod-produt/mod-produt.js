@@ -5012,9 +5012,12 @@
                                             pill.removeAttribute('data-retorno-ativo');
                                             pill.style.background = '#0f172a';
                                             pill.style.borderWidth = '1px';
+                                            pill.style.borderColor = 'rgba(148,163,184,0.35)';
                                             pill.style.padding = '1px 6px';
                                             pill.style.animation = 'none';
                                             pill.style.boxShadow = '0 4px 14px rgba(15,23,42,0.34)';
+                                        } else if (!d || !d.emDescanso || !d.alertaEmprestimoTexto) {
+                                            pill.style.borderColor = 'rgba(148,163,184,0.35)';
                                         }
                                     };
 
