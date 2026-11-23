@@ -43,25 +43,47 @@
     if (typeof importScripts !== 'function') return;
     const caminhosScripts = [
         './cfg-defaults.js',
+        '../lib/lib-constantes-catalogo.js',
         '../lib/lib-constantes.js',
         '../lib/lib-base-modulo.js',
         '../lib/lib-block-addon.js',
+        '../lib/lib-verificadores-docs.js',
+        '../lib/lib-verificadores-boletos.js',
         '../lib/lib-verificadores.js',
         '../lib/lib-geradores.js',
         '../lib/lib-urls.js',
         '../lib/lib-injecao.js',
         '../lib/lib-ui-tela.js',
+        '../lib/lib-config-helpers.js',
+        '../lib/lib-config-perfis.js',
+        '../lib/lib-config-exportacao.js',
+        '../lib/lib-config-icone.js',
         '../lib/lib-config.js',
         '../mod-navegador/navegador-janela-unica.js',
+        '../mod-navegador/navegador-urls-normalizacao.js',
         '../mod-navegador/navegador-anti-duplicacao.js',
+        '../mod-navegador/navegador-ordenacao-dominios.js',
+        '../mod-navegador/navegador-ordenacao-grupos.js',
         '../mod-navegador/navegador-ordenacao.js',
         '../mod-navegador/navegador-descarte.js',
+        '../mod-navegador/navegador-historico-abas.js',
+        '../mod-navegador/navegador-acoes-abas.js',
         '../mod-navegador/mod-navegador.js',
         '../mod-manut/mod-manut.js',
+        '../mod-produt/produt-bem-estar-cards.js',
         '../mod-produt/lib-produt-bem-estar.js',
         '../mod-produt/produt-resumo-ui.js',
+        '../mod-produt/produt-sync-nuvem.js',
+        '../mod-produt/produt-barra-injecao.js',
+        '../mod-produt/produt-estado-trabalho.js',
+        '../mod-produt/produt-motor-descanso.js',
+        '../mod-produt/produt-motor-flexivel.js',
+        '../mod-produt/produt-motor-ciclos.js',
+        '../mod-produt/produt-barra-geometria.js',
         '../mod-produt/mod-produt.js',
         '../mod-produt/produt-ipc.js',
+        '../mod-automate/automate-contextos.js',
+        '../mod-automate/automate-barra-pje.js',
         '../mod-automate/mod-automate.js',
         './lib-background.js'
     ];
@@ -382,6 +404,42 @@ if (chrome.windows && chrome.windows.onFocusChanged) {
                 obterConfiguracoesGerais()
             ]).then(([, cfg]) => {
                 return instanciaModuloProdutividade.sincronizarIndicadoresGlobaisPomodoro(cfg);
+            }).catch(() => { });
+        }
+    });
+}
+
+const ultimaGuiaAtivaPorJanela = new Map();
+if (chrome.tabs && chrome.tabs.onActivated) {
+    chrome.tabs.onActivated.addListener((activeInfo) => {
+        if (!activeInfo || !activeInfo.tabId || !activeInfo.windowId) return;
+        chrome.tabs.get(activeInfo.tabId).then((t) => {
+            if (t && t.id) {
+                ultimaGuiaAtivaPorJanela.set(activeInfo.windowId, {
+                    tabId: t.id,
+                    groupId: (typeof t.groupId === 'number') ? t.groupId : -1
+                });
+            }
+        }).catch(() => { });
+    });
+}
+
+if (chrome.tabGroups && chrome.tabGroups.onUpdated) {
+    chrome.tabGroups.onUpdated.addListener((group) => {
+        if (group && group.collapsed === true) {
+            obterConfiguracoesGerais().then(async (cfg) => {
+                if (cfg && cfg.agruparGuiasAutomatico !== false) {
+                    const abasAtivasNoGrupo = await chrome.tabs.query({ groupId: group.id, active: true }).catch(() => []);
+                    const ult = ultimaGuiaAtivaPorJanela.get(group.windowId);
+                    const estavaAtivoNoGrupo = (Array.isArray(abasAtivasNoGrupo) && abasAtivasNoGrupo.length > 0) ||
+                        Boolean(ult && ult.groupId === group.id);
+                    if (estavaAtivoNoGrupo) {
+                        await chrome.tabGroups.update(group.id, { collapsed: false }).catch(() => { });
+                        if (ult && ult.groupId === group.id && ult.tabId) {
+                            await chrome.tabs.update(ult.tabId, { active: true }).catch(() => { });
+                        }
+                    }
+                }
             }).catch(() => { });
         }
     });

@@ -42,121 +42,73 @@
     'use strict';
 
     class GerenciadorAntiDuplicacao {
-        #reutilizarAbasAbertas = true;
-        #focoPrimeiroPlano = true;
-        #monitorarUrlOriginal = false;
-        #monitorarUrlAtual = true;
-        #protegerGuiasModificadas = true;
-        #acaoConteudo = 'manter'; // 'manter', 'recarregar', 'recarregar_se_nao_modificada'
-        #mapaAbasUrls = new Map();
-        #timerSalvarSessionAbas = null;
+        _p_reutilizarAbasAbertas = true;
+        _p_focoPrimeiroPlano = true;
+        _p_monitorarUrlOriginal = false;
+        _p_monitorarUrlAtual = true;
+        _p_protegerGuiasModificadas = true;
+        _p_acaoConteudo = 'manter'; // 'manter', 'recarregar', 'recarregar_se_nao_modificada'
+        _p_mapaAbasUrls = new Map();
+        _p_timerSalvarSessionAbas = null;
 
         /**
          * @param {Object} [opcoes={}]
          */
         constructor(opcoes = {}) {
             if (typeof opcoes.reutilizarAbasAbertas === 'boolean') {
-                this.#reutilizarAbasAbertas = opcoes.reutilizarAbasAbertas;
+                this._p_reutilizarAbasAbertas = opcoes.reutilizarAbasAbertas;
             }
             if (typeof opcoes.focoPrimeiroPlano === 'boolean') {
-                this.#focoPrimeiroPlano = opcoes.focoPrimeiroPlano;
+                this._p_focoPrimeiroPlano = opcoes.focoPrimeiroPlano;
             }
             if (typeof opcoes.monitorarUrlOriginal === 'boolean') {
-                this.#monitorarUrlOriginal = opcoes.monitorarUrlOriginal;
+                this._p_monitorarUrlOriginal = opcoes.monitorarUrlOriginal;
             }
             if (typeof opcoes.monitorarUrlAtual === 'boolean') {
-                this.#monitorarUrlAtual = opcoes.monitorarUrlAtual;
+                this._p_monitorarUrlAtual = opcoes.monitorarUrlAtual;
             }
             if (typeof opcoes.protegerGuiasModificadas === 'boolean') {
-                this.#protegerGuiasModificadas = opcoes.protegerGuiasModificadas;
+                this._p_protegerGuiasModificadas = opcoes.protegerGuiasModificadas;
             }
             if (typeof opcoes.acaoConteudo === 'string') {
-                this.#acaoConteudo = opcoes.acaoConteudo;
+                this._p_acaoConteudo = opcoes.acaoConteudo;
             }
         }
 
-        get reutilizarAbasAbertas() { return this.#reutilizarAbasAbertas; }
-        set reutilizarAbasAbertas(v) { this.#reutilizarAbasAbertas = Boolean(v); }
+        get reutilizarAbasAbertas() { return this._p_reutilizarAbasAbertas; }
+        set reutilizarAbasAbertas(v) { this._p_reutilizarAbasAbertas = Boolean(v); }
 
-        get focoPrimeiroPlano() { return this.#focoPrimeiroPlano; }
-        set focoPrimeiroPlano(v) { this.#focoPrimeiroPlano = Boolean(v); }
+        get focoPrimeiroPlano() { return this._p_focoPrimeiroPlano; }
+        set focoPrimeiroPlano(v) { this._p_focoPrimeiroPlano = Boolean(v); }
 
-        get monitorarUrlOriginal() { return this.#monitorarUrlOriginal; }
-        set monitorarUrlOriginal(v) { this.#monitorarUrlOriginal = Boolean(v); }
+        get monitorarUrlOriginal() { return this._p_monitorarUrlOriginal; }
+        set monitorarUrlOriginal(v) { this._p_monitorarUrlOriginal = Boolean(v); }
 
-        get monitorarUrlAtual() { return this.#monitorarUrlAtual; }
-        set monitorarUrlAtual(v) { this.#monitorarUrlAtual = Boolean(v); }
+        get monitorarUrlAtual() { return this._p_monitorarUrlAtual; }
+        set monitorarUrlAtual(v) { this._p_monitorarUrlAtual = Boolean(v); }
 
-        get protegerGuiasModificadas() { return this.#protegerGuiasModificadas; }
-        set protegerGuiasModificadas(v) { this.#protegerGuiasModificadas = Boolean(v); }
+        get protegerGuiasModificadas() { return this._p_protegerGuiasModificadas; }
+        set protegerGuiasModificadas(v) { this._p_protegerGuiasModificadas = Boolean(v); }
 
-        get acaoConteudo() { return this.#acaoConteudo; }
-        set acaoConteudo(v) { this.#acaoConteudo = String(v); }
+        get acaoConteudo() { return this._p_acaoConteudo; }
+        set acaoConteudo(v) { this._p_acaoConteudo = String(v); }
 
-        #obterProtegerModificadasEfetivo(config = {}) {
+        _p_obterProtegerModificadasEfetivo(config = {}) {
             const acao = (typeof config.reutilizarAbasAcaoConteudo === 'string' && config.reutilizarAbasAcaoConteudo)
                 ? config.reutilizarAbasAcaoConteudo
-                : this.#acaoConteudo;
+                : this._p_acaoConteudo;
             if (acao === 'recarregar_se_modificada' || acao === 'recarregar_se_nao_modificada') {
                 return false;
             }
             return (config.protegerGuiasModificadas !== undefined)
                 ? (config.protegerGuiasModificadas !== false)
-                : this.#protegerGuiasModificadas;
+                : this._p_protegerGuiasModificadas;
         }
 
-        get mapaAbasUrls() { return this.#mapaAbasUrls; }
+        get mapaAbasUrls() { return this._p_mapaAbasUrls; }
 
         obterMapaAbasUrls() {
-            return this.#mapaAbasUrls;
-        }
-
-        /**
-         * Normaliza URLs para comparação descartando fragmentos de hash e parâmetros irrelevantes
-         * @param {string} urlStr
-         * @returns {string}
-         */
-        normalizarUrl(urlStr) {
-            if (!urlStr || typeof urlStr !== 'string') return '';
-            try {
-                const u = new URL(urlStr);
-                return (u.origin + u.pathname).toLowerCase().replace(/\/+$/, '');
-            } catch (_) {
-                return urlStr.split('#')[0].split('?')[0].toLowerCase().trim().replace(/\/+$/, '');
-            }
-        }
-
-        /**
-         * FUNÇÃO: normalizarUrlParaComparacao
-         * OBJETIVO DE RECONSTRUÇÃO: Sanitizar URLs removendo barras finais, ordenando parâmetros
-         * de busca e eliminando tokens efêmeros de rastreamento (tracking como utm_* e fbclid)
-         * a fim de comparar com precisão cirúrgica URLs originais e atuais de abas judiciais.
-         * @param {string} urlStr
-         * @returns {string}
-         */
-        normalizarUrlParaComparacao(urlStr) {
-            if (!urlStr || typeof urlStr !== 'string') return '';
-            try {
-                const u = new URL(urlStr);
-                let caminho = u.pathname;
-                if (caminho.length > 1 && caminho.endsWith('/')) {
-                    caminho = caminho.slice(0, -1);
-                }
-                /* Remove parâmetros efêmeros de rastreamento que geram falsos negativos em tribunais */
-                const rs = (typeof JusGovCfgDefaults !== 'undefined' && typeof JusGovCfgDefaults.obterRegrasSistema === 'function')
-                    ? JusGovCfgDefaults.obterRegrasSistema()
-                    : (typeof self !== 'undefined' ? self.__JUSGOV_REGRAS_SISTEMA_JSON__ : null);
-                const paramsParaRemover = (rs && rs.antiDuplicacao && Array.isArray(rs.antiDuplicacao.paramsRemover))
-                    ? rs.antiDuplicacao.paramsRemover
-                    : ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', '_cid', 'ts'];
-                const params = new URLSearchParams(u.search);
-                paramsParaRemover.forEach(p => params.delete(p));
-                params.sort();
-                const buscaLimpa = params.toString() ? ('?' + params.toString()) : '';
-                return (u.origin + caminho + buscaLimpa).toLowerCase();
-            } catch (_) {
-                return urlStr.trim().toLowerCase();
-            }
+            return this._p_mapaAbasUrls;
         }
 
         /**
@@ -169,7 +121,7 @@
                     const res = await chromeApi.storage.session.get('mapaAbasUrlsSession');
                     if (res && res.mapaAbasUrlsSession && typeof res.mapaAbasUrlsSession === 'object') {
                         for (const [idStr, val] of Object.entries(res.mapaAbasUrlsSession)) {
-                            this.#mapaAbasUrls.set(Number(idStr), val);
+                            this._p_mapaAbasUrls.set(Number(idStr), val);
                         }
                     }
                 }
@@ -181,13 +133,13 @@
          * @param {Object} [chromeApi]
          */
         salvarMapaAbasSessionDebounced(chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
-            if (this.#timerSalvarSessionAbas) clearTimeout(this.#timerSalvarSessionAbas);
-            this.#timerSalvarSessionAbas = setTimeout(async () => {
-                this.#timerSalvarSessionAbas = null;
+            if (this._p_timerSalvarSessionAbas) clearTimeout(this._p_timerSalvarSessionAbas);
+            this._p_timerSalvarSessionAbas = setTimeout(async () => {
+                this._p_timerSalvarSessionAbas = null;
                 try {
                     if (chromeApi && chromeApi.storage && chromeApi.storage.session) {
                         const obj = {};
-                        for (const [id, val] of this.#mapaAbasUrls.entries()) {
+                        for (const [id, val] of this._p_mapaAbasUrls.entries()) {
                             obj[id] = val;
                         }
                         await chromeApi.storage.session.set({ mapaAbasUrlsSession: obj });
@@ -210,9 +162,9 @@
                         abas.forEach((t) => {
                             const u = this.normalizarUrlParaComparacao(t.url || t.pendingUrl || '');
                             if (u && u !== 'about:blank' && !u.startsWith('chrome://')) {
-                                const existente = this.#mapaAbasUrls.get(t.id);
+                                const existente = this._p_mapaAbasUrls.get(t.id);
                                 if (!existente) {
-                                    this.#mapaAbasUrls.set(t.id, {
+                                    this._p_mapaAbasUrls.set(t.id, {
                                         urlOriginal: u,
                                         urlAtual: u,
                                         criadaEm: agora,
@@ -222,7 +174,7 @@
                                 } else {
                                     existente.urlAtual = u;
                                     if (!existente.urlOriginal) existente.urlOriginal = u;
-                                    this.#mapaAbasUrls.set(t.id, existente);
+                                    this._p_mapaAbasUrls.set(t.id, existente);
                                 }
                             }
                         });
@@ -269,9 +221,10 @@
                         }
                     } catch (_) { }
                 }
-                const isentarContraAnteriores = Boolean(duplicacaoManualPermitida || ehNovaGuiaNavegador);
+                const ehNovaGuiaUsuario = ehNovaGuiaNavegador && (urlInicial !== 'about:blank' || !tab.openerTabId);
+                const isentarContraAnteriores = Boolean(duplicacaoManualPermitida || ehNovaGuiaUsuario);
 
-                this.#mapaAbasUrls.set(tab.id, {
+                this._p_mapaAbasUrls.set(tab.id, {
                     urlOriginal: urlInicial || '',
                     urlAtual: urlInicial || '',
                     criadaEm: agora,
@@ -281,17 +234,17 @@
                 });
                 this.salvarMapaAbasSessionDebounced(chromeApi);
 
-                const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this.#reutilizarAbasAbertas;
+                const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this._p_reutilizarAbasAbertas;
                 if (!isentarContraAnteriores && reutilizarAtivo !== false && urlInicial && !ehNovaGuiaNavegador && !urlInicial.startsWith('chrome://')) {
-                    const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
-                    const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
-                    const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                    const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
+                    const abasJanela = await chromeApi.tabs.query({});
+                    const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this._p_monitorarUrlOriginal;
+                    const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this._p_monitorarUrlAtual;
+                    const protegerModificadas = this._p_obterProtegerModificadasEfetivo(config);
 
-                    const regNova = this.#mapaAbasUrls.get(tab.id);
+                    const regNova = this._p_mapaAbasUrls.get(tab.id);
                     const abaDuplicada = abasJanela.find((t) => {
                         if (t.id === tab.id) return false;
-                        const reg = this.#mapaAbasUrls.get(t.id);
+                        const reg = this._p_mapaAbasUrls.get(t.id);
                         /* FEAT-74: Novas abas abertas normalmente comparam contra todas as anteriores (inclusive novas guias/duplicadas) */
                         /* Seção 6.91 / FEAT-13: Se ambas forem modificadas e proteção estiver ativa, mantém ambas abertas */
                         if (protegerModificadas && reg && reg.paginaModificada && regNova && regNova.paginaModificada) {
@@ -299,13 +252,14 @@
                         }
                         const uAtual = this.normalizarUrlParaComparacao(t.url || t.pendingUrl || '');
                         const uOrig = (reg && reg.urlOriginal) ? reg.urlOriginal : uAtual;
-                        if (monAtual && urlInicial === uAtual) return true;
-                        if (monOrig && urlInicial === uOrig) return true;
+                        const uEstab = (reg && reg.urlEstabilizada) ? reg.urlEstabilizada : '';
+                        if (monAtual && (urlInicial === uAtual || (uEstab && urlInicial === uEstab))) return true;
+                        if ((monOrig || (uOrig && uOrig !== uAtual)) && urlInicial === uOrig) return true;
                         return false;
                     });
 
                     if (abaDuplicada) {
-                        const regDuplicada = this.#mapaAbasUrls.get(abaDuplicada.id);
+                        const regDuplicada = this._p_mapaAbasUrls.get(abaDuplicada.id);
 
                         /* Seção 6.91 / FEAT-13: Se a nova for modificada e a existente não for, mantém a nova e fecha a existente */
                         if (protegerModificadas && regNova && regNova.paginaModificada && (!regDuplicada || !regDuplicada.paginaModificada)) {
@@ -315,7 +269,7 @@
 
                         const focarPrimeiroPlano = (config.reutilizarAbasFocoPrimeiroPlano !== undefined)
                             ? (config.reutilizarAbasFocoPrimeiroPlano !== false)
-                            : this.#focoPrimeiroPlano;
+                            : this._p_focoPrimeiroPlano;
 
                         if (focarPrimeiroPlano) {
                             await chromeApi.tabs.update(abaDuplicada.id, { active: true });
@@ -324,7 +278,7 @@
                             }
                         }
 
-                        const acao = config.reutilizarAbasAcaoConteudo || this.#acaoConteudo;
+                        const acao = config.reutilizarAbasAcaoConteudo || this._p_acaoConteudo;
                         if (acao === 'recarregar') {
                             try { await chromeApi.tabs.reload(abaDuplicada.id); } catch (_) { }
                         } else if (acao === 'recarregar_se_modificada') {
@@ -359,13 +313,13 @@
             if (!tabId || !chromeApi || !chromeApi.tabs) return { duplicada: false, duplicacaoManualPermitida: false };
             let duplicacaoManualPermitida = false;
             try {
-                const regInicial = this.#mapaAbasUrls.get(tabId);
+                const regInicial = this._p_mapaAbasUrls.get(tabId);
                 if (regInicial && (regInicial.duplicacaoManualPermitida || regInicial.isentarContraAnteriores)) {
                     duplicacaoManualPermitida = true;
                 }
                 if (changeInfo.url) {
                     const uNova = this.normalizarUrlParaComparacao(changeInfo.url);
-                    let reg = this.#mapaAbasUrls.get(tabId);
+                    let reg = this._p_mapaAbasUrls.get(tabId);
                     const urlAnteriorStr = reg && reg.urlAtual ? reg.urlAtual : '';
                     const ehOrigemEmBranco = Boolean(
                         !urlAnteriorStr ||
@@ -402,19 +356,19 @@
                         reg.ultimoAcessoNavegacao = Date.now();
                     }
                     const isentaNestaNavegacao = Boolean(reg.isentarContraAnteriores || reg.duplicacaoManualPermitida);
-                    this.#mapaAbasUrls.set(tabId, reg);
+                    this._p_mapaAbasUrls.set(tabId, reg);
                     this.salvarMapaAbasSessionDebounced(chromeApi);
 
-                    const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this.#reutilizarAbasAbertas;
+                    const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this._p_reutilizarAbasAbertas;
                     if (!isentaNestaNavegacao && reutilizarAtivo !== false && uNova && uNova !== 'about:blank' && !uNova.startsWith('chrome://')) {
-                        const abasJanela = await chromeApi.tabs.query({ windowId: tab.windowId });
-                        const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
-                        const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                        const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
+                        const abasJanela = await chromeApi.tabs.query({});
+                        const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this._p_monitorarUrlOriginal;
+                        const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this._p_monitorarUrlAtual;
+                        const protegerModificadas = this._p_obterProtegerModificadasEfetivo(config);
 
                         const abaExistente = abasJanela.find((t) => {
                             if (t.id === tabId) return false;
-                            const regOutra = this.#mapaAbasUrls.get(t.id);
+                            const regOutra = this._p_mapaAbasUrls.get(t.id);
                             /* FEAT-74: Novas abas comparam normalmente contra guias novas/duplicadas anteriores */
                             /* Seção 6.91 / FEAT-13: Se ambas forem modificadas e proteção ativa, mantém ambas */
                             if (protegerModificadas && regOutra && regOutra.paginaModificada && reg && reg.paginaModificada) {
@@ -422,13 +376,14 @@
                             }
                             const uOutra = this.normalizarUrlParaComparacao(t.url || t.pendingUrl || '');
                             const uOrigOutra = (regOutra && regOutra.urlOriginal) ? regOutra.urlOriginal : uOutra;
-                            if (monAtual && uNova === uOutra) return true;
-                            if (monOrig && uNova === uOrigOutra) return true;
+                            const uEstabOutra = (regOutra && regOutra.urlEstabilizada) ? regOutra.urlEstabilizada : '';
+                            if (monAtual && (uNova === uOutra || (uEstabOutra && uNova === uEstabOutra))) return true;
+                            if ((monOrig || (uOrigOutra && uOrigOutra !== uOutra)) && uNova === uOrigOutra) return true;
                             return false;
                         });
 
                         if (abaExistente) {
-                            const regExistente = this.#mapaAbasUrls.get(abaExistente.id);
+                            const regExistente = this._p_mapaAbasUrls.get(abaExistente.id);
 
                             /* Seção 6.91 / FEAT-13: Se a atual for modificada e a existente não for, mantém a atual e fecha a existente */
                             if (protegerModificadas && reg && reg.paginaModificada && (!regExistente || !regExistente.paginaModificada)) {
@@ -438,7 +393,7 @@
 
                             const focarPrimeiroPlano = (config.reutilizarAbasFocoPrimeiroPlano !== undefined)
                                 ? (config.reutilizarAbasFocoPrimeiroPlano !== false)
-                                : this.#focoPrimeiroPlano;
+                                : this._p_focoPrimeiroPlano;
 
                             if (focarPrimeiroPlano) {
                                 await chromeApi.tabs.update(abaExistente.id, { active: true });
@@ -447,7 +402,7 @@
                                 }
                             }
 
-                            const acao = config.reutilizarAbasAcaoConteudo || this.#acaoConteudo;
+                            const acao = config.reutilizarAbasAcaoConteudo || this._p_acaoConteudo;
                             if (acao === 'recarregar') {
                                 try { await chromeApi.tabs.reload(abaExistente.id); } catch (_) { }
                             } else if (acao === 'recarregar_se_modificada') {
@@ -466,7 +421,7 @@
                              * estava (revertendo a navegação com goBack ou restaurando sua URL anterior).
                              * O fechamento com remove(tabId) é restrito EXCLUSIVAMENTE a abas efêmeras/temporárias
                              * recém-criadas sem histórico prévio (criadas há menos de 2.5s e sem carregamento prévio concluído). */
-                            const recemCriada = Boolean(reg && reg.criadaEm && (Date.now() - reg.criadaEm < 2500) && !reg.carregamentoConcluido);
+                            const recemCriada = Boolean(reg && reg.criadaEm && (Date.now() - reg.criadaEm < 15000) && !reg.carregamentoConcluido);
 
                             if (ehAbaPreExistente || !recemCriada) {
                                 if (urlAnteriorValida) {
@@ -478,7 +433,7 @@
                                         } catch (_) { }
                                     }
                                     reg.urlAtual = urlAnteriorValida;
-                                    this.#mapaAbasUrls.set(tabId, reg);
+                                    this._p_mapaAbasUrls.set(tabId, reg);
                                     this.salvarMapaAbasSessionDebounced(chromeApi);
                                 } else {
                                     try {
@@ -498,8 +453,13 @@
                 }
 
                 if (changeInfo.status === 'complete') {
-                    let regAtual = this.#mapaAbasUrls.get(tabId);
+                    let regAtual = this._p_mapaAbasUrls.get(tabId);
                     if (regAtual) {
+                        const uEstabNova = this.normalizarUrlParaComparacao((tab && tab.url) || regAtual.urlAtual || '');
+                        if (uEstabNova && uEstabNova !== 'about:blank' && !uEstabNova.startsWith('chrome://newtab') && !uEstabNova.startsWith('edge://newtab')) {
+                            regAtual.urlEstabilizada = uEstabNova;
+                            regAtual.urlAtual = uEstabNova;
+                        }
                         regAtual.carregamentoConcluido = true;
                         regAtual.ultimoAcessoNavegacao = Date.now();
                         const uConc = regAtual.urlAtual || '';
@@ -507,7 +467,8 @@
                             regAtual.isentarContraAnteriores = false;
                             regAtual.duplicacaoManualPermitida = false;
                         }
-                        this.#mapaAbasUrls.set(tabId, regAtual);
+                        this._p_mapaAbasUrls.set(tabId, regAtual);
+                        this.salvarMapaAbasSessionDebounced(chromeApi);
                     }
                 }
                 return { duplicada: false, duplicacaoManualPermitida };
@@ -522,7 +483,7 @@
          * @param {Object} [chromeApi]
          */
         processarAbaRemovida(tabId, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
-            this.#mapaAbasUrls.delete(tabId);
+            this._p_mapaAbasUrls.delete(tabId);
             this.salvarMapaAbasSessionDebounced(chromeApi);
         }
 
@@ -533,47 +494,14 @@
          * @param {Object} [chromeApi]
          */
         marcarPaginaModificada(tabId, modificada = true, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
-            let reg = this.#mapaAbasUrls.get(tabId);
+            let reg = this._p_mapaAbasUrls.get(tabId);
             if (!reg) {
                 reg = { urlOriginal: '', urlAtual: '', criadaEm: Date.now() };
             }
             reg.paginaModificada = Boolean(modificada);
             reg.modificadaEm = Date.now();
-            this.#mapaAbasUrls.set(tabId, reg);
+            this._p_mapaAbasUrls.set(tabId, reg);
             this.salvarMapaAbasSessionDebounced(chromeApi);
-        }
-
-        /**
-         * FEAT-74: Desempate estrito em duplicidade ->
-         * 1) guia protegida (active/pinned); 2) mais recentemente navegada (ultimoAcessoNavegacao);
-         * 3) mais recentemente acessada (tab.lastAccessed / ultimoAcessoFoco).
-         * @param {Array<Object>} candidatas
-         * @returns {Object|null}
-         */
-        selecionarEleitaPorDesempate(candidatas) {
-            if (!Array.isArray(candidatas) || candidatas.length === 0) return null;
-            const protegidas = candidatas.filter(t => t.active || t.pinned);
-            const basePool = protegidas.length > 0 ? protegidas : candidatas;
-            let melhor = basePool[0];
-            for (let idx = 1; idx < basePool.length; idx++) {
-                const atual = basePool[idx];
-                if (atual.active && !melhor.active) { melhor = atual; continue; }
-                if (melhor.active && !atual.active) continue;
-                const regA = this.#mapaAbasUrls.get(atual.id);
-                const regM = this.#mapaAbasUrls.get(melhor.id);
-                const navA = Number((regA && regA.ultimoAcessoNavegacao) ?? atual.ultimoAcessoNavegacao) || 0;
-                const navM = Number((regM && regM.ultimoAcessoNavegacao) ?? melhor.ultimoAcessoNavegacao) || 0;
-                if (navA !== navM) {
-                    if (navA > navM) melhor = atual;
-                    continue;
-                }
-                const accA = Number(atual.lastAccessed) || (regA && Number(regA.ultimoAcessoFoco)) || 0;
-                const accM = Number(melhor.lastAccessed) || (regM && Number(regM.ultimoAcessoFoco)) || 0;
-                if (accA > accM) {
-                    melhor = atual;
-                }
-            }
-            return melhor;
         }
 
         /**
@@ -591,14 +519,14 @@
                 const abas = await chromeApi.tabs.query(query);
                 if (!abas || abas.length <= 1) return 0;
 
-                const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this.#monitorarUrlOriginal;
-                const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this.#monitorarUrlAtual;
-                const protegerModificadas = this.#obterProtegerModificadasEfetivo(config);
+                const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this._p_monitorarUrlOriginal;
+                const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this._p_monitorarUrlAtual;
+                const protegerModificadas = this._p_obterProtegerModificadasEfetivo(config);
 
                 const mapaGrupos = new Map();
                 for (const t of abas) {
                     const uAtual = this.normalizarUrlParaComparacao(t.url || t.pendingUrl || '');
-                    const reg = this.#mapaAbasUrls.get(t.id);
+                    const reg = this._p_mapaAbasUrls.get(t.id);
                     const uOrig = (reg && reg.urlOriginal) ? reg.urlOriginal : uAtual;
 
                     const chaves = [];
@@ -644,7 +572,7 @@
                     const naoModificadas = [];
 
                     for (const t of grupo) {
-                        const reg = this.#mapaAbasUrls.get(t.id);
+                        const reg = this._p_mapaAbasUrls.get(t.id);
                         if (reg && reg.paginaModificada) {
                             modificadas.push(t);
                         } else {
@@ -687,6 +615,18 @@
         }
     }
 
+        const _ext_GerenciadorAntiDuplicacao = [
+        { g: 'JusGovNavegadorUrlsNormalizacao', p: './navegador-urls-normalizacao.js' }
+    ];
+    for (let i = 0; i < _ext_GerenciadorAntiDuplicacao.length; i++) {
+        const it = _ext_GerenciadorAntiDuplicacao[i];
+        const Cls = (typeof self !== 'undefined' && typeof self[it.g] === 'function')
+            ? self[it.g]
+            : ((typeof require === 'function') ? (() => { try { return require(it.p); } catch (_) { return null; } })() : null);
+        if (Cls && typeof Cls.instalarEm === 'function') Cls.instalarEm(GerenciadorAntiDuplicacao.prototype);
+    }
+
     Object.freeze(GerenciadorAntiDuplicacao.prototype);
     return Object.freeze(GerenciadorAntiDuplicacao);
 }));
+

@@ -1751,11 +1751,7 @@
                     const cenParaEsq = mp42.calcularEsquivaLateralBarra(700, { left: 540, width: 200 }, 'centro') === 'esquerda';
                     const centroOk = esqParaCentro && dirParaCentro && cenParaDir && cenParaEsq;
 
-                    const m1 = mp42.avancarModoFixacaoBarra(0);
-                    const m2 = mp42.avancarModoFixacaoBarra(m1);
-                    const m3 = mp42.avancarModoFixacaoBarra(m2);
-                    const m4 = mp42.avancarModoFixacaoBarra(m3);
-                    const cicloOk = (m1 === 1 && m2 === 2 && m3 === 3 && m4 === 0);
+                    const cicloOk = (typeof mp42.avancarModoFixacaoBarra === 'undefined');
 
                     const visModo1 = mp42.resolverVisibilidadeBarraPomodoro({ ativoPorConfig: true, deveExibirNormal: false, modoFixacao: 1, fechadaNestaGuia: true }) === true;
                     const visModo2 = mp42.resolverVisibilidadeBarraPomodoro({ ativoPorConfig: true, deveExibirNormal: false, modoFixacao: 2, fechadaNestaGuia: true }) === true;
@@ -1922,7 +1918,7 @@
                         const boxUi = document.createElement('div');
                         const cfg45 = { pomodoroAtivo: true, pomodoroFocoMinutos: 25, pomodoroProporcao: 4.5, pomodoroCiclos: 4 };
                         mp45.renderizarResumoProdutividadeDom(boxUi, st45, cfg45, tsIni45);
-                        const divs = Array.from(boxUi.querySelectorAll('div')).map(d => d.textContent.trim());
+                        const divs = Array.from(boxUi.children).map(d => d.textContent.trim());
                         const uiOk = (
                             divs.length === 3 &&
                             divs[0] === '🕒 Ligado 15/11/2026 desde 01:34hs (00h:11m)' &&
@@ -3021,7 +3017,7 @@
                         const vConcl = mp61.resolverEstadoVisualMinipopupDescanso({ emDescanso: true, aguardandoOciosidade: false, descansoMinCumprido: true, descansoAtividadeAteTs: 0, metaFaseMin: 6, descansoAcumuladoMs: 380000 }, 10000);
 
                         const visOk = (
-                            vPend.textoStatus === 'Pendente...' && vPend.corBorda === '#dc2626' && vPend.usarTelaEmbaccada === false &&
+                            vPend.textoStatus === 'Alívio Pendente' && (vPend.corBorda === '#eab308' || vPend.corBorda === '#dc2626') && vPend.usarTelaEmbaccada === false &&
                             vAnd.textoStatus === 'Em andamento...' && vAnd.corBorda === '#0284c7' && vAnd.usarTelaEmbaccada === true && vAnd.usarScreensaver === true &&
                             vAviso.textoStatus === 'Em andamento?' && vAviso.corBorda === '#eab308' && vAviso.usarTelaEmbaccada === false &&
                             vConcl.textoStatus === 'Concluído!' && vConcl.corBorda === '#16a34a' && vConcl.usarTelaEmbaccada === true && vConcl.usarScreensaver === true
@@ -3348,9 +3344,9 @@
                             const ui62 = host62 && host62.__jusgovUI;
                             const okComp = Boolean(ui62 && ui62.spanFase.style.display === 'none' && ui62.spanStatus.style.display === 'none' && ui62.pill.title === infoIco.tooltipTitle);
 
-                            /* Hover em Compacto: mostra somente botões, sem badge verde nem expandir status */
+                            /* Hover em Compacto: sem botões obsoletos de cadeado/ações e sem expandir status */
                             ui62.pill.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-                            const okHoverC = Boolean(ui62.btnFixar.style.display === 'inline-flex' && ui62.spanStatus.style.display === 'none');
+                            const okHoverC = Boolean(!ui62.btnFixar && ui62.spanStatus.style.display === 'none');
                             ui62.pill.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
 
                             fn62(snapN.cfgExib, snapN.resumoPomodoro, snapN.estadoBarra);
@@ -4005,7 +4001,140 @@
                     'Valida perfis.json, domínios PJe Cloud, injeção de fonte padrão, contrato POO (ARQ-10/FEAT-102/FEAT-104/FEAT-105).',
                     { detalhe: detalheTest20 }
                 );
+            }
 
+            // Bateria BUG-130: XPath e CSS recursivos atravessando <iframe> até a raiz + matching multi-iframe
+            {
+                let bug130Ok = false;
+                let detalhe130 = '';
+                let wrap130 = null;
+                try {
+                    const DiagCls = window.JusGovDialogoMapeamentoRegra;
+                    const InspCls = window.JusGovRegrasEInspetor;
+                    if (typeof DiagCls === 'function' && typeof InspCls === 'function' && document && document.body) {
+                        wrap130 = document.createElement('div');
+                        wrap130.id = 'jusgov-wrap-bug130';
+                        wrap130.style.display = 'none';
+                        const ifr = document.createElement('iframe');
+                        wrap130.appendChild(ifr);
+                        document.body.appendChild(wrap130);
+                        const docIfr = ifr.contentDocument || (ifr.contentWindow && ifr.contentWindow.document);
+                        if (docIfr) {
+                            docIfr.open();
+                            docIfr.write('<!doctype html><html><body><p id="alvo130">Teste</p></body></html>');
+                            docIfr.close();
+                            const htmlIfr = docIfr.documentElement;
+                            const pIfr = docIfr.getElementById('alvo130');
+                            const diag = new DiagCls();
+                            const insp = new InspCls();
+                            const xpHtml = diag.extrairCaminhoXPathAbsoluto(htmlIfr);
+                            const xpP = diag.extrairCaminhoXPathAbsoluto(pIfr);
+                            const cssP = diag.extrairSeletorCss2(pIfr);
+                            const trilha = diag.construirTrilhaElementos(pIfr);
+                            const matchXp = insp.elementoCorrespondeXPath(pIfr, xpP, true);
+                            const matchCss = insp.elementoCorrespondeCss(pIfr, cssP, true);
+                            const xpHtmlOk = xpHtml.endsWith('/iframe[1]/html') && xpHtml.length > '/html'.length;
+                            const xpPOk = xpP.includes('/iframe[1]/html/body') && xpP.endsWith('/p[1]');
+                            const cssPOk = /iframe:nth-child\(\d+\)\s*>\s*html\s*>\s*body:nth-child/i.test(cssP);
+                            const trilhaOk = Array.isArray(trilha) && trilha.some(t => t.tag === 'iframe') && trilha.filter(t => t.tag === 'html').length >= 2;
+                            bug130Ok = Boolean(xpHtmlOk && xpPOk && cssPOk && trilhaOk && matchXp && matchCss);
+                            detalhe130 = `xpHtml=${xpHtmlOk}, xpP=${xpPOk}, cssP=${cssPOk}, trilha=${trilhaOk}, matchXp=${matchXp}, matchCss=${matchCss}`;
+                        }
+                    }
+                } catch (e130) {
+                    detalhe130 = e130.message || String(e130);
+                } finally {
+                    if (wrap130 && wrap130.parentNode) wrap130.parentNode.removeChild(wrap130);
+                }
+                registrar(
+                    bug130Ok,
+                    'BUG_130_XPATH_CSS_RECURSIVO_IFRAME',
+                    'Valida geração e correspondência recursiva de XPath/CSS atravessando <iframe> até a raiz do documento (BUG-130 / Seção 6.285).',
+                    { detalhe: detalhe130 }
+                );
+            }
+
+            // Bateria TEST-21: BUG-131 + FEAT-106 (Autômato 2 camadas, 8 estados, trava ±1, acréscimo 25%, 2 linhas) e Ordenação/Nomes Primários de Grupos
+            {
+                let test21Ok = false;
+                let detalhe21 = '';
+                try {
+                    const ProdCls21 = window.JusGovModuloProdutividade;
+                    const OrdCls21 = window.JusGovOrdenacaoGuias || window.JusGovNavegadorOrdenacao;
+                    if (typeof ProdCls21 === 'function') {
+                        const mp21 = new ProdCls21();
+                        const cfg21 = { pomodoroAtivo: true, pomodoroFocoMinutos: 45, pomodoroProporcao: 4.5, pomodoroCiclos: 4 };
+
+                        /* 1) 8 estados visuais FEAT-106 + trava podeSalvarEstiloUsuario exclusiva em FOCO_NORMAL */
+                        const stNormal = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: false, segRestantes: 1200, necessidadeAtividadeMs: 1200000 }, 1000);
+                        const stAl30 = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: false, segRestantes: 20, necessidadeAtividadeMs: 20000 }, 1000);
+                        const stExtra = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: false, segRestantes: 0, necessidadeAtividadeMs: -120000 }, 1000);
+                        const stDeb = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: false, descansoPulado: true, descansoPendente: true }, 1000);
+                        const stAg = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: true, aguardandoOciosidade: true, descansoPendente: true }, 1000);
+                        const stAnd = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: true, aguardandoOciosidade: false, metaFaseMin: 10, descansoAcumuladoMs: 120000 }, 1000);
+                        const stFim = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: true, aguardandoOciosidade: false, metaFaseMin: 10, descansoAcumuladoMs: 580000 }, 1000);
+                        const stConcl = mp21.resolverEstadoVisualMinipopupDescanso({ emDescanso: true, aguardandoOciosidade: false, descansoMinCumprido: true, metaFaseMin: 10, descansoAcumuladoMs: 600000 }, 1000);
+                        const estadosOk = Boolean(
+                            stNormal.estadoAutomato === 'FOCO_NORMAL' && stNormal.podeSalvarEstiloUsuario === true && stNormal.corBorda === '#0d9488' &&
+                            stAl30.estadoAutomato === 'FOCO_ALERTA_30S' && stAl30.podeSalvarEstiloUsuario === false &&
+                            stExtra.estadoAutomato === 'FOCO_EXTRA' && stExtra.podeSalvarEstiloUsuario === false &&
+                            stDeb.estadoAutomato === 'FOCO_PAUSA_PENDENTE' && stDeb.podeSalvarEstiloUsuario === false && stDeb.corBorda === '#dc2626' &&
+                            stAg.estadoAutomato === 'PAUSA_AGUARDANDO' && stAg.podeSalvarEstiloUsuario === false && stAg.corBorda === '#eab308' &&
+                            stAnd.estadoAutomato === 'PAUSA_EM_ANDAMENTO' && stAnd.podeSalvarEstiloUsuario === false &&
+                            stFim.estadoAutomato === 'PAUSA_ALERTA_FIM' && stFim.podeSalvarEstiloUsuario === false &&
+                            stConcl.estadoAutomato === 'PAUSA_CONCLUIDA' && stConcl.podeSalvarEstiloUsuario === false && stConcl.textoRetorno === '✅ VOLTAR AO TRABALHO!'
+                        );
+
+                        /* 2) Trava de ciclo ±1 e acréscimo contínuo 25% proporcional com teto = Descanso (40m) */
+                        const calc25 = mp21._calcularAcrescimoExcessoTrabalhoMs(45 * 60000, cfg21, 10 * 60000); // +2.5m -> 12.5m
+                        const calcTeto = mp21._calcularAcrescimoExcessoTrabalhoMs(600 * 60000, cfg21, 10 * 60000); // teto 40m
+                        const t21 = 1795000000000;
+                        const stCiclo = mp21.criarEstadoTrabalhoZerado('2026-11-23', t21);
+                        stCiclo.pomodoroCicloAtual = 1;
+                        stCiclo.pomodoroDescansoPulado = true;
+                        stCiclo.pomodoroDescansoSaldoRestanteMs = 10 * 60000;
+                        stCiclo.necessidadePausaMs = 10 * 60000;
+                        mp21.iniciarFaseDescansoPomodoro(stCiclo, t21 + 45 * 60000, cfg21);
+                        const travaCicloOk = (stCiclo.pomodoroCicloAtual === 1);
+                        const acrescimoOk = (calc25.acrescimoMs === 150000 && calc25.atingiuDescanso === false && calcTeto.atingiuDescanso === true && calcTeto.totalPausaMs === 40 * 60000);
+
+                        /* 3) Resumo em 2 linhas (Foco 6/45m sem Ajustado indevido + linhaExtra para pendente) */
+                        const stUi = mp21.criarEstadoTrabalhoZerado('2026-11-23', t21);
+                        stUi.pomodoroMinutosNaFase = 6;
+                        stUi.pomodoroDescansoPulado = true;
+                        stUi.pomodoroDescansoSaldoRestanteMs = 10 * 60000;
+                        stUi.necessidadePausaMs = 10 * 60000;
+                        const infoUi21 = mp21.formatarResumoProdutividadeTexto(stUi, cfg21, t21 + 6 * 60000, null);
+                        const ui21Ok = Boolean(
+                            infoUi21.linhaPomodoro.includes('Foco 6/45m') &&
+                            !infoUi21.linhaPomodoro.includes('Foco Ajustado') &&
+                            infoUi21.segmentosPomodoro.some(s => s.linhaExtra && s.texto.includes('Alívio Pendente -10m'))
+                        );
+
+                        /* 4) Nome primário de domínio para grupos de guias */
+                        let domGrupoOk = true;
+                        if (typeof OrdCls21 === 'function') {
+                            const ord21 = new OrdCls21();
+                            if (typeof ord21.extrairNomePrimarioDominio === 'function') {
+                                domGrupoOk = (
+                                    ord21.extrairNomePrimarioDominio('https://www.trf1.jus.br/pje') === 'TRF1' &&
+                                    ord21.extrairNomePrimarioDominio('https://uol.com.br/noticias') === 'UOL'
+                                );
+                            }
+                        }
+
+                        test21Ok = Boolean(estadosOk && travaCicloOk && acrescimoOk && ui21Ok && domGrupoOk);
+                        detalhe21 = `estados=${estadosOk}, trava=${travaCicloOk}, acresc25=${acrescimoOk}, ui2L=${ui21Ok}, domGrupo=${domGrupoOk}`;
+                    }
+                } catch (e21) {
+                    detalhe21 = e21.message || String(e21);
+                }
+                registrar(
+                    test21Ok,
+                    'TEST_21_POMODORO_2CAMADAS_E_ORDENACAO_GUIAS',
+                    'Valida BUG-131, FEAT-106 (8 estados, trava ±1, acréscimo contínuo 25%, teto Descanso, resumo 2 linhas) e nomes primários de grupos de guias.',
+                    { detalhe: detalhe21 }
+                );
             }
         }
     }

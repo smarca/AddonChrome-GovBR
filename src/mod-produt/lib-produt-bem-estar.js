@@ -42,322 +42,17 @@
         piscar: true
     });
 
-    const CARDS_ALIVIO = Object.freeze([
-        Object.freeze({
-            chave: 'hidratar',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'agua',
-            titulo: 'Hidrate-se',
-            texto: 'Beba um copo de água agora ou vá ao banheiro!',
-            bg: '#0369a1',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'levantar',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'caminhar',
-            titulo: 'Levante-se!',
-            texto: 'Levante-se da cadeira agora e dê alguns passos!',
-            bg: '#0f766e',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'longe_tela',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'sem_tela',
-            titulo: 'Afaste-se da Tela',
-            texto: 'Tire a atenção do computador e relaxe o foco visual!',
-            bg: '#0369a1',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'esticar',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'esticar',
-            titulo: 'Alívio Físico',
-            texto: 'Levante-se e estique ombros, pescoço, costas e punhos!',
-            bg: '#0f766e',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'olhos_6m',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'olhos',
-            titulo: 'Visão (+6m)',
-            texto: 'Descanse os olhos: olhe para longe (+6m) fora da tela!',
-            bg: '#0f766e',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'piscar_olhos',
-            categoria: 'alivio',
-            prioridade: 'normal',
-            icone: 'olhos',
-            titulo: 'Lubrifique a Visão',
-            texto: 'Pisque devagar várias vezes ou feche os olhos por 20s.',
-            bg: '#047857',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'postura',
-            categoria: 'alivio',
-            prioridade: 'normal',
-            icone: 'esticar',
-            titulo: 'Postura e Coluna',
-            texto: 'Solte os braços, gire o pescoço devagar e alinhe as costas.',
-            bg: '#047857',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'respirar',
-            categoria: 'alivio',
-            prioridade: 'normal',
-            icone: 'respirar',
-            titulo: 'Respiração',
-            texto: 'Faça respirações lentas e fundas para baixar o estresse.',
-            bg: '#047857',
-            fg: '#f8fafc',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'copo_agua',
-            categoria: 'alivio',
-            prioridade: 'essencial',
-            icone: 'copo_agua',
-            titulo: 'Copo de Água',
-            texto: 'Beba um copo de água fresca para manter a hidratação!',
-            bg: '#0284c7',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'cafe_quente',
-            categoria: 'alivio',
-            prioridade: 'extra',
-            icone: 'cafe',
-            titulo: 'Café Quente / Chá',
-            texto: 'Aproveite a pausa para um café quente ou chá sem pressa.',
-            bg: '#78350f',
-            fg: '#fef3c7',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'vitamina_frutas',
-            categoria: 'alivio',
-            prioridade: 'extra',
-            icone: 'vitamina',
-            titulo: 'Vitamina de Frutas',
-            texto: 'Recarregue a energia com uma vitamina de frutas ou fruta fresca!',
-            bg: '#0f766e',
-            fg: '#ffffff',
-            piscar: false
-        })
-    ]);
-
-    const CARDS_PROIBIDOS = Object.freeze([
-        Object.freeze({
-            chave: 'sem_celular',
-            categoria: 'proibido',
-            prioridade: 'essencial',
-            icone: 'sem_celular',
-            titulo: 'Sem Celular',
-            texto: 'Não abra o celular ou redes sociais: descanse a atenção!',
-            bg: '#b91c1c',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'sem_pc',
-            categoria: 'proibido',
-            prioridade: 'essencial',
-            icone: 'sem_tela',
-            titulo: 'Sem Computador',
-            texto: 'Evite ler e-mails, mensagens ou telas de trabalho no alívio!',
-            bg: '#b91c1c',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'sem_tarefa',
-            categoria: 'proibido',
-            prioridade: 'normal',
-            icone: 'sem_tarefa',
-            titulo: 'Não Fazer',
-            texto: 'Não comece tarefa nova ou complexa durante a pausa!',
-            bg: '#b45309',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'sem_pressa',
-            categoria: 'proibido',
-            prioridade: 'extra',
-            icone: 'sem_tarefa',
-            titulo: 'Sem Olhar o Relógio',
-            texto: 'Não fique vigiando o cronômetro esperar o descanso acabar.',
-            bg: '#b45309',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'sem_redes',
-            categoria: 'proibido',
-            prioridade: 'normal',
-            icone: 'sem_redes',
-            titulo: 'Sem Redes Sociais',
-            texto: 'Evite rolar feeds ou chats: deixe a mente descansar de verdade!',
-            bg: '#b91c1c',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'sem_notificacoes',
-            categoria: 'proibido',
-            prioridade: 'normal',
-            icone: 'sem_notificacoes',
-            titulo: 'Sem Notificações',
-            texto: 'Silencie alertas e notificações durante o seu descanso.',
-            bg: '#b45309',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'sem_email',
-            categoria: 'proibido',
-            prioridade: 'extra',
-            icone: 'sem_email',
-            titulo: 'Sem E-mails',
-            texto: 'Não abra a caixa de e-mails ou mensagens de trabalho no alívio.',
-            bg: '#991b1b',
-            fg: '#ffffff',
-            piscar: false
-        })
-    ]);
-
-    const CARDS_PAUSA_MAIOR = Object.freeze([
-        Object.freeze({
-            chave: 'hidratar_longa',
-            categoria: 'pausa_maior',
-            prioridade: 'essencial',
-            icone: 'agua',
-            titulo: 'Hidratação e Pausa',
-            texto: 'Aproveite a pausa longa para beber água e renovar a mente!',
-            bg: '#0284c7',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'caminhar',
-            categoria: 'pausa_maior',
-            prioridade: 'essencial',
-            icone: 'caminhar',
-            titulo: 'Mude de Ambiente',
-            texto: 'Saia da cadeira agora, caminhe longe do PC e alongue-se!',
-            bg: '#0369a1',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'desconectar',
-            categoria: 'pausa_maior',
-            prioridade: 'essencial',
-            icone: 'desconectar',
-            titulo: 'Desconecte-se',
-            texto: 'Afaste-se do computador e do celular durante a pausa longa!',
-            bg: '#9a3412',
-            fg: '#ffffff',
-            piscar: true
-        }),
-        Object.freeze({
-            chave: 'banheiro',
-            categoria: 'pausa_maior',
-            prioridade: 'essencial',
-            icone: 'agua',
-            titulo: 'Pausa Completa',
-            texto: 'Vá ao banheiro, lave o rosto com água fria e respire fora da sala!',
-            bg: '#0f766e',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'sol_ar_fresco',
-            categoria: 'pausa_maior',
-            prioridade: 'normal',
-            icone: 'sol',
-            titulo: 'Luz Natural e Ar',
-            texto: 'Vá até uma janela ou área externa para tomar ar fresco.',
-            bg: '#0369a1',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'lanche',
-            categoria: 'pausa_maior',
-            prioridade: 'extra',
-            icone: 'lanche',
-            titulo: 'Lanche Leve',
-            texto: 'Coma uma fruta, castanhas ou tome um café/chá longe das telas.',
-            bg: '#0f766e',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'musica',
-            categoria: 'pausa_maior',
-            prioridade: 'extra',
-            icone: 'musica',
-            titulo: 'Música Calma',
-            texto: 'Ouça 1 ou 2 músicas calmas longe do teclado.',
-            bg: '#4338ca',
-            fg: '#ffffff',
-            piscar: false
-        }),
-        Object.freeze({
-            chave: 'organizar',
-            categoria: 'pausa_maior',
-            prioridade: 'extra',
-            icone: 'organizar',
-            titulo: 'Organize o Espaço',
-            texto: 'Guarde papéis ou organize brevemente a mesa ao finalizar.',
-            bg: '#0f766e',
-            fg: '#ffffff',
-            piscar: false
-        })
-    ]);
-
-    const CARD_RETORNO_TRABALHO = Object.freeze({
-        chave: 'foco_retorno',
-        categoria: 'retorno_trabalho',
-        icone: 'foco_retorno',
-        titulo: 'Retomar Foco',
-        texto: 'Saldo de pausas elevado hoje: hora de retomar o trabalho!',
-        bg: '#0f766e',
-        fg: '#ffffff',
-        piscar: true
-    });
-
-    const CARD_INCENTIVO_DESCANSO = Object.freeze({
-        chave: 'adiantar_descanso',
-        categoria: 'alivio',
-        icone: 'adiantar_descanso',
-        titulo: 'Pausa Merecida',
-        texto: 'Foco intenso acumulado! Que tal iniciar ou retomar um Alívio?',
-        bg: '#0284c7',
-        fg: '#ffffff',
-        piscar: true
-    });
+    const _cardsMod = (typeof self !== 'undefined' && self.JusGovProdutBemEstarCards)
+        ? self.JusGovProdutBemEstarCards
+        : ((typeof require === 'function') ? (() => { try { return require('./produt-bem-estar-cards.js'); } catch (_) { return {}; } })() : {});
+    const CARDS_FOCO = _cardsMod.CARDS_FOCO || Object.freeze([]);
+    const CARDS_AGUARDANDO = _cardsMod.CARDS_AGUARDANDO || Object.freeze([]);
+    const CARDS_DEBITO = _cardsMod.CARDS_DEBITO || Object.freeze([]);
+    const CARDS_ALIVIO = _cardsMod.CARDS_ALIVIO || Object.freeze([]);
+    const CARDS_PROIBIDOS = _cardsMod.CARDS_PROIBIDOS || Object.freeze([]);
+    const CARDS_PAUSA_MAIOR = _cardsMod.CARDS_PAUSA_MAIOR || Object.freeze([]);
+    const CARD_RETORNO_TRABALHO = _cardsMod.CARD_RETORNO_TRABALHO || Object.freeze({});
+    const CARD_INCENTIVO_DESCANSO = _cardsMod.CARD_INCENTIVO_DESCANSO || Object.freeze({});
 
     class BemEstarPomodoro {
         obterCatalogoCompleto() {
@@ -555,7 +250,13 @@
             const gov = this.calcularSaldoGovernanca(estado, config, agora);
             const hidr = this.avaliarHidratacao2h(estado, agora, config);
             const ehPausaMaior = Boolean(resumo && (resumo.fase === 'pausa_maior' || (Number(resumo.cicloAtual || 0) >= Number(resumo.ciclosMax || 4))));
-            const baseFase = ehPausaMaior ? CARDS_PAUSA_MAIOR : CARDS_ALIVIO;
+            const emDebito = Boolean(
+                resumo && !resumo.emDescanso &&
+                (resumo.descansoPulado || resumo.descansoPendente || Number(estado && estado.necessidadePausaMs || 0) > 0)
+            );
+            const emAguardando = Boolean(resumo && resumo.emDescanso && resumo.aguardandoOciosidade);
+            const emAlivioAtivo = Boolean(resumo && resumo.emDescanso && !resumo.aguardandoOciosidade);
+            const statusContexto = emDebito ? 'debito' : (emAguardando ? 'aguardando' : (emAlivioAtivo ? 'alivio' : 'foco'));
 
             const lista = [];
             if (hidr.aguaPendente) {
@@ -563,11 +264,22 @@
             }
             if (gov.estadoSaldo === 'excesso_pausas' && resumo && resumo.emDescanso && resumo.descansoMinCumprido && !resumo.descansoPendente) {
                 lista.push(CARD_RETORNO_TRABALHO);
-            } else if (gov.estadoSaldo === 'precisa_descanso' && (!resumo || !resumo.emDescanso)) {
+            } else if ((emDebito || gov.estadoSaldo === 'precisa_descanso') && (!resumo || !resumo.emDescanso)) {
                 lista.push(CARD_INCENTIVO_DESCANSO);
             }
 
-            const poolCombinado = [...baseFase, ...CARDS_PROIBIDOS];
+            let poolCombinado;
+            if (statusContexto === 'debito') {
+                poolCombinado = [...CARDS_DEBITO, ...(ehPausaMaior ? CARDS_PAUSA_MAIOR : CARDS_ALIVIO).filter(c => c.prioridade === 'essencial')];
+            } else if (statusContexto === 'aguardando') {
+                poolCombinado = [...CARDS_AGUARDANDO, ...(ehPausaMaior ? CARDS_PAUSA_MAIOR : CARDS_ALIVIO)];
+            } else if (statusContexto === 'foco') {
+                poolCombinado = [...CARDS_FOCO];
+            } else {
+                const baseFase = ehPausaMaior ? CARDS_PAUSA_MAIOR : CARDS_ALIVIO;
+                poolCombinado = [...baseFase, ...CARDS_PROIBIDOS];
+            }
+
             const essenciais = this._embaralharLista(poolCombinado.filter(c => c.prioridade === 'essencial'));
             const normais = this._embaralharLista(poolCombinado.filter(c => c.prioridade !== 'essencial' && c.prioridade !== 'extra'));
             const extras = this._embaralharLista(poolCombinado.filter(c => c.prioridade === 'extra'));
@@ -579,7 +291,7 @@
                 }
             };
 
-            /* Intercala priorizando as acoes essenciais do Pomodoro (~2..3 essenciais antes de cada dica complementar/extra) */
+            /* Intercala priorizando as acoes essenciais do status atual (~2 essenciais antes de cada dica complementar/extra) */
             let iEss = 0;
             let iSec = 0;
             while (iEss < essenciais.length || iSec < secundarios.length) {
@@ -592,6 +304,7 @@
             }
 
             return {
+                statusContexto,
                 aguaPendente: hidr.aguaPendente,
                 cardDestaque: lista[0] || CARDS_ALIVIO[0],
                 cardsCiclo: lista,
@@ -599,8 +312,8 @@
                 duracaoPrimeiraMsgMs: 14000,
                 intervaloTrocaMinMs: 7500,
                 intervaloTrocaMaxMs: 14500,
-                bannerLembreteMinMs: gov.estadoSaldo === 'precisa_descanso' ? 22000 : 45000,
-                bannerLembreteMaxMs: gov.estadoSaldo === 'precisa_descanso' ? 38000 : 85000
+                bannerLembreteMinMs: (emDebito || gov.estadoSaldo === 'precisa_descanso') ? 22000 : 45000,
+                bannerLembreteMaxMs: (emDebito || gov.estadoSaldo === 'precisa_descanso') ? 38000 : 85000
             };
         }
     }

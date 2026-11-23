@@ -453,168 +453,6 @@
         }
 
         /*
-         * METODO: acumularSelecaoTabelaPorColunasOuLinhas
-         * REFERENCIA HELP: Selecao Avancada de Tabelas por Colunas e por Linhas.
-         * OBJETIVO DE RECONSTRUCAO: Acumular colunas ou linhas em <table> (suportando
-         * ordem crescente padrao ou Modo Baralho com Shift, e toggle-off ao clicar
-         * novamente na mesma coluna/linha) e retornar estatisticas exatas.
-         */
-        acumularSelecaoTabelaPorColunasOuLinhas(celulaOuLinha, modo = 'COLUNA', modoBaralhoShift = false) {
-            /* Passo 3.6: Localizar a tabela ancestral e validar estrutura */
-            if (!celulaOuLinha || typeof celulaOuLinha.closest !== 'function') return null;
-            const tabela = celulaOuLinha.closest('table');
-            if (!tabela) return null;
-
-            if (this.tabelaAlvo !== tabela || this.modoTabelaAtivo !== modo) {
-                this.tabelaAlvo = tabela;
-                this.modoTabelaAtivo = modo;
-                this.indicesColunasSelecionadas.length = 0;
-                this.indicesLinhasSelecionadas.length = 0;
-                this.ultimoIndiceTabelaClicado = -1;
-            }
-
-            const todasLinhas = Array.from(tabela.querySelectorAll('tr')).filter(tr => {
-                const style = window.getComputedStyle(tr);
-                return style.display !== 'none' && style.visibility !== 'hidden';
-            });
-            if (todasLinhas.length === 0) return null;
-
-            this.entradasAcumuladas.length = 0;
-            this.pilhaHistoricoIds.length = 0;
-            let totalCelulasExtraidas = 0;
-            const rxMultiEspacos = EXPRESSOES_REGULARES.MULTIPLOS_ESPACOS;
-
-            if (modo === 'COLUNA') {
-                /* Passo 3.7: Determinar indice da coluna clicada (cellIndex) com toggle-off se ja selecionada */
-                const celula = celulaOuLinha.closest('td, th');
-                if (!celula) return null;
-                const colIdx = celula.cellIndex | 0;
-
-                const posExistente = this.indicesColunasSelecionadas.indexOf(colIdx);
-                if (posExistente >= 0) {
-                    this.indicesColunasSelecionadas.splice(posExistente, 1);
-                } else {
-                    this.indicesColunasSelecionadas.push(colIdx);
-                    this.ultimoIndiceTabelaClicado = colIdx;
-                }
-
-                if (!modoBaralhoShift) {
-                    this.indicesColunasSelecionadas.sort((a, b) => a - b);
-                }
-
-                /* Passo 3.8: Extrair os dados das colunas selecionadas linha por linha */
-                const linhasFormatadas = [];
-                for (const tr of todasLinhas) {
-                    const celulasLinha = tr.cells;
-                    const valoresLinha = [];
-                    for (const cIdx of this.indicesColunasSelecionadas) {
-                        if (celulasLinha && cIdx < celulasLinha.length) {
-                            const td = celulasLinha[cIdx];
-                            const bruto = td.innerText || td.textContent || '';
-                            const txt = (rxMultiEspacos ? bruto.replace(rxMultiEspacos, ' ') : bruto).trim();
-                            valoresLinha.push(txt);
-                            totalCelulasExtraidas++;
-                            if (this.entradasAcumuladas.length < CONFIG_ACUMULADOR.LIMITE_MAXIMO_RANGES_VISUAIS) {
-                                const r = document.createRange();
-                                r.selectNodeContents(td);
-                                this.entradasAcumuladas.push({
-                                    id: ++this.contadorSequencialId,
-                                    texto: txt,
-                                    range: r,
-                                    modoBaralho: Boolean(modoBaralhoShift)
-                                });
-                            }
-                        }
-                    }
-                    if (valoresLinha.length > 0 && valoresLinha.some(v => v.length > 0)) {
-                        const sep = this.separadorTabelaCustomizado || this.separadorCustomizado || CONFIG_ACUMULADOR.SEPARADOR_ITENS;
-                        const sufixoTab = (this.incluirSeparadorFinal && sep !== '\t' && sep !== ' | ') ? sep : '';
-                        linhasFormatadas.push(valoresLinha.join(sep) + sufixoTab);
-                    }
-                }
-
-                this.atualizarDestaqueVisualCSS();
-                const textoTabela = this.desacoplarStringV8(linhasFormatadas.join('\n'));
-                this.itensTexto.length = 0;
-                if (textoTabela) this.itensTexto.push(textoTabela);
-
-                return {
-                    consolidado: textoTabela,
-                    quantidade: this.indicesColunasSelecionadas.length | 0,
-                    colunas: this.indicesColunasSelecionadas.length | 0,
-                    linhas: linhasFormatadas.length | 0,
-                    celulas: totalCelulasExtraidas | 0,
-                    caracteres: textoTabela.length | 0
-                };
-            } else {
-                /* Passo 3.9: Modo LINHA -- Determinar indice da linha clicada com toggle-off */
-                const linhaTr = celulaOuLinha.closest('tr');
-                if (!linhaTr) return null;
-                const rowIdx = todasLinhas.indexOf(linhaTr);
-                if (rowIdx === -1) return null;
-
-                const posExistente = this.indicesLinhasSelecionadas.indexOf(rowIdx);
-                if (posExistente >= 0) {
-                    this.indicesLinhasSelecionadas.splice(posExistente, 1);
-                } else {
-                    this.indicesLinhasSelecionadas.push(rowIdx);
-                    this.ultimoIndiceTabelaClicado = rowIdx;
-                }
-
-                if (!modoBaralhoShift) {
-                    this.indicesLinhasSelecionadas.sort((a, b) => a - b);
-                }
-
-                const linhasFormatadas = [];
-                let maxColunasPorLinha = 0;
-                for (const rIdx of this.indicesLinhasSelecionadas) {
-                    const tr = todasLinhas[rIdx];
-                    if (!tr) continue;
-                    const celulasVisiveis = Array.from(tr.querySelectorAll('th, td'))
-                        .map(td => {
-                            const b = td.innerText || td.textContent || '';
-                            return (rxMultiEspacos ? b.replace(rxMultiEspacos, ' ') : b).trim();
-                        })
-                        .filter(Boolean);
-                    if (celulasVisiveis.length > 0) {
-                        const sep = this.separadorTabelaCustomizado || this.separadorCustomizado || CONFIG_ACUMULADOR.SEPARADOR_ITENS;
-                        const sufixoTab = (this.incluirSeparadorFinal && sep !== '\t' && sep !== ' | ') ? sep : '';
-                        const linhaStr = celulasVisiveis.join(sep) + sufixoTab;
-                        linhasFormatadas.push(linhaStr);
-                        totalCelulasExtraidas += celulasVisiveis.length;
-                        if (celulasVisiveis.length > maxColunasPorLinha) {
-                            maxColunasPorLinha = celulasVisiveis.length;
-                        }
-                        if (this.entradasAcumuladas.length < CONFIG_ACUMULADOR.LIMITE_MAXIMO_RANGES_VISUAIS) {
-                            const rng = document.createRange();
-                            rng.selectNodeContents(tr);
-                            this.entradasAcumuladas.push({
-                                id: ++this.contadorSequencialId,
-                                texto: linhaStr,
-                                range: rng,
-                                modoBaralho: Boolean(modoBaralhoShift)
-                            });
-                        }
-                    }
-                }
-
-                this.atualizarDestaqueVisualCSS();
-                const textoTabela = this.desacoplarStringV8(linhasFormatadas.join('\n'));
-                this.itensTexto.length = 0;
-                if (textoTabela) this.itensTexto.push(textoTabela);
-
-                return {
-                    consolidado: textoTabela,
-                    quantidade: this.indicesLinhasSelecionadas.length | 0,
-                    colunas: maxColunasPorLinha | 0,
-                    linhas: this.indicesLinhasSelecionadas.length | 0,
-                    celulas: totalCelulasExtraidas | 0,
-                    caracteres: textoTabela.length | 0
-                };
-            }
-        }
-
-        /*
          * METODO: desfazerUltimoItem
          * REFERENCIA HELP: Desfazer Ultima Carta do Acumulador (Ctrl + Alt + Clique Direito).
          * OBJETIVO DE RECONSTRUCAO: Remover exatamente a ultima carta inserida pelo usuario
@@ -686,7 +524,21 @@
     }
 
     /* Passo 6.1: Exportar a classe globalmente blindada com Object.freeze para consumo pelo orquestrador principal */
+        const _ext_GerenciadorAcumulador = [
+        { g: 'JusGovCopiaAcumuladorTabela', p: './copia-acumulador-tabela.js' }
+    ];
+    for (let i = 0; i < _ext_GerenciadorAcumulador.length; i++) {
+        const it = _ext_GerenciadorAcumulador[i];
+        const Cls = (typeof self !== 'undefined' && typeof self[it.g] === 'function')
+            ? self[it.g]
+            : ((typeof require === 'function') ? (() => { try { return require(it.p); } catch (_) { return null; } })() : null);
+        if (Cls && typeof Cls.instalarEm === 'function') {
+            Cls.instalarEm(GerenciadorAcumulador.prototype);
+        }
+    }
+
     Object.freeze(GerenciadorAcumulador.prototype);
     window.JusGovAcumulador = Object.freeze(GerenciadorAcumulador);
     window.JusGovCopiaAcumulador = window.JusGovAcumulador;
 })();
+

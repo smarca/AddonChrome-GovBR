@@ -59,56 +59,56 @@
     const RX_JSACTION_CLIQUE = /(?:^|[;\s])(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|tap)\s*:/i;
 
     class RegrasEInspetorDOM {
-        #regrasUsuario = [];
-        #regrasInternas = [];
-        #ultimoAlvoValidoInspecionado = null;
-        #cacheEl = null;
-        #cacheTs = 0;
-        #cacheRes = null;
-        #painelInspetorEl = null;
-        #idFrameInspetor = 'jusgov_insp_' + Math.random().toString(36).slice(2);
-        #ehCampoEditavelFn = () => false;
+        _p_regrasUsuario = [];
+        _p_regrasInternas = [];
+        _p_ultimoAlvoValidoInspecionado = null;
+        _p_cacheEl = null;
+        _p_cacheTs = 0;
+        _p_cacheRes = null;
+        _p_painelInspetorEl = null;
+        _p_idFrameInspetor = 'jusgov_insp_' + Math.random().toString(36).slice(2);
+        _p_ehCampoEditavelFn = () => false;
 
         constructor(opcoes = {}) {
             if (opcoes && typeof opcoes.ehCampoEditavelFn === 'function') {
-                this.#ehCampoEditavelFn = opcoes.ehCampoEditavelFn;
+                this._p_ehCampoEditavelFn = opcoes.ehCampoEditavelFn;
             }
             this.carregarRegrasInternas();
         }
 
         definirEhCampoEditavelFn(fn) {
             if (typeof fn === 'function') {
-                this.#ehCampoEditavelFn = fn;
+                this._p_ehCampoEditavelFn = fn;
             }
         }
 
         limparCache() {
-            this.#cacheEl = null;
-            this.#cacheTs = 0;
-            this.#cacheRes = null;
+            this._p_cacheEl = null;
+            this._p_cacheTs = 0;
+            this._p_cacheRes = null;
         }
 
         obterIdFrameInspetor() {
-            return this.#idFrameInspetor;
+            return this._p_idFrameInspetor;
         }
 
         obterUltimoAlvoValidoInspecionado() {
             try {
-                if (this.#ultimoAlvoValidoInspecionado && this.#ultimoAlvoValidoInspecionado.isConnected) {
-                    return this.#ultimoAlvoValidoInspecionado;
+                if (this._p_ultimoAlvoValidoInspecionado && this._p_ultimoAlvoValidoInspecionado.isConnected) {
+                    return this._p_ultimoAlvoValidoInspecionado;
                 }
             } catch (_) { }
             return null;
         }
 
         temPainelInspetorVisivel() {
-            return Boolean(this.#painelInspetorEl);
+            return Boolean(this._p_painelInspetorEl);
         }
 
         carregarRegrasInternas() {
             const aplicarRegrasInterface = (dados) => {
                 if (Array.isArray(dados)) {
-                    this.#regrasInternas = dados.filter(r => r && r.origem !== 'usuario');
+                    this._p_regrasInternas = dados.filter(r => r && r.origem !== 'usuario');
                     this.limparCache();
                 }
             };
@@ -158,22 +158,22 @@
         }
 
         definirRegrasUsuario(novasRegras) {
-            this.#regrasUsuario = Array.isArray(novasRegras) ? [...novasRegras] : [...PADROES_FABRICA_REGRAS_MAPEAMENTO];
+            this._p_regrasUsuario = Array.isArray(novasRegras) ? [...novasRegras] : [...PADROES_FABRICA_REGRAS_MAPEAMENTO];
             this.limparCache();
         }
 
         obterRegrasUsuario() {
-            return this.#regrasUsuario;
+            return this._p_regrasUsuario;
         }
 
         adicionarRegrasUsuario(novasRegras) {
             if (!Array.isArray(novasRegras) || novasRegras.length === 0) return;
-            this.#regrasUsuario.push(...novasRegras);
+            this._p_regrasUsuario.push(...novasRegras);
             this.limparCache();
         }
 
         definirRegrasInternas(regras) {
-            this.#regrasInternas = Array.isArray(regras) ? [...regras] : [];
+            this._p_regrasInternas = Array.isArray(regras) ? [...regras] : [];
             this.limparCache();
         }
 
@@ -183,6 +183,37 @@
             if (!doc || typeof doc.evaluate !== 'function') return false;
             try {
                 const expr = expressaoXPath.trim();
+                /* BUG-130: Suporte a XPath recursivo atravessando <iframe> (/.../iframe[n]/html/...) */
+                if (/\/iframe(?:\[\d+\])?\/html(?:\/|$)/i.test(expr)) {
+                    const segmentos = expr.split(/(?=\/html(?:\/|$))/i).filter(Boolean);
+                    const cadeia = [];
+                    let noAtual = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
+                    while (noAtual) {
+                        const dAtual = noAtual.ownerDocument;
+                        if (!dAtual) break;
+                        cadeia.unshift({ el: noAtual, doc: dAtual });
+                        const wAtual = dAtual.defaultView;
+                        noAtual = (wAtual && wAtual !== wAtual.top && wAtual.frameElement) ? wAtual.frameElement : null;
+                    }
+                    if (cadeia.length >= segmentos.length) {
+                        let todosBatem = true;
+                        for (let s = 0; s < segmentos.length; s++) {
+                            const nivel = cadeia[s];
+                            const segExpr = segmentos[s];
+                            const ehUltimoSeg = (s === segmentos.length - 1);
+                            const snapSeg = nivel.doc.evaluate(segExpr, nivel.doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                            let bateNivel = false;
+                            for (let k = 0; k < (snapSeg ? snapSeg.snapshotLength : 0); k++) {
+                                const noSeg = snapSeg.snapshotItem(k);
+                                if (!noSeg) continue;
+                                if (noSeg === nivel.el) { bateNivel = true; break; }
+                                if (ehUltimoSeg && herdarFilhos && typeof noSeg.contains === 'function' && noSeg.contains(nivel.el)) { bateNivel = true; break; }
+                            }
+                            if (!bateNivel) { todosBatem = false; break; }
+                        }
+                        if (todosBatem) return true;
+                    }
+                }
                 const snap = doc.evaluate(expr, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
                 if (!snap || snap.snapshotLength === 0) return false;
                 for (let i = 0; i < snap.snapshotLength; i++) {
@@ -214,6 +245,29 @@
             if (!base) return false;
             try {
                 const sel = seletorCss.trim();
+                /* BUG-130: Suporte a seletor CSS recursivo atravessando <iframe> (... > iframe... > html > ...) */
+                if (/iframe[^>]*>\s*html\b/i.test(sel)) {
+                    const segsCss = sel.split(/\s*>\s*(?=html\b)/i).filter(Boolean);
+                    const cadeia = [];
+                    let noAtual = base;
+                    while (noAtual) {
+                        cadeia.unshift(noAtual);
+                        const wAtual = noAtual.ownerDocument && noAtual.ownerDocument.defaultView;
+                        noAtual = (wAtual && wAtual !== wAtual.top && wAtual.frameElement) ? wAtual.frameElement : null;
+                    }
+                    if (cadeia.length >= segsCss.length) {
+                        let todosBatem = true;
+                        for (let s = 0; s < segsCss.length; s++) {
+                            const noSeg = cadeia[s];
+                            const segSel = segsCss[s].trim();
+                            const ehUltimo = (s === segsCss.length - 1);
+                            const bateu = (typeof noSeg.matches === 'function' && noSeg.matches(segSel))
+                                || (ehUltimo && herdarFilhos && typeof noSeg.closest === 'function' && Boolean(noSeg.closest(segSel)));
+                            if (!bateu) { todosBatem = false; break; }
+                        }
+                        if (todosBatem) return true;
+                    }
+                }
                 if (typeof base.matches === 'function' && base.matches(sel)) return true;
                 if (herdarFilhos && typeof base.closest === 'function' && base.closest(sel)) return true;
                 if (herdarFilhos) {
@@ -295,14 +349,14 @@
 
             if (!apenasUsuario) {
                 const agora = Date.now();
-                if (base === this.#cacheEl && (agora - this.#cacheTs) < 16) {
-                    return this.#cacheRes;
+                if (base === this._p_cacheEl && (agora - this._p_cacheTs) < 16) {
+                    return this._p_cacheRes;
                 }
                 const det = this.obterDiagnosticoRegraDetalhado(base, false);
                 const resultado = det ? det.tipo : null;
-                this.#cacheEl = base;
-                this.#cacheTs = agora;
-                this.#cacheRes = resultado;
+                this._p_cacheEl = base;
+                this._p_cacheTs = agora;
+                this._p_cacheRes = resultado;
                 return resultado;
             }
 
@@ -320,7 +374,7 @@
             return `<${tag}${idSufixo}${clsStr}>`;
         }
 
-        #temTextoDiretoVisivel(el) {
+        _p_temTextoDiretoVisivel(el) {
             if (!el || !el.childNodes) return false;
             const filhos = el.childNodes;
             for (let i = 0; i < filhos.length; i++) {
@@ -391,542 +445,22 @@
             return this.obterDiagnosticoElemento(el).tipo;
         }
 
-        obterDiagnosticoRegraDetalhado(el, apenasUsuario = false) {
-            if (!el) return null;
-            const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-            if (!base) return null;
-            const grupos = apenasUsuario
-                ? [{ origem: 'Regra do Usuário', lista: this.#regrasUsuario }]
-                : [
-                    { origem: 'Regra do Usuário', lista: this.#regrasUsuario },
-                    { origem: 'Regra Interna', lista: this.#regrasInternas }
-                ];
-            let achado = null;
-            const historico = [];
-            for (let g = 0; g < grupos.length; g++) {
-                const { origem, lista } = grupos[g];
-                if (!Array.isArray(lista) || lista.length === 0) continue;
-                let deveParar = false;
-                for (let i = 0; i < lista.length; i++) {
-                    const regra = lista[i];
-                    if (!regra || regra.ativo === false || !regra.expressao) continue;
-                    const herdar = regra.herdarFilhos !== false;
-                    if (this.elementoCorrespondeRegraMapeamento(base, regra.expressao, herdar, regra.tipoSeletor || '')) {
-                        const parou = (regra.continuarProxima !== true);
-                        const item = {
-                            tipo: regra.tipo || 'semiflexivel',
-                            origem,
-                            regra: regra.expressao,
-                            tipoSeletor: regra.tipoSeletor || '',
-                            observacao: regra.observacao || '',
-                            parou
-                        };
-                        achado = item;
-                        historico.push(item);
-                        if (parou) {
-                            deveParar = true;
-                            break;
-                        }
-                    }
-                }
-                if (deveParar || achado !== null) break;
-            }
-            if (achado) {
-                achado.historico = historico;
-            }
-            return achado;
-        }
+    }
 
-        obterDiagnosticoElemento(el) {
-            const diag = {
-                tipo: 'textual',
-                origem: 'Padrão (Texto)',
-                rotuloDetalhe: 'Motivo',
-                detalhe: 'Textual',
-                observacao: '',
-                trilha: []
-            };
-            if (!el) {
-                diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-                return diag;
-            }
-            const base = (el.nodeType === Node.TEXT_NODE) ? el.parentElement : el;
-            if (!base) {
-                diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-                return diag;
-            }
-
-            const registrarEtapa = (passo, descricao, tipo, parou = false, observacao = '') => {
-                diag.trilha.forEach((t) => { t.decisivo = false; });
-                diag.trilha.push({ passo, descricao, tipo, parou, observacao, decisivo: true });
-            };
-
-            if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
-                try {
-                    const cur = window.getComputedStyle(base).cursor;
-                    if (cur === 'text' || cur === 'vertical-text' || cur === 'cell') {
-                        diag.tipo = 'textual';
-                        diag.origem = 'Cursor do Mouse';
-                        diag.rotuloDetalhe = 'Cursor CSS';
-                        diag.detalhe = `cursor: ${cur}`;
-                        registrarEtapa('1. Mouse', `cursor: ${cur}`, 'textual', false);
-                    } else if (cur === 'default' || cur === 'arrow' || cur === 'context-menu') {
-                        diag.tipo = 'semiflexivel';
-                        diag.origem = 'Cursor do Mouse';
-                        diag.rotuloDetalhe = 'Cursor CSS';
-                        diag.detalhe = `cursor: ${cur}`;
-                        registrarEtapa('1. Mouse', `cursor: ${cur}`, 'semiflexivel', false);
-                    } else if (cur === 'pointer' || cur === 'not-allowed' || cur === 'grabbing' || cur === 'grab' || cur === 'progress' || cur === 'help') {
-                        diag.tipo = 'interface';
-                        diag.origem = 'Cursor do Mouse';
-                        diag.rotuloDetalhe = 'Cursor CSS';
-                        diag.detalhe = `cursor: ${cur}`;
-                        registrarEtapa('1. Mouse', `cursor: ${cur}`, 'interface', false);
-                    }
-                } catch (_) { }
-            }
-
-            const motivoEvento = this.temEventosAssociadosAoObjeto(base);
-            if (motivoEvento) {
-                diag.tipo = 'interface';
-                diag.origem = 'Eventos / Controle';
-                diag.rotuloDetalhe = 'Gatilho';
-                diag.detalhe = motivoEvento;
-                registrarEtapa('2. Evento JS', motivoEvento, 'interface', false);
-            }
-
-            if (diag.tipo !== 'interface') {
-                /* BUG-66: Rótulos (<label>), controles nativos e células/contêineres de formulário/tabela cujo conteúdo
-                 * pertence a <label>/controles (ex.: espaço vazio à direita ou logo abaixo do <label>) devem ser
-                 * classificados como 'interface' ("elemento central"), nunca como 'textual'. */
-                try {
-                    const seletorControle = 'label, input, select, textarea, button, option, fieldset, legend, [role="checkbox"], [role="radio"], [role="switch"], [role="button"]';
-                    const tagB = (base.tagName || '').toUpperCase();
-                    if (typeof base.matches === 'function' && base.matches(seletorControle)) {
-                        diag.tipo = 'interface';
-                        diag.origem = 'Controle / Rótulo';
-                        diag.rotuloDetalhe = 'Elemento UI';
-                        diag.detalhe = `<${tagB.toLowerCase()}>`;
-                        registrarEtapa('3. Heurística', `controle/rótulo <${tagB.toLowerCase()}>`, 'interface', false);
-                    } else if (
-                        !['P', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'CODE', 'BODY', 'HTML', 'MAIN'].includes(tagB) &&
-                        typeof base.querySelector === 'function' &&
-                        base.querySelector('label, input, select, textarea, [role="checkbox"], [role="radio"], [role="switch"]')
-                    ) {
-                        const temParagrafoLeitura = Boolean(base.querySelector('p, article, blockquote, pre'));
-                        if (!temParagrafoLeitura) {
-                            const txtForaControles = (() => {
-                                let soma = 0;
-                                const children = base.childNodes || [];
-                                for (let c = 0; c < children.length; c++) {
-                                    const ch = children[c];
-                                    if (!ch) continue;
-                                    if (ch.nodeType === Node.TEXT_NODE) {
-                                        soma += (ch.nodeValue || '').trim().length;
-                                    } else if (ch.nodeType === Node.ELEMENT_NODE && typeof ch.matches === 'function' && !ch.matches(seletorControle + ', a[href], br')) {
-                                        if (!ch.querySelector || !ch.querySelector(seletorControle)) {
-                                            soma += (ch.textContent || '').trim().length;
-                                        }
-                                    }
-                                }
-                                return soma;
-                            })();
-                            if (txtForaControles < 25) {
-                                diag.tipo = 'interface';
-                                diag.origem = 'Contêiner de Formulário';
-                                diag.rotuloDetalhe = 'Layout UI';
-                                diag.detalhe = `<${tagB.toLowerCase()}> com controles/rótulos`;
-                                registrarEtapa('3. Heurística', `entorno de formulário em <${tagB.toLowerCase()}>`, 'interface', false);
-                            }
-                        }
-                    }
-                } catch (_) { }
-            }
-
-            if (diag.tipo !== 'interface') {
-                try {
-                    const stExtra = (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
-                        ? window.getComputedStyle(base)
-                        : null;
-                    const us = stExtra ? (stExtra.userSelect || stExtra.webkitUserSelect) : '';
-                    const tabIdx = base.getAttribute ? base.getAttribute('tabindex') : null;
-                    if (us === 'none') {
-                        diag.tipo = 'interface';
-                        diag.origem = 'Heurística Browser';
-                        diag.rotuloDetalhe = 'Heurística';
-                        diag.detalhe = 'user-select: none';
-                        registrarEtapa('3. Heurística', 'user-select: none', 'interface', false);
-                    } else if (tabIdx === '0') {
-                        diag.tipo = 'interface';
-                        diag.origem = 'Heurística Browser';
-                        diag.rotuloDetalhe = 'Heurística';
-                        diag.detalhe = 'tabindex="0"';
-                        registrarEtapa('3. Heurística', 'tabindex="0"', 'interface', false);
-                    } else {
-                        const tagB = (base.tagName || '').toUpperCase();
-                        const ehParagrafo = tagB === 'P' || tagB === 'ARTICLE' || tagB === 'BLOCKQUOTE';
-                        const ehTagDocumentalSemTextoDireto = TAGS_DOCUMENTAIS_SEMPRE_LEITURA.has(tagB);
-                        const ehEditavelDireto = Boolean(
-                            (typeof this.#ehCampoEditavelFn === 'function' && this.#ehCampoEditavelFn(base)) ||
-                            (typeof base.matches === 'function' && base.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"]), rich-textarea, [role="textbox"], [role="searchbox"]'))
-                        );
-                        if (!ehEditavelDireto && !ehTagDocumentalSemTextoDireto && !this.#temTextoDiretoVisivel(base)) {
-                            diag.tipo = 'interface';
-                            diag.origem = 'Heurística Estrutural';
-                            diag.rotuloDetalhe = 'Sem Texto Direto';
-                            diag.detalhe = `<${tagB.toLowerCase()}> apenas estrutural/propriedades`;
-                            registrarEtapa('3. Heurística', `sem texto direto <${tagB.toLowerCase()}>`, 'interface', false);
-                        } else {
-                            const txt = (base.textContent || '').trim();
-                            if (!ehParagrafo && txt.length > 0 && txt.length <= 80 && !txt.includes('\n')) {
-                                const temMascara = /\b(\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}(?::\d{2})?|\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b/.test(txt);
-                                if (temMascara) {
-                                    diag.tipo = 'semiflexivel';
-                                    diag.origem = 'Heurística Browser';
-                                    diag.rotuloDetalhe = 'Heurística';
-                                    diag.detalhe = 'Texto curto com máscara forense';
-                                    registrarEtapa('3. Heurística', 'máscara forense curta', 'semiflexivel', false);
-                                }
-                            } else if (txt.length > 100) {
-                                diag.tipo = 'textual';
-                                diag.origem = 'Heurística Browser';
-                                diag.rotuloDetalhe = 'Heurística';
-                                diag.detalhe = `Bloco de texto longo (${txt.length} chars)`;
-                                registrarEtapa('3. Heurística', `texto longo (${txt.length} chars)`, 'textual', false);
-                            }
-                        }
-                    }
-                } catch (_) { }
-            }
-
-            const regraDetalhe = this.obterDiagnosticoRegraDetalhado(base);
-            if (regraDetalhe) {
-                const ehProtecaoSemTextoDiretoBasico = (
-                    diag.tipo === 'interface' &&
-                    diag.rotuloDetalhe === 'Sem Texto Direto' &&
-                    regraDetalhe.origem === 'Regra Interna' &&
-                    regraDetalhe.tipo === 'textual' &&
-                    !/pdf|cke_editable|textLayer|downloadBinario/i.test(String(regraDetalhe.regra || ''))
-                );
-                const rebaixadoPorRegraInterna = (
-                    (
-                        diag.tipo === 'interface' &&
-                        (diag.origem === 'Contêiner de Formulário' || diag.origem === 'Controle / Rótulo') &&
-                        regraDetalhe.origem === 'Regra Interna' &&
-                        regraDetalhe.tipo === 'textual'
-                    ) ||
-                    ehProtecaoSemTextoDiretoBasico
-                );
-                if (!rebaixadoPorRegraInterna) {
-                    diag.tipo = regraDetalhe.tipo;
-                    diag.origem = regraDetalhe.origem;
-                    diag.rotuloDetalhe = 'Regra';
-                    diag.detalhe = `${regraDetalhe.tipoSeletor ? '[' + regraDetalhe.tipoSeletor + '] ' : ''}${regraDetalhe.regra}`;
-                    diag.observacao = regraDetalhe.observacao || '';
-                    const listaHist = Array.isArray(regraDetalhe.historico) && regraDetalhe.historico.length > 0
-                        ? regraDetalhe.historico
-                        : [regraDetalhe];
-                    for (let h = 0; h < listaHist.length; h++) {
-                        const itemH = listaHist[h];
-                        const prefixoSel = itemH.tipoSeletor ? `[${itemH.tipoSeletor}] ` : '';
-                        registrarEtapa(`4. ${itemH.origem}`, `${prefixoSel}${itemH.regra}`, itemH.tipo, Boolean(itemH.parou), itemH.observacao || '');
-                    }
-                }
-            }
-
-            if (diag.trilha.length === 0) {
-                diag.trilha.push({ passo: '0. Padrão', descricao: '', tipo: 'textual', parou: false, observacao: '', decisivo: true });
-            }
-            return diag;
-        }
-
-        #obterContextoRaizUi() {
-            const docLocal = typeof document !== 'undefined' ? document : null;
-            const winLocal = typeof window !== 'undefined' ? window : null;
-            let w = winLocal;
-            let ox = 0;
-            let oy = 0;
-            while (w && w !== w.top) {
-                try {
-                    const pDoc = w.parent && w.parent.document;
-                    const fe = w.frameElement;
-                    if (!pDoc || !pDoc.body || !fe) break;
-                    const r = fe.getBoundingClientRect();
-                    ox += r.left;
-                    oy += r.top;
-                    w = w.parent;
-                } catch (_) {
-                    break;
-                }
-            }
-            const docUi = (w && w.document && w.document.body) ? w.document : docLocal;
-            const winUi = w || winLocal;
-            return { docUi, winUi, offsetX: ox, offsetY: oy };
-        }
-
-        ocultarInspetorTempoReal(ignorarOrigemId = null) {
-            if (!ignorarOrigemId || !this.#painelInspetorEl || this.#painelInspetorEl.getAttribute('data-jusgov-origem-frame') !== ignorarOrigemId) {
-                try {
-                    if (this.#painelInspetorEl) {
-                        if (typeof this.#painelInspetorEl.hidePopover === 'function') {
-                            try { this.#painelInspetorEl.hidePopover(); } catch (_) { }
-                        }
-                        if (this.#painelInspetorEl.parentNode) {
-                            this.#painelInspetorEl.parentNode.removeChild(this.#painelInspetorEl);
-                        }
-                    }
-                } catch (_) { }
-                this.#painelInspetorEl = null;
-            }
-            const docsLimpar = [];
-            if (typeof document !== 'undefined') docsLimpar.push(document);
-            const { docUi } = this.#obterContextoRaizUi();
-            if (docUi && !docsLimpar.includes(docUi)) docsLimpar.push(docUi);
-            docsLimpar.forEach((docRef) => {
-                try {
-                    const orfaos = docRef.querySelectorAll('#jusgov-inspetor-tempo-real, [data-jusgov-inspetor="true"]');
-                    for (let i = 0; i < orfaos.length; i++) {
-                        if (ignorarOrigemId && orfaos[i].getAttribute && orfaos[i].getAttribute('data-jusgov-origem-frame') === ignorarOrigemId) {
-                            continue;
-                        }
-                        try {
-                            if (typeof orfaos[i].hidePopover === 'function') orfaos[i].hidePopover();
-                        } catch (_) { }
-                        try { orfaos[i].remove(); } catch (_) { }
-                    }
-                } catch (_) { }
-            });
-        }
-
-        notificarOutrosFramesOcultarInspetor(origemOverride = null) {
-            try {
-                const payload = {
-                    __jusgovAcao: 'OCULTAR_INSPETOR_TEMPO_REAL',
-                    origemId: origemOverride || this.#idFrameInspetor
-                };
-                if (typeof window === 'undefined') return;
-                if (window.top && window.top !== window) {
-                    try { window.top.postMessage(payload, '*'); } catch (_) { }
-                }
-                if (window.parent && window.parent !== window && window.parent !== window.top) {
-                    try { window.parent.postMessage(payload, '*'); } catch (_) { }
-                }
-                if (window.frames && window.frames.length > 0) {
-                    for (let i = 0; i < window.frames.length; i++) {
-                        try { window.frames[i].postMessage({ ...payload, __repassado: true }, '*'); } catch (_) { }
-                    }
-                }
-            } catch (_) { }
-        }
-
-        #obterDominioCompletoUrl(baseEl, winUi) {
-            const extrairHostDeUrl = (urlBruta) => {
-                try {
-                    if (!urlBruta || typeof urlBruta !== 'string') return '';
-                    if (/^about:/i.test(urlBruta)) return '';
-                    const u = new URL(urlBruta);
-                    if (u.host) return u.host;
-                    if (u.protocol === 'file:') return 'file://';
-                } catch (_) { }
-                return '';
-            };
-            try {
-                const docAlvo = (baseEl && baseEl.ownerDocument) ? baseEl.ownerDocument : (typeof document !== 'undefined' ? document : null);
-                const winAlvo = (docAlvo && docAlvo.defaultView) ? docAlvo.defaultView : (typeof window !== 'undefined' ? window : null);
-                const candidatos = [];
-                if (winAlvo && winAlvo.location && winAlvo.location.href) candidatos.push(winAlvo.location.href);
-                if (winUi && winUi.location && winUi.location.href) candidatos.push(winUi.location.href);
-                if (docAlvo && docAlvo.referrer) candidatos.push(docAlvo.referrer);
-                if (typeof document !== 'undefined' && document.referrer) candidatos.push(document.referrer);
-                for (let i = 0; i < candidatos.length; i++) {
-                    const host = extrairHostDeUrl(candidatos[i]);
-                    if (host) return host;
-                }
-            } catch (_) { }
-            return '';
-        }
-
-        atualizarInspetorTempoReal(x, y, alvo, ehCampoEditavelOverride = null) {
-            if (typeof document === 'undefined' || !document.body) return;
-            const base = (alvo && alvo.nodeType === Node.TEXT_NODE) ? alvo.parentElement : alvo;
-            if (!base) {
-                this.ocultarInspetorTempoReal();
-                this.notificarOutrosFramesOcultarInspetor();
-                return;
-            }
-            if (base.closest && (base.closest('[data-jusgov-inspetor="true"]') || base.closest('#jusgov-inspetor-tempo-real'))) {
-                this.ocultarInspetorTempoReal();
-                this.notificarOutrosFramesOcultarInspetor();
-                return;
-            }
-            if (base.closest && base.closest('[data-jusgov-ignore="true"]')) {
-                this.ocultarInspetorTempoReal();
-                return;
-            }
-            if (base.tagName === 'IFRAME' || base.tagName === 'FRAME' || base.tagName === 'EMBED' || base.tagName === 'OBJECT') {
-                this.ocultarInspetorTempoReal();
-                this.notificarOutrosFramesOcultarInspetor();
-                return;
-            }
-            this.#ultimoAlvoValidoInspecionado = base;
-
-            /* Fecha qualquer inspetor antigo local (inclusive órfãos) ou em outros frames antes de renderizar o novo */
-            this.ocultarInspetorTempoReal();
-            this.notificarOutrosFramesOcultarInspetor();
-
-            const ctxUi = this.#obterContextoRaizUi();
-            const docUi = ctxUi.docUi || document;
-            const winUi = ctxUi.winUi || window;
-
-            const painel = docUi.createElement('div');
-            painel.id = 'jusgov-inspetor-tempo-real';
-            painel.setAttribute('data-jusgov-ignore', 'true');
-            painel.setAttribute('data-jusgov-inspetor', 'true');
-            painel.setAttribute('data-jusgov-origem-frame', this.#idFrameInspetor);
-            if (typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype) {
-                painel.setAttribute('popover', 'manual');
-            }
-            painel.style.cssText = 'position: fixed !important; left: -9999px; top: -9999px; inset: auto !important; right: auto !important; bottom: auto !important; margin: 0 !important; z-index: 2147483647 !important; isolation: isolate !important; pointer-events: auto !important; cursor: default !important; background: rgba(15, 23, 42, 0.96); color: #f8fafc; border: 1px solid #38bdf8; border-radius: 8px; padding: 8px 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; line-height: 1.45; box-shadow: 0 10px 25px rgba(0,0,0,0.55); max-width: 420px; word-break: break-word;';
-
-            const fecharAoPassarMouse = (ev) => {
-                if (ev && ev.isTrusted && ev.type !== 'mousedown' && ev.ctrlKey && ev.altKey && ev.shiftKey) {
-                    return;
-                }
-                try {
-                    if (typeof painel.hidePopover === 'function') painel.hidePopover();
-                } catch (_) { }
-                try {
-                    if (painel && painel.parentNode) painel.parentNode.removeChild(painel);
-                } catch (_) { }
-                this.ocultarInspetorTempoReal();
-                this.notificarOutrosFramesOcultarInspetor();
-            };
-            painel.addEventListener('mouseenter', fecharAoPassarMouse);
-            painel.addEventListener('mousemove', fecharAoPassarMouse);
-            painel.addEventListener('mousedown', fecharAoPassarMouse);
-            docUi.body.appendChild(painel);
-            if (typeof painel.showPopover === 'function') {
-                try {
-                    if (painel.matches && painel.matches(':popover-open')) {
-                        painel.hidePopover();
-                    }
-                    painel.showPopover();
-                } catch (_) { }
-            }
-            this.#painelInspetorEl = painel;
-
-            const fnCampo = typeof ehCampoEditavelOverride === 'function' ? ehCampoEditavelOverride : this.#ehCampoEditavelFn;
-            const ehCampoEditavel = Boolean(fnCampo(base));
-            const diag = this.obterDiagnosticoElemento(base);
-            const coresTipo = {
-                interface: { nome: 'Interface', cor: '#fbbf24' },
-                semiflexivel: { nome: 'SemiFlexível', cor: '#38bdf8' },
-                textual: { nome: 'Textual', cor: '#34d399' },
-                editavel: { nome: 'Editável', cor: '#c084fc' }
-            };
-            const infoTipo = coresTipo[diag.tipo] || coresTipo.textual;
-            const tag = (base.tagName || '').toLowerCase();
-            const idStr = base.id ? ` id="${base.id}"` : '';
-            const nameAttr = base.getAttribute ? base.getAttribute('name') : '';
-            const nameStr = nameAttr ? ` name="${nameAttr}"` : '';
-            const roleAttr = base.getAttribute ? base.getAttribute('role') : '';
-            const roleStr = roleAttr ? ` role="${roleAttr}"` : '';
-            const typeAttr = base.getAttribute ? base.getAttribute('type') : '';
-            const typeStr = typeAttr ? ` type="${typeAttr}"` : '';
-            const clsStr = (typeof base.className === 'string' && base.className.trim())
-                ? ` class="${base.className.trim().split(/\s+/).slice(0, 4).join(' ')}"`
-                : '';
-
-            this.#painelInspetorEl.replaceChildren();
-            const l1 = docUi.createElement('div');
-            l1.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 4px;';
-            const badgeTipo = docUi.createElement('span');
-            badgeTipo.style.cssText = `font-weight: 700; color: ${ehCampoEditavel ? '#c084fc' : infoTipo.cor};`;
-            badgeTipo.textContent = ehCampoEditavel ? '● Campo Editável (Regra de Ouro)' : `● ${infoTipo.nome}`;
-            const badgeOrigem = docUi.createElement('span');
-            badgeOrigem.style.cssText = 'font-size: 10px; color: #94a3b8; background: #1e293b; padding: 1px 6px; border-radius: 4px;';
-            badgeOrigem.textContent = ehCampoEditavel ? 'Edição Nativa' : diag.origem;
-            l1.append(badgeTipo, badgeOrigem);
-
-            const l2 = docUi.createElement('div');
-            l2.style.cssText = 'font-family: monospace; font-size: 10px; color: #cbd5e1; margin-bottom: 3px;';
-            l2.textContent = `Elemento: <${tag}${idStr}${nameStr}${typeStr}${roleStr}${clsStr}>`;
-            this.#painelInspetorEl.append(l1, l2);
-
-            if (ehCampoEditavel) {
-                const l3 = docUi.createElement('div');
-                l3.style.cssText = 'font-family: monospace; font-size: 10px; font-weight: 700; color: #c084fc;';
-                l3.textContent = 'Comportamento: Edição livre (nunca intercepta clique/seleção)';
-                this.#painelInspetorEl.appendChild(l3);
-            }
-
-            if (Array.isArray(diag.trilha) && diag.trilha.length > 0) {
-                const boxTrilha = docUi.createElement('div');
-                boxTrilha.style.cssText = 'font-family: monospace; font-size: 9.5px; margin-top: 5px; border-top: 1px dashed #334155; padding-top: 4px; display: flex; flex-direction: column; gap: 2px;';
-                diag.trilha.forEach((etapa) => {
-                    const linhaT = docUi.createElement('div');
-                    const corEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].cor : '#94a3b8';
-                    const nomeEtapa = coresTipo[etapa.tipo] ? coresTipo[etapa.tipo].nome : etapa.tipo;
-                    const tagParada = etapa.parou ? ' [PAROU]' : (etapa.passo.startsWith('4.') ? ' [continua]' : '');
-                    const textoEtapa = etapa.descricao
-                        ? `${etapa.passo}: ${etapa.descricao} → ${nomeEtapa}${tagParada}`
-                        : `${etapa.passo}: ${nomeEtapa}${tagParada}`;
-                    if (etapa.decisivo && !ehCampoEditavel) {
-                        linhaT.style.cssText = `color: #f8fafc; background: rgba(56, 189, 248, 0.14); border-left: 2px solid ${corEtapa}; padding: 1px 5px; border-radius: 3px; font-weight: 700;`;
-                        linhaT.textContent = `★ ${textoEtapa}`;
-                    } else {
-                        linhaT.style.cssText = 'color: #94a3b8; padding-left: 7px;';
-                        linhaT.textContent = `• ${textoEtapa}`;
-                    }
-                    boxTrilha.appendChild(linhaT);
-
-                    if (etapa.observacao) {
-                        const linhaObs = docUi.createElement('div');
-                        linhaObs.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; color: #fbbf24; font-style: italic; padding-left: 14px; margin-bottom: 2px;';
-                        linhaObs.textContent = `Obs: ${etapa.observacao}`;
-                        boxTrilha.appendChild(linhaObs);
-                    }
-                });
-                this.#painelInspetorEl.appendChild(boxTrilha);
-            }
-
-            const dominioCompleto = this.#obterDominioCompletoUrl(base, winUi);
-            if (dominioCompleto) {
-                const barraStatus = docUi.createElement('div');
-                barraStatus.style.cssText = 'font-family: monospace; font-size: 9.5px; color: #94a3b8; margin-top: 5px; border-top: 1px solid #334155; padding-top: 3px; display: flex; align-items: center; justify-content: space-between; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
-                const spanDom = docUi.createElement('span');
-                spanDom.style.cssText = 'color: #7dd3fc; overflow: hidden; text-overflow: ellipsis;';
-                spanDom.textContent = `🌐 ${dominioCompleto}`;
-                barraStatus.appendChild(spanDom);
-                this.#painelInspetorEl.appendChild(barraStatus);
-            }
-
-            const rectPainel = this.#painelInspetorEl.getBoundingClientRect();
-            const larguraPainel = rectPainel.width || 420;
-            const alturaPainel = rectPainel.height || 200;
-            const margemTela = 8;
-            const deslocamentoCursor = 16;
-            const vwUi = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 320);
-            const vhUi = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 240);
-            const xTela = x + ctxUi.offsetX;
-            const yTela = y + ctxUi.offsetY;
-
-            let left = xTela + deslocamentoCursor;
-            if (left + larguraPainel > vwUi - margemTela) {
-                left = xTela - larguraPainel - deslocamentoCursor;
-            }
-            left = Math.max(margemTela, Math.min(left, vwUi - larguraPainel - margemTela));
-
-            let top = yTela + deslocamentoCursor;
-            if (top + alturaPainel > vhUi - margemTela) {
-                top = yTela - alturaPainel - deslocamentoCursor;
-            }
-            top = Math.max(margemTela, Math.min(top, vhUi - alturaPainel - margemTela));
-
-            this.#painelInspetorEl.style.left = `${Math.round(left)}px`;
-            this.#painelInspetorEl.style.top = `${Math.round(top)}px`;
+        const _ext_RegrasEInspetorDOM = [
+        { g: 'JusGovXPathInspetorUi', p: './xpath-inspetor-ui.js' }
+    ];
+    for (let i = 0; i < _ext_RegrasEInspetorDOM.length; i++) {
+        const it = _ext_RegrasEInspetorDOM[i];
+        const Cls = (typeof self !== 'undefined' && typeof self[it.g] === 'function')
+            ? self[it.g]
+            : ((typeof require === 'function') ? (() => { try { return require(it.p); } catch (_) { return null; } })() : null);
+        if (Cls && typeof Cls.instalarEm === 'function') {
+            Cls.instalarEm(RegrasEInspetorDOM.prototype);
         }
     }
 
-    return Object.freeze(RegrasEInspetorDOM);
+    Object.freeze(RegrasEInspetorDOM.prototype);
+    return RegrasEInspetorDOM;
 }));
+

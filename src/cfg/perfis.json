@@ -13,7 +13,7 @@
   "configPadrao": {
     "modoTurbo": "url",
     "comportamentoCliqueIcone": "popup",
-    "manterFormatacaoBasica": true,
+    "manterFormatacaoBasica": false,
     "nivelFiltroFormatacao": "basico",
     "padronizarFonteCopiaAtivo": false,
     "fontePadraoCopia": "Arial",
@@ -40,6 +40,7 @@
     "monitorarUrlOriginalAbertura": false,
     "monitorarUrlAtualPagina": true,
     "criterioOrdenacaoGuias": "hierarquia_arvore",
+    "agruparGuiasAutomatico": true,
     "sentidoOrdenacaoGuias": "esq_dir",
     "ordenarGuiasFixadas": false,
     "fecharHierarquiaEmCascata": false,
@@ -194,7 +195,7 @@
       "predefinido": true,
       "sobrescritas": {
         "modoTurbo": "url",
-        "manterFormatacaoBasica": true,
+        "manterFormatacaoBasica": false,
         "nivelFiltroFormatacao": "basico",
         "tempoExibicaoAlertaMs": 2500,
         "tempoFlashBorderMs": 1200,

@@ -3323,19 +3323,14 @@
         if (typeof cfg.modoPlaceholdersMinutasHtml === 'string' && ['desabilitado', 'placeholders', 'ctrl_avancado', 'avancado'].includes(cfg.modoPlaceholdersMinutasHtml)) {
             modoPlaceholdersMinutasHtml = cfg.modoPlaceholdersMinutasHtml;
             placeholdersMinutasHtmlAtivo = (cfg.modoPlaceholdersMinutasHtml !== 'desabilitado');
-            selecaoEditavelAtiva = (cfg.modoPlaceholdersMinutasHtml !== 'desabilitado');
         } else if (typeof cfg.placeholdersMinutasHtmlAtivo === 'boolean') {
             placeholdersMinutasHtmlAtivo = cfg.placeholdersMinutasHtmlAtivo;
-            selecaoEditavelAtiva = placeholdersMinutasHtmlAtivo;
             if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
                 modoPlaceholdersMinutasHtml = placeholdersMinutasHtmlAtivo ? 'placeholders' : 'desabilitado';
             }
-        } else if (typeof cfg.selecaoEditavelAtiva === 'boolean') {
+        }
+        if (typeof cfg.selecaoEditavelAtiva === 'boolean') {
             selecaoEditavelAtiva = cfg.selecaoEditavelAtiva;
-            placeholdersMinutasHtmlAtivo = selecaoEditavelAtiva;
-            if (modoPlaceholdersMinutasHtml !== 'avancado' && modoPlaceholdersMinutasHtml !== 'ctrl_avancado') {
-                modoPlaceholdersMinutasHtml = selecaoEditavelAtiva ? 'placeholders' : 'desabilitado';
-            }
         }
         if (typeof cfg.colagemBotaoDireitoAtiva === 'boolean') colagemBotaoDireitoAtiva = cfg.colagemBotaoDireitoAtiva;
         if (typeof cfg.capturaBotoesMouse4e5Ativa === 'boolean') capturaBotoesMouse4e5Ativa = cfg.capturaBotoesMouse4e5Ativa;

@@ -457,7 +457,7 @@
                                 Quando marcado, copia apenas texto limpo, sem formatação visual. Desmarcado (ou via <code>Esc + Esc</code>), preserva os estilos conforme o nível abaixo; fonte e tamanho originais são sempre limpos para se adaptarem ao destino.
                             </p>
                         </div>
-                        <input type="checkbox" id="checkOpcaoRemoverFormatacoes"
+                        <input type="checkbox" id="checkOpcaoRemoverFormatacoes" checked
                             style="width:20px;height:20px;cursor:pointer;flex-shrink:0;">
                     </div>
 
@@ -896,6 +896,12 @@
                                 <option value="dir_esq">Da Direita para a Esquerda (Z-A ou Antigo-Novo)</option>
                             </select>
                         </div>
+                        <label id="containerAgruparGuiasAutomatico"
+                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--texto-principal); font-weight: 600; cursor: pointer;"
+                            title="Agrupa automaticamente as guias em Tab Groups com cores randômicas (disponível em Por Hierarquia e Domínio do Site)">
+                            <input type="checkbox" id="optAgruparGuiasAutomatico" checked>
+                            <span>Agrupar</span>
+                        </label>
                         <label id="containerFecharHierarquiaCascata"
                             style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #f59e0b; font-weight: 600; cursor: pointer;"
                             title="No modo Por Hierarquia, fechar uma guia pai fecha automaticamente todas as guias filhas e descendentes abertas a partir dela">
@@ -1076,14 +1082,6 @@
                                 <option value="compacto" selected>Mini (MM:SS)</option>
                                 <option value="normal">Normal (🍅 Foco x/x MM:SS)</option>
                                 <option value="expandido">Expandido (+ Último Alívio)</option>
-                            </select>
-                        </label>
-                        <label class="jg-inline-rotulo" title="Define o comportamento do minipopup flutuante em sincronia com o cadeado e o fechar do próprio minipopup">
-                            Minipopup:
-                            <select id="optPomodoroComportamentoBarra" class="input-select jg-select-compacto">
-                                <option value="fixo" selected>Fixo (Cadeado Amarelo)</option>
-                                <option value="movel">Móvel (Cadeado Cinza)</option>
-                                <option value="oculto">Oculto no Ativo (Só no Descanso)</option>
                             </select>
                         </label>
                         <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-principal); cursor: pointer;" title="Quando marcado, silencia todos os beeps sonoros progressivos após concluir o tempo de descanso">
@@ -2510,9 +2508,12 @@
     <!-- Passo 4.1: Scripts do motor carregados na ordem deterministica exata para habilitar o Sandbox e a Auditoria -->
     <script src="cfg-defaults.js"></script>
     <script src="../lib/lib-base-modulo.js"></script>
+    <script src="../lib/lib-constantes-catalogo.js"></script>
     <script src="../lib/lib-constantes.js"></script>
     <script src="../mod-anti-ampulheta/mod-anti-ampulheta.js"></script>
     <script src="../lib/lib-block-addon.js"></script>
+    <script src="../lib/lib-verificadores-docs.js"></script>
+    <script src="../lib/lib-verificadores-boletos.js"></script>
     <script src="../lib/lib-verificadores.js"></script>
     <script src="../lib/lib-geradores.js"></script>
     <script src="../lib/lib-urls.js"></script>
@@ -2520,10 +2521,17 @@
     <script src="../lib/lib-injecao.js"></script>
     <script src="../lib/lib-ui-tela.js"></script>
     <script src="../lib/lib-ui-ancorado.js"></script>
+    <script src="../lib/lib-config-helpers.js"></script>
+    <script src="../lib/lib-config-perfis.js"></script>
+    <script src="../lib/lib-config-exportacao.js"></script>
+    <script src="../lib/lib-config-icone.js"></script>
     <script src="../lib/lib-config.js"></script>
+    <script src="../mod-XPath/xpath-extratores.js"></script>
     <script src="../mod-XPath/xpath-dialogo.js"></script>
+    <script src="../mod-XPath/xpath-inspetor-ui.js"></script>
     <script src="../mod-XPath/xpath-regras-inspetor.js"></script>
     <script src="../mod-XPath/mod-xpath.js"></script>
+    <script src="../mod-colar/colar-formatacao.js"></script>
     <script src="../mod-colar/mod-colar.js"></script>
     <script src="../mod-input/input-orquestrador-mouse.js"></script>
     <script src="../mod-copia/copia-synccfg.js"></script>
@@ -2532,14 +2540,21 @@
     <script src="../mod-copia/copia-politica-selecao.js"></script>
     <script src="../mod-copia/lib-copia-padroes.js"></script>
     <script src="../mod-copia/lib-copia-filtros-texto.js"></script>
+    <script src="../mod-copia/copia-aviso-auditoria.js"></script>
+    <script src="../mod-copia/copia-aviso-render.js"></script>
     <script src="../mod-copia/copia-aviso-flutuante.js"></script>
     <script src="../mod-copia/copia-clipboard.js"></script>
+    <script src="../mod-copia/copia-acumulador-tabela.js"></script>
     <script src="../mod-copia/copia-acumulador.js"></script>
     <script src="../mod-copia/copia-geometria.js"></script>
+    <script src="../mod-copia/copia-filtros-html-basico.js"></script>
+    <script src="../mod-copia/copia-filtros-html-niveis.js"></script>
     <script src="../mod-copia/copia-filtros-html.js"></script>
     <script src="../mod-copia/copia-filtros.js"></script>
     <script src="../mod-copia/copia-validadores.js"></script>
     <script src="../mod-copia/copia-minutas.js"></script>
+    <script src="../mod-copia/copia-visual-marcadores.js"></script>
+    <script src="../mod-copia/copia-visual-flash.js"></script>
     <script src="../mod-copia/copia-visual.js"></script>
     <script src="../mod-copia/copia-estagio1.js"></script>
     <script src="../mod-copia/copia-estagio2.js"></script>
@@ -2547,8 +2562,10 @@
     <script src="../mod-copia/copia-estagio4.js"></script>
     <script src="../mod-copia/copia-estagio5.js"></script>
     <script src="../mod-copia/copia-estagio6.js"></script>
+    <script src="../mod-copia/copia-comportamento-links.js"></script>
     <script src="../mod-copia/copia-comportamento-dom.js"></script>
     <script src="../mod-copia/copia-progressao.js"></script>
+    <script src="../mod-copia/copia-copiar-nativo.js"></script>
     <script src="../mod-copia/copia-copiar.js"></script>
     <script src="../mod-copia/copia-monitor-dom.js"></script>
     <script src="../mod-copia/mod-copia.js"></script>
@@ -2563,10 +2580,15 @@
     <script src="../mod-navegador/navegador-ordenacao.js"></script>
     <script src="../mod-navegador/navegador-descarte.js"></script>
     <script src="../mod-navegador/mod-navegador.js"></script>
+    <script src="../mod-automate/automate-seletores-pad.js"></script>
     <script src="../mod-automate/automate-seletores.js"></script>
     <script src="../mod-automate/automate-espera.js"></script>
     <script src="../mod-automate/automate-dialogos.js"></script>
+    <script src="../mod-automate/automate-fluxo-tarefas.js"></script>
+    <script src="../mod-automate/automate-fluxo-movimentos.js"></script>
     <script src="../mod-automate/automate-motor-fluxo.js"></script>
+    <script src="../mod-automate/automate-contextos.js"></script>
+    <script src="../mod-automate/automate-barra-pje.js"></script>
     <script src="../mod-automate/mod-automate.js"></script>
     <script src="../mod-copia/copia-selecionar.js"></script>
     <script src="exemplos.js"></script>
@@ -2580,10 +2602,19 @@
     <script src="mod-debug/mod-debug.js"></script>
     <script src="options-mapeamento.js"></script>
     <script src="options-laboratorio.js"></script>
+    <script src="../mod-produt/produt-bem-estar-cards.js"></script>
     <script src="../mod-produt/lib-produt-bem-estar.js"></script>
     <script src="../mod-produt/produt-resumo-ui.js"></script>
+    <script src="../mod-produt/produt-sync-nuvem.js"></script>
+    <script src="../mod-produt/produt-barra-injecao.js"></script>
+    <script src="../mod-produt/produt-estado-trabalho.js"></script>
+    <script src="../mod-produt/produt-motor-descanso.js"></script>
+    <script src="../mod-produt/produt-motor-flexivel.js"></script>
+    <script src="../mod-produt/produt-motor-ciclos.js"></script>
+    <script src="../mod-produt/produt-barra-geometria.js"></script>
     <script src="../mod-produt/mod-produt.js"></script>
     <script src="options.js"></script>
+    <script src="editor_demo_helpers.js"></script>
     <script src="editor_demo.js"></script>
 </body>
 

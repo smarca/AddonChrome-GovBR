@@ -82,12 +82,12 @@
     });
 
     class GerenciadorColagem {
-        #colagemEmAndamento = false;
-        #ultimoDisparoColagemTs = 0;
-        #ultimoTextoConfirmadoGlobal = '';
-        #ultimoTsConfirmadoGlobal = 0;
-        #deps = {
-            obterEstadoOpcoes: () => ({ manterFormatacaoBasica: true, nivelFiltroFormatacao: 'basico', ultimoTextoLimpo: '', modoShiftCnj: '20digitos', selecaoEditavelAtiva: true }),
+        _p_colagemEmAndamento = false;
+        _p_ultimoDisparoColagemTs = 0;
+        _p_ultimoTextoConfirmadoGlobal = '';
+        _p_ultimoTsConfirmadoGlobal = 0;
+        _p_deps = {
+            obterEstadoOpcoes: () => ({ manterFormatacaoBasica: false, nivelFiltroFormatacao: 'basico', ultimoTextoLimpo: '', modoShiftCnj: '20digitos', selecaoEditavelAtiva: true }),
             classificarContextoElementoAlvo: null,
             confirmarVisualMarcador: () => null,
             selecionarTudoAoEntrarNoInput: null
@@ -103,70 +103,11 @@
 
         configurarDependencias(opcoes = {}) {
             if (!opcoes || typeof opcoes !== 'object') return;
-            Object.keys(this.#deps).forEach((k) => {
+            Object.keys(this._p_deps).forEach((k) => {
                 if (typeof opcoes[k] === 'function') {
-                    this.#deps[k] = opcoes[k];
+                    this._p_deps[k] = opcoes[k];
                 }
             });
-        }
-
-        /**
-         * Aplica na colagem o mesmo filtro usado ao copiar com Shift (FEAT-65):
-         * - Preserva dígitos puros (ex.: datas DD/MM/AAAA -> DDMMAAAA, CPF/valores -> só dígitos);
-         * - Se for CNPJ alfanumérico, remove pontuação preservando letras maiúsculas e dígitos;
-         * - Se for número de processo CNJ (parcial ou completo), aplica preenchimento de 7 dígitos
-         *   na numeração inicial quando `modoShiftCnj !== 'semZeros'`.
-         * - Caso o texto contenha palavras alfabéticas não-CNPJ/não-INSS, retorna o texto plano limpo.
-         * @param {string} textoBruto
-         * @param {string} [modoShiftCnjOpcional]
-         * @returns {string}
-         */
-        aplicarFiltroShiftParaColagem(textoBruto, modoShiftCnjOpcional = null) {
-            const texto = typeof textoBruto === 'string' ? textoBruto : String(textoBruto || '');
-            const textoTrim = texto.trim();
-            if (!textoTrim) return '';
-
-            const estado = this.#deps.obterEstadoOpcoes() || {};
-            const modoShift = modoShiftCnjOpcional || estado.modoShiftCnj || '20digitos';
-            const C = obterConstantesGlobais();
-            const EXPR = C && C.EXPRESSOES_REGULARES ? C.EXPRESSOES_REGULARES : null;
-            const REGEX_AUD = C && C.REGEX_AUDITORIA ? C.REGEX_AUDITORIA : null;
-
-            /* Caso especial de benefício INSS com espécie prefixada (ex: 31/123.456.789-0 -> 1234567890) */
-            const matchInssComEsp = textoTrim.match(/^(\d{2})\/(\d{10}|\d{1,3}\.\d{3}\.\d{3}-\d)$/i);
-            if (matchInssComEsp) {
-                return matchInssComEsp[2].replace(/\D+/g, '');
-            }
-
-            /* CNPJ alfanumérico (nova regra RFB 2026) */
-            if (REGEX_AUD && REGEX_AUD.CNPJ_ISOLADO && REGEX_AUD.CNPJ_ISOLADO.test(textoTrim)) {
-                return textoTrim.toUpperCase().replace(/[^A-Z0-9]+/g, '');
-            }
-
-            /* Retira pontuação/símbolos comuns para checar se restam apenas dígitos numéricos */
-            const semPontuacaoESimbolos = textoTrim.replace(/[\s.,\-\/\\():;R$€£¥%°ºª§_+*#|]+/g, '');
-            if (semPontuacaoESimbolos && /^\d+$/.test(semPontuacaoESimbolos) && !/[\p{L}]/u.test(semPontuacaoESimbolos)) {
-                let digitosPuros = semPontuacaoESimbolos;
-                const rxCnj = (EXPR && EXPR.ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL)
-                    ? EXPR.ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL
-                    : /^(\d{1,7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$/;
-                const matchCnj = textoTrim.match(rxCnj);
-                if (matchCnj && matchCnj[0] === textoTrim && modoShift !== 'semZeros') {
-                    const seqPreenchida = matchCnj[1].padStart(7, '0');
-                    digitosPuros = seqPreenchida + digitosPuros.substring(matchCnj[1].length);
-                }
-                return digitosPuros;
-            }
-
-            /* Se contiver texto misto com CNJ isolado ou dígitos puros, extrai CNJ formatado se único */
-            const matchCnjEmbutido = textoTrim.match(/\b(\d{1,7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})\b/);
-            if (matchCnjEmbutido && textoTrim.length <= 32) {
-                let seq = matchCnjEmbutido[1];
-                if (modoShift !== 'semZeros') seq = seq.padStart(7, '0');
-                return `${seq}${matchCnjEmbutido[2]}${matchCnjEmbutido[3]}${matchCnjEmbutido[4]}${matchCnjEmbutido[5]}${matchCnjEmbutido[6]}`;
-            }
-
-            return textoTrim;
         }
 
         /**
@@ -178,7 +119,7 @@
             if (!el) return null;
             const cur = (el.nodeType === 3) ? el.parentElement : el;
             if (!cur || cur.nodeType !== 1) return null;
-            const classificar = this.#deps.classificarContextoElementoAlvo;
+            const classificar = this._p_deps.classificarContextoElementoAlvo;
 
             if (typeof cur.closest === 'function') {
                 const campoDireto = cur.closest('input, textarea, rich-textarea');
@@ -247,13 +188,13 @@
             } catch (_) { }
 
             this.focarElementoSeguro(alvoParaFocar);
-            const estado = this.#deps.obterEstadoOpcoes() || {};
+            const estado = this._p_deps.obterEstadoOpcoes() || {};
             const selEditAtiva = opcoes.selecaoEditavelAtiva !== undefined
                 ? Boolean(opcoes.selecaoEditavelAtiva)
                 : Boolean(estado.selecaoEditavelAtiva !== false);
             if (selEditAtiva && alvoParaFocar && alvoParaFocar.tagName === 'INPUT' && typeof alvoParaFocar.select === 'function') {
-                if (typeof this.#deps.selecionarTudoAoEntrarNoInput === 'function') {
-                    this.#deps.selecionarTudoAoEntrarNoInput(alvoParaFocar, 10);
+                if (typeof this._p_deps.selecionarTudoAoEntrarNoInput === 'function') {
+                    this._p_deps.selecionarTudoAoEntrarNoInput(alvoParaFocar, 10);
                 } else {
                     setTimeout(() => {
                         try {
@@ -266,7 +207,7 @@
             return true;
         }
 
-        #ehElementoCKEditorOuIframeRico(alvo, docRef = null) {
+        _p_ehElementoCKEditorOuIframeRico(alvo, docRef = null) {
             if (!alvo) return false;
             try {
                 const doc = docRef || alvo.ownerDocument || (typeof document !== 'undefined' ? document : null);
@@ -284,7 +225,7 @@
             return false;
         }
 
-        #obterBlocoEditavelInternoSeguro(raiz) {
+        _p_obterBlocoEditavelInternoSeguro(raiz) {
             if (!raiz || typeof raiz.querySelectorAll !== 'function') return raiz;
             try {
                 const ehRaizEstrutural = (
@@ -305,7 +246,7 @@
             return raiz;
         }
 
-        #posicionarCursorSeguroEmContentEditable(alvoFoco, docRef, winRef, clientX = null, clientY = null) {
+        _p_posicionarCursorSeguroEmContentEditable(alvoFoco, docRef, winRef, clientX = null, clientY = null) {
             if (!alvoFoco || !winRef || typeof winRef.getSelection !== 'function' || !docRef || typeof docRef.createRange !== 'function') {
                 return false;
             }
@@ -346,8 +287,8 @@
                             ? Math.min(Math.max(0, rangeAlvo.startOffset - 1), filhos.length - 1)
                             : -1;
                         const candidato = (idxFilho >= 0 && filhos[idxFilho])
-                            ? (this.#obterBlocoEditavelInternoSeguro(filhos[idxFilho]) || filhos[idxFilho])
-                            : this.#obterBlocoEditavelInternoSeguro(alvoFoco);
+                            ? (this._p_obterBlocoEditavelInternoSeguro(filhos[idxFilho]) || filhos[idxFilho])
+                            : this._p_obterBlocoEditavelInternoSeguro(alvoFoco);
                         if (candidato && candidato !== noContainer) {
                             const rBloco = docRef.createRange();
                             rBloco.selectNodeContents(candidato);
@@ -367,7 +308,7 @@
                     (sel.anchorNode.tagName === 'BODY' || (sel.anchorNode.classList && sel.anchorNode.classList.contains('paginaA4')))
                 );
                 if (!selDentroDoAlvo || ancoraEhBodyDireto) {
-                    const blocoSeguro = this.#obterBlocoEditavelInternoSeguro(alvoFoco) || alvoFoco;
+                    const blocoSeguro = this._p_obterBlocoEditavelInternoSeguro(alvoFoco) || alvoFoco;
                     const rangeFim = docRef.createRange();
                     rangeFim.selectNodeContents(blocoSeguro);
                     rangeFim.collapse(false);
@@ -407,178 +348,11 @@
                 );
                 const winRef = (docRef && docRef.defaultView) || (typeof window !== 'undefined' ? window : null);
                 if (ehCe) {
-                    this.#posicionarCursorSeguroEmContentEditable(alvoConfirmado, docRef, winRef, clientX, clientY);
+                    this._p_posicionarCursorSeguroEmContentEditable(alvoConfirmado, docRef, winRef, clientX, clientY);
                 }
 
                 const opcoesComCoords = { ...opcoesColagem, clientX, clientY };
                 await this.executarColagem(alvoConfirmado, modo || 'normal', Boolean(usarAnterior), opcoesComCoords);
-                return true;
-            } catch (_) {
-                return false;
-            }
-        }
-
-        #converterNivelParaIndice(nivelRaw, temHtmlFormatado) {
-            if (!temHtmlFormatado) return 0;
-            const chave = String(nivelRaw || 'basico').trim().toLowerCase();
-            return Object.prototype.hasOwnProperty.call(NIVEL_CLIPBOARD_INDICE, chave)
-                ? NIVEL_CLIPBOARD_INDICE[chave]
-                : 1;
-        }
-
-        obterNivelEFormatosParaColagem(itemInterno, modo = 'normal', opcoesColagem = {}) {
-            try {
-                const aplicarShift = Boolean(opcoesColagem && opcoesColagem.aplicarFiltroShift);
-                const forcarTexto = Boolean((opcoesColagem && opcoesColagem.forcarSomenteTexto) || aplicarShift || modo === 'texto_puro');
-                const ehObjeto = Boolean(itemInterno && typeof itemInterno === 'object');
-                const textoBruto = (typeof itemInterno === 'string')
-                    ? itemInterno
-                    : ((ehObjeto && typeof itemInterno.texto === 'string') ? itemInterno.texto : '');
-                const htmlBruto = (ehObjeto && itemInterno.formatado && typeof itemInterno.html === 'string')
-                    ? itemInterno.html
-                    : '';
-
-                const nivelIdx = forcarTexto
-                    ? 0
-                    : this.#converterNivelParaIndice(ehObjeto ? itemInterno.nivelCopia : 'texto_puro', Boolean(htmlBruto.trim()));
-                const nivelCopia = NOMES_NIVEL_CLIPBOARD[nivelIdx] || 'texto_puro';
-                const formatado = Boolean(nivelIdx >= 1 && htmlBruto);
-                const html = formatado ? htmlBruto : '';
-
-                const extrasBruto = (formatado && ehObjeto && itemInterno.formatosExtras && typeof itemInterno.formatosExtras === 'object')
-                    ? itemInterno.formatosExtras
-                    : null;
-                let formatosExtras = null;
-                if (extrasBruto) {
-                    const filtrado = {
-                        uriList: typeof extrasBruto.uriList === 'string' ? extrasBruto.uriList : '',
-                        estruturadoMime: typeof extrasBruto.estruturadoMime === 'string' ? extrasBruto.estruturadoMime : '',
-                        estruturadoConteudo: typeof extrasBruto.estruturadoConteudo === 'string' ? extrasBruto.estruturadoConteudo : '',
-                        markdown: (nivelIdx >= 2 && typeof extrasBruto.markdown === 'string') ? extrasBruto.markdown : '',
-                        rtf: (nivelIdx >= 3 && typeof extrasBruto.rtf === 'string') ? extrasBruto.rtf : '',
-                        svgMarkup: (nivelIdx >= 4 && typeof extrasBruto.svgMarkup === 'string') ? extrasBruto.svgMarkup : ''
-                    };
-                    if (Object.values(filtrado).some(Boolean)) {
-                        formatosExtras = filtrado;
-                    }
-                }
-
-                const tiposClipboard = ['text/plain'];
-                if (formatado) {
-                    tiposClipboard.push('text/html');
-                    if (formatosExtras) {
-                        if (formatosExtras.uriList) tiposClipboard.push('text/uri-list');
-                        if (formatosExtras.estruturadoMime && formatosExtras.estruturadoConteudo) {
-                            tiposClipboard.push(formatosExtras.estruturadoMime);
-                        }
-                        if (formatosExtras.markdown) tiposClipboard.push('text/markdown');
-                        if (formatosExtras.rtf) tiposClipboard.push('text/rtf');
-                        if (formatosExtras.svgMarkup) tiposClipboard.push('image/svg+xml');
-                    }
-                }
-
-                return { texto: textoBruto, html, formatado, nivelCopia, nivelIdx, formatosExtras, tiposClipboard };
-            } catch (_) {
-                return { texto: '', html: '', formatado: false, nivelCopia: 'texto_puro', nivelIdx: 0, formatosExtras: null, tiposClipboard: ['text/plain'] };
-            }
-        }
-
-        #preencherDataTransferPorNivel(dt, payload, ehEditorRico) {
-            if (!dt || !payload) return;
-            try {
-                if (payload.formatado && payload.nivelIdx >= 1) {
-                    if (payload.html && ehEditorRico) {
-                        dt.setData('text/html', payload.html);
-                    }
-                    if (payload.formatosExtras) {
-                        const ex = payload.formatosExtras;
-                        if (ex.uriList) dt.setData('text/uri-list', ex.uriList);
-                        if (ex.estruturadoMime && ex.estruturadoConteudo) {
-                            dt.setData(ex.estruturadoMime, ex.estruturadoConteudo);
-                        }
-                        if (payload.nivelIdx >= 2 && ex.markdown) {
-                            dt.setData('text/markdown', ex.markdown);
-                        }
-                        if (payload.nivelIdx >= 3 && ex.rtf) {
-                            dt.setData('text/rtf', ex.rtf);
-                        }
-                        if (payload.nivelIdx >= 4 && ex.svgMarkup) {
-                            dt.setData('image/svg+xml', ex.svgMarkup);
-                        }
-                    }
-                }
-                dt.setData('text/plain', payload.texto || '');
-            } catch (_) { }
-        }
-
-        emularTeclasColar(alvo, texto, html, opcoes = {}) {
-            if (this.#colagemEmAndamento) return false;
-            this.#colagemEmAndamento = true;
-            try {
-                if (!alvo) return false;
-                this.focarElementoSeguro(alvo);
-
-                const itemSintetico = {
-                    texto: texto || '',
-                    html: html || '',
-                    formatado: Boolean(html),
-                    nivelCopia: (opcoes && opcoes.nivelCopia) || (html ? 'basico' : 'texto_puro'),
-                    formatosExtras: (opcoes && opcoes.formatosExtras) || null
-                };
-                const payload = this.obterNivelEFormatosParaColagem(itemSintetico, (opcoes && opcoes.modo) || 'normal', opcoes);
-
-                alvo.dispatchEvent(new KeyboardEvent('keydown', {
-                    key: 'v', code: 'KeyV', keyCode: 86, which: 86, ctrlKey: true,
-                    bubbles: true, cancelable: true, composed: true
-                }));
-
-                let pasteTratadoPeloEditor = false;
-                const ehEditorRico = Boolean(alvo.isContentEditable || (alvo.closest && alvo.closest('[contenteditable]:not([contenteditable="false"])')) || (typeof document !== 'undefined' && document.designMode === 'on'));
-                try {
-                    if (typeof DataTransfer !== 'undefined') {
-                        const dt = new DataTransfer();
-                        this.#preencherDataTransferPorNivel(dt, payload, ehEditorRico);
-                        const evtPaste = new ClipboardEvent('paste', {
-                            clipboardData: dt, bubbles: true, cancelable: true, composed: true
-                        });
-                        pasteTratadoPeloEditor = !alvo.dispatchEvent(evtPaste);
-                    }
-                } catch (_) { }
-
-                if (!pasteTratadoPeloEditor) {
-                    let colouExec = false;
-                    try { colouExec = document.execCommand('paste'); } catch (_) { }
-                    if (!colouExec && payload.formatado && payload.html && ehEditorRico) {
-                        try { colouExec = document.execCommand('insertHTML', false, payload.html); } catch (_) { }
-                    }
-                    if (!colouExec) {
-                        const usarHtml = Boolean(ehEditorRico && payload.formatado && payload.html);
-                        const conteudoParaInserir = usarHtml ? payload.html : (payload.texto || '');
-                        this.inserirTextoEmElemento(alvo, conteudoParaInserir, usarHtml);
-                    }
-                }
-
-                alvo.dispatchEvent(new KeyboardEvent('keyup', {
-                    key: 'v', code: 'KeyV', keyCode: 86, which: 86, ctrlKey: true,
-                    bubbles: true, cancelable: true, composed: true
-                }));
-                return true;
-            } catch (_) {
-                return false;
-            } finally {
-                this.#colagemEmAndamento = false;
-            }
-        }
-
-        emularTeclasWinV(alvo) {
-            try {
-                const el = alvo || (typeof document !== 'undefined' ? (document.activeElement || document.body) : null);
-                if (!el) return false;
-                this.focarElementoSeguro(el);
-                el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', keyCode: 91, which: 91, metaKey: true, bubbles: true, cancelable: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', keyCode: 86, which: 86, metaKey: true, bubbles: true, cancelable: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keyup', { key: 'v', code: 'KeyV', keyCode: 86, which: 86, metaKey: true, bubbles: true, cancelable: true, composed: true }));
-                el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft', keyCode: 91, which: 91, metaKey: false, bubbles: true, composed: true }));
                 return true;
             } catch (_) {
                 return false;
@@ -613,7 +387,7 @@
                                 valorData = `${mDataBr[3]}-${mDataBr[2].padStart(2, '0')}-${mDataBr[1].padStart(2, '0')}`;
                             }
                         }
-                        this.#definirValorInputNativo(alvo, valorData);
+                        this._p_definirValorInputNativo(alvo, valorData);
                         try {
                             alvo.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
                             alvo.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
@@ -630,7 +404,7 @@
 
                     /* Prioridade nativa Blink (Desfazer Ctrl+Z preservado via execCommand 'insertText'):
                      * Comando antigo (mantido como fallback caso execCommand não seja suportado no tipo de input):
-                     *   this.#definirValorInputNativo(alvo, valAnt.substring(0, start) + texto + valAnt.substring(end));
+                     *   this._p_definirValorInputNativo(alvo, valAnt.substring(0, start) + texto + valAnt.substring(end));
                      *   alvo.setSelectionRange(novaPos, novaPos); / alvo.setRangeText(texto, start, end, 'end'); */
                     let inseriuViaExecCommand = false;
                     try {
@@ -647,7 +421,7 @@
                         const valAnt = String(alvo.value || '');
                         const novoVal = valAnt.substring(0, start) + texto + valAnt.substring(end);
                         const novaPos = start + texto.length;
-                        this.#definirValorInputNativo(alvo, novoVal);
+                        this._p_definirValorInputNativo(alvo, novoVal);
                         try {
                             if (typeof alvo.setSelectionRange === 'function') {
                                 alvo.setSelectionRange(novaPos, novaPos);
@@ -660,7 +434,7 @@
                             }
                         }
                     } else {
-                        this.#definirValorInputNativo(alvo, texto);
+                        this._p_definirValorInputNativo(alvo, texto);
                     }
 
                     try {
@@ -675,9 +449,9 @@
 
                 const cx = (opcoesColagem && typeof opcoesColagem.clientX === 'number') ? opcoesColagem.clientX : null;
                 const cy = (opcoesColagem && typeof opcoesColagem.clientY === 'number') ? opcoesColagem.clientY : null;
-                this.#posicionarCursorSeguroEmContentEditable(alvoFoco, docRef, winRef, cx, cy);
+                this._p_posicionarCursorSeguroEmContentEditable(alvoFoco, docRef, winRef, cx, cy);
 
-                const ehCkEditor = this.#ehElementoCKEditorOuIframeRico(alvoFoco, docRef);
+                const ehCkEditor = this._p_ehElementoCKEditorOuIframeRico(alvoFoco, docRef);
                 const usarInsertHtml = Boolean(ehHtmlFormatado && !ehCkEditor);
 
                 let executou = false;
@@ -725,7 +499,7 @@
             }
         }
 
-        #definirValorInputNativo(alvo, valor) {
+        _p_definirValorInputNativo(alvo, valor) {
             try {
                 const proto = (typeof HTMLTextAreaElement !== 'undefined' && (alvo instanceof HTMLTextAreaElement || (alvo.tagName && alvo.tagName.toUpperCase() === 'TEXTAREA')))
                     ? HTMLTextAreaElement.prototype
@@ -741,41 +515,6 @@
             }
         }
 
-        confirmarColagemGlobalEMarcarPermanente(textoColado, origemRemota = false) {
-            try {
-                const estado = this.#deps.obterEstadoOpcoes() || {};
-                const txt = (typeof textoColado === 'string' && textoColado.trim().length > 0)
-                    ? textoColado.trim()
-                    : ((typeof window !== 'undefined' && window.__JUSGOV_ULTIMO_CLIPBOARD__ && window.__JUSGOV_ULTIMO_CLIPBOARD__.texto) || estado.ultimoTextoLimpo || '');
-                const agoraConfirm = Date.now();
-                if (!origemRemota && txt && txt === this.#ultimoTextoConfirmadoGlobal && (agoraConfirm - this.#ultimoTsConfirmadoGlobal) < 350) {
-                    return null;
-                }
-                if (!origemRemota && txt) {
-                    this.#ultimoTextoConfirmadoGlobal = txt;
-                    this.#ultimoTsConfirmadoGlobal = agoraConfirm;
-                }
-                const resMarcador = this.#deps.confirmarVisualMarcador(txt);
-                if (!origemRemota && txt) {
-                    const idInstancia = (typeof window !== 'undefined')
-                        ? (window.__JUSGOV_ID_INSTANCIA_FRAME__ || (window.__JUSGOV_ID_INSTANCIA_FRAME__ = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`))
-                        : 'frame';
-                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                        chrome.storage.local.set({
-                            ultimaColagemConfirmadaGlobal: {
-                                idOrigem: idInstancia,
-                                texto: txt,
-                                timestamp: agoraConfirm
-                            }
-                        });
-                    }
-                }
-                return resMarcador;
-            } catch (_) {
-                return null;
-            }
-        }
-
         /**
          * Executa a colagem blindada no alvo editável a partir dos 2 slots internos (sem readText),
          * com suporte a `aplicarFiltroShift` (`Botão do Meio + Shift` = mesmo filtro da cópia com Shift + texto puro)
@@ -783,13 +522,13 @@
          * Possui trava reentrante e debounce anti-loop.
          */
         async executarColagem(alvo, modo = 'normal', usarAnterior = false, opcoesColagem = {}) {
-            if (this.#colagemEmAndamento) return false;
+            if (this._p_colagemEmAndamento) return false;
             const agora = Date.now();
-            if (opcoesColagem && opcoesColagem.ignorarDebounce !== true && (agora - this.#ultimoDisparoColagemTs) < INTERVALO_DEBOUNCE_COLAGEM_MS) {
+            if (opcoesColagem && opcoesColagem.ignorarDebounce !== true && (agora - this._p_ultimoDisparoColagemTs) < INTERVALO_DEBOUNCE_COLAGEM_MS) {
                 return false;
             }
-            this.#colagemEmAndamento = true;
-            this.#ultimoDisparoColagemTs = agora;
+            this._p_colagemEmAndamento = true;
+            this._p_ultimoDisparoColagemTs = agora;
 
             try {
                 if (!alvo) return false;
@@ -798,7 +537,7 @@
                     ? alvo.closest('[contenteditable]:not([contenteditable="false"]), .ck-editor__editable, .ck-content, .cke_editable, .tox-edit-area')
                     : null;
                 const alvoEfetivo = hostCe || alvo;
-                const estado = this.#deps.obterEstadoOpcoes() || {};
+                const estado = this._p_deps.obterEstadoOpcoes() || {};
                 const aplicarFiltroShift = Boolean(opcoesColagem && opcoesColagem.aplicarFiltroShift);
                 const forcarSomenteTexto = Boolean((opcoesColagem && opcoesColagem.forcarSomenteTexto) || aplicarFiltroShift);
                 const modoEfetivo = (forcarSomenteTexto || modo === 'texto_puro') ? 'texto_puro' : 'normal';
@@ -855,7 +594,7 @@
                         try { winAlvo.__JUSGOV_ULTIMA_COLAGEM_MEIO_TS__ = tsColagem; } catch (_) { }
                     }
                     const payloadFinal = { ...payload, texto: textoEmulado };
-                    const ehCkEditor = this.#ehElementoCKEditorOuIframeRico(alvoEfetivo, docRef);
+                    const ehCkEditor = this._p_ehElementoCKEditorOuIframeRico(alvoEfetivo, docRef);
 
                     /* BUG-128 (Seção 6.258): NUNCA disparar ClipboardEvent('paste') sintético do Isolated World
                      * em editores ricos / CKEditor 4, pois o CKEditor aciona o fallback #cke_pastebin criando
@@ -876,7 +615,7 @@
             } catch (_) {
                 return false;
             } finally {
-                this.#colagemEmAndamento = false;
+                this._p_colagemEmAndamento = false;
             }
         }
 
@@ -885,6 +624,20 @@
         }
     }
 
+    const _ext_GerenciadorColagem = [
+        { g: 'JusGovColarFormatacao', p: './colar-formatacao.js' }
+    ];
+    for (let i = 0; i < _ext_GerenciadorColagem.length; i++) {
+        const it = _ext_GerenciadorColagem[i];
+        const Cls = (typeof self !== 'undefined' && typeof self[it.g] === 'function')
+            ? self[it.g]
+            : ((typeof require === 'function') ? (() => { try { return require(it.p); } catch (_) { return null; } })() : null);
+        if (Cls && typeof Cls.instalarEm === 'function') {
+            Cls.instalarEm(GerenciadorColagem.prototype);
+        }
+    }
+
     Object.freeze(GerenciadorColagem.prototype);
     return Object.freeze(GerenciadorColagem);
 }));
+

@@ -40,7 +40,7 @@
     class GerenciadorClipboardInterno {
         #colagem = null;
         #deps = {
-            obterEstadoOpcoes: () => ({ manterFormatacaoBasica: true, nivelFiltroFormatacao: 'basico', ultimoTextoLimpo: '' }),
+            obterEstadoOpcoes: () => ({ manterFormatacaoBasica: false, nivelFiltroFormatacao: 'basico', ultimoTextoLimpo: '' }),
             normalizarNivelFiltro: (n) => n || 'basico',
             verificarSeTextoEhBlocoOuPalavraUnica: () => false,
             aplicarFiltroHtmlPorNivel: () => '',

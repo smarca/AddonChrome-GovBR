@@ -203,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnFecharDuplicadasAgora = document.getElementById('btnFecharDuplicadasAgora');
     const feedbackFecharDuplicadas = document.getElementById('feedbackFecharDuplicadas');
     const optCriterioOrdenacaoGuias = document.getElementById('optCriterioOrdenacaoGuias');
+    const optAgruparGuiasAutomatico = document.getElementById('optAgruparGuiasAutomatico');
+    const containerAgruparGuiasAutomatico = document.getElementById('containerAgruparGuiasAutomatico');
     const optSentidoOrdenacaoGuias = document.getElementById('optSentidoOrdenacaoGuias');
     const optSentidoOrdenacaoGuiasSwitch = document.getElementById('optSentidoOrdenacaoGuiasSwitch');
     const lblSentidoOrdenacaoGuias = document.getElementById('lblSentidoOrdenacaoGuias');
@@ -280,7 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const optPomodoroCiclos = document.getElementById('optPomodoroCiclos');
     const lblPomodoroPausaMaiorCalculada = document.getElementById('lblPomodoroPausaMaiorCalculada');
     const optPomodoroEstiloMinipopup = document.getElementById('optPomodoroEstiloMinipopup');
-    const optPomodoroComportamentoBarra = document.getElementById('optPomodoroComportamentoBarra');
     const optPomodoroBeepConclusaoAtivo = document.getElementById('optPomodoroBeepConclusaoAtivo');
     const painelConfigPomodoro = document.getElementById('painelConfigPomodoro');
     const lblStatusProdutividadeTrabalho = document.getElementById('lblStatusProdutividadeTrabalho');
@@ -1251,6 +1252,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (containerFecharHierarquiaCascata) {
             containerFecharHierarquiaCascata.style.display = (crit === 'hierarquia_arvore') ? 'inline-flex' : 'none';
         }
+        const permiteAgrupar = (crit === 'hierarquia_arvore' || ['dominio_criacao', 'url', 'dominio_titulo', 'dominio_acesso', 'dominio_ativacao'].includes(crit));
+        if (optAgruparGuiasAutomatico) optAgruparGuiasAutomatico.disabled = !permiteAgrupar;
+        if (containerAgruparGuiasAutomatico) {
+            containerAgruparGuiasAutomatico.style.display = permiteAgrupar ? 'inline-flex' : 'none';
+        }
         if (containerSubControlesOrdenacao) {
             containerSubControlesOrdenacao.style.opacity = ativo ? '1' : '0.45';
             containerSubControlesOrdenacao.style.pointerEvents = ativo ? 'auto' : 'none';
@@ -1371,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 optNivelFiltroEstilos.value = String(idx);
             }
             if (checkOpcaoRemoverFormatacoes) {
-                checkOpcaoRemoverFormatacoes.checked = (dados.manterFormatacaoBasica === false);
+                checkOpcaoRemoverFormatacoes.checked = (dados.manterFormatacaoBasica !== true);
             }
             if (optPadronizarFonteCopiaAtivo) {
                 optPadronizarFonteCopiaAtivo.checked = (dados.padronizarFonteCopiaAtivo === true);
@@ -1431,6 +1437,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optCriterioOrdenacaoGuias) {
                 const critSalvo = dados.criterioOrdenacaoGuias || 'hierarquia_arvore';
                 optCriterioOrdenacaoGuias.value = (critSalvo === 'dominio') ? 'dominio_criacao' : critSalvo;
+            }
+            if (optAgruparGuiasAutomatico) {
+                optAgruparGuiasAutomatico.checked = (dados.agruparGuiasAutomatico !== false);
             }
             const sentidoEfetivo = dados.sentidoOrdenacaoGuias || 'esq_dir';
             if (optSentidoOrdenacaoGuias) optSentidoOrdenacaoGuias.value = sentidoEfetivo;
@@ -1554,29 +1563,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const estMini = String(dados.pomodoroEstiloMinipopup || 'compacto').toLowerCase();
                 optPomodoroEstiloMinipopup.value = ['micro', 'compacto', 'normal', 'expandido'].includes(estMini) ? estMini : 'compacto';
             }
-            if (optPomodoroComportamentoBarra) {
-                const modoAvisoAtual = normalizarModoAvisoPomodoro(dados.pomodoroModoAviso);
-                if (modoAvisoAtual === 'badge_e_barra_descanso' || modoAvisoAtual === 'barra_descanso') {
-                    optPomodoroComportamentoBarra.value = 'oculto';
-                } else {
-                    optPomodoroComportamentoBarra.value = 'fixo';
-                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                        chrome.storage.local.get(['jusgovPomodoroBarraEstadoGlobal'], (resLoc) => {
-                            if (chrome.runtime && chrome.runtime.lastError) return;
-                            const estBar = resLoc && resLoc.jusgovPomodoroBarraEstadoGlobal;
-                            if (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value !== 'oculto' && estBar && Number(estBar.modoFixacao) === 2) {
-                                optPomodoroComportamentoBarra.value = 'movel';
-                            }
-                            if (optPomodoroEstiloMinipopup && estBar) {
-                                if (estBar.minimizadoMicro) {
-                                    optPomodoroEstiloMinipopup.value = 'micro';
-                                } else if (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2) {
-                                    optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
-                                }
-                            }
-                        });
+            if (optPomodoroEstiloMinipopup && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get(['jusgovPomodoroBarraEstadoGlobal'], (resLoc) => {
+                    if (chrome.runtime && chrome.runtime.lastError) return;
+                    const estBar = resLoc && resLoc.jusgovPomodoroBarraEstadoGlobal;
+                    if (optPomodoroEstiloMinipopup && estBar) {
+                        if (estBar.minimizadoMicro) {
+                            optPomodoroEstiloMinipopup.value = 'micro';
+                        } else if (estBar.nivelDetalhe === 0 || estBar.nivelDetalhe === 1 || estBar.nivelDetalhe === 2) {
+                            optPomodoroEstiloMinipopup.value = (estBar.nivelDetalhe === 1) ? 'normal' : ((estBar.nivelDetalhe === 2) ? 'expandido' : 'compacto');
+                        }
                     }
-                }
+                });
             }
             if (optPomodoroBeepConclusaoAtivo) {
                 optPomodoroBeepConclusaoAtivo.checked = (dados.pomodoroBeepConclusaoAtivo === false);
@@ -1741,6 +1739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             monitorarUrlOriginalAbertura: optMonitorarUrlOriginal ? optMonitorarUrlOriginal.checked : false,
             monitorarUrlAtualPagina: optMonitorarUrlAtual ? optMonitorarUrlAtual.checked : true,
             criterioOrdenacaoGuias: optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'hierarquia_arvore',
+            agruparGuiasAutomatico: optAgruparGuiasAutomatico ? optAgruparGuiasAutomatico.checked : true,
             sentidoOrdenacaoGuias: optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir',
             ordenarGuiasFixadas: false,
             fecharHierarquiaEmCascata: optFecharHierarquiaEmCascata ? optFecharHierarquiaEmCascata.checked : false,
@@ -1780,9 +1779,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pomodoroCiclos: optPomodoroCiclos ? (Number(optPomodoroCiclos.value) || 4) : 4,
             pomodoroPausasAutomaticas: true,
             pomodoroBeepConclusaoAtivo: optPomodoroBeepConclusaoAtivo ? !optPomodoroBeepConclusaoAtivo.checked : true,
-            pomodoroModoAviso: (optPomodoroComportamentoBarra && optPomodoroComportamentoBarra.value === 'oculto')
-                ? 'badge_e_barra_descanso'
-                : 'completo',
+            pomodoroModoAviso: 'completo',
             pomodoroEstiloMinipopup: optPomodoroEstiloMinipopup
                 ? (['micro', 'compacto', 'normal', 'expandido'].includes(optPomodoroEstiloMinipopup.value) ? optPomodoroEstiloMinipopup.value : 'compacto')
                 : 'compacto',
@@ -1931,10 +1928,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* Ordenação Imediata ao alterar "Ordenar por:" */
+    adicionarOuvinteSeguro(optAgruparGuiasAutomatico, 'change', () => {
+        salvarConfiguracoes();
+        const crit = optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'nenhum';
+        const sent = optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir';
+        try {
+            if (optAgruparGuiasAutomatico && !optAgruparGuiasAutomatico.checked) {
+                chrome.runtime.sendMessage({ acao: 'desagruparGuiasAgora' }, () => { });
+            } else if (crit && crit !== 'nenhum') {
+                chrome.runtime.sendMessage({ acao: 'ordenarGuiasAgora', criterio: crit, sentido: sent, ordenarFixadas: false }, () => { });
+            }
+        } catch (_) { }
+    });
     adicionarOuvinteSeguro(optCriterioOrdenacaoGuias, 'change', () => {
         atualizarVisibilidadeSubOpcoesOrdenacaoGuias();
         salvarConfiguracoes();
         const crit = optCriterioOrdenacaoGuias ? optCriterioOrdenacaoGuias.value : 'nenhum';
+        if (crit === 'nenhum') {
+            try {
+                chrome.runtime.sendMessage({ acao: 'restaurarOrdemGuiasPadrao' }, () => { });
+            } catch (_) { }
+            return;
+        }
         if (crit && crit !== 'nenhum') {
             const sent = optSentidoOrdenacaoGuias ? optSentidoOrdenacaoGuias.value : 'esq_dir';
             try {
@@ -2255,17 +2270,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 minimizadoMicro: ehMicro,
                 ...(ehMicro ? {} : { minimizadoDescansoAdiadoTs: 0 }),
                 nivelDetalhe: nivel
-            }).catch(() => { });
-        }
-        salvarConfiguracoes();
-    });
-    adicionarOuvinteSeguro(optPomodoroComportamentoBarra, 'change', () => {
-        const comp = optPomodoroComportamentoBarra ? optPomodoroComportamentoBarra.value : 'fixo';
-        if ((comp === 'fixo' || comp === 'movel') && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-            chrome.runtime.sendMessage({
-                acao: 'ATUALIZAR_ESTADO_BARRA_POMODORO',
-                modoFixacao: (comp === 'movel') ? 2 : 1,
-                ancorar: (comp === 'fixo')
             }).catch(() => { });
         }
         salvarConfiguracoes();

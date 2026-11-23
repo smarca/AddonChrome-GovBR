@@ -39,155 +39,18 @@
     const LIMITE_MAXIMO_CONTADOR_OPERACIONAL = 999999999;
 
     class GerenciadorCopia {
-        #deps;
-        #ultimoTextoBotaoCopiarNativo;
-        #ultimoTimestampBotaoCopiarNativo;
+        _p_deps;
+        _p_ultimoTextoBotaoCopiarNativo;
+        _p_ultimoTimestampBotaoCopiarNativo;
 
         constructor(dependencias = {}) {
-            this.#deps = dependencias || {};
-            this.#ultimoTextoBotaoCopiarNativo = '';
-            this.#ultimoTimestampBotaoCopiarNativo = 0;
+            this._p_deps = dependencias || {};
+            this._p_ultimoTextoBotaoCopiarNativo = '';
+            this._p_ultimoTimestampBotaoCopiarNativo = 0;
         }
 
         static get SELETOR_BOTAO_COPIAR_NATIVO() {
             return SELETOR_BOTAO_COPIAR_NATIVO;
-        }
-
-        ehAppWebConfiavel(winOpt = null) {
-            try {
-                const refWin = winOpt || (typeof window !== 'undefined' ? window : null);
-                const host = String((refWin && refWin.location && refWin.location.hostname) || '').toLowerCase();
-                return REGEX_DOMINIO_APP_CONFIÁVEL.test(host);
-            } catch (_) {
-                return false;
-            }
-        }
-
-        localizarBotaoCopiarNativo(alvo) {
-            if (!alvo) return null;
-            const base = (alvo.nodeType === 1) ? alvo : (alvo.parentElement || null);
-            if (!base || typeof base.closest !== 'function') return null;
-            try {
-                const direto = base.closest(SELETOR_BOTAO_COPIAR_NATIVO);
-                if (direto) return direto;
-                let atual = base;
-                let passos = 0;
-                while (atual && atual !== document.body && passos < 3) {
-                    const tit = String(atual.getAttribute('title') || atual.getAttribute('aria-label') || '');
-                    if (/\b(?:copiar|copy)\b/i.test(tit)) return atual;
-                    atual = atual.parentElement;
-                    passos++;
-                }
-            } catch (_) { }
-            return null;
-        }
-
-        extrairDadosAlvoDeBotaoCopiarNativo(btnEl) {
-            if (!btnEl) return null;
-            try {
-                const doc = btnEl.ownerDocument || document;
-                const dadosDiretos = (btnEl.getAttribute('data-clipboard-text') || btnEl.getAttribute('cdkcopytoclipboard') || '').trim();
-                if (dadosDiretos) {
-                    return { texto: dadosDiretos, range: null, elementoFonte: btnEl };
-                }
-
-                const seletorTarget = (btnEl.getAttribute('data-clipboard-target') || '').trim();
-                if (seletorTarget) {
-                    const elTarget = doc.querySelector(seletorTarget);
-                    if (elTarget) {
-                        const txtTarget = (elTarget.value !== undefined ? String(elTarget.value) : (elTarget.innerText || elTarget.textContent || '')).trim();
-                        if (txtTarget) {
-                            let rTarget = null;
-                            if (elTarget.nodeType === 1 && elTarget.tagName !== 'INPUT' && elTarget.tagName !== 'TEXTAREA' && typeof doc.createRange === 'function') {
-                                rTarget = doc.createRange();
-                                rTarget.selectNodeContents(elTarget);
-                            }
-                            return { texto: txtTarget, range: rTarget, elementoFonte: elTarget };
-                        }
-                    }
-                }
-
-                const cExt = (typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : {};
-                const regexAud = cExt.REGEX_AUDITORIA || {};
-                const ehTextoEstruturadoValido = (txt) => {
-                    const t = String(txt || '').trim();
-                    if (!t) return false;
-                    return Boolean(
-                        (regexAud.CNJ_ISOLADO && regexAud.CNJ_ISOLADO.test(t)) ||
-                        (regexAud.CPF_ISOLADO && regexAud.CPF_ISOLADO.test(t)) ||
-                        (regexAud.CNPJ_ISOLADO && regexAud.CNPJ_ISOLADO.test(t)) ||
-                        /\d{6,7}-?\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(t) ||
-                        /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/.test(t) ||
-                        /\b[0-9A-Za-z]{2}\.[0-9A-Za-z]{3}\.[0-9A-Za-z]{3}\/[0-9A-Za-z]{4}-\d{2}\b/.test(t)
-                    );
-                };
-
-                const extrairCandidatoDeContainer = (containerEl) => {
-                    if (!containerEl) return null;
-                    const walker = doc.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, {
-                        acceptNode(n) {
-                            const p = n.parentElement;
-                            if (!p) return NodeFilter.FILTER_REJECT;
-                            if (p === btnEl || btnEl.contains(p)) return NodeFilter.FILTER_REJECT;
-                            if (typeof p.matches === 'function' && p.matches(SELETOR_BOTAO_COPIAR_NATIVO)) return NodeFilter.FILTER_REJECT;
-                            const s = String(n.nodeValue || '').trim();
-                            return s ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-                        }
-                    });
-                    const nosTexto = [];
-                    let no;
-                    while ((no = walker.nextNode())) {
-                        nosTexto.push(no);
-                    }
-                    if (nosTexto.length === 0) return null;
-
-                    for (let i = nosTexto.length - 1; i >= 0; i--) {
-                        const nAtual = nosTexto[i];
-                        const val = String(nAtual.nodeValue || '');
-                        const matchCnj = val.match(/\d{6,7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/);
-                        if (matchCnj) {
-                            const rCnj = doc.createRange();
-                            const idxIni = val.indexOf(matchCnj[0]);
-                            rCnj.setStart(nAtual, idxIni);
-                            rCnj.setEnd(nAtual, idxIni + matchCnj[0].length);
-                            return { texto: matchCnj[0], range: rCnj, elementoFonte: nAtual.parentElement || containerEl };
-                        }
-                        if (ehTextoEstruturadoValido(val)) {
-                            const trimVal = val.trim();
-                            const rEst = doc.createRange();
-                            const idxIni = val.indexOf(trimVal);
-                            rEst.setStart(nAtual, idxIni);
-                            rEst.setEnd(nAtual, idxIni + trimVal.length);
-                            return { texto: trimVal, range: rEst, elementoFonte: nAtual.parentElement || containerEl };
-                        }
-                    }
-
-                    const textoAcum = nosTexto.map(n => String(n.nodeValue || '').trim()).filter(Boolean).join(' ').trim();
-                    if (textoAcum && textoAcum.length <= 160) {
-                        const rCont = doc.createRange();
-                        rCont.setStart(nosTexto[0], 0);
-                        rCont.setEnd(nosTexto[nosTexto.length - 1], nosTexto[nosTexto.length - 1].nodeValue.length);
-                        return { texto: textoAcum, range: rCont, elementoFonte: containerEl };
-                    }
-                    return null;
-                };
-
-                const elIrmaoAnt = btnEl.previousElementSibling;
-                if (elIrmaoAnt && !elIrmaoAnt.matches('input[type="checkbox"], input[type="radio"]')) {
-                    const candIrmao = extrairCandidatoDeContainer(elIrmaoAnt);
-                    if (candIrmao && candIrmao.texto) return candIrmao;
-                }
-
-                let ancestral = btnEl.parentElement;
-                let passos = 0;
-                while (ancestral && ancestral !== doc.body && ancestral !== doc.documentElement && passos < 3) {
-                    const candPai = extrairCandidatoDeContainer(ancestral);
-                    if (candPai && candPai.texto) return candPai;
-                    ancestral = ancestral.parentElement;
-                    passos++;
-                }
-            } catch (_) { }
-            return null;
         }
 
         registrarEstatisticaOperacional(inconsistenciaDetectada = false) {
@@ -218,149 +81,29 @@
             } catch (_) { }
         }
 
-        async processarTextoCopiaNativaInterceptada(textoBruto, opcoes = {}) {
-            if (typeof textoBruto !== 'string') return false;
-            const estado = (typeof this.#deps.obterEstado === 'function') ? this.#deps.obterEstado() : {};
-            const setEstado = (typeof this.#deps.atualizarEstado === 'function') ? this.#deps.atualizarEstado : (() => { });
-
-            if (opcoes && opcoes.preservarBruto === true) {
-                const bruto = textoBruto;
-                if (!bruto.trim()) return false;
-                setEstado({ ultimoTextoSelecionadoLimpo: bruto.trim() });
-                const htmlBruto = typeof opcoes.html === 'string' ? opcoes.html : '';
-                const normFn = this.#deps.normalizarNivelFiltro;
-                const nivelRaw = (typeof normFn === 'function') ? normFn(estado.nivelFiltroFormatacao) : (estado.nivelFiltroFormatacao || 'basico');
-                const temHtml = Boolean(htmlBruto && nivelRaw !== 'texto_puro');
-                this.#deps.salvarClipboardInternoComBackup({
-                    texto: bruto,
-                    html: temHtml ? htmlBruto : '',
-                    formatado: temHtml,
-                    nivelCopia: temHtml ? nivelRaw : 'texto_puro'
-                });
-                return true;
-            }
-
-            let textoLimpo = this.#deps.higienizarTextoParaCopia(textoBruto);
-            if (!textoLimpo) return false;
-
-            const matchDataSep = textoLimpo.match(/^(\d{1,2})[\.\-](\d{1,2})[\.\-](\d{2,4})((?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)$/);
-            if (matchDataSep) {
-                textoLimpo = `${matchDataSep[1]}/${matchDataSep[2]}/${matchDataSep[3]}${matchDataSep[4] || ''}`;
-            }
-
-            if (opcoes && opcoes.comShift) {
-                const cExt = (typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : {};
-                const regexAud = cExt.REGEX_AUDITORIA || {};
-                const rx = cExt.EXPRESSOES_REGULARES || {};
-                const ehCnpjAlfa = regexAud.CNPJ_ISOLADO && regexAud.CNPJ_ISOLADO.test(textoLimpo);
-                let digitos = ehCnpjAlfa
-                    ? textoLimpo.toUpperCase().replace(rx.NAO_ALFANUMERICO_UPPER || /[^0-9A-Z]/g, '')
-                    : this.#deps.aplicarLimpezaNumericaComTravaAlfabetica(textoLimpo);
-                if (rx.ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL) {
-                    const matchCnj = textoLimpo.match(rx.ESTRUTURA_CNJ_COMPLETA_OU_PARCIAL);
-                    if (matchCnj && estado.modoShiftCnj !== 'semZeros') {
-                        const seqPad = matchCnj[1].padStart(7, '0');
-                        const soDigitos = textoLimpo.replace(rx.NAO_DIGITOS || /\D+/g, '');
-                        digitos = seqPad + soDigitos.substring(matchCnj[1].length);
-                    }
-                }
-                if (digitos) textoLimpo = digitos;
-            }
-
-            const agora = Date.now();
-            if (textoLimpo === this.#ultimoTextoBotaoCopiarNativo && (agora - this.#ultimoTimestampBotaoCopiarNativo) < 350) {
-                return true;
-            }
-            this.#ultimoTextoBotaoCopiarNativo = textoLimpo;
-            this.#ultimoTimestampBotaoCopiarNativo = agora;
-
-            const rangeAlvo = (opcoes && opcoes.range) ? opcoes.range : null;
-            const modoAcum = Boolean(opcoes && opcoes.modoAcumulador);
-
-            if (!modoAcum) {
-                setEstado({ ultimoTextoSelecionadoLimpo: textoLimpo });
-                this.#deps.salvarClipboardInternoComBackup({ texto: textoLimpo, html: '', formatado: false, nivelCopia: 'texto_puro' });
-            }
-            if (opcoes && opcoes.apenasInterno === true) {
-                return true;
-            }
-
-            if (rangeAlvo) {
-                if ((estado.tempoFlashBorderMs || 0) !== 0) {
-                    setEstado({ flashExclusivoSemSelecao: true });
-                    this.#deps.dispararFlashBorderVisual(rangeAlvo);
-                }
-                await this.executarCopiaDeSelecao(rangeAlvo, modoAcum, textoLimpo, { forcarUmaLinha: true });
-            } else {
-                setEstado({ ultimoTextoSelecionadoLimpo: textoLimpo });
-                await this.#deps.gravarNaAreaDeTransferencia(textoLimpo, null);
-                const validador = (typeof this.#deps.obterValidador === 'function') ? this.#deps.obterValidador() : this.#deps.validador;
-                if (validador && estado.validacaoMatematicaAtiva) {
-                    try {
-                        const rFallback = (opcoes && opcoes.elementoFonte && document.createRange) ? (() => {
-                            const r = document.createRange();
-                            r.selectNode(opcoes.elementoFonte);
-                            return r;
-                        })() : null;
-                        if (rFallback) {
-                            const check = validador.auditarEAlerta(textoBruto.trim(), rFallback, { textoSobrescrito: textoLimpo });
-                            this.registrarEstatisticaOperacional(!check.valido);
-                        } else {
-                            this.registrarEstatisticaOperacional(false);
-                        }
-                    } catch (_) { }
-                } else {
-                    this.registrarEstatisticaOperacional(false);
-                }
-            }
-
-            setTimeout(() => {
-                if (this.#ultimoTextoBotaoCopiarNativo === textoLimpo) {
-                    this.#deps.gravarNaAreaDeTransferencia(textoLimpo, null, { preservarHistorico: true }).catch(() => { });
-                }
-            }, 65);
-
-            return true;
-        }
-
-        async interceptarCliqueBotaoCopiarNativo(elAlvo, eventoMouse = null) {
-            const btnCopiar = this.localizarBotaoCopiarNativo(elAlvo);
-            if (!btnCopiar) return false;
-            const dados = this.extrairDadosAlvoDeBotaoCopiarNativo(btnCopiar);
-            if (!dados || !dados.texto) return false;
-            const comShift = Boolean(eventoMouse && eventoMouse.shiftKey);
-            const modoAcum = Boolean(eventoMouse && eventoMouse.ctrlKey && eventoMouse.altKey);
-            return this.processarTextoCopiaNativaInterceptada(dados.texto, {
-                range: dados.range || null,
-                elementoFonte: dados.elementoFonte || btnCopiar,
-                comShift,
-                modoAcumulador: modoAcum
-            });
-        }
-
         async executarCopiaDeSelecao(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesCopia = {}) {
             if (!rangeAlvo && textoSobrescrito === null) return false;
-            const estado = (typeof this.#deps.obterEstado === 'function') ? this.#deps.obterEstado() : {};
-            const setEstado = (typeof this.#deps.atualizarEstado === 'function') ? this.#deps.atualizarEstado : (() => { });
-            const acumulador = this.#deps.acumulador;
-            const visual = this.#deps.visual;
-            const validador = (typeof this.#deps.obterValidador === 'function') ? this.#deps.obterValidador() : this.#deps.validador;
+            const estado = (typeof this._p_deps.obterEstado === 'function') ? this._p_deps.obterEstado() : {};
+            const setEstado = (typeof this._p_deps.atualizarEstado === 'function') ? this._p_deps.atualizarEstado : (() => { });
+            const acumulador = this._p_deps.acumulador;
+            const visual = this._p_deps.visual;
+            const validador = (typeof this._p_deps.obterValidador === 'function') ? this._p_deps.obterValidador() : this._p_deps.validador;
             const cExt = (typeof window !== 'undefined' && window.JusGovConstantes) ? window.JusGovConstantes : {};
             const rx = cExt.EXPRESSOES_REGULARES || {};
 
             let textoOriginalRange = '';
             if (rangeAlvo) {
-                textoOriginalRange = this.#deps.extrairTextoPuroSanitizado(rangeAlvo);
+                textoOriginalRange = this._p_deps.extrairTextoPuroSanitizado(rangeAlvo);
                 if (!textoOriginalRange) {
-                    textoOriginalRange = this.#deps.higienizarTextoParaCopia(rangeAlvo.toString());
+                    textoOriginalRange = this._p_deps.higienizarTextoParaCopia(rangeAlvo.toString());
                 }
             }
 
             let textoLimpo = '';
             if (textoSobrescrito !== null) {
-                textoLimpo = this.#deps.higienizarTextoParaCopia(textoSobrescrito);
+                textoLimpo = this._p_deps.higienizarTextoParaCopia(textoSobrescrito);
                 if (opcoesCopia && opcoesCopia.forcarUmaLinha) {
-                    textoLimpo = this.#deps.unificarLinhasComEspacamentoAntiTruncamento(textoLimpo);
+                    textoLimpo = this._p_deps.unificarLinhasComEspacamentoAntiTruncamento(textoLimpo);
                 }
             } else {
                 textoLimpo = textoOriginalRange;
@@ -381,8 +124,8 @@
                 const ehModoBaralho = (typeof window !== 'undefined' && window.__JUSGOV_MODO_BARALHO__ === true);
                 const res = acumulador.adicionarItem(textoLimpo, rangeAlvo, ehModoBaralho);
                 if (res) {
-                    await this.#deps.gravarNaAreaDeTransferencia(res.consolidado || '', null);
-                    await this.#deps.cederControleAoCompositorBlink();
+                    await this._p_deps.gravarNaAreaDeTransferencia(res.consolidado || '', null);
+                    await this._p_deps.cederControleAoCompositorBlink();
                     let alertaInvalido = false;
                     if (validador && rangeAlvo) {
                         const textoParaAuditoria = (textoOriginalRange && textoOriginalRange.trim().length > 0) ? textoOriginalRange.trim() : textoLimpo;
@@ -421,7 +164,7 @@
 
             const rangeParaGravacao = (opcoesCopia && opcoesCopia.forcarUmaLinha) ? null : rangeAlvo;
             const ehAlteracaoContorno = Boolean(opcoesCopia && opcoesCopia.preservarHistorico);
-            await this.#deps.gravarNaAreaDeTransferencia(textoLimpo, rangeParaGravacao, { preservarHistorico: ehAlteracaoContorno });
+            await this._p_deps.gravarNaAreaDeTransferencia(textoLimpo, rangeParaGravacao, { preservarHistorico: ehAlteracaoContorno });
 
             try {
                 const idInstanciaCopia = (typeof window !== 'undefined')
@@ -436,7 +179,7 @@
 
             try {
                 const selAssinatura = window.getSelection();
-                const ass = this.#deps.calcularAssinaturaSelecao(selAssinatura);
+                const ass = this._p_deps.calcularAssinaturaSelecao(selAssinatura);
                 if (ass) {
                     setEstado({ ultimoRangeAssinaturaGlobal: ass });
                 } else if (rangeAlvo) {
@@ -444,7 +187,7 @@
                 }
             } catch (_) { }
 
-            await this.#deps.cederControleAoCompositorBlink();
+            await this._p_deps.cederControleAoCompositorBlink();
             let alertaInvalido = false;
             if (!(opcoesCopia && opcoesCopia.pularAuditoriaPesada === true) && validador && estado.validacaoMatematicaAtiva && rangeAlvo) {
                 const ehForcadoTextoPuro = Boolean(opcoesCopia && opcoesCopia.forcarUmaLinha && textoSobrescrito !== null);
@@ -460,27 +203,27 @@
 
         async aplicarSelecaoECopiar(rangeAlvo, modoAcumulador = false, textoSobrescrito = null, opcoesSelecao = {}) {
             const temModificador = Boolean(opcoesSelecao && opcoesSelecao.temModificador);
-            if (!temModificador && this.#deps.isSelecaoOuElementoEmCampoEditavel(rangeAlvo)) {
+            if (!temModificador && this._p_deps.isSelecaoOuElementoEmCampoEditavel(rangeAlvo)) {
                 return false;
             }
             if (!rangeAlvo) return false;
 
             let textoPreview = '';
             if (textoSobrescrito !== null) {
-                textoPreview = this.#deps.higienizarTextoParaCopia(textoSobrescrito);
+                textoPreview = this._p_deps.higienizarTextoParaCopia(textoSobrescrito);
             } else {
-                textoPreview = this.#deps.extrairTextoPuroSanitizado(rangeAlvo) || this.#deps.higienizarTextoParaCopia(rangeAlvo.toString());
+                textoPreview = this._p_deps.extrairTextoPuroSanitizado(rangeAlvo) || this._p_deps.higienizarTextoParaCopia(rangeAlvo.toString());
             }
             if (!textoPreview || textoPreview.length === 0) return false;
 
-            const estado = (typeof this.#deps.obterEstado === 'function') ? this.#deps.obterEstado() : {};
-            const setEstado = (typeof this.#deps.atualizarEstado === 'function') ? this.#deps.atualizarEstado : (() => { });
+            const estado = (typeof this._p_deps.obterEstado === 'function') ? this._p_deps.obterEstado() : {};
+            const setEstado = (typeof this._p_deps.atualizarEstado === 'function') ? this._p_deps.atualizarEstado : (() => { });
             const elAlvoVerif = rangeAlvo.commonAncestorContainer || null;
             const minCustomizado = (opcoesSelecao && typeof opcoesSelecao.minimoCaracteres === 'number')
                 ? opcoesSelecao.minimoCaracteres
                 : ((opcoesSelecao && opcoesSelecao.eraArrasto) ? (temModificador ? 1 : 2) : null);
 
-            if (!this.#deps.verificarProtecaoTamanhoMinimoInterface(textoPreview, elAlvoVerif, temModificador, minCustomizado)) {
+            if (!this._p_deps.verificarProtecaoTamanhoMinimoInterface(textoPreview, elAlvoVerif, temModificador, minCustomizado)) {
                 const eraArrastoBloq = Boolean(opcoesSelecao && opcoesSelecao.eraArrasto);
                 const modoRetBloq = estado.modoRetirarSelecao;
                 if (!eraArrastoBloq && modoRetBloq !== 'com_flash' && modoRetBloq !== 'nenhuma') {
@@ -492,8 +235,8 @@
                 return false;
             }
 
-            if (typeof this.#deps.limparTimerDebounceSelecao === 'function') {
-                this.#deps.limparTimerDebounceSelecao();
+            if (typeof this._p_deps.limparTimerDebounceSelecao === 'function') {
+                this._p_deps.limparTimerDebounceSelecao();
             }
 
             setEstado({ selecaoSendoAplicadaPeloAddon: true });
@@ -501,7 +244,7 @@
                 const eraArrasto = Boolean(opcoesSelecao && opcoesSelecao.eraArrasto);
                 const ehExtensaMultipage = Boolean(
                     (opcoesSelecao && opcoesSelecao.semFlashEMarcador === true) ||
-                    this.#deps.isSelecaoExtensaOuMultipage(rangeAlvo, textoPreview)
+                    this._p_deps.isSelecaoExtensaOuMultipage(rangeAlvo, textoPreview)
                 );
                 const elAlvo = rangeAlvo ? rangeAlvo.commonAncestorContainer : null;
                 const modoRet = estado.modoRetirarSelecao;
@@ -515,9 +258,9 @@
                 else if (modoRet === 'total_exceto_arrasto') deveManter = (eraArrasto === true);
                 else if (typeof opcoesSelecao.forcarManterSelecao === 'boolean') deveManter = opcoesSelecao.forcarManterSelecao;
                 else if (typeof opcoesSelecao.forcarDesselecao === 'boolean') deveManter = !opcoesSelecao.forcarDesselecao;
-                else deveManter = this.#deps.deveManterSelecaoAtivaNoDom(elAlvo, eraArrasto);
+                else deveManter = this._p_deps.deveManterSelecaoAtivaNoDom(elAlvo, eraArrasto);
 
-                this.#deps.aplicarSelecaoDOM(rangeAlvo, {
+                this._p_deps.aplicarSelecaoDOM(rangeAlvo, {
                     ...opcoesSelecao,
                     forcarManterSelecao: deveManter,
                     forcarDesselecao: !deveManter,
@@ -536,19 +279,19 @@
                 if (!modoAcumulador && !ehExtensaMultipage) {
                     if (tempoFlash !== 0) {
                         if (!deveManter) setEstado({ flashExclusivoSemSelecao: true });
-                        flashAtivou = Boolean(this.#deps.dispararFlashBorderVisual(rangeAlvo));
+                        flashAtivou = Boolean(this._p_deps.dispararFlashBorderVisual(rangeAlvo));
                     } else {
-                        this.#deps.limparFlashBorderImediatamente();
+                        this._p_deps.limparFlashBorderImediatamente();
                     }
                 } else if (ehExtensaMultipage) {
                     setEstado({ flashExclusivoSemSelecao: false });
-                    this.#deps.limparFlashBorderImediatamente();
+                    this._p_deps.limparFlashBorderImediatamente();
                 }
 
                 if (modoRet === 'com_flash' && !flashAtivou) {
                     deveManter = true;
                     setEstado({ flashExclusivoSemSelecao: false });
-                    this.#deps.aplicarSelecaoDOM(rangeAlvo, {
+                    this._p_deps.aplicarSelecaoDOM(rangeAlvo, {
                         ...opcoesSelecao,
                         forcarManterSelecao: true,
                         forcarDesselecao: false,
@@ -566,7 +309,7 @@
                             const sel = window.getSelection();
                             if (sel) sel.removeAllRanges();
                         } catch (_) { }
-                        const estAtual = (typeof this.#deps.obterEstado === 'function') ? this.#deps.obterEstado() : {};
+                        const estAtual = (typeof this._p_deps.obterEstado === 'function') ? this._p_deps.obterEstado() : {};
                         if ((estAtual.tempoFlashBorderMs || 0) === 0) {
                             setEstado({ flashExclusivoSemSelecao: false });
                         }
@@ -604,7 +347,7 @@
                     if (selObj && !selObj.isCollapsed && selObj.rangeCount > 0) {
                         const r = selObj.getRangeAt(0);
                         textoCtrlC = String(selObj.toString() || '');
-                        if (r && !this.#deps.isSelecaoExtensaOuMultipage(r, textoCtrlC)) {
+                        if (r && !this._p_deps.isSelecaoExtensaOuMultipage(r, textoCtrlC)) {
                             rangeCtrlC = r;
                         }
                     }
@@ -613,16 +356,16 @@
                     textoCtrlC = evCopyOpt.clipboardData.getData('text/plain') || '';
                     if (!htmlCtrlC) htmlCtrlC = evCopyOpt.clipboardData.getData('text/html') || '';
                 }
-                const textoLimpoCtrlC = this.#deps.higienizarTextoParaCopia(textoCtrlC);
+                const textoLimpoCtrlC = this._p_deps.higienizarTextoParaCopia(textoCtrlC);
                 if (textoLimpoCtrlC && textoLimpoCtrlC.trim().length > 0) {
-                    if (typeof this.#deps.atualizarEstado === 'function') {
-                        this.#deps.atualizarEstado({ ultimoTextoSelecionadoLimpo: textoLimpoCtrlC });
+                    if (typeof this._p_deps.atualizarEstado === 'function') {
+                        this._p_deps.atualizarEstado({ ultimoTextoSelecionadoLimpo: textoLimpoCtrlC });
                     }
 
-                    const estado = (typeof this.#deps.obterEstado === 'function') ? this.#deps.obterEstado() : {};
-                    const normFn = this.#deps.normalizarNivelFiltro;
+                    const estado = (typeof this._p_deps.obterEstado === 'function') ? this._p_deps.obterEstado() : {};
+                    const normFn = this._p_deps.normalizarNivelFiltro;
                     const nivelCfg = (typeof normFn === 'function') ? normFn(estado.nivelFiltroFormatacao) : (estado.nivelFiltroFormatacao || 'basico');
-                    const verifBlocoFn = this.#deps.verificarSeTextoEhBlocoOuPalavraUnica;
+                    const verifBlocoFn = this._p_deps.verificarSeTextoEhBlocoOuPalavraUnica;
                     const ehBlocoPuro = (typeof verifBlocoFn === 'function') ? Boolean(verifBlocoFn(textoLimpoCtrlC)) : false;
                     const podeFormatar = Boolean(!veioDeInputPuro && estado.manterFormatacaoBasica !== false && nivelCfg !== 'texto_puro' && !ehBlocoPuro);
                     const forcarFonteCtrlC = Boolean(!podeFormatar && estado.padronizarFonteCopiaAtivo === true);
@@ -639,11 +382,11 @@
                         const esc = textoLimpoCtrlC.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>');
                         htmlFinal = `<span style="font-family: ${fonteCss}; font-size: ${tamCss};">${esc}</span>`;
                         nivelCopia = 'basico';
-                    } else if (podeFormatar && typeof this.#deps.gerarMapaFormatosClipboard === 'function') {
+                    } else if (podeFormatar && typeof this._p_deps.gerarMapaFormatosClipboard === 'function') {
                         try {
                             const origemMapa = rangeCtrlC || htmlCtrlC;
                             if (origemMapa) {
-                                const mapa = this.#deps.gerarMapaFormatosClipboard(origemMapa, nivelCfg, { textoFallback: textoLimpoCtrlC });
+                                const mapa = this._p_deps.gerarMapaFormatosClipboard(origemMapa, nivelCfg, { textoFallback: textoLimpoCtrlC });
                                 if (mapa && mapa.htmlClipboard) {
                                     htmlFinal = mapa.htmlClipboard;
                                     nivelCopia = mapa.nivelNorm || nivelCfg;
@@ -675,7 +418,7 @@
                         } catch (_) { }
                     }
 
-                    this.#deps.salvarClipboardInternoComBackup({
+                    this._p_deps.salvarClipboardInternoComBackup({
                         texto: textoLimpoCtrlC,
                         html: htmlFinal,
                         formatado: Boolean(htmlFinal),
@@ -687,6 +430,20 @@
         }
     }
 
+        const _ext_GerenciadorCopia = [
+        { g: 'JusGovCopiaCopiarNativo', p: './copia-copiar-nativo.js' }
+    ];
+    for (let i = 0; i < _ext_GerenciadorCopia.length; i++) {
+        const it = _ext_GerenciadorCopia[i];
+        const Cls = (typeof self !== 'undefined' && typeof self[it.g] === 'function')
+            ? self[it.g]
+            : ((typeof require === 'function') ? (() => { try { return require(it.p); } catch (_) { return null; } })() : null);
+        if (Cls && typeof Cls.instalarEm === 'function') {
+            Cls.instalarEm(GerenciadorCopia.prototype);
+        }
+    }
+
     Object.freeze(GerenciadorCopia.prototype);
     window.JusGovGerenciadorCopia = Object.freeze(GerenciadorCopia);
 })();
+
