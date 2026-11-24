@@ -493,6 +493,7 @@
 
             const tentarAutoRetomarFocoEmDescanso = () => {
                 const origemFocoAtual = String(estado.pomodoroBancoOrigemFoco || '');
+                const origemDescAntes = String(estado.pomodoroBancoOrigemDescanso || '');
                 if (origemFocoAtual === 'posterior') {
                     /* Regra estrita ±1: já está consumindo foco emprestado do futuro — não empresta de ciclos adicionais (regra antiga) */
                     return null;
@@ -501,7 +502,17 @@
                 const temFocoAnteriorIncompleto = (focoSalvoMs >= 60000 && focoSalvoMs < Math.max(60000, focoMin * 60000 - 5000));
                 const retFoco = this.pularDescansoEIniciarFoco(estado, agora, config);
                 if (retFoco && estado.pomodoroFase === 'foco') {
-                    estado.pomodoroBancoOrigemFoco = temFocoAnteriorIncompleto ? 'anterior' : 'posterior';
+                    estado.pomodoroBancoOrigemDescanso = '';
+                    if (origemDescAntes === 'posterior') {
+                        /* Era apenas pausa temporária por idle no meio do Foco: não gera débito de Alívio Pendente */
+                        estado.pomodoroDescansoPulado = false;
+                        estado.pomodoroDescansoSaldoRestanteMs = 0;
+                        estado.pomodoroDescansoSaldoTipo = '';
+                        estado.necessidadePausaMs = 0;
+                        estado.pomodoroBancoOrigemFoco = '';
+                    } else {
+                        estado.pomodoroBancoOrigemFoco = temFocoAnteriorIncompleto ? 'anterior' : 'posterior';
+                    }
                     estado.pomodoroFaseInicioTs = Math.max(0, Number(estado.pomodoroFaseInicioTs || agora) - limiarAtivoDescMs);
                     estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + limiarAtivoDescMin;
                     return { evento: 'auto_retomou_foco_em_descanso', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };

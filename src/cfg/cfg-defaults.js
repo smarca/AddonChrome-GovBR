@@ -67,7 +67,7 @@
     const CATALOGO_PERFIS_MINIMO = Object.freeze({
         versaoEsquema: 1,
         perfilPadraoId: 'padrao',
-        chavesGlobais: Object.freeze(['regrasMapeamentoElementos', 'urlsTurbo', 'perfilAtivoId', 'listaPerfis']),
+        chavesGlobais: Object.freeze(['regrasMapeamentoElementos', 'urlsTurbo', 'urlsTurboExcecoes', 'perfilAtivoId', 'listaPerfis']),
         configPadrao: Object.freeze({}),
         perfisPredefinidos: Object.freeze([
             Object.freeze({ id: 'padrao', nome: 'Padrão', predefinido: true, sobrescritas: Object.freeze({}) }),
@@ -118,7 +118,7 @@
         const chavesGlobais = Object.freeze(
             Array.isArray(origem.chavesGlobais) && origem.chavesGlobais.length > 0
                 ? [...origem.chavesGlobais]
-                : ['regrasMapeamentoElementos', 'urlsTurbo', 'perfilAtivoId', 'listaPerfis']
+                : ['regrasMapeamentoElementos', 'urlsTurbo', 'urlsTurboExcecoes', 'perfilAtivoId', 'listaPerfis']
         );
 
         return Object.freeze({

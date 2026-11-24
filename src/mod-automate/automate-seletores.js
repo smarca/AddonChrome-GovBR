@@ -142,6 +142,11 @@
                     elementoIframe = null;
                 }
                 if (!elementoIframe) {
+                    if (/ngFrame/i.test(seletorFrame) && typeof contextoAtual.querySelector === 'function') {
+                        if (contextoAtual.querySelector('#divProcessosTarefa, #frameTarefas, #conteudoTarefa, #processosTarefa')) {
+                            continue;
+                        }
+                    }
                     return null;
                 }
                 try {

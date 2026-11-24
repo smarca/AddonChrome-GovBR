@@ -293,7 +293,9 @@
                     }
                 }
             } else if (tarefaAtual === '[JEF] Implantação de Benefício - Requisição' ||
-                       tarefaAtual === 'Implantação de Benefício - Requisição') {
+                       tarefaAtual === 'Implantação de Benefício - Requisição' ||
+                       tarefaAtual === '[JEF] Revisar Sentença - Secretaria' ||
+                       tarefaAtual === 'Revisar Sentença - Secretaria') {
                 if (this.seletores.contemElemento('jefTopicoImplantarAgora')) {
                     this.seletores.clicarElemento('jefTopicoImplantarAgora');
                 }

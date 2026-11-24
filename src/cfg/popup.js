@@ -125,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hostnameAbaAtual = '';
     let mascaraDominioAbaAtual = '';
     let cacheUrlsTurbo = [];
+    let cacheUrlsTurboExcecoes = ['*://*/*jogos*', '*://*/*games*', '*://*jogos*/*', '*://*games*/*'];
     let modoOperacionalAtual = 'global';
 
     /*
@@ -146,6 +147,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const atualizarIconeBotaoBarraAutomatePopup = (vis = true) => _popUi.atualizarIconeBotaoBarraAutomatePopup && _popUi.atualizarIconeBotaoBarraAutomatePopup(btnRestaurarBarraAutomatePopup, vis);
     const renderizarSeletorPerfisPopup = (lista, ativo) => _popUi.renderizarSeletorPerfisPopup && _popUi.renderizarSeletorPerfisPopup(selectPerfilPopup, lista, ativo);
 
+    function atualizarBotoesExecucaoAutomatePopup(executando = false) {
+        const ativo = Boolean(executando);
+        if (btnExecutarAutomatePopup) btnExecutarAutomatePopup.style.display = ativo ? 'none' : '';
+        if (btnConfigurarAutomatePopup) btnConfigurarAutomatePopup.style.display = ativo ? 'none' : '';
+        if (btnPararAutomatePopup) btnPararAutomatePopup.style.display = ativo ? '' : 'none';
+        if (btnRestaurarBarraAutomatePopup) {
+            btnRestaurarBarraAutomatePopup.disabled = ativo;
+            btnRestaurarBarraAutomatePopup.style.opacity = ativo ? '0.45' : '';
+            btnRestaurarBarraAutomatePopup.style.cursor = ativo ? 'not-allowed' : '';
+            if (ativo) {
+                btnRestaurarBarraAutomatePopup.title = 'A mini barra permanece visível enquanto a automação está em execução';
+            }
+        }
+    }
+    atualizarBotoesExecucaoAutomatePopup(false);
+
     function consultarEstadoBarraAutomateAbaAtiva() {
         if (!btnRestaurarBarraAutomatePopup || typeof chrome === 'undefined' || !chrome.tabs || !chrome.tabs.query) return;
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -158,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? Boolean(resp.barraVisivel)
                         : Boolean(resp.ativo && !resp.fechadaNaAba);
                     atualizarIconeBotaoBarraAutomatePopup(visivel);
+                    atualizarBotoesExecucaoAutomatePopup(Boolean(resp.executando));
                 }
             });
         });
@@ -207,9 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnModoUrl) btnModoUrl.classList.remove('ativo');
         if (btnModoDesligado) btnModoDesligado.classList.remove('ativo');
 
-        /* Ocultar barra de inclusao de site quando em Modo Global ou Desligado */
+        /* Exibir barra de site em Lista de Sites (Permitidos) e Todos os Sites (Excecoes); ocultar apenas em Desligado */
         if (barraDominioAtual) {
-            barraDominioAtual.style.display = (modoAtivo === 'url') ? 'flex' : 'none';
+            barraDominioAtual.style.display = (modoAtivo === 'url' || modoAtivo === 'global') ? 'flex' : 'none';
         }
 
         /* Passo 2.2: Aplicar destaque visual, rotulo descritivo e cores do SVG via DOM seguro */
@@ -299,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             infoDominioAba.appendChild(forte);
         }
         if (barraDominioAtual) {
-            barraDominioAtual.style.display = (modoOperacionalAtual === 'url') ? 'flex' : 'none';
+            barraDominioAtual.style.display = (modoOperacionalAtual === 'url' || modoOperacionalAtual === 'global') ? 'flex' : 'none';
         }
 
         /* Passo 2.5: Deteccao multi-sistema judicial (PJe, Eproc, PDPJ, Projudi, SAJ, Creta, SEEU ou *.jus.br) */
@@ -337,13 +355,18 @@ document.addEventListener('DOMContentLoaded', () => {
             atualizarVisibilidadeAutomatePopup(Boolean(checkAutomatePje && checkAutomatePje.checked), false);
         }
 
-        const jaEstaNaLista = cacheUrlsTurbo.some(u => {
+        const listaAtiva = (modoOperacionalAtual === 'global') ? cacheUrlsTurboExcecoes : cacheUrlsTurbo;
+        const jaEstaNaLista = listaAtiva.some(u => {
             if (!u || u === '<all_urls>') return false;
             return u.toLowerCase().includes(hostnameAbaAtual.toLowerCase());
         });
 
         if (btnAlternarDominioAba) {
-            btnAlternarDominioAba.textContent = jaEstaNaLista ? '- Remover da Lista' : '+ Incluir na Lista';
+            if (modoOperacionalAtual === 'global') {
+                btnAlternarDominioAba.textContent = jaEstaNaLista ? '- Remover Exceção' : '+ Adicionar Exceção';
+            } else {
+                btnAlternarDominioAba.textContent = jaEstaNaLista ? '- Remover da Lista' : '+ Incluir na Lista';
+            }
         }
     }
 
@@ -359,11 +382,11 @@ document.addEventListener('DOMContentLoaded', () => {
             chrome.storage.sync.get([
                 'modoTurbo',
                 'urlsTurbo',
+                'urlsTurboExcecoes',
                 'ativoAmpuletas',
                 'automatePjeAtivo',
                 'manterFormatacaoBasica',
                 'nivelFiltroFormatacao',
-                'comportamentoCliqueIcone',
                 'listaPerfis',
                 'perfilAtivoId'
             ], async (config) => {
@@ -387,8 +410,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 } catch (_) { }
-                const modo = cfg.modoTurbo || 'url';
+                const modo = cfg.modoTurbo || 'global';
                 cacheUrlsTurbo = Array.isArray(cfg.urlsTurbo) ? cfg.urlsTurbo : [];
+                cacheUrlsTurboExcecoes = Array.isArray(cfg.urlsTurboExcecoes)
+                    ? cfg.urlsTurboExcecoes
+                    : ['*://*/*jogos*', '*://*/*games*', '*://*jogos*/*', '*://*games*/*'];
 
                 if (Array.isArray(cfg.listaPerfis) && cfg.listaPerfis.length > 0) {
                     renderizarSeletorPerfisPopup(cfg.listaPerfis, cfg.perfilAtivoId || 'padrao');
@@ -455,11 +481,13 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Passo 4.1: Eventos dos botoes de Modo de Execucao com blindagem defensiva */
     adicionarOuvinteSeguro(btnModoGlobal, 'click', () => {
         atualizarInterfaceModo('global');
+        atualizarBotaoDominioAba();
         salvarPreferenciaPopupDiferida({ modoTurbo: 'global' });
     });
 
     adicionarOuvinteSeguro(btnModoUrl, 'click', () => {
         atualizarInterfaceModo('url');
+        atualizarBotaoDominioAba();
         salvarPreferenciaPopupDiferida({ modoTurbo: 'url' });
     });
 
@@ -468,21 +496,26 @@ document.addEventListener('DOMContentLoaded', () => {
         salvarPreferenciaPopupDiferida({ modoTurbo: 'desligado' });
     });
 
-    /* Passo 4.2: Evento do botao de incluir/remover dominio da aba atual */
+    /* Passo 4.2: Evento do botao de incluir/remover dominio da aba atual (Permitidos ou Exceções conforme o modo) */
     adicionarOuvinteSeguro(btnAlternarDominioAba, 'click', () => {
         if (!hostnameAbaAtual || !mascaraDominioAbaAtual) return;
 
-        const idxExistente = cacheUrlsTurbo.findIndex(u =>
+        const ehModoGlobal = (modoOperacionalAtual === 'global');
+        const listaAlvo = ehModoGlobal ? cacheUrlsTurboExcecoes : cacheUrlsTurbo;
+        const idxExistente = listaAlvo.findIndex(u =>
             u && u !== '<all_urls>' && u.toLowerCase().includes(hostnameAbaAtual.toLowerCase())
         );
 
         if (idxExistente !== -1) {
-            cacheUrlsTurbo.splice(idxExistente, 1);
+            listaAlvo.splice(idxExistente, 1);
         } else {
-            cacheUrlsTurbo.push(mascaraDominioAbaAtual);
+            listaAlvo.push(mascaraDominioAbaAtual);
         }
 
-        salvarPreferenciaPopupDiferida({ urlsTurbo: cacheUrlsTurbo }, () => {
+        const patch = ehModoGlobal
+            ? { urlsTurboExcecoes: cacheUrlsTurboExcecoes }
+            : { urlsTurbo: cacheUrlsTurbo };
+        salvarPreferenciaPopupDiferida(patch, () => {
             atualizarBotaoDominioAba();
         });
     });
@@ -535,6 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const enviarComandoAutomateParaAbaAtiva = (a, f = false, cb = null) => _popUi.enviarComandoAutomateParaAbaAtiva && _popUi.enviarComandoAutomateParaAbaAtiva(atualizarIconeBotaoBarraAutomatePopup, a, f, cb);
 
     adicionarOuvinteSeguro(btnExecutarAutomatePopup, 'click', () => {
+        atualizarBotoesExecucaoAutomatePopup(true);
         enviarComandoAutomateParaAbaAtiva('AUTOMATE_DISPARAR_CICLO', true);
     });
 
@@ -543,6 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     adicionarOuvinteSeguro(btnPararAutomatePopup, 'click', () => {
+        atualizarBotoesExecucaoAutomatePopup(false);
         enviarComandoAutomateParaAbaAtiva('AUTOMATE_PARAR', false);
     });
 

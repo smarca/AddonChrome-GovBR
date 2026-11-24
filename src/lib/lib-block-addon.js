@@ -79,7 +79,7 @@
             if (!caminhoRelativo || caminhoRelativo === '' || caminhoRelativo === '/' || caminhoRelativo.startsWith('?')) {
                 const aba = JusGovBlockAddon.obterAbaPorParametro(caminhoRelativo);
                 if (aba && aba !== 'abaConfiguracoes') {
-                    const hashAba = (aba === 'abaAjuda') ? '#ajuda' : ((aba === 'abaLaboratorio') ? '#laboratorio' : '#configuracoes');
+                    const hashAba = (aba === 'abaAjuda') ? '#ajuda' : ((aba === 'abaLaboratorio') ? '#laboratorio' : ((aba === 'abaBeta') ? '#beta' : '#configuracoes'));
                     return optionsUrl + hashAba;
                 }
                 return optionsUrl;
@@ -96,7 +96,7 @@
                 const query = caminhoRelativo.slice('src/cfg/options.html'.length);
                 const aba = JusGovBlockAddon.obterAbaPorParametro(query);
                 if (aba) {
-                    const hashAba = (aba === 'abaAjuda') ? '#ajuda' : ((aba === 'abaLaboratorio') ? '#laboratorio' : '#configuracoes');
+                    const hashAba = (aba === 'abaAjuda') ? '#ajuda' : ((aba === 'abaLaboratorio') ? '#laboratorio' : ((aba === 'abaBeta') ? '#beta' : '#configuracoes'));
                     const destinoComHash = optionsUrl + hashAba;
                     if (destinoComHash !== url) {
                         return destinoComHash;
@@ -123,6 +123,9 @@
             }
             if (s.includes('lab') || s.includes('test') || s.includes('sandbox')) {
                 return 'abaLaboratorio';
+            }
+            if (s.includes('beta')) {
+                return 'abaBeta';
             }
             if (s.includes('config') || s.includes('opcao') || s.includes('options') || s.includes('preferencia')) {
                 return 'abaConfiguracoes';

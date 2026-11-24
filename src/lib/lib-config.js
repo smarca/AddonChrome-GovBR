@@ -240,6 +240,12 @@
                     : [...padraoTurbo];
                 precisaSalvar = true;
             }
+            if (!Array.isArray(config.urlsTurboExcecoes)) {
+                config.urlsTurboExcecoes = Array.isArray(padraoPerfil.urlsTurboExcecoes)
+                    ? [...padraoPerfil.urlsTurboExcecoes]
+                    : ['*://*/*jogos*', '*://*/*games*', '*://*jogos*/*', '*://*games*/*'];
+                precisaSalvar = true;
+            }
             if (!Array.isArray(config.urlsAmpuletas) || config.urlsAmpuletas.length === 0) {
                 config.urlsAmpuletas = Array.isArray(padraoPerfil.urlsAmpuletas) && padraoPerfil.urlsAmpuletas.length > 0
                     ? [...padraoPerfil.urlsAmpuletas]
@@ -261,10 +267,6 @@
 
             if (!['global', 'url', 'desligado'].includes(config.modoTurbo)) {
                 config.modoTurbo = padraoPerfil.modoTurbo;
-                precisaSalvar = true;
-            }
-            if (typeof config.comportamentoCliqueIcone !== 'string' || !['acoes_rapidas', 'popup'].includes(config.comportamentoCliqueIcone)) {
-                config.comportamentoCliqueIcone = padraoPerfil.comportamentoCliqueIcone;
                 precisaSalvar = true;
             }
             if (config.ativoAmpuletas === undefined) {
@@ -543,10 +545,9 @@
             /* Passo 4.5: Atualizar dinamicamente o icone e o popup da extensao na barra de ferramentas */
             if (typeof self !== 'undefined') {
                 self.__JUSGOV_MODO_TURBO_ATUAL__ = config.modoTurbo;
-                self.__JUSGOV_COMPORTAMENTO_ICONE_ATUAL__ = config.comportamentoCliqueIcone;
             }
-            this.sincronizarComportamentoIcone(config.comportamentoCliqueIcone, apiChrome);
-            this.desenharIconeVetorialFallback(config.modoTurbo, config.comportamentoCliqueIcone, apiChrome);
+            this.sincronizarComportamentoIcone(apiChrome);
+            this.desenharIconeVetorialFallback(config.modoTurbo, 'popup', apiChrome);
 
             return config;
         }

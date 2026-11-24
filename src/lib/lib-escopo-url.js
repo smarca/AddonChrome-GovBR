@@ -56,8 +56,9 @@
     const SELETOR_EDITAVEL_CONHECIDO = '[contenteditable="true"], [contenteditable=""], [role="textbox"], .cke_editable, .ck-editor__editable, .ProseMirror, .CodeMirror, .monaco-editor, .tox-edit-area';
 
     class GerenciadorEscopoUrl extends BasePai {
-        #modoExecucao = 'url';
+        #modoExecucao = 'global';
         #listaUrlsPermitidas = [];
+        #listaUrlsExcecoes = [];
 
         constructor(opcoes = {}) {
             super('GerenciadorEscopoUrl');
@@ -75,6 +76,9 @@
             }
             if (Array.isArray(cfg.listaUrlsPermitidas)) {
                 this.#listaUrlsPermitidas = cfg.listaUrlsPermitidas;
+            }
+            if (Array.isArray(cfg.listaUrlsExcecoes)) {
+                this.#listaUrlsExcecoes = cfg.listaUrlsExcecoes;
             }
             return true;
         }
@@ -104,17 +108,8 @@
             return urlAtual;
         }
 
-        verificarUrlPermitida(modoOverride = null, urlsOverride = null) {
-            const modo = (typeof modoOverride === 'string') ? modoOverride : this.#modoExecucao;
-            const lista = Array.isArray(urlsOverride) ? urlsOverride : this.#listaUrlsPermitidas;
-
-            if (modo === 'desligado') return false;
-            if (modo === 'global') return true;
-
-            const urlAtual = this.obterUrlEfetiva();
-            if (urlAtual.startsWith('chrome-extension://')) return true;
+        _correspondeListaPadroes(urlAtual, lista) {
             if (!Array.isArray(lista) || lista.length === 0) return false;
-
             for (let i = 0; i < lista.length; i++) {
                 const padrao = lista[i];
                 if (!padrao || padrao === '' || padrao === '<all_urls>') continue;
@@ -129,6 +124,23 @@
                 }
             }
             return false;
+        }
+
+        verificarUrlPermitida(modoOverride = null, urlsOverride = null, excecoesOverride = null) {
+            const modo = (typeof modoOverride === 'string') ? modoOverride : this.#modoExecucao;
+            const lista = Array.isArray(urlsOverride) ? urlsOverride : this.#listaUrlsPermitidas;
+            const listaExc = Array.isArray(excecoesOverride) ? excecoesOverride : this.#listaUrlsExcecoes;
+
+            if (modo === 'desligado') return false;
+
+            const urlAtual = this.obterUrlEfetiva();
+            if (urlAtual.startsWith('chrome-extension://')) return true;
+
+            if (modo === 'global') {
+                return !this._correspondeListaPadroes(urlAtual, listaExc);
+            }
+
+            return this._correspondeListaPadroes(urlAtual, lista);
         }
 
         ehDocumentoEditorRicoIsolado(docRef = null) {
@@ -179,14 +191,14 @@
             return false;
         }
 
-        sincronizarProtecaoLeituraDom(modoOverride = null, urlsOverride = null) {
+        sincronizarProtecaoLeituraDom(modoOverride = null, urlsOverride = null, excecoesOverride = null) {
             try {
                 if (typeof window !== 'undefined' && window.__TESTE_HEADLESS__) return false;
                 const doc = typeof document !== 'undefined' ? document : null;
                 if (!doc) return false;
                 if (this.ehDocumentoEditorRicoIsolado(doc)) return false;
 
-                const permitido = this.verificarUrlPermitida(modoOverride, urlsOverride);
+                const permitido = this.verificarUrlPermitida(modoOverride, urlsOverride, excecoesOverride);
                 if (doc.documentElement) {
                     doc.documentElement.setAttribute('data-jusgov-ativo', permitido ? '1' : '0');
                 }

@@ -54,6 +54,7 @@
                 Listas de Sites</button>
             <button type="button" class="btn-aba" data-aba="abaAjuda">2. Central de Ajuda</button>
             <button type="button" class="btn-aba" data-aba="abaLaboratorio">3. Testes</button>
+            <button type="button" class="btn-aba" data-aba="abaBeta">4. Beta</button>
         </div>
     </nav>
 
@@ -64,38 +65,25 @@
         <div id="abaConfiguracoes" class="painel-aba ativa">
             <!-- Seletor de Perfis de Uso -->
             <section id="barraPerfisConfiguracoes" class="barra-perfis-box" aria-label="Perfis de Uso">
-                <div class="barra-perfis-controles">
-                    <label for="selectPerfilAtivo" style="font-weight: 700; font-size: 13.5px; color: var(--texto-principal);">Perfil Ativo:</label>
-                    <select id="selectPerfilAtivo" class="seletor-estilizado" style="min-width: 180px;">
-                        <option value="padrao">Padrão</option>
-                        <option value="trabalho">Trabalho</option>
-                        <option value="casa">Casa</option>
-                        <option value="estudo">Estudo</option>
-                        <option value="leitura">Leitura / Pesquisa</option>
-                        <option value="reuniao">Apresentação / Reunião</option>
-                    </select>
-                    <button type="button" class="btn btn-primario" id="btnNovoPerfil">+ Novo Perfil</button>
-                    <button type="button" class="btn btn-secundario" id="btnRenomearPerfil" style="display: none;" disabled>Renomear</button>
-                    <button type="button" class="btn btn-secundario" id="btnExcluirPerfil" style="display: none;" disabled>Excluir</button>
-                </div>
-            </section>
+                    <div class="barra-perfis-controles">
+                        <label for="selectPerfilAtivo" style="font-weight: 700; font-size: 13.5px; color: var(--texto-principal);">Perfil Ativo:</label>
+                        <select id="selectPerfilAtivo" class="seletor-estilizado" style="min-width: 180px;">
+                            <option value="padrao">Padrão</option>
+                            <option value="trabalho">Trabalho</option>
+                            <option value="casa">Casa</option>
+                            <option value="estudo">Estudo</option>
+                            <option value="leitura">Leitura / Pesquisa</option>
+                            <option value="reuniao">Apresentação / Reunião</option>
+                        </select>
+                        <button type="button" class="btn btn-primario" id="btnNovoPerfil">+ Novo Perfil</button>
+                        <button type="button" class="btn btn-secundario" id="btnRenomearPerfil" style="display: none;" disabled>Renomear</button>
+                        <button type="button" class="btn btn-secundario" id="btnExcluirPerfil" style="display: none;" disabled>Excluir</button>
+                    </div>
+                </section>
 
             <!-- Secao 1: COPIA INTELIGENTE -->
             <section class="cartao">
                 <h2>1. Cópia Inteligente: Editores de Minutas e Validação</h2>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
-                        para <code>id ..., pg. ...</code></div>
-                    <div class="setting-help">Ao selecionar cabeçalhos nativos de peças do PJe
-                        (ex: <code>Num. 2297820154 - Pág. 1</code>), copia automaticamente no formato
-                        padronizado e simplificado <code>id 2297820154, pg. 1</code>.</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="optConverterCabecalhoPje" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
 
             <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
@@ -298,6 +286,20 @@
 
             <div class="setting-item">
                 <div>
+                    <div class="setting-label">Conversão Automática de Cabeçalhos do PJe
+                        para <code>id ..., pg. ...</code></div>
+                    <div class="setting-help">Ao selecionar cabeçalhos nativos de peças do PJe
+                        (ex: <code>Num. 2297820154 - Pág. 1</code>), copia automaticamente no formato
+                        padronizado e simplificado <code>id 2297820154, pg. 1</code>.</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="optConverterCabecalhoPje" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <div>
                     <div class="setting-label">Seleção Automática de Placeholders em Editores</div>
                     <div class="setting-help">Em caixas de texto, campos editáveis e editores de minutas
                         online (como CKEditor, TinyMCE e editores HTML), seleciona marcadores de preenchimento
@@ -388,16 +390,27 @@
             </details>
 
                 <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
-                    <div>
-                        <div class="setting-label">Lista de Domínios do Motor de Seleção e Cópia</div>
-                        <div class="setting-help">
-                            Utilizada quando o modo "Só Sites da Lista" está selecionado. Informe um
-                            padrão por linha (ex: <code>*://*.jus.br/*</code>).
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 240px;">
+                            <div id="tituloListaUrlsTurbo" class="setting-label">Modo de Ativação do Motor</div>
+                            <div id="ajudaListaUrlsTurbo" class="setting-help">
+                                Escolha se a seleção inteligente deve atuar em todos os sites ou apenas nos domínios listados abaixo.
+                            </div>
+                        </div>
+                        <div style="display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding-top: 2px;">
+                            <button type="button" id="btnOptModoGlobal" style="padding: 5px 11px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; cursor: pointer;">Todos os Sites</button>
+                            <button type="button" id="btnOptModoUrl" style="padding: 5px 11px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; cursor: pointer;">Lista de Sites</button>
+                            <button type="button" id="btnOptModoDesligado" style="padding: 5px 11px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; cursor: pointer;">Desligado</button>
+                            <select id="selectModoTurbo" class="seletor-modo" style="display: none;" aria-hidden="true">
+                                <option value="global">Todos os Sites (Global)</option>
+                                <option value="url">Só Sites da Lista</option>
+                                <option value="desligado">Desligado</option>
+                            </select>
                         </div>
                     </div>
-                    <details id="detalhesListaDominiosMotor" style="border: 1px solid var(--borda-suave); border-radius: 8px; background: #f8fafc; overflow: hidden;">
-                        <summary style="padding: 8px 12px; font-size: 12.5px; font-weight: 600; color: var(--texto-secundario); cursor: pointer; user-select: none;">
-                            🌐 Exibir / Editar Lista de Domínios
+                    <details id="detalhesListaDominiosMotor" open style="border: 1px solid var(--borda-suave); border-radius: 8px; background: #f8fafc; overflow: hidden;">
+                        <summary id="resumoListaUrlsTurbo" style="padding: 8px 12px; font-size: 12.5px; font-weight: 600; color: var(--texto-secundario); cursor: pointer; user-select: none;">
+                            🚫 Exibir / Editar Lista de Exceções
                         </summary>
                         <div style="padding: 10px 12px; border-top: 1px solid var(--borda-suave); background: #ffffff;">
                             <textarea id="textoUrlsTurbo" class="lista-urls" spellcheck="false"></textarea>
@@ -414,38 +427,6 @@
                     navegador. Todas as alterações entram em vigor imediatamente, sem precisar recarregar
                     as páginas.
                 </p>
-
-                <div class="grade-opcoes">
-                    <div class="caixa-opcao">
-                        <div>
-                            <h3>Modo de Ativação do Motor</h3>
-                            <p>Escolha se a seleção inteligente deve atuar em todos os sites ou apenas nos
-                                domínios listados abaixo.</p>
-                        </div>
-                        <select id="selectModoTurbo" class="seletor-modo">
-                            <option value="global">Todos os Sites (Global)</option>
-                            <option value="url">Só Sites da Lista</option>
-                            <option value="desligado">Desligado</option>
-                        </select>
-                    </div>
-
-                    <div class="caixa-opcao">
-                        <div>
-                            <h3>Comportamento do Ícone da Extensão</h3>
-                            <p>
-                                Escolha a ação ao clicar no ícone da extensão na barra de
-                                ferramentas:
-                                alternar modos com 1 clique (e 2 cliques para Opções) ou exibir
-                                diretamente o Painel Popup com 1 clique.
-                            </p>
-                        </div>
-                        <select id="selectComportamentoIcone" class="seletor-modo">
-                            <option value="popup">1 clique: Abrir Painel Popup</option>
-                            <option value="acoes_rapidas">1 clique: Alternar Modo | 2 cliques: Opções
-                            </option>
-                        </select>
-                    </div>
-                </div>
 
                 <!-- Nova linha: Remover Formatacoes (Somente Texto) e Nivel de Filtro de Estilos -->
                 <div class="caixa-opcao" style="flex-direction: column; align-items: stretch; gap: 14px; width: 100%;">
@@ -604,18 +585,6 @@
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="checkOpcaoAmpuletas" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Automação de Tarefas — Fluxos Hierárquicos do Navegador (Inclui Contexto PJe)</div>
-                    <div class="setting-help">
-                        Ativa a barra compacta de Automação de Tarefas do navegador (desabilitada por padrão em todos os perfis; pode ser habilitada manualmente ou automaticamente pelos domínios configurados em cada contexto). Inclui o subcontexto pré-configurado do PJe (35 regras de tarefas, leitura automática dos Autos, etiquetas e movimentação).
-                    </div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="optAutomatePjeAtivo">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -2466,6 +2435,36 @@
                 <pre id="painelResultadoAuditoria" data-jusgov-ignore="true"></pre>
             </section>
         </div>
+    
+        <!-- ==================================================================
+             ABA 4: CANAL BETA (MODULOS EXPERIMENTAIS ISOLADOS - FORA DO DEBUG)
+             ================================================================== -->
+        <div id="abaBeta" class="painel-aba">
+            <section class="cartao" style="border-left: 4px solid #f59e0b;">
+                <h2>🧪 Canal Beta — Módulos em Homologação e Evolução Experimental</h2>
+                <div class="setting-help" style="margin-bottom: 14px; padding: 10px 12px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 12.5px; line-height: 1.5;">
+                    <strong>Isolamento Arquitetural Beta:</strong> Os módulos desta guia estão em fase ativa de testes e modelagem. Eles operam em <strong>casulos fechados POO por Contexto de Site</strong> (sem variáveis globais, podendo consumir bibliotecas públicas de <code>src/lib/</code>, mas jamais sendo dependência de módulos estáveis) e <strong>não integram a suíte de debug automatizada</strong> até sua promoção definitiva para a aba principal. As personalizações criadas aqui são exportadas e importadas automaticamente junto com o JSON de configurações da extensão.
+                </div>
+
+                <div class="setting-item" style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+                    <div>
+                        <div class="setting-label" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span>Automação de Tarefas por Contextos Fechados (Inclui Contexto PJe TRF1)</span>
+                            <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #b45309; border: 1px solid #f59e0b; font-size: 11px; font-weight: 800; letter-spacing: 0.3px;">BETA</span>
+                        </div>
+                        <div class="setting-help" style="margin-top: 4px;">
+                            Habilita o interpretador declarativo orientado a banco de dados JSON e a barra flutuante compacta nos sites pertencentes aos Contextos ativos (ex.: <code>https://pje1g.trf1.jus.br/</code> e <code>https://pje1gbeta.trf1.jus.br/</code>). Desabilitado por padrão; cada contexto encapsula suas próprias subtelas (rotas), objetos CSS/XPath, estado e algoritmos.
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="optAutomatePjeAtivo">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="containerAutomateComandosObjetos"></div>
+            </section>
+        </div>
     </div>
 
     <div id="modalConfirmarResetPerfis" class="modal-perfis-overlay" role="dialog" aria-modal="true" aria-labelledby="tituloModalResetPerfis">
@@ -2601,6 +2600,7 @@
     <script src="mod-debug/debug-fuzzing.js"></script>
     <script src="mod-debug/mod-debug.js"></script>
     <script src="options-mapeamento.js"></script>
+    <script src="options-automate.js"></script>
     <script src="options-laboratorio.js"></script>
     <script src="../mod-produt/produt-bem-estar-cards.js"></script>
     <script src="../mod-produt/lib-produt-bem-estar.js"></script>

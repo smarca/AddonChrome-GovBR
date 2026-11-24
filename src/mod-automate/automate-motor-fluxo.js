@@ -50,8 +50,11 @@
             this.espera = (opcoes && opcoes.espera) ? opcoes.espera : null;
             this.dialogos = (opcoes && opcoes.dialogos) ? opcoes.dialogos : null;
             this.ponteAbas = (opcoes && typeof opcoes.ponteAbas === 'function') ? opcoes.ponteAbas : null;
+            this.onStatus = (opcoes && typeof opcoes.onStatus === 'function') ? opcoes.onStatus : null;
 
             this.variaveis = {};
+            this._escoposContexto = new Map();
+            this.contextoAtivoId = 'pje_trf1_1g';
             this.historicoLogs = [];
             this.emExecucao = false;
 
@@ -88,6 +91,24 @@
          * @param {*} [padrao=undefined]
          * @returns {*}
          */
+        /**
+         * Retorna (ou instancia sob demanda) o escopo fechado POO (`estado`) exclusivo de um Contexto.
+         * Garante zero poluicao de variaveis entre contextos distintos (ex.: PJe TRF1 vs outro sistema).
+         * @param {string} [contextoId]
+         * @returns {Object}
+         */
+        obterEstadoContexto(contextoId = '') {
+            const id = String(contextoId || this.contextoAtivoId || 'pje_trf1_1g');
+            if (!this._escoposContexto.has(id)) {
+                const listaCtx = Array.isArray(this.dadosAutomate && this.dadosAutomate.contextos)
+                    ? this.dadosAutomate.contextos : [];
+                const defCtx = listaCtx.find((c) => c && c.id === id);
+                const inicial = (defCtx && defCtx.estadoInicial) ? JSON.parse(JSON.stringify(defCtx.estadoInicial)) : { configuracao: {}, sessao: {} };
+                this._escoposContexto.set(id, inicial);
+            }
+            return this._escoposContexto.get(id);
+        }
+
         obterVariavel(nome, padrao = undefined) {
             if (!nome || typeof nome !== 'string') return padrao;
             if (Object.prototype.hasOwnProperty.call(this.variaveis, nome)) {
@@ -104,6 +125,11 @@
          */
         definirVariavel(nome, valor) {
             if (!nome || typeof nome !== 'string') return undefined;
+            const estCtx = this.obterEstadoContexto(this.contextoAtivoId);
+            if (estCtx) {
+                if (!estCtx.vars) estCtx.vars = {};
+                estCtx.vars[nome] = valor;
+            }
             this.variaveis[nome] = valor;
             return valor;
         }
@@ -241,6 +267,18 @@
             }
             if (op === 'naoexisteelemento' || op === 'not_contains_element') {
                 return Boolean(!this.seletores || !this.seletores.contemElemento(condicao.objeto, variaveisLocais));
+            }
+            if (op === 'paginacontemtexto' || op === 'paginanaocontemtexto') {
+                const doc = (this.seletores && this.seletores.documentoRaiz) || (typeof document !== 'undefined' ? document : null);
+                const corpo = String((doc && doc.body && doc.body.textContent) || '');
+                const alvo = this.interpolarTexto(String(condicao.texto || condicao.direita || ''), variaveisLocais);
+                let encontrou = false;
+                if (condicao.regex) {
+                    try { encontrou = new RegExp(alvo, 'i').test(corpo); } catch (_) { encontrou = false; }
+                } else {
+                    encontrou = corpo.toLowerCase().includes(alvo.toLowerCase());
+                }
+                return op === 'paginacontemtexto' ? encontrou : !encontrou;
             }
 
             const esq = condicao.variavel
@@ -409,6 +447,103 @@
                     return iter;
                 }
 
+                case 'SET_STATUS': {
+                    const statusVal = passo.status !== undefined
+                        ? this.interpolarTexto(String(passo.status), variaveisLocais)
+                        : (passo.texto !== undefined ? this.interpolarTexto(String(passo.texto), variaveisLocais) : undefined);
+                    const substatusVal = passo.substatus !== undefined
+                        ? this.interpolarTexto(String(passo.substatus), variaveisLocais)
+                        : undefined;
+                    const detalhe = this.interpolarTexto(String(passo.detalhe || ''), variaveisLocais);
+                    const payloadSt = { detalhe };
+                    if (statusVal !== undefined) payloadSt.status = statusVal;
+                    if (substatusVal !== undefined) payloadSt.substatus = substatusVal;
+                    if (this.onStatus) {
+                        try { this.onStatus(payloadSt, detalhe); } catch (_) { }
+                    }
+                    this.registrarLog('SET_STATUS', (statusVal || '') + (substatusVal ? ' · ' + substatusVal : ''), detalhe ? { detalhe } : null);
+                    return payloadSt;
+                }
+
+                case 'CLICK_IF_UNCHECKED': {
+                    if (!this.seletores) return false;
+                    const el = this.seletores.resolverElemento(passo.objeto, variaveisLocais);
+                    if (!el || el.disabled || el.offsetParent === null) return false;
+                    if (!el.checked) {
+                        el.click();
+                        return true;
+                    }
+                    return false;
+                }
+
+                case 'TAB_CHECK_MATCH': {
+                    if (!this.ponteAbas) return false;
+                    const objVer = (this.dadosAutomate && this.dadosAutomate.repositorioObjetos && this.dadosAutomate.repositorioObjetos[passo.objetoVerificar]) || null;
+                    const selsVer = objVer
+                        ? (Array.isArray(objVer.seletores) ? objVer.seletores : (objVer.seletor ? [{ tipo: objVer.tipo || 'css', expressao: objVer.seletor }] : []))
+                        : [];
+                    const esperado = this.interpolarTexto(String(passo.textoEsperado || ''), variaveisLocais);
+                    const resp = await this.ponteAbas('AUTOMATE_EXECUTAR_EM_ABAS', {
+                        padraoUrl: this.interpolarTexto(String(passo.padraoUrl || ''), variaveisLocais),
+                        seletoresVerificar: selsVer,
+                        regexExtrair: String(passo.regexExtrair || ''),
+                        textoEsperado: esperado,
+                        modoMatch: passo.modoMatch || 'igual',
+                        acaoNaAba: 'verificar'
+                    });
+                    const encontrado = Boolean(resp && resp.sucesso && Number(resp.correspondencias) > 0);
+                    if (passo.variavelDestino) {
+                        this.definirVariavel(passo.variavelDestino, encontrado);
+                    }
+                    return encontrado;
+                }
+
+                case 'TAB_ACTION_MATCH': {
+                    if (!this.ponteAbas) return { sucesso: false, fechadas: 0, acoesExecutadas: 0 };
+                    const repo = (this.dadosAutomate && this.dadosAutomate.repositorioObjetos) || {};
+                    const objVer = repo[passo.objetoVerificar] || null;
+                    const objAcao = repo[passo.objetoAcao] || null;
+                    const extrairSels = (o) => o
+                        ? (Array.isArray(o.seletores) ? o.seletores : (o.seletor ? [{ tipo: o.tipo || 'css', expressao: o.seletor }] : []))
+                        : [];
+                    const condExec = passo.variavelExecutarAcao
+                        ? Boolean(this.obterVariavel(passo.variavelExecutarAcao, true))
+                        : (passo.executarAcao !== false);
+                    const resp = await this.ponteAbas('AUTOMATE_EXECUTAR_EM_ABAS', {
+                        padraoUrl: this.interpolarTexto(String(passo.padraoUrl || ''), variaveisLocais),
+                        seletoresVerificar: extrairSels(objVer),
+                        regexExtrair: String(passo.regexExtrair || ''),
+                        textoEsperado: this.interpolarTexto(String(passo.textoEsperado || ''), variaveisLocais),
+                        modoMatch: passo.modoMatch || 'diferente',
+                        acaoNaAba: passo.acaoNaAba || 'clicar_e_fechar',
+                        seletoresAcao: extrairSels(objAcao),
+                        executarAcao: condExec,
+                        delayAposAcaoMs: Number(passo.delayAposAcaoMs) || 0,
+                        textoPreencher: this.interpolarTexto(String(passo.textoPreencher || ''), variaveisLocais)
+                    });
+                    if (passo.variavelFechadas) {
+                        this.definirVariavel(passo.variavelFechadas, Number(resp && resp.fechadas) || 0);
+                    }
+                    if (passo.variavelAcoes) {
+                        this.definirVariavel(passo.variavelAcoes, Number(resp && resp.acoesExecutadas) || 0);
+                    }
+                    return resp;
+                }
+
+                case 'DISPATCH_ACTION': {
+                    if (!this.ponteAbas) return null;
+                    const cmd = this.interpolarTexto(String(passo.comando || passo.acaoSw || ''), variaveisLocais);
+                    const payloadBruto = passo.payload && typeof passo.payload === 'object' ? passo.payload : {};
+                    const payload = {};
+                    Object.keys(payloadBruto).forEach((k) => {
+                        const v = payloadBruto[k];
+                        payload[k] = typeof v === 'string' ? this.interpolarTexto(v, variaveisLocais) : v;
+                    });
+                    const resp = await this.ponteAbas(cmd, payload);
+                    if (passo.variavelDestino) this.definirVariavel(passo.variavelDestino, resp);
+                    return resp;
+                }
+
                 case 'CALL_SUBFLOW': {
                     const nomeSub = String(passo.subfluxo || passo.nome || '').trim();
                     return this.executarSubfluxoPorNome(nomeSub, passo.parametros || variaveisLocais);
@@ -426,6 +561,74 @@
          * @param {Object} [variaveisLocais]
          * @returns {Promise<{sucesso: boolean, passosExecutados: number, ultimoResultado: any}>}
          */
+        /**
+         * Verifica se uma URL corresponde a pelo menos um padrao da lista `urlsAlvo` (suporta wildcard `*` e prefixo).
+         * Garante que comandos nunca rodem fora dos sites/contextos configurados.
+         * @param {string} urlAtual
+         * @param {string[]} urlsAlvo
+         * @returns {boolean}
+         */
+        urlCorrespondePadroes(urlAtual, urlsAlvo) {
+            const url = String(urlAtual || '').trim();
+            if (!url || !Array.isArray(urlsAlvo) || urlsAlvo.length === 0) return false;
+            return urlsAlvo.some((padraoBruto) => {
+                const padrao = String(padraoBruto || '').trim();
+                if (!padrao) return false;
+                if (padrao.indexOf('*') === -1) {
+                    return url.toLowerCase().startsWith(padrao.toLowerCase()) || url.toLowerCase().includes(padrao.toLowerCase());
+                }
+                try {
+                    const rxStr = '^' + padrao.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$';
+                    return new RegExp(rxStr, 'i').test(url);
+                } catch (_) {
+                    return false;
+                }
+            });
+        }
+
+        /**
+         * Executa todos os comandos ativos do Banco de Dados JSON (`comandosInternos` + `comandosUsuario`)
+         * que correspondam ao `gatilho` e cujo escopo `urlsAlvo` inclua `urlAtual`.
+         * @param {string} gatilho
+         * @param {string} urlAtual
+         * @param {Object} [variaveisIniciais]
+         * @returns {Promise<{executados: number, comandos: string[]}>}
+         */
+        async executarComandosPorGatilho(gatilho, urlAtual, variaveisIniciais = {}) {
+            if (!gatilho || !urlAtual) return { executados: 0, comandos: [] };
+            if (variaveisIniciais && typeof variaveisIniciais === 'object') {
+                Object.keys(variaveisIniciais).forEach((k) => this.definirVariavel(k, variaveisIniciais[k]));
+            }
+            const internos = Array.isArray(this.dadosAutomate && this.dadosAutomate.comandosInternos)
+                ? this.dadosAutomate.comandosInternos : [];
+            const usuario = Array.isArray(this.dadosAutomate && this.dadosAutomate.comandosUsuario)
+                ? this.dadosAutomate.comandosUsuario : [];
+            const todos = internos.concat(usuario);
+
+            const executados = [];
+            for (let i = 0; i < todos.length; i++) {
+                const cmd = todos[i];
+                if (!cmd || cmd.ativo === false) continue;
+                if (String(cmd.gatilho || '') !== String(gatilho)) continue;
+                if (!this.urlCorrespondePadroes(urlAtual, cmd.urlsAlvo)) continue;
+                const passos = Array.isArray(cmd.passos) ? cmd.passos : [];
+                if (passos.length === 0) continue;
+
+                const ctxAnterior = this.contextoAtivoId;
+                this.contextoAtivoId = String(cmd.contextoId || 'pje_trf1_1g');
+                if (variaveisIniciais && typeof variaveisIniciais === 'object') {
+                    Object.keys(variaveisIniciais).forEach((k) => this.definirVariavel(k, variaveisIniciais[k]));
+                }
+                this.registrarLog('ComandoBD', 'Executando comando [' + this.contextoAtivoId + ']: ' + (cmd.nome || cmd.id), { gatilho, urlAtual });
+                for (let j = 0; j < passos.length; j++) {
+                    await this.executarPassoDeclarativo(passos[j], variaveisIniciais);
+                }
+                this.contextoAtivoId = ctxAnterior;
+                executados.push(cmd.id || cmd.nome || ('cmd_' + i));
+            }
+            return { executados: executados.length, comandos: executados };
+        }
+
         async executarFluxoDeclarativo(idOuFluxo, variaveisLocais = {}) {
             const mapaFluxos = (this.dadosAutomate && this.dadosAutomate.fluxosDeclarativos) || {};
             const definicao = (typeof idOuFluxo === 'string') ? mapaFluxos[idOuFluxo] : idOuFluxo;
@@ -450,8 +653,29 @@
          * @param {Object} [parametros]
          * @returns {Promise<any>}
          */
+        _buscarSubfluxoCustomizadoBd(chave) {
+            if (!chave || !this.dadosAutomate) return null;
+            const ovr = this.dadosAutomate.comandosOverrides || {};
+            const internos = Array.isArray(this.dadosAutomate.comandosInternos) ? this.dadosAutomate.comandosInternos : [];
+            const usuario = Array.isArray(this.dadosAutomate.comandosUsuario) ? this.dadosAutomate.comandosUsuario : [];
+            const cmdUsr = usuario.find((c) => c && (c.id === chave || c.nomePad === chave || c.nome === chave));
+            if (cmdUsr && Array.isArray(cmdUsr.passos)) return cmdUsr;
+            const cmdInt = internos.find((c) => c && (c.id === chave || c.nomePad === chave));
+            if (cmdInt && ovr[cmdInt.id] && Array.isArray(cmdInt.passos)) return cmdInt;
+            return null;
+        }
+
         async executarSubfluxoPorNome(nomeSubfluxo, parametros = {}) {
             const chave = String(nomeSubfluxo || '').trim();
+            const customBd = this._buscarSubfluxoCustomizadoBd(chave);
+            if (customBd && !parametros.__ignorarOverrideBd) {
+                const paramsInternos = Object.assign({}, parametros, { __ignorarOverrideBd: true });
+                let ult = null;
+                for (let i = 0; i < customBd.passos.length; i++) {
+                    ult = await this.executarPassoDeclarativo(customBd.passos[i], paramsInternos);
+                }
+                return ult;
+            }
             switch (chave) {
                 case 'ValoresPadrão':
                 case 'valoresPadrao':

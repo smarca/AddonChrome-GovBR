@@ -306,6 +306,7 @@
     /* Passo 1.2: Variaveis de controle de estado monomorficas em tempo real */
     let modoExecucao = 'global';
     let listaUrlsPermitidas = [];
+    let listaUrlsExcecoes = ['*://*/*jogos*', '*://*/*games*', '*://*jogos*/*', '*://*games*/*'];
     let manterFormatacaoBasica = false;
     let nivelFiltroFormatacao = 'basico';
     let padronizarFonteCopiaAtivo = false;
@@ -761,7 +762,7 @@
 
     /* Delegação Modular (ENG-00 / ARQ-10): Escopo de URL, Contexto Editável e Proteção DOM (src/lib/lib-escopo-url.js) */
     const gerenciadorEscopoUrl = (typeof window !== 'undefined' && typeof window.JusGovLibEscopoUrl === 'function')
-        ? new window.JusGovLibEscopoUrl({ modoExecucao, listaUrlsPermitidas })
+        ? new window.JusGovLibEscopoUrl({ modoExecucao, listaUrlsPermitidas, listaUrlsExcecoes })
         : ((typeof window !== 'undefined' && window.JusGovLibEscopoUrl && window.JusGovLibEscopoUrl.NULL_OBJECT) || {
             aplicarConfig: () => false,
             verificarUrlPermitida: () => false,
@@ -772,7 +773,7 @@
         });
 
     function verificarUrlPermitida() {
-        return gerenciadorEscopoUrl.verificarUrlPermitida(modoExecucao, listaUrlsPermitidas);
+        return gerenciadorEscopoUrl.verificarUrlPermitida(modoExecucao, listaUrlsPermitidas, listaUrlsExcecoes);
     }
 
     function ehDocumentoEditorRicoIsolado(docRef = null) {
@@ -784,7 +785,7 @@
     }
 
     function sincronizarProtecaoLeituraDom() {
-        return gerenciadorEscopoUrl.sincronizarProtecaoLeituraDom(modoExecucao, listaUrlsPermitidas);
+        return gerenciadorEscopoUrl.sincronizarProtecaoLeituraDom(modoExecucao, listaUrlsPermitidas, listaUrlsExcecoes);
     }
 
     /*
@@ -3303,7 +3304,8 @@
         if (Array.isArray(cfg.regrasMapeamentoElementos)) definirRegrasMapeamentoElementos(cfg.regrasMapeamentoElementos);
         if (cfg.modoTurbo) modoExecucao = cfg.modoTurbo;
         if (Array.isArray(cfg.urlsTurbo)) listaUrlsPermitidas = cfg.urlsTurbo;
-        if (cfg.modoTurbo || Array.isArray(cfg.urlsTurbo)) sincronizarProtecaoLeituraDom();
+        if (Array.isArray(cfg.urlsTurboExcecoes)) listaUrlsExcecoes = cfg.urlsTurboExcecoes;
+        if (cfg.modoTurbo || Array.isArray(cfg.urlsTurbo) || Array.isArray(cfg.urlsTurboExcecoes)) sincronizarProtecaoLeituraDom();
         if (typeof cfg.manterFormatacaoBasica === 'boolean') manterFormatacaoBasica = cfg.manterFormatacaoBasica;
         if (typeof cfg.nivelFiltroFormatacao === 'string' && ['texto_puro', 'basico', 'intermediario', 'avancado', 'estendido', 'sem_filtro'].includes(cfg.nivelFiltroFormatacao)) {
             nivelFiltroFormatacao = cfg.nivelFiltroFormatacao;

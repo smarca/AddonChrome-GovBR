@@ -402,7 +402,70 @@
                 if (respMock) return respMock;
             }
 
+            const modosSelecao = (Array.isArray(opcoesSchema.modosSelecao) && opcoesSchema.modosSelecao.length > 0)
+                ? opcoesSchema.modosSelecao
+                : [
+                    { titulo: 'Manualmente (Sem Movimentar)', valor: 'Silente' },
+                    { titulo: 'Manualmente (Movimentando)', valor: 'Manual' },
+                    { titulo: 'Automáticamente (Primeiro Visível)', valor: 'Visivel' },
+                    { titulo: 'Sequencial (desde o #º Processo da Lista)', valor: 'Sequencial' },
+                    { titulo: 'Sequencial (Loop)', valor: 'Loop' }
+                ];
+
+            const listaTp1 = (Array.isArray(opcoesSchema.etiquetasRemoverTp1) && opcoesSchema.etiquetasRemoverTp1.length > 0)
+                ? opcoesSchema.etiquetasRemoverTp1
+                : [
+                    { titulo: 'Contestação; Réplica', valor: '.?A.? Contestação; .?A.? Réplica' },
+                    { titulo: 'Convertido; Aditamento; Emenda', valor: '.?A.? Convertido; .?A.? Aditamento; .?A.? Emenda' },
+                    { titulo: 'Análise Tutela', valor: 'Análise Tutela' },
+                    { titulo: 'Aguardando Assinatura', valor: 'Aguardando Assinatura' }
+                ];
+
+            const listaTp2 = (Array.isArray(opcoesSchema.etiquetasRemoverTp2) && opcoesSchema.etiquetasRemoverTp2.length > 0)
+                ? opcoesSchema.etiquetasRemoverTp2
+                : [
+                    { titulo: 'Citar; Intimar; Notificar', valor: 'Citar; Intimar; Notificar' },
+                    { titulo: 'Concluir; Correções; Homologar; Proposta; Após', valor: 'Concluir; Correções; Homologar; Proposta; Ap(o|ó)s' }
+                ];
+
+            const listaTp3 = (Array.isArray(opcoesSchema.etiquetasRemoverTp3) && opcoesSchema.etiquetasRemoverTp3.length > 0)
+                ? opcoesSchema.etiquetasRemoverTp3
+                : [
+                    { titulo: 'Dist; Perito', valor: 'Dist.; Perit(o|a)' },
+                    { titulo: 'Evoluir; Expedir; Minutar; Analisar', valor: 'Evoluir; Expedir; Minutar; Analisar' },
+                    { titulo: 'Designar; Arquivar; Certificar; Remeter', valor: 'Designar; Arquivar; Certificar; Remeter; Reme(ç|c)a Necess(á|a)ria' },
+                    { titulo: 'Pré Arquivamento (diversos)', valor: 'laudo|pauta|correç|pedido|prevenção|multirão|perícia|suspens|impugna' }
+                ];
+
+            const padraoTp1Str = listaTp1.map(x => x.valor).join(', ');
+            const padraoTp2Str = listaTp2.map(x => x.valor).join(', ');
+            const padraoTp3Str = listaTp3.map(x => x.valor).join(', ');
+
+            const nomeEtqEntrada = String(valoresAtuais.v_EtiquetaEntrada || 'Relatório Silmar').trim() || 'Relatório Silmar';
+            const nomeEtqSaida = String(valoresAtuais.v_EtiquetaSaida || 'Silmar TMP').trim() || 'Silmar TMP';
+
             const padraoRetorno = {
+                Selecionar: valoresAtuais.v_CFGSelecionar || 'Sequencial',
+                PrimeiroPlano: valoresAtuais.v_CFGPrimeiroPlano !== undefined ? Boolean(valoresAtuais.v_CFGPrimeiroPlano) : true,
+                EtqtListaRemoverTp0Txt: valoresAtuais.v_CFGEtqtListaRemoverTp0Txt !== undefined
+                    ? String(valoresAtuais.v_CFGEtqtListaRemoverTp0Txt)
+                    : '[A] Decisão CNJ - Prazo Suspenso AGU',
+                EtqtListaRemoverTp1Lista: valoresAtuais.v_CFGEtqtListaRemoverTp1Lista !== undefined
+                    ? String(valoresAtuais.v_CFGEtqtListaRemoverTp1Lista)
+                    : padraoTp1Str,
+                EtqtListaRemoverTp2Lista: valoresAtuais.v_CFGEtqtListaRemoverTp2Lista !== undefined
+                    ? String(valoresAtuais.v_CFGEtqtListaRemoverTp2Lista)
+                    : padraoTp2Str,
+                EtqtListaRemoverTp3Lista: valoresAtuais.v_CFGEtqtListaRemoverTp3Lista !== undefined
+                    ? String(valoresAtuais.v_CFGEtqtListaRemoverTp3Lista)
+                    : padraoTp3Str,
+                EtqtListaIncluir1: valoresAtuais.v_CFGEtqtListaIncluir1 !== undefined ? String(valoresAtuais.v_CFGEtqtListaIncluir1) : '',
+                EtqtListaIncluir2: valoresAtuais.v_CFGEtqtListaIncluir2 !== undefined ? String(valoresAtuais.v_CFGEtqtListaIncluir2) : '',
+                EtiquetaEntrada: valoresAtuais.v_CFGEtiquetaEntrada !== undefined ? Boolean(valoresAtuais.v_CFGEtiquetaEntrada) : false,
+                EtiquetaSaida: valoresAtuais.v_CFGEtiquetaSaida !== undefined ? Boolean(valoresAtuais.v_CFGEtiquetaSaida) : true,
+                EtiquetaControleExcludente: valoresAtuais.v_CFGEtiquetaControleExcludente !== undefined ? Boolean(valoresAtuais.v_CFGEtiquetaControleExcludente) : false,
+                MarcarLidosDocsAutos: valoresAtuais.v_CFGMarcarLidosDocsAutos !== undefined ? Boolean(valoresAtuais.v_CFGMarcarLidosDocsAutos) : true,
+                PrazosEmAbertoVerf: valoresAtuais.v_CFGPrazosEmAbertoVerf !== undefined ? Boolean(valoresAtuais.v_CFGPrazosEmAbertoVerf) : false,
                 f_CFG_TarefaSequencia: valoresAtuais.v_CFGTarefaSequencia || 'Ler e Movimentar',
                 f_CFG_QtdPagsSequencia: String(valoresAtuais.v_CFGQtdPagsSequencia || '1'),
                 f_CFG_AutosLista: valoresAtuais.v_CFGAutosLista || 'Sentença, Decisão, Despacho, Acórdão',
@@ -413,211 +476,217 @@
             };
 
             if (!this.documentoRaiz || !this.documentoRaiz.body) {
-                return { ButtonPressed: 'Ok', valores: padraoRetorno };
+                return { ButtonPressed: 'OK', valores: padraoRetorno };
             }
 
             return new Promise((resolve) => {
-                const ui = this._criarOverlayBase('Automação de Tarefas — Configuração');
+                const ui = this._criarOverlayBase('Parametros');
                 if (!ui) {
-                    resolve({ ButtonPressed: 'Ok', valores: padraoRetorno });
+                    resolve({ ButtonPressed: 'OK', valores: padraoRetorno });
                     return;
                 }
 
                 const docModal = (ui.overlay && ui.overlay.ownerDocument) || this._obterDocumentoRaizUi() || document;
-                const contextosLista = Array.isArray(opcoesSchema.contextosDisponiveis) && opcoesSchema.contextosDisponiveis.length > 0
-                    ? opcoesSchema.contextosDisponiveis
-                    : [
-                        { id: 'navegador_geral', nome: 'Navegador — Automação Geral', dominios: [], autoAtivar: false },
-                        { id: 'pje_padrao', nome: '↳ PJe — Tarefas e Autos Digitais', dominios: ['*.pje.jus.br', '*pje*.jus.br', 'frontend.prd.cnj.cloud', 'sso.cloud.pje.jus.br'], autoAtivar: false }
-                    ];
-                const ctxInicialId = opcoesSchema.contextoAtivoId || contextosLista[0].id;
-                const ctxInicialObj = contextosLista.find(c => c.id === ctxInicialId) || contextosLista[0];
 
-                const grade = docModal.createElement('div');
-                grade.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px;align-items:end;';
+                ui.card.style.cssText = [
+                    'background:#ffffff', 'border-radius:4px', 'box-shadow:0 12px 32px rgba(0,0,0,0.34)',
+                    'width:min(368px,95vw)', 'max-height:92vh', 'display:flex', 'flex-direction:column',
+                    'overflow:hidden', 'border:1px solid #94a3b8',
+                    'font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif',
+                    'font-size:12.5px', 'color:#111827'
+                ].join(';');
 
-                const boxContexto = docModal.createElement('div');
-                boxContexto.style.cssText = 'grid-column:1 / -1;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;display:grid;grid-template-columns:1fr 1.15fr;gap:5px 8px;align-items:center;';
+                ui.header.style.cssText = [
+                    'background:#ffffff', 'color:#475569', 'padding:7px 10px 6px 10px',
+                    'font-weight:400', 'font-size:12.5px', 'display:flex',
+                    'align-items:center', 'justify-content:space-between', 'gap:8px',
+                    'border-bottom:1px solid #e5e7eb', 'user-select:none'
+                ].join(';');
 
-                const wrapCtx = docModal.createElement('div');
-                wrapCtx.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0;';
-                const lblCtx = docModal.createElement('label');
-                lblCtx.textContent = 'Contexto Hierárquico / Site:';
-                lblCtx.style.cssText = 'font-weight:700;font-size:10.5px;color:#0f172a;';
-                const selContexto = docModal.createElement('select');
-                selContexto.style.cssText = 'padding:3px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;background:#fff;width:100%;box-sizing:border-box;';
-                contextosLista.forEach((c) => {
+                while (ui.header.firstChild) ui.header.removeChild(ui.header.firstChild);
+                const tituloWrap = docModal.createElement('div');
+                tituloWrap.style.cssText = 'display:inline-flex;align-items:center;gap:7px;';
+                const iconePad = docModal.createElement('span');
+                iconePad.textContent = '❯';
+                iconePad.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#ffffff;font-size:11px;font-weight:700;line-height:1;';
+                const txtTitulo = docModal.createElement('span');
+                txtTitulo.textContent = 'Parametros';
+                txtTitulo.style.cssText = 'color:#64748b;font-size:12.5px;font-weight:400;';
+                tituloWrap.appendChild(iconePad);
+                tituloWrap.appendChild(txtTitulo);
+
+                const btnFecharTopo = docModal.createElement('button');
+                btnFecharTopo.type = 'button';
+                btnFecharTopo.textContent = '×';
+                btnFecharTopo.title = 'Fechar';
+                btnFecharTopo.style.cssText = 'background:transparent;border:none;color:#64748b;font-size:18px;line-height:1;padding:0 5px;cursor:pointer;';
+                ui.header.appendChild(tituloWrap);
+                ui.header.appendChild(btnFecharTopo);
+
+                ui.corpo.style.cssText = 'padding:8px 14px 6px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:0;background:#ffffff;';
+
+                const criarSeparador = () => {
+                    const hr = docModal.createElement('div');
+                    hr.style.cssText = 'height:1px;background:#6b7280;opacity:0.55;margin:6px 0 5px 0;width:100%;flex-shrink:0;';
+                    ui.corpo.appendChild(hr);
+                };
+
+                const criarTituloSecao = (texto, margemTopo = 0) => {
+                    const div = docModal.createElement('div');
+                    div.textContent = texto;
+                    div.style.cssText = `font-size:12.5px;font-weight:400;color:#111827;margin:${margemTopo}px 0 3px 0;line-height:1.25;`;
+                    ui.corpo.appendChild(div);
+                    return div;
+                };
+
+                const criarCheckboxLinha = (texto, marcadoInicial, margemInferior = 2) => {
+                    const lbl = docModal.createElement('label');
+                    lbl.style.cssText = `display:flex;align-items:center;gap:6px;font-size:12.5px;color:#111827;cursor:pointer;margin:1px 0 ${margemInferior}px 0;line-height:1.3;user-select:none;`;
+                    const chk = docModal.createElement('input');
+                    chk.type = 'checkbox';
+                    chk.checked = Boolean(marcadoInicial);
+                    chk.style.cssText = 'margin:0;width:14px;height:14px;cursor:pointer;accent-color:#111827;flex-shrink:0;';
+                    const sp = docModal.createElement('span');
+                    sp.textContent = texto;
+                    lbl.appendChild(chk);
+                    lbl.appendChild(sp);
+                    ui.corpo.appendChild(lbl);
+                    return chk;
+                };
+
+                const itemEstaMarcado = (valorItem, strSalva) => {
+                    const s = String(strSalva || '');
+                    if (!s) return false;
+                    return s.includes(valorItem);
+                };
+
+                criarTituloSecao('Como selecionar o processo?', 2);
+                const selSelecionar = docModal.createElement('select');
+                selSelecionar.style.cssText = 'width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #9ca3af;border-radius:2px;font-size:12.5px;background:#f3f4f6;color:#111827;margin-bottom:4px;font-family:inherit;';
+                modosSelecao.forEach((op) => {
                     const opt = docModal.createElement('option');
-                    opt.value = c.id;
-                    opt.textContent = c.nome || c.id;
-                    if (c.id === ctxInicialId) opt.selected = true;
-                    selContexto.appendChild(opt);
+                    opt.value = op.valor;
+                    opt.textContent = op.titulo;
+                    if (String(op.valor) === String(padraoRetorno.Selecionar)) opt.selected = true;
+                    selSelecionar.appendChild(opt);
                 });
-                wrapCtx.appendChild(lblCtx);
-                wrapCtx.appendChild(selContexto);
+                ui.corpo.appendChild(selSelecionar);
 
-                const wrapDom = docModal.createElement('div');
-                wrapDom.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0;';
-                const lblDom = docModal.createElement('label');
-                lblDom.textContent = 'Domínios p/ auto-ativar (vírgula):';
-                lblDom.style.cssText = 'font-weight:600;font-size:10.5px;color:#334155;';
-                const rowDom = docModal.createElement('div');
-                rowDom.style.cssText = 'display:flex;align-items:center;gap:5px;';
-                const inpDominios = docModal.createElement('input');
-                inpDominios.type = 'text';
-                inpDominios.value = Array.isArray(ctxInicialObj.dominios) ? ctxInicialObj.dominios.join(', ') : '';
-                inpDominios.placeholder = 'Ex.: *.pje.jus.br, sistema.gov.br';
-                inpDominios.style.cssText = 'flex:1;min-width:0;padding:3px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;';
-                const lblAutoDom = docModal.createElement('label');
-                lblAutoDom.title = 'Habilitar automaticamente este contexto ao acessar os domínios indicados';
-                lblAutoDom.style.cssText = 'display:inline-flex;align-items:center;gap:3px;font-size:10.5px;color:#0f172a;white-space:nowrap;cursor:pointer;';
-                const chkAutoDom = docModal.createElement('input');
-                chkAutoDom.type = 'checkbox';
-                chkAutoDom.checked = Boolean(ctxInicialObj.autoAtivar);
-                chkAutoDom.style.cssText = 'margin:0;cursor:pointer;';
-                lblAutoDom.appendChild(chkAutoDom);
-                lblAutoDom.appendChild(docModal.createTextNode('Auto'));
-                rowDom.appendChild(inpDominios);
-                rowDom.appendChild(lblAutoDom);
-                wrapDom.appendChild(lblDom);
-                wrapDom.appendChild(rowDom);
+                const chkPrimeiroPlano = criarCheckboxLinha('Escolher Movimentação na Janela Principal?', padraoRetorno.PrimeiroPlano, 1);
 
-                selContexto.addEventListener('change', () => {
-                    const escolhido = contextosLista.find(c => c.id === selContexto.value);
-                    if (escolhido) {
-                        inpDominios.value = Array.isArray(escolhido.dominios) ? escolhido.dominios.join(', ') : '';
-                        chkAutoDom.checked = Boolean(escolhido.autoAtivar);
+                criarSeparador();
+                criarTituloSecao('Lista de Etiquetas pra Remover Tp0 (sempre):');
+                const inpTp0 = docModal.createElement('input');
+                inpTp0.type = 'text';
+                inpTp0.value = padraoRetorno.EtqtListaRemoverTp0Txt;
+                inpTp0.style.cssText = 'width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #9ca3af;border-radius:2px;font-size:12.5px;background:#ffffff;color:#111827;margin-bottom:2px;font-family:inherit;';
+                ui.corpo.appendChild(inpTp0);
+
+                criarSeparador();
+                criarTituloSecao('Lista de Etiquetas pra Remover Tp1:');
+                const checksTp1 = listaTp1.map((item) => ({
+                    valor: item.valor,
+                    chk: criarCheckboxLinha(item.titulo, itemEstaMarcado(item.valor, padraoRetorno.EtqtListaRemoverTp1Lista))
+                }));
+
+                criarSeparador();
+                criarTituloSecao('Lista de Etiquetas pra Remover Tp2:');
+                const checksTp2 = listaTp2.map((item) => ({
+                    valor: item.valor,
+                    chk: criarCheckboxLinha(item.titulo, itemEstaMarcado(item.valor, padraoRetorno.EtqtListaRemoverTp2Lista))
+                }));
+
+                criarSeparador();
+                criarTituloSecao('Lista de Etiquetas pra Remover Tp3:');
+                const checksTp3 = listaTp3.map((item) => ({
+                    valor: item.valor,
+                    chk: criarCheckboxLinha(item.titulo, itemEstaMarcado(item.valor, padraoRetorno.EtqtListaRemoverTp3Lista))
+                }));
+
+                criarSeparador();
+                criarTituloSecao('Lista de Etiquetas pra Incluir:');
+                const chkIncluirInterrog = criarCheckboxLinha('?', String(padraoRetorno.EtqtListaIncluir1 || '').includes('?'), 3);
+                const inpIncluir2 = docModal.createElement('input');
+                inpIncluir2.type = 'text';
+                inpIncluir2.value = padraoRetorno.EtqtListaIncluir2;
+                inpIncluir2.style.cssText = 'width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #9ca3af;border-radius:2px;font-size:12.5px;background:#ffffff;color:#111827;margin-bottom:2px;font-family:inherit;';
+                ui.corpo.appendChild(inpIncluir2);
+
+                criarSeparador();
+                criarTituloSecao('Marcas de Controle:');
+                const chkEntrada = criarCheckboxLinha(`Entrada: ${nomeEtqEntrada}`, padraoRetorno.EtiquetaEntrada, 3);
+                const chkSaida = criarCheckboxLinha(`Saída: ${nomeEtqSaida}`, padraoRetorno.EtiquetaSaida, 3);
+                const chkExcludentes = criarCheckboxLinha('Entrada/Saída excludentes?', padraoRetorno.EtiquetaControleExcludente, 2);
+
+                criarSeparador();
+                const chkMarcarLidos = criarCheckboxLinha('Ao ler autos, marcar documentos como Lidos?', padraoRetorno.MarcarLidosDocsAutos, 3);
+                const chkVerificarPrazos = criarCheckboxLinha('Verificar Prazos em Aberto?', padraoRetorno.PrazosEmAbertoVerf, 2);
+
+                ui.rodape.style.cssText = 'padding:8px 14px 12px 14px;background:#ffffff;border-top:none;display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+
+                const coletarValores = () => {
+                    const tp1Sel = checksTp1.filter(x => x.chk.checked).map(x => x.valor).join(', ');
+                    const tp2Sel = checksTp2.filter(x => x.chk.checked).map(x => x.valor).join(', ');
+                    const tp3Sel = checksTp3.filter(x => x.chk.checked).map(x => x.valor).join(', ');
+                    return {
+                        Selecionar: selSelecionar.value,
+                        PrimeiroPlano: chkPrimeiroPlano.checked,
+                        EtqtListaRemoverTp0Txt: inpTp0.value,
+                        EtqtListaRemoverTp1Lista: tp1Sel,
+                        EtqtListaRemoverTp2Lista: tp2Sel,
+                        EtqtListaRemoverTp3Lista: tp3Sel,
+                        EtqtListaIncluir1: chkIncluirInterrog.checked ? '?' : '',
+                        EtqtListaIncluir2: inpIncluir2.value,
+                        EtiquetaEntrada: chkEntrada.checked,
+                        EtiquetaSaida: chkSaida.checked,
+                        EtiquetaControleExcludente: chkExcludentes.checked,
+                        MarcarLidosDocsAutos: chkMarcarLidos.checked,
+                        PrazosEmAbertoVerf: chkVerificarPrazos.checked
+                    };
+                };
+
+                const aoTeclaEsc = (ev) => {
+                    if (ev.key === 'Escape') {
+                        ev.preventDefault();
+                        finalizar('Cancel');
                     }
-                });
-
-                boxContexto.appendChild(wrapCtx);
-                boxContexto.appendChild(wrapDom);
-                grade.appendChild(boxContexto);
-
-                const criarCampoSelect = (rotulo, opcoesLista, valorInicial, colSpanFull = false) => {
-                    const wrap = docModal.createElement('div');
-                    wrap.style.cssText = `display:flex;flex-direction:column;gap:2px;min-width:0;${colSpanFull ? 'grid-column:1 / -1;' : ''}`;
-                    const lbl = docModal.createElement('label');
-                    lbl.textContent = rotulo;
-                    lbl.style.cssText = 'font-weight:600;font-size:11px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-                    const sel = docModal.createElement('select');
-                    sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11.5px;width:100%;box-sizing:border-box;background:#fff;';
-                    (opcoesLista || []).forEach((op) => {
-                        const opt = docModal.createElement('option');
-                        const val = typeof op === 'object' ? op.valor : String(op);
-                        const txt = typeof op === 'object' ? op.titulo : String(op);
-                        opt.value = val;
-                        opt.textContent = txt;
-                        if (String(val) === String(valorInicial)) opt.selected = true;
-                        sel.appendChild(opt);
-                    });
-                    wrap.appendChild(lbl);
-                    wrap.appendChild(sel);
-                    grade.appendChild(wrap);
-                    return sel;
                 };
-
-                const criarCampoInput = (rotulo, valorInicial, placeholder = '', colSpanFull = false) => {
-                    const wrap = docModal.createElement('div');
-                    wrap.style.cssText = `display:flex;flex-direction:column;gap:2px;min-width:0;${colSpanFull ? 'grid-column:1 / -1;' : ''}`;
-                    const lbl = docModal.createElement('label');
-                    lbl.textContent = rotulo;
-                    lbl.style.cssText = 'font-weight:600;font-size:11px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-                    const inp = docModal.createElement('input');
-                    inp.type = 'text';
-                    inp.value = valorInicial || '';
-                    inp.placeholder = placeholder;
-                    inp.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:11.5px;width:100%;box-sizing:border-box;';
-                    wrap.appendChild(lbl);
-                    wrap.appendChild(inp);
-                    grade.appendChild(wrap);
-                    return inp;
-                };
-
-                const selSequencia = criarCampoSelect(
-                    '1. Tarefas em Sequência?',
-                    opcoesSchema.tarefaSequencia || ['Não, Parar na Primeira', 'Ler e Movimentar', 'Apenas Movimentar'],
-                    padraoRetorno.f_CFG_TarefaSequencia
-                );
-                const selPaginas = criarCampoSelect(
-                    'Páginas em sequência:',
-                    opcoesSchema.qtdPagsSequencia || ['1', '2', '3', '5', '10', '20', '99999999999'],
-                    padraoRetorno.f_CFG_QtdPagsSequencia
-                );
-                const selAutosLista = criarCampoSelect(
-                    '2. Autos — Abrir Documentos:',
-                    opcoesSchema.autosLista || [
-                        'Sentença, Decisão, Despacho, Acórdão',
-                        'Petição, Manifestação, Contestação, Impugnação, Apelação, Recurso, Contrarrazões',
-                        'Certidão, Intimação, Citação',
-                        'Nenhum'
-                    ],
-                    padraoRetorno.f_CFG_AutosLista
-                );
-                const selAutosSoma = criarCampoSelect(
-                    'Abrir Mais:',
-                    opcoesSchema.autosSoma || ['Nenhum', 'Perícia, Laudo', 'Cálculos, Planilha, Contadoria'],
-                    padraoRetorno.f_CFG_AutosSoma
-                );
-                const inpTermo = criarCampoInput(
-                    'Termos adicionais (Autos):',
-                    padraoRetorno.f_CFG_TermoPesquisa,
-                    'Ex.: Laudo, Decisão'
-                );
-                const selEtiqueta = criarCampoSelect(
-                    '3. Etiquetar Autom.?',
-                    ['True', 'False'],
-                    padraoRetorno.f_CFG_EtiquetaAuto
-                );
-                const selMovimentar = criarCampoSelect(
-                    '4. Movimentar o Processo:',
-                    opcoesSchema.movimentarOpcoes || [
-                        'Perguntar, com Sugestão Padrão',
-                        'Sempre Perguntar',
-                        'Automatico, se Houver Padrão',
-                        '- Nao Movimentar, Só Tarefas'
-                    ],
-                    padraoRetorno.f_CFG_Movimentar,
-                    true
-                );
-
-                ui.corpo.appendChild(grade);
 
                 const finalizar = (botao) => {
-                    const valores = {
-                        f_CFG_ContextoId: selContexto.value,
-                        f_CFG_DominiosAutoAtivacao: inpDominios.value,
-                        f_CFG_AutoAtivarDominio: chkAutoDom.checked,
-                        f_CFG_TarefaSequencia: selSequencia.value,
-                        f_CFG_QtdPagsSequencia: selPaginas.value,
-                        f_CFG_AutosLista: selAutosLista.value,
-                        f_CFG_AutosSoma: selAutosSoma.value,
-                        f_CFG_TermoPesquisa: inpTermo.value,
-                        f_CFG_EtiquetaAuto: selEtiqueta.value,
-                        f_CFG_Movimentar: selMovimentar.value
-                    };
+                    docModal.removeEventListener('keydown', aoTeclaEsc);
+                    const valores = coletarValores();
                     this.fecharDialogoAtivo();
                     resolve({ ButtonPressed: botao, valores });
                 };
 
-                if (ui.btnFecharTopo) {
-                    ui.btnFecharTopo.addEventListener('click', () => finalizar('Cancel'));
-                }
+                docModal.addEventListener('keydown', aoTeclaEsc);
+                btnFecharTopo.addEventListener('click', () => finalizar('Cancel'));
 
-                const btnCancel = docModal.createElement('button');
-                btnCancel.type = 'button';
-                btnCancel.textContent = 'Cancelar';
-                btnCancel.style.cssText = 'background:#e2e8f0;color:#1e293b;border:none;padding:5px 12px;border-radius:5px;font-size:11.5px;cursor:pointer;';
-                btnCancel.addEventListener('click', () => finalizar('Cancel'));
+                const estiloBtnPad = [
+                    'background:#e5e7eb', 'color:#111827', 'border:1px solid #9ca3af',
+                    'border-radius:2px', 'padding:7px 10px', 'font-size:13.5px',
+                    'font-weight:400', 'cursor:pointer', 'width:100%', 'box-sizing:border-box',
+                    'font-family:inherit'
+                ].join(';');
 
-                const btnOk = docModal.createElement('button');
-                btnOk.type = 'button';
-                btnOk.textContent = 'Confirmar';
-                btnOk.style.cssText = 'background:#2563eb;color:#fff;border:none;padding:5px 12px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:600;';
-                btnOk.addEventListener('click', () => finalizar('Ok'));
+                const btnAutomatizar = docModal.createElement('button');
+                btnAutomatizar.type = 'button';
+                btnAutomatizar.textContent = 'Automatizar';
+                btnAutomatizar.style.cssText = estiloBtnPad;
+                btnAutomatizar.addEventListener('mouseenter', () => { btnAutomatizar.style.background = '#d1d5db'; });
+                btnAutomatizar.addEventListener('mouseleave', () => { btnAutomatizar.style.background = '#e5e7eb'; });
+                btnAutomatizar.addEventListener('click', () => finalizar('OK'));
 
-                ui.rodape.appendChild(btnCancel);
-                ui.rodape.appendChild(btnOk);
+                const btnSilente = docModal.createElement('button');
+                btnSilente.type = 'button';
+                btnSilente.textContent = 'Silente';
+                btnSilente.style.cssText = estiloBtnPad;
+                btnSilente.addEventListener('mouseenter', () => { btnSilente.style.background = '#d1d5db'; });
+                btnSilente.addEventListener('mouseleave', () => { btnSilente.style.background = '#e5e7eb'; });
+                btnSilente.addEventListener('click', () => finalizar('Silente'));
+
+                ui.rodape.appendChild(btnAutomatizar);
+                ui.rodape.appendChild(btnSilente);
             });
         }
     }

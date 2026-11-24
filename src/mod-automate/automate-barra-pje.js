@@ -49,20 +49,125 @@
         }
 
         /**
-         * Abre diretamente o dialogo compacto de configuracao de execucao e contextos (`DialogoCFG`).
+         * Abre diretamente o dialogo `Parametros` (`DialogoCFG`), persiste as configuracoes e inicia o monitoramento
+         * quando o usuario confirma com `Automatizar` ou `Silente`.
          * @returns {Promise<Object>}
          */
         async abrirDialogoConfiguracao() {
+            // Ao chamar Config, para automaticamente qualquer execucao/monitoramento ativo
+            if (this.monitorAtivo || (this.motorFluxo && this.motorFluxo.emExecucao)) {
+                if (typeof this.pararMonitorAutomacao === 'function') {
+                    this.pararMonitorAutomacao();
+                }
+                this.abortarExecucao();
+                this._statusBarraTexto = 'Parado';
+                this._statusBarraDetalhe = 'Pausado para configuração';
+                this.renderizarOuRemoverBarraControlePje(true);
+            }
             await this.carregarDadosDeclarativos();
             if (!this.motorFluxo) {
                 return { confirmado: false, motivo: 'MOTOR_INDISPONIVEL' };
             }
+            await this._carregarParametrosStorage();
             const res = await this.motorFluxo.dialogoCfg();
-            if (res && res.confirmado && Array.isArray(this.dadosAutomate && this.dadosAutomate.contextosAutomacao)) {
-                this._persistirOverridesContextosStorage();
+            if (res && res.confirmado) {
+                this._persistirParametrosStorage();
+                if (Array.isArray(this.dadosAutomate && this.dadosAutomate.contextosAutomacao)) {
+                    this._persistirOverridesContextosStorage();
+                }
+                const modoEscolhido = res.modoBotao === 'Silente'
+                    ? 'Silente'
+                    : String(this.motorFluxo.obterVariavel('v_CFGSelecionar', 'Sequencial'));
+                // Ao confirmar Config (Automatizar/Silente), da play automatico
+                if (typeof this.iniciarMonitorAutomacao === 'function') {
+                    this.iniciarMonitorAutomacao(modoEscolhido);
+                }
+                this._statusBarraTexto = modoEscolhido === 'Silente' ? 'Silente ●' : `${modoEscolhido} ●`;
+                this._statusBarraDetalhe = `Modo ativo: ${modoEscolhido} — aguardando seleção de novo processo`;
                 this.renderizarOuRemoverBarraControlePje(true);
             }
             return res;
+        }
+
+        /**
+         * Carrega os parametros salvos de `Parametros` (`v_CFG*`) do chrome.storage.local para o motorFluxo.
+         * @private
+         */
+        async _carregarParametrosStorage() {
+            if (!this.motorFluxo || typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+            try {
+                const res = await chrome.storage.local.get(['jusgovAutomateParametrosCfg']);
+                const salvo = res && res.jusgovAutomateParametrosCfg;
+                if (salvo && typeof salvo === 'object') {
+                    this.motorFluxo.importarEstadoVariaveis(salvo, false);
+                }
+            } catch (_) { }
+        }
+
+        /**
+         * Persiste os parametros atuais (`v_CFG*`, `v_EtiquetaExcluirTp*`, `v_IncluirEtiqueta`) em chrome.storage.local.
+         * @private
+         */
+        _persistirParametrosStorage() {
+            if (!this.motorFluxo || typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+            const chaves = [
+                'v_CFGSelecionar', 'v_CFGPrimeiroPlano', 'v_CFGMarcarLidosDocsAutos', 'v_CFGPrazosEmAbertoVerf',
+                'v_CFGEtiquetaEntrada', 'v_CFGEtiquetaSaida', 'v_CFGEtiquetaControleExcludente',
+                'v_CFGEtqtListaRemoverTp0Txt', 'v_CFGEtqtListaRemoverTp1Lista', 'v_CFGEtqtListaRemoverTp2Lista',
+                'v_CFGEtqtListaRemoverTp3Lista', 'v_CFGEtqtListaIncluir1', 'v_CFGEtqtListaIncluir2',
+                'v_EtiquetaEntrada', 'v_EtiquetaSaida', 'v_EtiquetaExcluirTp0', 'v_EtiquetaExcluirTp1',
+                'v_EtiquetaExcluirTp2', 'v_EtiquetaExcluirTp3', 'v_IncluirEtiqueta'
+            ];
+            const dadosSalvar = {};
+            for (let i = 0; i < chaves.length; i++) {
+                const k = chaves[i];
+                const val = this.motorFluxo.obterVariavel(k);
+                if (val !== undefined) dadosSalvar[k] = val;
+            }
+            try {
+                chrome.storage.local.set({ jusgovAutomateParametrosCfg: dadosSalvar }).catch(() => { });
+            } catch (_) { }
+        }
+
+        /**
+         * Atualiza o texto de status exibido na barra flutuante inferior, se ela estiver renderizada.
+         * @param {string} texto
+         */
+        atualizarStatusBarra(textoOuObj, detalhe = '') {
+            if (textoOuObj && typeof textoOuObj === 'object') {
+                if (textoOuObj.status !== undefined && textoOuObj.status !== '') {
+                    this._statusPrincipal = String(textoOuObj.status);
+                }
+                if (textoOuObj.substatus !== undefined) {
+                    this._substatus = String(textoOuObj.substatus || '');
+                }
+                if (textoOuObj.detalhe !== undefined && textoOuObj.detalhe !== '') {
+                    this._statusBarraDetalhe = String(textoOuObj.detalhe);
+                }
+                const p = String(this._statusPrincipal || '').trim();
+                const sub = String(this._substatus || '').trim();
+                this._statusBarraTexto = (p && sub) ? `${p} · ${sub}` : (p || sub || 'Pronto');
+            } else {
+                const txt = String(textoOuObj || 'Pronto');
+                this._statusPrincipal = txt;
+                this._substatus = '';
+                this._statusBarraTexto = txt;
+                if (detalhe) {
+                    this._statusBarraDetalhe = String(detalhe);
+                }
+            }
+            const doc = this.documentoRaiz || (typeof document !== 'undefined' ? document : null);
+            if (!doc) return;
+            const st = doc.getElementById('jusgov-automate-status-txt');
+            if (st) {
+                st.textContent = this._statusBarraTexto;
+                st.title = this._statusBarraDetalhe || this._statusBarraTexto;
+            }
+            const minTxt = doc.getElementById('jusgov-automate-min-status');
+            if (minTxt) {
+                minTxt.textContent = `${this._statusBarraTexto} ▴`;
+                minTxt.title = this._statusBarraDetalhe || this._statusBarraTexto;
+            }
         }
 
         /**
@@ -114,7 +219,11 @@
             };
 
             const emJanelaTopo = (typeof window === 'undefined' || window === window.top);
-            if (!this.estaEfetivamenteAtivoNaUrl() || !emJanelaTopo || this.fechadaNaAba) {
+            const emExecucaoAgora = Boolean(this.monitorAtivo || (this.motorFluxo && this.motorFluxo.emExecucao));
+            if (emExecucaoAgora) {
+                this.fechadaNaAba = false;
+            }
+            if ((!this.estaEfetivamenteAtivoNaUrl() && !emExecucaoAgora) || !emJanelaTopo || (this.fechadaNaAba && !emExecucaoAgora)) {
                 removerBarraAtual();
                 return;
             }
@@ -177,12 +286,19 @@
                 return btn;
             };
 
+            const textoStatusAtual = String(this._statusBarraTexto || (this.monitorAtivo ? `${this.modoMonitor || 'Ativo'} ●` : 'Pronto'));
+            const detalheStatusAtual = String(this._statusBarraDetalhe || '');
+            const tipStatusMin = detalheStatusAtual
+                ? `${textoStatusAtual}\n${detalheStatusAtual}\nClique para expandir ou arraste na borda inferior`
+                : `${textoStatusAtual} (${contextoAtual.nome || 'Navegador'})\nClique para expandir ou arraste na borda inferior`;
+
             if (this.minimizado) {
                 const spanRest = doc.createElement('span');
+                spanRest.id = 'jusgov-automate-min-txt';
                 spanRest.setAttribute('data-jusgov-ignore', 'true');
-                spanRest.title = `Restaurar Automação de Tarefas (${contextoAtual.nome || 'Navegador'}) — arraste na borda inferior para mover`;
-                spanRest.style.cssText = 'font-weight:700;font-size:10px;color:#2dd4bf;padding:0 3px;cursor:pointer;';
-                spanRest.textContent = ehSubcontextoPje ? '⚡ Tarefas·PJe ▴' : '⚡ Tarefas ▴';
+                spanRest.title = tipStatusMin;
+                spanRest.style.cssText = 'font-weight:700;font-size:10px;color:#2dd4bf;padding:0 3px;cursor:pointer;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                spanRest.textContent = `${textoStatusAtual} ▴`;
                 barra.appendChild(spanRest);
 
                 const btnFecharMin = criarMicroBtn('×', 'transparent', '#fca5a5', 'Fechar barra nesta aba', () => {
@@ -191,7 +307,7 @@
                     this.renderizarOuRemoverBarraControlePje(true);
                 });
                 btnFecharMin.style.setProperty('padding', '0 3px', 'important');
-                barra.appendChild(btnFecharMin);
+                if (!emExecucaoAgora) barra.appendChild(btnFecharMin);
             } else {
                 const titulo = doc.createElement('span');
                 titulo.setAttribute('data-jusgov-ignore', 'true');
@@ -200,20 +316,29 @@
                 titulo.textContent = ehSubcontextoPje ? '⚡ Tarefas·PJe' : '⚡ Tarefas';
 
                 const statusTxt = doc.createElement('span');
+                statusTxt.id = 'jusgov-automate-status-txt';
                 statusTxt.setAttribute('data-jusgov-ignore', 'true');
-                statusTxt.style.cssText = 'font-size:9.5px;color:#cbd5e1;max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 1px;';
-                statusTxt.textContent = 'Pronto';
+                statusTxt.style.cssText = 'font-size:9.5px;color:#cbd5e1;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px;';
+                statusTxt.textContent = textoStatusAtual;
+                statusTxt.title = detalheStatusAtual ? `${textoStatusAtual} — ${detalheStatusAtual}` : textoStatusAtual;
 
                 const btnExecutar = criarMicroBtn(
                     '▶ Exec',
                     '#0d9488',
                     '#ffffff',
-                    'Executar fluxo do contexto atual',
+                    'Iniciar automação com os parâmetros configurados',
                     async () => {
-                        statusTxt.textContent = 'Exec...';
                         await this.carregarDadosDeclarativos();
-                        const res = await this.executarCicloPrincipal();
-                        statusTxt.textContent = (res && res.sucesso) ? 'OK!' : ((res && res.motivo) || 'Parado');
+                        await this._carregarParametrosStorage();
+                        const modoSalvo = this.motorFluxo
+                            ? String(this.motorFluxo.obterVariavel('v_CFGSelecionar', 'Silente'))
+                            : 'Silente';
+                        if (typeof this.iniciarMonitorAutomacao === 'function') {
+                            this.iniciarMonitorAutomacao(modoSalvo);
+                        }
+                        this._statusBarraTexto = modoSalvo === 'Silente' ? 'Silente ●' : `${modoSalvo} ●`;
+                        this._statusBarraDetalhe = `Modo ativo: ${modoSalvo} — aguardando seleção de novo processo`;
+                        this.renderizarOuRemoverBarraControlePje(true);
                     }
                 );
 
@@ -221,12 +346,9 @@
                     '⚙ Cfg',
                     '#2563eb',
                     '#ffffff',
-                    'Configurar contexto, domínios de auto-ativação e execução',
+                    'Abrir tela de Parâmetros da Automação PJe',
                     async () => {
-                        const resCfg = await this.abrirDialogoConfiguracao();
-                        if (resCfg && resCfg.confirmado) {
-                            statusTxt.textContent = 'Salvo!';
-                        }
+                        await this.abrirDialogoConfiguracao();
                     }
                 );
 
@@ -236,8 +358,13 @@
                     '#ffffff',
                     'Interromper imediatamente a automação em andamento',
                     () => {
+                        if (typeof this.pararMonitorAutomacao === 'function') {
+                            this.pararMonitorAutomacao();
+                        }
                         this.abortarExecucao();
-                        statusTxt.textContent = 'Parado';
+                        this._statusBarraTexto = 'Parado';
+                        this._statusBarraDetalhe = 'Automação interrompida pelo usuário';
+                        this.renderizarOuRemoverBarraControlePje(true);
                     }
                 );
 
@@ -267,12 +394,15 @@
                 );
 
                 barra.appendChild(titulo);
-                barra.appendChild(btnExecutar);
-                barra.appendChild(btnConfig);
-                barra.appendChild(btnParar);
+                if (this.monitorAtivo) {
+                    barra.appendChild(btnParar);
+                } else {
+                    barra.appendChild(btnExecutar);
+                    barra.appendChild(btnConfig);
+                }
                 barra.appendChild(statusTxt);
                 barra.appendChild(btnMin);
-                barra.appendChild(btnFechar);
+                if (!emExecucaoAgora) barra.appendChild(btnFechar);
             }
 
             doc.body.appendChild(barra);
@@ -360,16 +490,54 @@
             };
 
             const aoResize = () => aplicarPosicaoColadaBordaInferior(this.barraX);
+            let mouseSobreBarra = false;
+            let timerAutoMin = null;
+
+            const cancelarAutoMin = () => {
+                if (timerAutoMin) {
+                    clearTimeout(timerAutoMin);
+                    timerAutoMin = null;
+                }
+            };
+
+            const agendarAutoMin = () => {
+                cancelarAutoMin();
+                if (this.minimizado) return;
+                timerAutoMin = setTimeout(() => {
+                    timerAutoMin = null;
+                    if (!barra.isConnected || this.minimizado || arrastando || mouseSobreBarra) return;
+                    this.minimizado = true;
+                    this.renderizarOuRemoverBarraControlePje(true);
+                }, 5000);
+            };
+
+            const aoMouseEnter = () => {
+                mouseSobreBarra = true;
+                cancelarAutoMin();
+            };
+
+            const aoMouseLeave = () => {
+                mouseSobreBarra = false;
+                agendarAutoMin();
+            };
 
             barra.addEventListener('mousedown', aoMouseDown);
+            barra.addEventListener('mouseenter', aoMouseEnter);
+            barra.addEventListener('mouseleave', aoMouseLeave);
             doc.addEventListener('mousemove', aoMouseMove, { passive: true });
             doc.addEventListener('mouseup', aoMouseUp);
             if (typeof window !== 'undefined') {
                 window.addEventListener('resize', aoResize);
             }
+            if (!this.minimizado) {
+                agendarAutoMin();
+            }
 
             this._limparOuvintesBarra = () => {
+                cancelarAutoMin();
                 barra.removeEventListener('mousedown', aoMouseDown);
+                barra.removeEventListener('mouseenter', aoMouseEnter);
+                barra.removeEventListener('mouseleave', aoMouseLeave);
                 doc.removeEventListener('mousemove', aoMouseMove);
                 doc.removeEventListener('mouseup', aoMouseUp);
                 if (typeof window !== 'undefined') {
@@ -507,6 +675,293 @@
                 }
                 chrome.tabs.update(tabId, { active: true }, () => {
                     sendResponse({ sucesso: !chrome.runtime.lastError });
+                });
+                return true;
+            }
+
+            if (acao === 'AUTOMATE_MARCAR_LIDOS_E_FECHAR_AUTOS_ANTERIORES') {
+                if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+                    sendResponse({ sucesso: false, marcadasComoLidas: 0, fechadas: 0 });
+                    return false;
+                }
+                const cnjAtual = String(request.cnjAtual || '').trim();
+                const cnjAnterior = String(request.cnjAnterior || '').trim();
+                const marcarLidos = request.marcarLidos !== false;
+                const rxCnj = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
+
+                (async () => {
+                    try {
+                        const abas = await chrome.tabs.query({});
+                        const abasAnteriores = (abas || []).filter((aba) => {
+                            if (!aba || !aba.id) return false;
+                            const url = String(aba.url || '');
+                            const titulo = String(aba.title || '');
+                            if (!url.includes('listAutosDigitais.seam')) return false;
+                            if (cnjAtual && (titulo.includes(cnjAtual) || url.includes(cnjAtual))) return false;
+                            if (cnjAnterior && (titulo.includes(cnjAnterior) || url.includes(cnjAnterior))) return true;
+                            const mTit = titulo.match(rxCnj);
+                            if (mTit && mTit[0] && mTit[0] !== cnjAtual) return true;
+                            return false;
+                        });
+
+                        let marcadasComoLidas = 0;
+                        let fechadas = 0;
+
+                        for (let i = 0; i < abasAnteriores.length; i++) {
+                            const abaAnt = abasAnteriores[i];
+                            let clicouMarcar = false;
+                            if (marcarLidos && chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+                                try {
+                                    const resExec = await chrome.scripting.executeScript({
+                                        target: { tabId: abaAnt.id },
+                                        func: () => {
+                                            const seletores = [
+                                                ".panel-doc-nao-lido input[value='Marcar todos como lidos']",
+                                                ".panel-doc-nao-lido input[value*='Marcar todos' i]",
+                                                ".panel-doc-nao-lido input[type='button']",
+                                                "input[value='Marcar todos como lidos']",
+                                                "button[title*='Marcar todos como lidos' i]"
+                                            ];
+                                            for (let k = 0; k < seletores.length; k++) {
+                                                const btn = document.querySelector(seletores[k]);
+                                                if (btn && btn.offsetParent !== null && !btn.disabled) {
+                                                    btn.click();
+                                                    return true;
+                                                }
+                                            }
+                                            return false;
+                                        }
+                                    });
+                                    if (Array.isArray(resExec) && resExec[0] && resExec[0].result === true) {
+                                        clicouMarcar = true;
+                                        marcadasComoLidas++;
+                                    }
+                                } catch (_) { }
+                            }
+                            if (clicouMarcar) {
+                                await new Promise((r) => setTimeout(r, 750));
+                            }
+                            try {
+                                await chrome.tabs.remove(abaAnt.id);
+                                fechadas++;
+                            } catch (_) { }
+                        }
+
+                        sendResponse({ sucesso: true, marcadasComoLidas, fechadas });
+                    } catch (err) {
+                        sendResponse({ sucesso: false, erro: String(err), marcadasComoLidas: 0, fechadas: 0 });
+                    }
+                })();
+                return true;
+            }
+
+            if (acao === 'AUTOMATE_EXECUTAR_EM_ABAS') {
+                if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+                    sendResponse({ sucesso: false, correspondencias: 0, acoesExecutadas: 0, fechadas: 0, abas: [] });
+                    return false;
+                }
+                const padraoUrl = String(request.padraoUrl || '').trim();
+                const seletoresVerificar = Array.isArray(request.seletoresVerificar) ? request.seletoresVerificar : [];
+                const regexExtrair = String(request.regexExtrair || '');
+                const textoEsperado = String(request.textoEsperado || '').trim();
+                const modoMatch = String(request.modoMatch || 'igual').toLowerCase();
+                const acaoNaAba = String(request.acaoNaAba || 'verificar').toLowerCase();
+                const seletoresAcao = Array.isArray(request.seletoresAcao) ? request.seletoresAcao : [];
+                const executarAcao = request.executarAcao !== false;
+                const delayAposAcaoMs = Number(request.delayAposAcaoMs) || 0;
+                const textoPreencher = String(request.textoPreencher || '');
+
+                (async () => {
+                    try {
+                        const abas = await chrome.tabs.query({});
+                        const candidatas = (abas || []).filter((aba) => {
+                            if (!aba || !aba.id) return false;
+                            const url = String(aba.url || '');
+                            if (!padraoUrl) return true;
+                            return url.includes(padraoUrl);
+                        });
+
+                        const abasCorrespondentes = [];
+                        let acoesExecutadas = 0;
+                        let fechadas = 0;
+
+                        for (let i = 0; i < candidatas.length; i++) {
+                            const aba = candidatas[i];
+                            let textoExtraido = '';
+                            let corresponde = false;
+
+                            if (chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+                                try {
+                                    const resLeitura = await chrome.scripting.executeScript({
+                                        target: { tabId: aba.id },
+                                        args: [seletoresVerificar, regexExtrair],
+                                        func: (sels, rxStr) => {
+                                            let bruto = '';
+                                            for (let k = 0; k < sels.length; k++) {
+                                                const item = sels[k];
+                                                if (!item || !item.expressao) continue;
+                                                try {
+                                                    let el = null;
+                                                    if (String(item.tipo || 'css').toLowerCase() === 'xpath') {
+                                                        el = document.evaluate(item.expressao, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                                                    } else {
+                                                        el = document.querySelector(item.expressao);
+                                                    }
+                                                    if (el) {
+                                                        const t = String(el.textContent || el.innerText || el.value || '').trim();
+                                                        if (t) { bruto = t; break; }
+                                                    }
+                                                } catch (_) { }
+                                            }
+                                            if (!bruto) {
+                                                bruto = String(document.title || '');
+                                            }
+                                            if (rxStr) {
+                                                try {
+                                                    const m = bruto.match(new RegExp(rxStr));
+                                                    if (m) return String(m[1] || m[0] || '').trim();
+                                                } catch (_) { }
+                                            }
+                                            return bruto.trim();
+                                        }
+                                    });
+                                    if (Array.isArray(resLeitura) && resLeitura[0] && typeof resLeitura[0].result === 'string') {
+                                        textoExtraido = resLeitura[0].result;
+                                    }
+                                } catch (_) { }
+                            }
+
+                            if (!textoExtraido) {
+                                const tit = String(aba.title || '');
+                                if (regexExtrair) {
+                                    try {
+                                        const m = tit.match(new RegExp(regexExtrair));
+                                        textoExtraido = m ? String(m[1] || m[0] || '').trim() : tit;
+                                    } catch (_) { textoExtraido = tit; }
+                                } else {
+                                    textoExtraido = tit;
+                                }
+                            }
+
+                            if (!textoEsperado) {
+                                corresponde = true;
+                            } else if (modoMatch === 'diferente') {
+                                corresponde = Boolean(textoExtraido && textoExtraido !== textoEsperado);
+                            } else if (modoMatch === 'contem') {
+                                corresponde = textoExtraido.toLowerCase().includes(textoEsperado.toLowerCase());
+                            } else {
+                                corresponde = textoExtraido === textoEsperado || textoExtraido.includes(textoEsperado);
+                            }
+
+                            if (!corresponde) continue;
+
+                            abasCorrespondentes.push({ id: aba.id, url: aba.url, title: aba.title, textoExtraido });
+
+                            if (acaoNaAba === 'clicar' || acaoNaAba === 'clicar_e_fechar') {
+                                let clicou = false;
+                                if (executarAcao && seletoresAcao.length > 0 && chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+                                    try {
+                                        const resClique = await chrome.scripting.executeScript({
+                                            target: { tabId: aba.id },
+                                            args: [seletoresAcao],
+                                            func: (sels) => {
+                                                for (let k = 0; k < sels.length; k++) {
+                                                    const item = sels[k];
+                                                    if (!item || !item.expressao) continue;
+                                                    try {
+                                                        let el = null;
+                                                        if (String(item.tipo || 'css').toLowerCase() === 'xpath') {
+                                                            el = document.evaluate(item.expressao, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                                                        } else {
+                                                            el = document.querySelector(item.expressao);
+                                                        }
+                                                        if (el && el.offsetParent !== null && !el.disabled) {
+                                                            el.click();
+                                                            return true;
+                                                        }
+                                                    } catch (_) { }
+                                                }
+                                                return false;
+                                            }
+                                        });
+                                        if (Array.isArray(resClique) && resClique[0] && resClique[0].result === true) {
+                                            clicou = true;
+                                            acoesExecutadas++;
+                                        }
+                                    } catch (_) { }
+                                }
+                                if (clicou && delayAposAcaoMs > 0) {
+                                    await new Promise((r) => setTimeout(r, delayAposAcaoMs));
+                                }
+                            }
+
+                            if (acaoNaAba === 'preencher') {
+                                if (executarAcao && seletoresAcao.length > 0 && chrome.scripting && typeof chrome.scripting.executeScript === 'function') {
+                                    try {
+                                        const resPre = await chrome.scripting.executeScript({
+                                            target: { tabId: aba.id },
+                                            args: [seletoresAcao, textoPreencher],
+                                            func: (sels, valTxt) => {
+                                                for (let k = 0; k < sels.length; k++) {
+                                                    const item = sels[k];
+                                                    if (!item || !item.expressao) continue;
+                                                    try {
+                                                        let el = null;
+                                                        if (String(item.tipo || 'css').toLowerCase() === 'xpath') {
+                                                            el = document.evaluate(item.expressao, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                                                        } else {
+                                                            el = document.querySelector(item.expressao);
+                                                        }
+                                                        if (el && !el.disabled) {
+                                                            el.value = valTxt;
+                                                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                                                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                                                            return true;
+                                                        }
+                                                    } catch (_) { }
+                                                }
+                                                return false;
+                                            }
+                                        });
+                                        if (Array.isArray(resPre) && resPre[0] && resPre[0].result === true) {
+                                            acoesExecutadas++;
+                                        }
+                                    } catch (_) { }
+                                }
+                            }
+
+                            if (acaoNaAba === 'fechar' || acaoNaAba === 'clicar_e_fechar') {
+                                try {
+                                    await chrome.tabs.remove(aba.id);
+                                    fechadas++;
+                                } catch (_) { }
+                            }
+                        }
+
+                        sendResponse({
+                            sucesso: true,
+                            correspondencias: abasCorrespondentes.length,
+                            acoesExecutadas,
+                            fechadas,
+                            abas: abasCorrespondentes
+                        });
+                    } catch (err) {
+                        sendResponse({ sucesso: false, erro: String(err), correspondencias: 0, acoesExecutadas: 0, fechadas: 0, abas: [] });
+                    }
+                })();
+                return true;
+            }
+
+            if (acao === 'AUTOMATE_BROADCAST_ABA') {
+                const tabId = (sender && sender.tab && sender.tab.id) || Number(request.tabId);
+                if (!tabId || !request.subAcao || typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+                    sendResponse({ sucesso: false });
+                    return false;
+                }
+                const msgRepasse = Object.assign({}, request.payload || {}, { acao: request.subAcao });
+                chrome.tabs.sendMessage(tabId, msgRepasse, () => {
+                    const err = chrome.runtime.lastError;
+                    sendResponse({ sucesso: !err, erro: err ? err.message : undefined });
                 });
                 return true;
             }

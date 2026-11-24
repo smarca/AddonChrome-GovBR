@@ -7,12 +7,12 @@
   "chavesGlobais": [
     "regrasMapeamentoElementos",
     "urlsTurbo",
+    "urlsTurboExcecoes",
     "perfilAtivoId",
     "listaPerfis"
   ],
   "configPadrao": {
-    "modoTurbo": "url",
-    "comportamentoCliqueIcone": "popup",
+    "modoTurbo": "global",
     "manterFormatacaoBasica": false,
     "nivelFiltroFormatacao": "basico",
     "padronizarFonteCopiaAtivo": false,
@@ -95,6 +95,12 @@
       "*://frontend.prd.cnj.cloud/*",
       "*://sso.cloud.pje.jus.br/*"
     ],
+    "urlsTurboExcecoes": [
+      "*://*/*jogos*",
+      "*://*/*games*",
+      "*://*jogos*/*",
+      "*://*games*/*"
+    ],
     "urlsAmpuletas": [
       "*://*.jus.br/*",
       "*://*.pje.jus.br/*",
@@ -117,7 +123,7 @@
       "nome": "Trabalho",
       "predefinido": true,
       "sobrescritas": {
-        "modoTurbo": "url",
+        "modoTurbo": "global",
         "ativoAmpuletas": true,
         "converterCabecalhoPjeAtivo": true,
         "validacaoMatematicaAtiva": true,
@@ -141,7 +147,7 @@
       "nome": "Casa",
       "predefinido": true,
       "sobrescritas": {
-        "modoTurbo": "url",
+        "modoTurbo": "global",
         "converterCabecalhoPjeAtivo": false,
         "validacaoMatematicaAtiva": false,
         "tempoConferenciaDocumentosMs": 0,
@@ -166,7 +172,7 @@
       ],
       "predefinido": true,
       "sobrescritas": {
-        "modoTurbo": "url",
+        "modoTurbo": "global",
         "manterFormatacaoBasica": false,
         "nivelFiltroFormatacao": "texto_puro",
         "converterCabecalhoPjeAtivo": false,
@@ -194,7 +200,7 @@
       ],
       "predefinido": true,
       "sobrescritas": {
-        "modoTurbo": "url",
+        "modoTurbo": "global",
         "manterFormatacaoBasica": false,
         "nivelFiltroFormatacao": "basico",
         "tempoExibicaoAlertaMs": 2500,
@@ -221,7 +227,7 @@
       ],
       "predefinido": true,
       "sobrescritas": {
-        "modoTurbo": "url",
+        "modoTurbo": "global",
         "tempoExibicaoAlertaMs": 0,
         "tempoFlashBorderMs": 0,
         "modoRetirarSelecao": "nunca",

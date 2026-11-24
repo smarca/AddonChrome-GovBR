@@ -3959,10 +3959,14 @@
                     const cfgPad20 = cat20 && cat20.configPadrao ? cat20.configPadrao : {};
                     const perfisOk20 = Boolean(
                         cfgPad20.automatePjeAtivo === false &&
-                        cfgPad20.modoTurbo === 'url' &&
+                        cfgPad20.modoTurbo === 'global' &&
                         Array.isArray(cat20 && cat20.chavesGlobais) &&
                         cat20.chavesGlobais.includes('urlsTurbo') &&
+                        cat20.chavesGlobais.includes('urlsTurboExcecoes') &&
                         Array.isArray(cfgPad20.urlsTurbo) &&
+                        Array.isArray(cfgPad20.urlsTurboExcecoes) &&
+                        cfgPad20.urlsTurboExcecoes.includes('*://*/*jogos*') &&
+                        cfgPad20.urlsTurboExcecoes.includes('*://*/*games*') &&
                         cfgPad20.urlsTurbo.includes('*://frontend.prd.cnj.cloud/*') &&
                         cfgPad20.urlsTurbo.includes('*://sso.cloud.pje.jus.br/*') &&
                         cfgPad20.tipoContornoFlashBorder === 'solido'

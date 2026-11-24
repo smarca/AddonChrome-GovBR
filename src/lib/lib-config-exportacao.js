@@ -212,6 +212,23 @@
                 totalChavesModificadas += 1;
             }
 
+            const autoBeta = (opts.automateBetaAtual && typeof opts.automateBetaAtual === 'object') ? opts.automateBetaAtual : null;
+            if (autoBeta) {
+                const temCtx = Array.isArray(autoBeta.contextosUsuario) && autoBeta.contextosUsuario.length > 0;
+                const temCmd = Array.isArray(autoBeta.comandosUsuario) && autoBeta.comandosUsuario.length > 0;
+                const temObj = autoBeta.objetosUsuario && typeof autoBeta.objetosUsuario === 'object' && Object.keys(autoBeta.objetosUsuario).length > 0;
+                const temOvr = autoBeta.comandosOverrides && typeof autoBeta.comandosOverrides === 'object' && Object.keys(autoBeta.comandosOverrides).length > 0;
+                if (temCtx || temCmd || temObj || temOvr) {
+                    dadosJson.automateBeta = clonarValorSimples({
+                        contextosUsuario: temCtx ? autoBeta.contextosUsuario : [],
+                        comandosUsuario: temCmd ? autoBeta.comandosUsuario : [],
+                        objetosUsuario: temObj ? autoBeta.objetosUsuario : {},
+                        comandosOverrides: temOvr ? autoBeta.comandosOverrides : {}
+                    });
+                    totalChavesModificadas += 1;
+                }
+            }
+
             const barraAtual = (opts.barraPomodoroAtual && typeof opts.barraPomodoroAtual === 'object') ? opts.barraPomodoroAtual : null;
             if (barraAtual) {
                 const barraDiff = {};
@@ -301,7 +318,7 @@
 
             const chavesValidas = [];
             const chavesDescartadas = [];
-            const chavesReconhecidasRaiz = new Set(['projeto', 'versaoBackup', 'backupTotalPerfis', 'dataExportacao', 'perfilAtivoId', 'listaPerfis', 'perfis', 'regrasMapeamentoElementos', 'barraPomodoro']);
+            const chavesReconhecidasRaiz = new Set(['projeto', 'versaoBackup', 'backupTotalPerfis', 'dataExportacao', 'perfilAtivoId', 'listaPerfis', 'perfis', 'regrasMapeamentoElementos', 'barraPomodoro', 'automateBeta']);
 
             if (!metadados) {
                 const proj = typeof jsonBruto.projeto === 'string' ? jsonBruto.projeto.toLowerCase() : '';
@@ -310,7 +327,8 @@
                     configPadraoRef[k] !== undefined ||
                     k === 'perfis' ||
                     k === 'regrasMapeamentoElementos' ||
-                    k === 'barraPomodoro'
+                    k === 'barraPomodoro' ||
+                    k === 'automateBeta'
                 );
                 if (!proj.includes('jusgovbr') && !temChaveConfig) {
                     return { ok: false, motivo: 'addon_incompativel', mensagem: 'Arquivo incompatível: nenhuma configuração válida do JusGovBR identificada.' };
@@ -379,7 +397,15 @@
                     listaPerfis: Array.isArray(jsonBruto.listaPerfis) ? jsonBruto.listaPerfis : [],
                     perfis: perfisSanitizados,
                     regrasMapeamentoElementos: regrasSanitizadas,
-                    barraPomodoro: barraSanitizada
+                    barraPomodoro: barraSanitizada,
+                    automateBeta: (jsonBruto.automateBeta && typeof jsonBruto.automateBeta === 'object' && !Array.isArray(jsonBruto.automateBeta))
+                        ? {
+                            contextosUsuario: Array.isArray(jsonBruto.automateBeta.contextosUsuario) ? jsonBruto.automateBeta.contextosUsuario : [],
+                            comandosUsuario: Array.isArray(jsonBruto.automateBeta.comandosUsuario) ? jsonBruto.automateBeta.comandosUsuario : [],
+                            objetosUsuario: (jsonBruto.automateBeta.objetosUsuario && typeof jsonBruto.automateBeta.objetosUsuario === 'object') ? jsonBruto.automateBeta.objetosUsuario : {},
+                            comandosOverrides: (jsonBruto.automateBeta.comandosOverrides && typeof jsonBruto.automateBeta.comandosOverrides === 'object') ? jsonBruto.automateBeta.comandosOverrides : {}
+                        }
+                        : null
                 },
                 chavesValidas,
                 chavesDescartadas,
@@ -459,6 +485,14 @@
                 await apiChrome.storage.sync.set(gravacao);
                 if (chavesRemover.length > 0 && typeof apiChrome.storage.sync.remove === 'function') {
                     await apiChrome.storage.sync.remove(chavesRemover);
+                }
+                if (dv.automateBeta && apiChrome.storage.local) {
+                    await apiChrome.storage.local.set({
+                        jusgovAutomateContextosUsuario: dv.automateBeta.contextosUsuario || [],
+                        jusgovAutomateComandosUsuario: dv.automateBeta.comandosUsuario || [],
+                        jusgovAutomateObjetosUsuario: dv.automateBeta.objetosUsuario || {},
+                        jusgovAutomateComandosOverrides: dv.automateBeta.comandosOverrides || {}
+                    });
                 }
                 if (dv.barraPomodoro && apiChrome.storage.local) {
                     const b = dv.barraPomodoro;

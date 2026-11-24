@@ -165,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const paineisAbas = document.querySelectorAll('.painel-aba');
 
     const selectModoTurbo = document.getElementById('selectModoTurbo');
-    const selectComportamentoIcone = document.getElementById('selectComportamentoIcone');
     const iconeOptionsBg = document.getElementById('iconeOptionsBg');
     const iconeOptionsRaio = document.getElementById('iconeOptionsRaio');
     const checkOpcaoRemoverFormatacoes = document.getElementById('checkOpcaoRemoverFormatacoes');
@@ -177,6 +176,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const optTamanhoFontePadraoCopia = document.getElementById('optTamanhoFontePadraoCopia');
     const blocoPadraoFonteCopiaCampos = document.getElementById('blocoPadraoFonteCopiaCampos');
     const textoUrlsTurbo = document.getElementById('textoUrlsTurbo');
+    const tituloListaUrlsTurbo = document.getElementById('tituloListaUrlsTurbo');
+    const ajudaListaUrlsTurbo = document.getElementById('ajudaListaUrlsTurbo');
+    const resumoListaUrlsTurbo = document.getElementById('resumoListaUrlsTurbo');
+    const btnOptModoGlobal = document.getElementById('btnOptModoGlobal');
+    const btnOptModoUrl = document.getElementById('btnOptModoUrl');
+    const btnOptModoDesligado = document.getElementById('btnOptModoDesligado');
+    const detalhesListaDominiosMotor = document.getElementById('detalhesListaDominiosMotor');
+
+    const PADROES_FABRICA_EXCECOES = Object.freeze([
+        '*://*/*jogos*',
+        '*://*/*games*',
+        '*://*jogos*/*',
+        '*://*games*/*'
+    ]);
+    let cacheUrlsTurboPermitidas = [];
+    let cacheUrlsTurboExcecoes = [...PADROES_FABRICA_EXCECOES];
+    let modoListaAtualTextarea = 'global';
+
+    function sincronizarListaUrlsComModo(modoDestino, salvarTextareaAntes = false) {
+        const modoNorm = (modoDestino === 'url' || modoDestino === 'desligado') ? modoDestino : 'global';
+        if (salvarTextareaAntes && textoUrlsTurbo) {
+            const linhasAtuais = extrairLinhasLimpas(textoUrlsTurbo.value);
+            if (modoListaAtualTextarea === 'global') {
+                cacheUrlsTurboExcecoes = linhasAtuais;
+            } else {
+                cacheUrlsTurboPermitidas = linhasAtuais.length > 0 ? linhasAtuais : [...PADROES_FABRICA_TURBO];
+            }
+        }
+        modoListaAtualTextarea = modoNorm;
+        const aplicarEstiloBtnModo = (btn, ativo, perigo = false) => {
+            if (!btn) return;
+            if (ativo) {
+                btn.style.background = perigo ? '#fee2e2' : '#dbeafe';
+                btn.style.borderColor = perigo ? '#dc2626' : '#2563eb';
+                btn.style.color = perigo ? '#b91c1c' : '#1d4ed8';
+            } else {
+                btn.style.background = '#ffffff';
+                btn.style.borderColor = '#cbd5e1';
+                btn.style.color = '#475569';
+            }
+        };
+        aplicarEstiloBtnModo(btnOptModoGlobal, modoNorm === 'global', false);
+        aplicarEstiloBtnModo(btnOptModoUrl, modoNorm === 'url', false);
+        aplicarEstiloBtnModo(btnOptModoDesligado, modoNorm === 'desligado', true);
+        if (detalhesListaDominiosMotor) {
+            if (modoNorm === 'desligado') {
+                detalhesListaDominiosMotor.open = false;
+                detalhesListaDominiosMotor.style.display = 'none';
+            } else {
+                if (detalhesListaDominiosMotor.style.display === 'none') detalhesListaDominiosMotor.open = true;
+                detalhesListaDominiosMotor.style.display = '';
+            }
+        }
+        if (modoNorm === 'desligado') {
+            if (tituloListaUrlsTurbo) tituloListaUrlsTurbo.textContent = 'Modo de Ativação do Motor';
+            if (ajudaListaUrlsTurbo) ajudaListaUrlsTurbo.textContent = 'Motor de seleção e cópia desligado. Escolha "Todos os Sites" ou "Lista de Sites" para ativar.';
+        } else if (modoNorm === 'global') {
+            if (tituloListaUrlsTurbo) tituloListaUrlsTurbo.textContent = 'Modo de Ativação do Motor';
+            if (ajudaListaUrlsTurbo) ajudaListaUrlsTurbo.textContent = 'Escolha se a seleção inteligente deve atuar em todos os sites (com exceções abaixo) ou apenas nos domínios listados.';
+            if (resumoListaUrlsTurbo) resumoListaUrlsTurbo.textContent = '🚫 Exibir / Editar Lista de Exceções';
+            if (textoUrlsTurbo) textoUrlsTurbo.value = cacheUrlsTurboExcecoes.join('\n');
+        } else {
+            if (tituloListaUrlsTurbo) tituloListaUrlsTurbo.textContent = 'Modo de Ativação do Motor';
+            if (ajudaListaUrlsTurbo) ajudaListaUrlsTurbo.textContent = 'Escolha se a seleção inteligente deve atuar em todos os sites ou apenas nos domínios listados abaixo.';
+            if (resumoListaUrlsTurbo) resumoListaUrlsTurbo.textContent = '🌐 Exibir / Editar Lista de Domínios';
+            if (textoUrlsTurbo) {
+                const listaMostrar = cacheUrlsTurboPermitidas.length > 0 ? cacheUrlsTurboPermitidas : PADROES_FABRICA_TURBO;
+                textoUrlsTurbo.value = listaMostrar.join('\n');
+            }
+        }
+    }
 
     /* Controles da Secao Avancada Categorizada */
     const selectModoPlaceholdersMinutasHtml = document.getElementById('selectModoPlaceholdersMinutasHtml');
@@ -1319,7 +1389,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const estrutura = configuradorPerfis.garantirEstruturaPerfis({});
                 atualizarBarraPerfisUI(estrutura.listaPerfis, estrutura.perfilAtivoId);
             }
-            if (textoUrlsTurbo) textoUrlsTurbo.value = PADROES_FABRICA_TURBO.join('\n');
+            cacheUrlsTurboPermitidas = [...PADROES_FABRICA_TURBO];
+            cacheUrlsTurboExcecoes = [...PADROES_FABRICA_EXCECOES];
+            sincronizarListaUrlsComModo('global', false);
             renderizarListaRegrasMapeamento(PADROES_FABRICA_REGRAS_MAPEAMENTO);
             atualizarRotuloSliderConferencia();
             atualizarRotuloSliderFlash();
@@ -1367,10 +1439,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (pendLocalObj) {
                 Object.assign(dados, pendLocalObj);
             }
-            const modoAtual = dados.modoTurbo || 'url';
+            const modoAtual = dados.modoTurbo || 'global';
             if (selectModoTurbo) selectModoTurbo.value = modoAtual;
-            const compIcone = dados.comportamentoCliqueIcone || 'popup';
-            if (selectComportamentoIcone) selectComportamentoIcone.value = compIcone;
             atualizarIconeModoOptions(modoAtual);
             if (dados.nivelFiltroFormatacao !== undefined && optNivelFiltroEstilos) {
                 const idx = converterNivelFiltroParaIndice(dados.nivelFiltroFormatacao);
@@ -1585,11 +1655,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlsFiltradas = Array.isArray(dados.urlsTurbo)
                 ? dados.urlsTurbo.filter(u => u && u !== '<all_urls>')
                 : [];
-            const listaTurbo = urlsFiltradas.length > 0
-                ? urlsFiltradas
-                : PADROES_FABRICA_TURBO;
+            cacheUrlsTurboPermitidas = urlsFiltradas.length > 0
+                ? [...urlsFiltradas]
+                : [...PADROES_FABRICA_TURBO];
+            cacheUrlsTurboExcecoes = Array.isArray(dados.urlsTurboExcecoes)
+                ? dados.urlsTurboExcecoes.filter(u => typeof u === 'string' && u.trim() !== '')
+                : [...PADROES_FABRICA_EXCECOES];
 
-            if (textoUrlsTurbo) textoUrlsTurbo.value = listaTurbo.join('\n');
+            sincronizarListaUrlsComModo(modoAtual, false);
             const regrasCarregadas = Array.isArray(dados.regrasMapeamentoElementos)
                 ? dados.regrasMapeamentoElementos
                 : [];
@@ -1675,7 +1748,14 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function coletarPayloadConfiguracoesUI() {
         /* Passo 4.1: Coletar valores atuais da UI em formato canônico */
-        const novasUrlsTurbo = extrairLinhasLimpas(textoUrlsTurbo ? textoUrlsTurbo.value : '');
+        const linhasTextareaAtual = extrairLinhasLimpas(textoUrlsTurbo ? textoUrlsTurbo.value : '');
+        if (modoListaAtualTextarea === 'global') {
+            cacheUrlsTurboExcecoes = linhasTextareaAtual;
+        } else {
+            cacheUrlsTurboPermitidas = linhasTextareaAtual.length > 0 ? linhasTextareaAtual : [...PADROES_FABRICA_TURBO];
+        }
+        const novasUrlsTurbo = cacheUrlsTurboPermitidas.length > 0 ? [...cacheUrlsTurboPermitidas] : [...PADROES_FABRICA_TURBO];
+        const novasUrlsExcecoes = [...cacheUrlsTurboExcecoes];
         const manterBasica = checkOpcaoRemoverFormatacoes ? !checkOpcaoRemoverFormatacoes.checked : false;
         const sepValor = optAcumuladorSeparador
             ? normalizarSeparadorAcumulador(optAcumuladorSeparador.value)
@@ -1700,8 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarRotuloSliderFlash();
 
         return {
-            modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'url',
-            comportamentoCliqueIcone: selectComportamentoIcone ? selectComportamentoIcone.value : 'popup',
+            modoTurbo: selectModoTurbo ? selectModoTurbo.value : 'global',
             manterFormatacaoBasica: manterBasica,
             nivelFiltroFormatacao: optNivelFiltroEstilos ? converterIndiceParaNivelFiltro(optNivelFiltroEstilos.value) : 'basico',
             padronizarFonteCopiaAtivo: optPadronizarFonteCopiaAtivo ? Boolean(optPadronizarFonteCopiaAtivo.checked) : false,
@@ -1784,6 +1863,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? (['micro', 'compacto', 'normal', 'expandido'].includes(optPomodoroEstiloMinipopup.value) ? optPomodoroEstiloMinipopup.value : 'compacto')
                 : 'compacto',
             urlsTurbo: novasUrlsTurbo.length > 0 ? novasUrlsTurbo : [...PADROES_FABRICA_TURBO],
+            urlsTurboExcecoes: novasUrlsExcecoes,
             regrasMapeamentoElementos: moduloMapeamento.obterRegrasAtuais()
         };
     }
@@ -1800,7 +1880,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         atualizarIconeModoOptions(payload.modoTurbo);
 
-        if (textoUrlsTurbo) textoUrlsTurbo.value = payload.urlsTurbo.join('\n');
+        sincronizarListaUrlsComModo(payload.modoTurbo, false);
 
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             chrome.storage.sync.remove('flashBorderAtivo').catch(() => { });
@@ -1825,8 +1905,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Passo 4.2: Vincular eventos de salvamento imediato nos controles principais e avancados */
     adicionarOuvinteSeguro(btnSalvarConfiguracoes, 'click', salvarConfiguracoes);
-    adicionarOuvinteSeguro(selectModoTurbo, 'change', salvarConfiguracoes);
-    adicionarOuvinteSeguro(selectComportamentoIcone, 'change', salvarConfiguracoes);
+    const vincularBotaoModoLista = (btn, modoAlvo) => {
+        adicionarOuvinteSeguro(btn, 'click', (ev) => {
+            if (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
+            if (selectModoTurbo) selectModoTurbo.value = modoAlvo;
+            sincronizarListaUrlsComModo(modoAlvo, true);
+            salvarConfiguracoes();
+        });
+    };
+    vincularBotaoModoLista(btnOptModoGlobal, 'global');
+    vincularBotaoModoLista(btnOptModoUrl, 'url');
+    vincularBotaoModoLista(btnOptModoDesligado, 'desligado');
+
+    adicionarOuvinteSeguro(selectModoTurbo, 'change', () => {
+        sincronizarListaUrlsComModo(selectModoTurbo ? selectModoTurbo.value : 'global', true);
+        salvarConfiguracoes();
+    });
     adicionarOuvinteSeguro(checkOpcaoRemoverFormatacoes, 'change', () => {
         atualizarEstadoOfuscamentoNivelFiltro();
         salvarConfiguracoes();
@@ -2420,6 +2517,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await configuradorPerfis.alternarPerfil(novoId, typeof chrome !== 'undefined' ? chrome : null);
             if (res && res.ok) {
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                     chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
                 }
@@ -2450,6 +2550,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await configuradorPerfis.excluirPerfil(atual.id, typeof chrome !== 'undefined' ? chrome : null);
         if (res && res.ok) {
             carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                 chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
             }
@@ -2477,6 +2580,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res && res.ok) {
                 fecharModalGerenciarPerfil();
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 exibirToast(`Perfil renomeado para "${nome}".`);
             } else {
                 exibirToast('Não foi possível renomear o perfil.');
@@ -2487,6 +2593,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res && res.ok) {
                 fecharModalGerenciarPerfil();
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                     chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
                 }
@@ -2522,6 +2631,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res && res.ok) {
                 atualizarBarraPerfisUI(res.listaPerfis, res.perfilAtivoId);
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                     chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }, () => {
                         atualizarStatusProdutividadeUI();
@@ -2552,6 +2664,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 atualizarBarraPerfisUI(res.listaPerfis, res.perfilAtivoId);
                 marcarAlteracoesPendentesMapeamento(false);
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                     chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }, () => {
                         atualizarStatusProdutividadeUI();
@@ -2614,7 +2729,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     nomeAddon,
                     versaoAddon,
                     regrasPadraoUsuario,
-                    barraPomodoroAtual: barraEstado
+                    barraPomodoroAtual: barraEstado,
+                    automateBetaAtual: (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.obterDadosParaBackupGlobal === 'function')
+                        ? window.__jusGovOptionsAutomate.obterDadosParaBackupGlobal()
+                        : null
                 }
             );
             conteudoFinal = expRes.conteudoArquivo;
@@ -2666,6 +2784,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         const resImp = await configuradorPerfis.importarBackupTotal(textoBruto, chrome);
                         if (resImp && resImp.ok) {
                             carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                             if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                                 chrome.runtime.sendMessage({ acao: 'forcarSincronizacaoNuvem' }).catch(() => { });
                             }
@@ -2698,6 +2819,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.runtime.onMessage.addListener((msg) => {
             if (msg && msg.acao === 'PERFIL_ALTERADO') {
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
             }
         });
     }
@@ -2735,22 +2859,29 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area === 'local' && changes.perfilAtivoId) {
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                 return;
             }
             if (area === 'local' && (changes.jusgovPomodoroBarraEstadoGlobal || (changes.jusgovConfigSyncPendente && !salvandoConfigLocalAgora))) {
                 carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
             }
             if (area === 'sync') {
                 if (changes.listaPerfis) {
                     carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
                     return;
                 }
                 if (changes.modoTurbo) {
                     if (selectModoTurbo) selectModoTurbo.value = changes.modoTurbo.newValue;
                     atualizarIconeModoOptions(changes.modoTurbo.newValue);
-                }
-                if (changes.comportamentoCliqueIcone && selectComportamentoIcone) {
-                    selectComportamentoIcone.value = changes.comportamentoCliqueIcone.newValue;
+                    sincronizarListaUrlsComModo(changes.modoTurbo.newValue, false);
                 }
                 if (changes.manterFormatacaoBasica !== undefined && checkOpcaoRemoverFormatacoes) {
                     checkOpcaoRemoverFormatacoes.checked = !Boolean(changes.manterFormatacaoBasica.newValue);
@@ -2939,9 +3070,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? changes.promptF1Gemini.newValue
                         : PROMPT_F1_GEMINI_PADRAO;
                 }
-                if (changes.urlsTurbo !== undefined && textoUrlsTurbo && Array.isArray(changes.urlsTurbo.newValue)) {
+                if (changes.urlsTurbo !== undefined && Array.isArray(changes.urlsTurbo.newValue)) {
                     const listaLimpa = changes.urlsTurbo.newValue.filter(u => u && u !== '<all_urls>');
-                    textoUrlsTurbo.value = (listaLimpa.length > 0 ? listaLimpa : PADROES_FABRICA_TURBO).join('\n');
+                    cacheUrlsTurboPermitidas = listaLimpa.length > 0 ? [...listaLimpa] : [...PADROES_FABRICA_TURBO];
+                    if (modoListaAtualTextarea !== 'global' && textoUrlsTurbo) {
+                        textoUrlsTurbo.value = cacheUrlsTurboPermitidas.join('\n');
+                    }
+                }
+                if (changes.urlsTurboExcecoes !== undefined && Array.isArray(changes.urlsTurboExcecoes.newValue)) {
+                    cacheUrlsTurboExcecoes = changes.urlsTurboExcecoes.newValue.filter(u => typeof u === 'string' && u.trim() !== '');
+                    if (modoListaAtualTextarea === 'global' && textoUrlsTurbo) {
+                        textoUrlsTurbo.value = cacheUrlsTurboExcecoes.join('\n');
+                    }
                 }
                 if (changes.separadorAcumulador !== undefined && optAcumuladorSeparador) {
                     optAcumuladorSeparador.value = normalizarSeparadorAcumulador(changes.separadorAcumulador.newValue);
@@ -3004,6 +3144,9 @@ document.addEventListener('DOMContentLoaded', () => {
         configurarNavegacaoAbas();
         inicializarCartoesColapsaveis();
         carregarConfiguracoesDoStorage();
+                            if (window.__jusGovOptionsAutomate && typeof window.__jusGovOptionsAutomate.inicializar === 'function') {
+                                window.__jusGovOptionsAutomate.inicializar();
+                            }
         inicializarMonitorPermissaoClipboard();
     })();
 

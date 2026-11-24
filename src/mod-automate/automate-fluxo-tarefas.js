@@ -381,80 +381,66 @@
          */
         async dialogoCfg() {
             if (!this.dialogos) {
-                return { confirmado: true, valores: this.variaveis };
+                return { confirmado: true, modoBotao: 'Automatizar', valores: this.variaveis };
             }
             const opcoesSchemaBase = (this.dadosAutomate && this.dadosAutomate.opcoesDialogoConfig) || {};
             const opcoesSchema = Object.assign({}, opcoesSchemaBase);
-            if (Array.isArray(this.dadosAutomate && this.dadosAutomate.contextosAutomacao)) {
-                const achatar = (nos, nivel = 0, out = []) => {
-                    for (let i = 0; i < nos.length; i++) {
-                        const n = nos[i];
-                        if (!n || !n.id) continue;
-                        out.push({
-                            id: n.id,
-                            nome: `${nivel > 0 ? '↳ '.repeat(nivel) : ''}${n.nome || n.id}`,
-                            dominios: Array.isArray(n.dominiosAutoAtivacao) ? [...n.dominiosAutoAtivacao] : [],
-                            autoAtivar: Boolean(n.ativarAutomaticamentePorDominio && n.habilitado)
-                        });
-                        if (Array.isArray(n.filhos) && n.filhos.length > 0) {
-                            achatar(n.filhos, nivel + 1, out);
-                        }
-                    }
-                    return out;
-                };
-                opcoesSchema.contextosDisponiveis = achatar(this.dadosAutomate.contextosAutomacao);
-            }
             const resp = await this.dialogos.exibirDialogoConfiguracao(this.variaveis, opcoesSchema);
             if (!resp || resp.ButtonPressed === 'Cancel') {
-                return { confirmado: false, valores: this.variaveis };
+                return { confirmado: false, modoBotao: 'Cancel', valores: this.variaveis };
             }
 
             const v = resp.valores || {};
-            if (v.f_CFG_ContextoId && Array.isArray(this.dadosAutomate && this.dadosAutomate.contextosAutomacao)) {
-                const atualizarNo = (nos) => {
-                    for (let i = 0; i < nos.length; i++) {
-                        const n = nos[i];
-                        if (n && n.id === v.f_CFG_ContextoId) {
-                            const listaDom = String(v.f_CFG_DominiosAutoAtivacao || '')
-                                .split(/[,\n;]+/)
-                                .map(s => s.trim())
-                                .filter(Boolean);
-                            n.dominiosAutoAtivacao = listaDom;
-                            n.ativarAutomaticamentePorDominio = Boolean(v.f_CFG_AutoAtivarDominio);
-                            if (n.ativarAutomaticamentePorDominio) n.habilitado = true;
-                            return true;
-                        }
-                        if (Array.isArray(n && n.filhos) && atualizarNo(n.filhos)) return true;
-                    }
-                    return false;
-                };
-                atualizarNo(this.dadosAutomate.contextosAutomacao);
+            const botaoSilente = resp.ButtonPressed === 'Silente';
+
+            if (v.Selecionar !== undefined) {
+                this.definirVariavel('v_CFGSelecionar', botaoSilente ? 'Silente' : String(v.Selecionar));
+            } else if (botaoSilente) {
+                this.definirVariavel('v_CFGSelecionar', 'Silente');
             }
-            if (v.f_CFG_TarefaSequencia !== undefined) {
-                this.definirVariavel('v_CFGTarefaSequencia', v.f_CFG_TarefaSequencia);
-            }
+            if (v.PrimeiroPlano !== undefined) this.definirVariavel('v_CFGPrimeiroPlano', Boolean(v.PrimeiroPlano));
+            if (v.EtqtListaRemoverTp0Txt !== undefined) this.definirVariavel('v_CFGEtqtListaRemoverTp0Txt', String(v.EtqtListaRemoverTp0Txt));
+            if (v.EtqtListaRemoverTp1Lista !== undefined) this.definirVariavel('v_CFGEtqtListaRemoverTp1Lista', String(v.EtqtListaRemoverTp1Lista));
+            if (v.EtqtListaRemoverTp2Lista !== undefined) this.definirVariavel('v_CFGEtqtListaRemoverTp2Lista', String(v.EtqtListaRemoverTp2Lista));
+            if (v.EtqtListaRemoverTp3Lista !== undefined) this.definirVariavel('v_CFGEtqtListaRemoverTp3Lista', String(v.EtqtListaRemoverTp3Lista));
+            if (v.EtqtListaIncluir1 !== undefined) this.definirVariavel('v_CFGEtqtListaIncluir1', String(v.EtqtListaIncluir1));
+            if (v.EtqtListaIncluir2 !== undefined) this.definirVariavel('v_CFGEtqtListaIncluir2', String(v.EtqtListaIncluir2));
+            if (v.EtiquetaEntrada !== undefined) this.definirVariavel('v_CFGEtiquetaEntrada', Boolean(v.EtiquetaEntrada));
+            if (v.EtiquetaSaida !== undefined) this.definirVariavel('v_CFGEtiquetaSaida', Boolean(v.EtiquetaSaida));
+            if (v.EtiquetaControleExcludente !== undefined) this.definirVariavel('v_CFGEtiquetaControleExcludente', Boolean(v.EtiquetaControleExcludente));
+            if (v.MarcarLidosDocsAutos !== undefined) this.definirVariavel('v_CFGMarcarLidosDocsAutos', Boolean(v.MarcarLidosDocsAutos));
+            if (v.PrazosEmAbertoVerf !== undefined) this.definirVariavel('v_CFGPrazosEmAbertoVerf', Boolean(v.PrazosEmAbertoVerf));
+
+            const juntarPorPipe = (strLista) => String(strLista || '').split(/[,;]+/).map(s => s.trim()).filter(Boolean).join('|');
+            const etqEntradaAtiva = this.obterVariavel('v_CFGEtiquetaEntrada', false) ? String(this.obterVariavel('v_EtiquetaEntrada', '')).trim() : '';
+            const tp0Bruto = [etqEntradaAtiva, ...String(this.obterVariavel('v_CFGEtqtListaRemoverTp0Txt', '')).split(';')]
+                .map(s => s.trim()).filter(Boolean).join('|').replace(/\[|\]/g, '.?');
+            this.definirVariavel('v_EtiquetaExcluirTp0', tp0Bruto);
+            this.definirVariavel('v_EtiquetaExcluirTp1', juntarPorPipe(this.obterVariavel('v_CFGEtqtListaRemoverTp1Lista', '')));
+            this.definirVariavel('v_EtiquetaExcluirTp2', juntarPorPipe(this.obterVariavel('v_CFGEtqtListaRemoverTp2Lista', '')));
+            this.definirVariavel('v_EtiquetaExcluirTp3', juntarPorPipe(this.obterVariavel('v_CFGEtqtListaRemoverTp3Lista', '')));
+
+            const etqSaidaAtiva = this.obterVariavel('v_CFGEtiquetaSaida', true) ? String(this.obterVariavel('v_EtiquetaSaida', '')).trim() : '';
+            const incluirLista = [
+                etqSaidaAtiva,
+                ...String(this.obterVariavel('v_CFGEtqtListaIncluir1', '')).split(/[,;]+/),
+                ...String(this.obterVariavel('v_CFGEtqtListaIncluir2', '')).split(';')
+            ].map(s => s.trim()).filter(Boolean);
+            this.definirVariavel('v_IncluirEtiqueta', incluirLista.join(';'));
+            this.definirVariavel('v_inConfig', false);
+
+            if (v.f_CFG_TarefaSequencia !== undefined) this.definirVariavel('v_CFGTarefaSequencia', v.f_CFG_TarefaSequencia);
             if (v.f_CFG_QtdPagsSequencia !== undefined) {
                 const nPags = parseInt(String(v.f_CFG_QtdPagsSequencia), 10);
                 this.definirVariavel('v_CFGQtdPagsSequencia', Number.isNaN(nPags) ? 1 : nPags);
             }
-            if (v.f_CFG_AutosLista !== undefined) {
-                this.definirVariavel('v_CFGAutosLista', v.f_CFG_AutosLista);
-            }
-            if (v.f_CFG_AutosSoma !== undefined) {
-                this.definirVariavel('v_CFGAutosSoma', v.f_CFG_AutosSoma);
-            }
-            if (v.f_CFG_TermoPesquisa !== undefined) {
-                this.definirVariavel('v_CFGTermoPesquisa', v.f_CFG_TermoPesquisa);
-            }
-            if (v.f_CFG_EtiquetaAuto !== undefined) {
-                const boolEtq = String(v.f_CFG_EtiquetaAuto).toLowerCase() === 'true';
-                this.definirVariavel('v_CFGEtiquetaAuto', boolEtq);
-            }
-            if (v.f_CFG_Movimentar !== undefined) {
-                this.definirVariavel('v_CFGMovimentar', v.f_CFG_Movimentar);
-            }
+            if (v.f_CFG_AutosLista !== undefined) this.definirVariavel('v_CFGAutosLista', v.f_CFG_AutosLista);
+            if (v.f_CFG_AutosSoma !== undefined) this.definirVariavel('v_CFGAutosSoma', v.f_CFG_AutosSoma);
+            if (v.f_CFG_TermoPesquisa !== undefined) this.definirVariavel('v_CFGTermoPesquisa', v.f_CFG_TermoPesquisa);
+            if (v.f_CFG_EtiquetaAuto !== undefined) this.definirVariavel('v_CFGEtiquetaAuto', String(v.f_CFG_EtiquetaAuto).toLowerCase() === 'true');
+            if (v.f_CFG_Movimentar !== undefined) this.definirVariavel('v_CFGMovimentar', v.f_CFG_Movimentar);
 
-            return { confirmado: true, valores: this.variaveis };
+            return { confirmado: true, modoBotao: botaoSilente ? 'Silente' : 'Automatizar', valores: this.variaveis };
         }
 
         /**

@@ -329,6 +329,7 @@
                         acao: 'atualizarEstadoModulo',
                         modoTurbo: config.modoTurbo,
                         urlsTurbo: config.urlsTurbo,
+                        urlsTurboExcecoes: config.urlsTurboExcecoes,
                         ativoAmpuletas: config.ativoAmpuletas !== false,
                         automatePjeAtivo: Boolean(config.automatePjeAtivo),
                         manterFormatacaoBasica: Boolean(config.manterFormatacaoBasica),
@@ -480,7 +481,7 @@
                 const autoExistentes = await this.filtrarArquivosExistentes(ARQUIVOS_MODULO_AUTOMATE, apiChrome);
                 if (autoExistentes.length === 0) return false;
                 await apiChrome.scripting.executeScript({
-                    target: { tabId, allFrames: false },
+                    target: { tabId, allFrames: true },
                     files: autoExistentes,
                     injectImmediately: true
                 });

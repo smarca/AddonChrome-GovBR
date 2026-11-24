@@ -345,8 +345,7 @@
                 let desenhouNoIcone = false;
                 if (cfgInst && typeof cfgInst.desenharIconeVetorialFallback === 'function') {
                     const modoAtual = (cfg && cfg.modoTurbo) || (typeof self !== 'undefined' && self.__JUSGOV_MODO_TURBO_ATUAL__) || 'global';
-                    const compAtual = (cfg && cfg.comportamentoCliqueIcone) || (typeof self !== 'undefined' && self.__JUSGOV_COMPORTAMENTO_ICONE_ATUAL__) || 'popup';
-                    desenhouNoIcone = Boolean(cfgInst.desenharIconeVetorialFallback(modoAtual, compAtual, chrome, badgeObj));
+                    desenhouNoIcone = Boolean(cfgInst.desenharIconeVetorialFallback(modoAtual, 'popup', chrome, badgeObj));
                 }
                 if (chrome.action.setBadgeText) {
                     if (desenhouNoIcone) {

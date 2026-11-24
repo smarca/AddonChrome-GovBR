@@ -59,15 +59,11 @@
          *   1 clique alterne o modo (Global -> Lista -> Desligado) e 2 cliques abram Opcoes.
          * - "popup" (padrao): Restaura "popup.html" como popup nativo, abrindo o painel com 1 clique.
          */
-        sincronizarComportamentoIcone(comportamento, chromeApi = null) {
-            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
+        sincronizarComportamentoIcone(chromeApi = null) {
+            const apiChrome = (chromeApi && chromeApi.action) ? chromeApi : (typeof chrome !== 'undefined' ? chrome : null);
             if (!apiChrome || !apiChrome.action || !apiChrome.action.setPopup) return;
             try {
-                if (comportamento === 'acoes_rapidas') {
-                    apiChrome.action.setPopup({ popup: '' });
-                } else {
-                    apiChrome.action.setPopup({ popup: 'src/cfg/popup.html' });
-                }
+                apiChrome.action.setPopup({ popup: 'src/cfg/popup.html' });
             } catch (_) { }
         }
 
@@ -110,9 +106,7 @@
                 }
 
                 if (apiChrome.action.setTitle && !(typeof self !== 'undefined' && self.JusGovModuloProdutividade)) {
-                    const subtituloAcao = (comportamento === 'acoes_rapidas')
-                        ? '\n(1 clique: alternar modo | 2 cliques: abrir Opcoes)'
-                        : '\n(1 clique: abrir popup)';
+                    const subtituloAcao = '\n(1 clique: abrir popup)';
                     apiChrome.action.setTitle({
                         title: 'Selecao/Copia Aprimorada - ' + tituloModo + subtituloAcao
                     }).catch(() => { });
@@ -282,41 +276,13 @@
 
         async sincronizarMenusContexto(chromeApi = null) {
             const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
-            if (!apiChrome || !apiChrome.contextMenus || !apiChrome.storage || !apiChrome.storage.sync) return;
+            if (!apiChrome || !apiChrome.contextMenus) return;
             try {
-                const config = await apiChrome.storage.sync.get(['comportamentoCliqueIcone']);
-                const isAcoesRapidas = config && config.comportamentoCliqueIcone === 'acoes_rapidas';
                 apiChrome.contextMenus.removeAll(() => {
-                    apiChrome.contextMenus.create({ id: 'toggle-comportamento-icone', type: 'checkbox', title: 'Ações Rápidas no Ícone', checked: Boolean(isAcoesRapidas), contexts: ['action'] }, () => { });
                     apiChrome.contextMenus.create({ id: 'configurar-extensao', title: 'Configurar Extensão', contexts: ['action'] }, () => { });
                     apiChrome.contextMenus.create({ id: 'abrir-painel-extensao', title: 'Desenvolvimento (Página do Plugin)', contexts: ['action'] }, () => { });
                 });
             } catch (_) { }
-        }
-
-        tratarCliqueIconeExtensao(chromeApi = null) {
-            const apiChrome = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
-            if (!apiChrome) return;
-            if (this._timerCliqueIcone !== undefined && this._timerCliqueIcone !== null) {
-                clearTimeout(this._timerCliqueIcone);
-                this._timerCliqueIcone = null;
-                if (apiChrome.runtime && typeof apiChrome.runtime.openOptionsPage === 'function') {
-                    apiChrome.runtime.openOptionsPage();
-                }
-                return;
-            }
-            this._timerCliqueIcone = setTimeout(async () => {
-                this._timerCliqueIcone = null;
-                try {
-                    const atual = await apiChrome.storage.sync.get(['modoTurbo']);
-                    const modoAtual = (atual && atual.modoTurbo) || 'global';
-                    const proximoModo = modoAtual === 'global'
-                        ? 'url'
-                        : (modoAtual === 'url' ? 'desligado' : 'global');
-                    await apiChrome.storage.sync.set({ modoTurbo: proximoModo });
-                    this.desenharIconeVetorialFallback(proximoModo, 'acoes_rapidas', apiChrome);
-                } catch (_) { }
-            }, JANELA_DUPLO_CLIQUE_ICONE_MS);
         }
 
         /* Aplica alteracoes imediatamente no runtime local + storage.local sem disparar gravacao imediata em storage.sync */

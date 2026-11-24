@@ -290,17 +290,10 @@ if (typeof chrome !== 'undefined' && chrome.commands && chrome.commands.onComman
     });
 }
 
-if (chrome.action && chrome.action.onClicked) {
-    chrome.action.onClicked.addListener(() => {
-        if (instanciaConfig) instanciaConfig.tratarCliqueIconeExtensao(chrome);
-    });
-}
 
 if (chrome.contextMenus) {
     chrome.contextMenus.onClicked.addListener(async (info) => {
-        if (info.menuItemId === 'toggle-comportamento-icone') {
-            await chrome.storage.sync.set({ comportamentoCliqueIcone: info.checked ? 'acoes_rapidas' : 'popup' });
-        } else if (info.menuItemId === 'configurar-extensao') {
+        if (info.menuItemId === 'configurar-extensao') {
             chrome.runtime.openOptionsPage();
         } else if (info.menuItemId === 'abrir-painel-extensao') {
             chrome.tabs.create({ url: 'https://github.com/smarca/AddonChrome-GovBR.git', active: true });
@@ -312,11 +305,6 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
     if (namespace === 'sync') {
         if (!instanciaConfig || instanciaConfig.houveMudancaDeConfiguracao(changes)) {
             await sincronizarEstado();
-        }
-        if (changes.comportamentoCliqueIcone && chrome.contextMenus) {
-            chrome.contextMenus.update('toggle-comportamento-icone', {
-                checked: changes.comportamentoCliqueIcone.newValue === 'acoes_rapidas'
-            }).catch(() => { });
         }
         if (instanciaModuloProdutividade && (
             changes.tempoTrabalhoCorridoAtivo || changes.tempoTrabalhoCorridoHoras ||

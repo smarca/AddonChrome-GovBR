@@ -41,7 +41,7 @@
         };
 
     const CHAVES_SYNC_COPIA = Object.freeze([
-        'modoTurbo', 'urlsTurbo', 'manterFormatacaoBasica', 'nivelFiltroFormatacao',
+        'modoTurbo', 'urlsTurbo', 'urlsTurboExcecoes', 'manterFormatacaoBasica', 'nivelFiltroFormatacao',
         'padronizarFonteCopiaAtivo', 'fontePadraoCopia', 'tamanhoFontePadraoCopia',
         'selecaoEditavelAtiva', 'modoPlaceholdersMinutasHtml', 'placeholdersMinutasHtmlAtivo',
         'colagemBotaoDireitoAtiva', 'capturaBotoesMouse4e5Ativa', 'colarBotaoMeioAtivo',

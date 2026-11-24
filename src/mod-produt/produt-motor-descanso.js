@@ -519,6 +519,66 @@
                 (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') &&
                 !estado.pomodoroDescansoMinCumprido
             );
+            /* Separação entre estado permanente e estado temporário auto-detectado por idle durante o Foco:
+             * Se entrou temporariamente em Alívio por idle no meio do Foco (pomodoroBancoOrigemDescanso = 'posterior'|'anterior')
+             * e o usuário retornou com clique/tecla ANTES de completar o Alívio, restaura imediatamente o Foco de onde parou
+             * sem travar em Alívio nem cobrar Alívio Pendente indevido (quando origem='posterior'). */
+            const origemTempDesc = String(estado.pomodoroBancoOrigemDescanso || '');
+            if (aindaPendenteAntes && (origemTempDesc === 'posterior' || origemTempDesc === 'anterior')) {
+                if (tipoInteracao === 'movimento') {
+                    return { resetouDescanso: false, iniciouFocoPosDescanso: false, iniciouBadgeVerde: false, ocultouBadgeVerde: false, alterouDescanso: false };
+                }
+                const progTemp = this.calcularProgressoDescanso(estado, agora, config, { mutar: false });
+                const restanteTempMs = Math.max(0, Number(progTemp && progTemp.restanteMs || 0));
+                const faseTempAntes = estado.pomodoroFase;
+                const focoMinCfgTemp = Math.max(25, Number((config && config.pomodoroFocoMinutos) || 45));
+                const focoMetaTempMs = focoMinCfgTemp * 60000;
+                const focoSalvoBrutoTempMs = Math.max(0, Number(estado.pomodoroFocoAcumuladoAntesPausaMs || 0));
+                const focoRestaurarMs = (focoSalvoBrutoTempMs > 0 && focoSalvoBrutoTempMs < Math.max(10000, focoMetaTempMs - 5000))
+                    ? focoSalvoBrutoTempMs
+                    : 0;
+
+                estado.pomodoroFase = 'foco';
+                estado.pomodoroMinutosNaFase = focoRestaurarMs > 0 ? Math.floor(focoRestaurarMs / 60000) : 0;
+                estado.pomodoroFaseInicioTs = focoRestaurarMs > 0 ? (agora - focoRestaurarMs) : agora;
+                estado.pomodoroFocoAcumuladoAntesPausaMs = 0;
+                estado.pomodoroMetaCustomMs = 0;
+                estado.pomodoroBancoOrigemDescanso = '';
+                estado.pomodoroBancoOrigemFoco = '';
+                estado.pomodoroFocoPausadoMs = 0;
+                estado.pomodoroPausaInicioTs = 0;
+                estado.emPausa = false;
+                estado.ultimaAtividadeTs = agora;
+                estado.minutosInativosPendentes = 0;
+                estado._nivelAutoCreditado = '';
+                estado.pomodoroDescansoMinCumprido = false;
+                estado.pomodoroDescansoRealizadoNoCiclo = false;
+                estado.pomodoroDescansoPendente = false;
+                estado.pomodoroDescansoAcumuladoMs = 0;
+                estado.pomodoroDescansoSyncTs = 0;
+                estado.pomodoroDescansoAtividadeAteTs = 0;
+                estado.pomodoroDescansoCliquesPenalidade = 0;
+                estado.pomodoroDescansoUltimoCliqueTs = 0;
+                estado.pomodoroDescansoUltimoTipoInteracao = '';
+                estado.pomodoroSemScreensaverAteTs = 0;
+                estado.pomodoroModalDescansoChave = '';
+                estado.pomodoroModalFechadoNestaPausa = false;
+                estado.pomodoroBarraOcultadaChave = '';
+                estado.pomodoroMinutosAtivoEmDescanso = 0;
+
+                if (origemTempDesc === 'anterior' && restanteTempMs > 0) {
+                    estado.pomodoroDescansoPulado = true;
+                    estado.pomodoroDescansoSaldoRestanteMs = restanteTempMs;
+                    estado.pomodoroDescansoSaldoTipo = (faseTempAntes === 'pausa_maior') ? 'pausa_maior' : 'alivio';
+                    estado.necessidadePausaMs = restanteTempMs;
+                } else {
+                    estado.pomodoroDescansoPulado = false;
+                    estado.pomodoroDescansoSaldoRestanteMs = 0;
+                    estado.pomodoroDescansoSaldoTipo = '';
+                    estado.necessidadePausaMs = 0;
+                }
+                return { resetouDescanso: true, iniciouFocoPosDescanso: true, iniciouBadgeVerde: false, ocultouBadgeVerde: true, alterouDescanso: true };
+            }
             const progAntes = aindaPendenteAntes
                 ? this.calcularProgressoDescanso(estado, agora, config, { mutar: true, registrarTipo: tipoInteracao })
                 : null;
