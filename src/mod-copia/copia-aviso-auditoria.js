@@ -118,7 +118,7 @@
                             ? this.verificadores.formatarRespostaWiki(
                                 'Data e Horário',
                                 diaSemana,
-                                t,
+                                `${(resData && resData.valor) ? resData.valor : matchDataHora[1]} ${matchDataHora[2]}`,
                                 subDataHora,
                                 {
                                     ...((resData && resData.detalhes) || {}),

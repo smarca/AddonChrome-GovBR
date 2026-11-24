@@ -255,8 +255,11 @@
                      * aplicado em tempo real por verificarUrlPermitida() dentro de copia-selecionar.js. */
                     if (modoTurbo !== 'desligado') {
                         const matchesTurbo = ['<all_urls>'];
+                        const listaJsConteudo = (estadoAmpuletas === false)
+                            ? ARQUIVOS_CONTEUDO_INTEGRADO.filter((arq) => arq !== 'src/mod-anti-ampulheta/mod-anti-ampulheta.js')
+                            : ARQUIVOS_CONTEUDO_INTEGRADO;
                         const [jsExistentes, mainExistentes] = await Promise.all([
-                            this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
+                            this.filtrarArquivosExistentes(listaJsConteudo, apiChrome),
                             this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
                         ]);
                         const scriptsParaRegistrar = [];
@@ -357,8 +360,11 @@
 
                     /* Passo 3.8: Se o modulo de copia e navegacao estiver ativo, garantir injecao dos scripts na aba */
                     if (config.modoTurbo !== 'desligado') {
+                        const listaJsAba = (config.ativoAmpuletas === false)
+                            ? ARQUIVOS_CONTEUDO_INTEGRADO.filter((arq) => arq !== 'src/mod-anti-ampulheta/mod-anti-ampulheta.js')
+                            : ARQUIVOS_CONTEUDO_INTEGRADO;
                         const [jsExistentes, mainExistentes] = await Promise.all([
-                            this.filtrarArquivosExistentes(ARQUIVOS_CONTEUDO_INTEGRADO, apiChrome),
+                            this.filtrarArquivosExistentes(listaJsAba, apiChrome),
                             this.filtrarArquivosExistentes(ARQUIVOS_PROTECAO_MAIN, apiChrome)
                         ]);
                         if (mainExistentes.length > 0) {

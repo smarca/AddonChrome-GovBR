@@ -361,10 +361,15 @@
                 ? `${descDiaPadrao} • Horário: ${matchHoraInterno[1]}:${matchHoraInterno[2]}${matchHoraInterno[3] ? ':' + matchHoraInterno[3] : ''}h`
                 : descDiaPadrao;
 
+            const dataPadronizada = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${String(ano).padStart(4, '0')}`;
+            const valorWikiPadronizado = matchHoraInterno
+                ? `${dataPadronizada} ${String(matchHoraInterno[1]).padStart(2, '0')}:${matchHoraInterno[2]}${matchHoraInterno[3] ? ':' + matchHoraInterno[3] : ''}`
+                : dataPadronizada;
+
             return formatarRespostaWiki(
                 tipoFinal,
                 nomeDiaSemana,
-                textoLimpo,
+                valorWikiPadronizado,
                 descDia,
                 {
                     dia: dia,

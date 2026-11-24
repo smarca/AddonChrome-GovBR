@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const iconeBg = document.getElementById('iconeBg');
     const iconeRaio = document.getElementById('iconeRaio');
 
+    let urlAbaAtual = '';
     let hostnameAbaAtual = '';
     let mascaraDominioAbaAtual = '';
     let cacheUrlsTurbo = [];
@@ -304,8 +305,9 @@ document.addEventListener('DOMContentLoaded', () => {
         /* Passo 2.5: Deteccao multi-sistema judicial (PJe, Eproc, PDPJ, Projudi, SAJ, Creta, SEEU ou *.jus.br) */
         if (containerAmpuletas) {
             const strHost = hostnameAbaAtual.toLowerCase();
+            const strAlvoSistema = `${urlAbaAtual || ''} ${strHost}`.toLowerCase();
             const matrizSistemas = [
-                { nome: 'PJe', padrao: /\bpje\b|pje\./i },
+                { nome: 'PJe', padrao: /\bpje\b|pje\.|\.jus\.br\/pje|frontend\.prd\.cnj\.cloud|sso\.cloud\.pje\.jus\.br/i },
                 { nome: 'Eproc', padrao: /\beproc\b|eproc\./i },
                 { nome: 'PDPJ', padrao: /\bpdpj\b|\bprevjud\b|stf\.jus\.br|stj\.jus\.br/i },
                 { nome: 'Projudi', padrao: /\bprojudi\b|projudi\./i },
@@ -313,10 +315,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 { nome: 'Creta', padrao: /\bcreta\b|creta\./i },
                 { nome: 'SEEU', padrao: /\bseeu\b|seeu\./i }
             ];
-            const sisMatch = matrizSistemas.find((s) => s.padrao.test(strHost));
+            const sisMatch = matrizSistemas.find((s) => s.padrao.test(strAlvoSistema));
             if (sisMatch || strHost.includes('.jus.br')) {
-                const sufixoSistema = sisMatch ? ` (${sisMatch.nome})` : '';
-                if (tituloAmpuletas) tituloAmpuletas.textContent = `Sistema Judicial Turbo${sufixoSistema}`;
+                let nomeSistema = sisMatch ? sisMatch.nome : '';
+                if (!nomeSistema) {
+                    const mTrib = strHost.match(/([a-z0-9-]+)\.jus\.br$/i);
+                    nomeSistema = (mTrib && mTrib[1]) ? mTrib[1].toUpperCase() : 'Jus.br';
+                }
+                if (tituloAmpuletas) tituloAmpuletas.textContent = `Sistema Judicial Turbo (${nomeSistema})`;
                 if (subtituloAmpuletas) subtituloAmpuletas.textContent = 'Minimiza telas de bloqueios.';
                 containerAmpuletas.style.display = 'flex';
             } else {
@@ -404,19 +410,32 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        /* Passo 3.2: Consultar a aba ativa para extrair o hostname */
+        /* Passo 3.2: Consultar a aba ativa para extrair URL completa e hostname (com fallback lastFocusedWindow) */
+        const aplicarAbaAtiva = (tabs) => {
+            const aba = Array.isArray(tabs) && tabs[0] ? tabs[0] : null;
+            const urlBruta = aba ? (aba.url || aba.pendingUrl || '') : '';
+            if (urlBruta) {
+                try {
+                    const urlObj = new URL(urlBruta);
+                    if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+                        urlAbaAtual = urlBruta;
+                        hostnameAbaAtual = urlObj.hostname;
+                        mascaraDominioAbaAtual = `*://${hostnameAbaAtual}/*`;
+                    }
+                } catch (_) {}
+            }
+            atualizarBotaoDominioAba();
+        };
         if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs && tabs[0] && tabs[0].url) {
-                    try {
-                        const urlObj = new URL(tabs[0].url);
-                        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
-                            hostnameAbaAtual = urlObj.hostname;
-                            mascaraDominioAbaAtual = `*://${hostnameAbaAtual}/*`;
-                        }
-                    } catch (_) {}
+                const aba = Array.isArray(tabs) && tabs[0] ? tabs[0] : null;
+                if (aba && (aba.url || aba.pendingUrl)) {
+                    aplicarAbaAtiva(tabs);
+                } else {
+                    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabsFallback) => {
+                        aplicarAbaAtiva(tabsFallback);
+                    });
                 }
-                atualizarBotaoDominioAba();
             });
         }
     }

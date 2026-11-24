@@ -299,7 +299,7 @@
             wikiDataIso.tituloDoc === 'Quarta-feira' &&
             wikiDataIso.ehFimDeSemana === false &&
             wikiDataIso.html.includes('Quarta-feira') &&
-            wikiDataIso.html.includes('2026-11-04') &&
+            wikiDataIso.html.includes('04/11/2026') &&
             wikiDataIso.html.includes('✓</span>');
         registrar(aprovadoDataIso, 'MATEMATICA', 'Wiki Forense Data Formato ISO (AAAA-MM-DD): decodificacao de Quarta-feira no titulo e Dia Util', {
             obtido: wikiDataIso ? `${wikiDataIso.tituloDoc} | ${wikiDataIso.subtitulo}` : 'falha'
