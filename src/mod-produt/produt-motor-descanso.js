@@ -551,7 +551,13 @@
                     const excessoDescMs = Math.max(0, creditoRealMs - metaDescConclMs);
                     const focoMinCfgRet = Math.max(25, Number((config && config.pomodoroFocoMinutos) || 45));
                     const focoMetaRetMs = focoMinCfgRet * 60000;
-                    const focoInicialCompMs = Math.min(Math.max(0, focoMetaRetMs - 60000), focoSalvoMs + excessoDescMs);
+                    /* Excesso de descanso (ex.: folga longa de 2h) jamais avança o cronômetro do próximo Foco;
+                     * preserva apenas eventual foco salvo antes de pausa flexível no meio do ciclo (RN-07). */
+                    const focoSalvoEfetivoMs = (estado.pomodoroFase === 'pausa_maior') ? 0 : focoSalvoMs;
+                    const focoInicialCompMs = Math.min(Math.max(0, focoMetaRetMs - 60000), focoSalvoEfetivoMs);
+                    if (estado.pomodoroFase === 'pausa_maior') {
+                        estado.pomodoroCicloAtual = 0;
+                    }
                     const creditoDescansoFinalMs = Math.max(60000, creditoRealMs);
                     estado.pomodoroDescansoTotalMs = Math.max(0, Number(estado.pomodoroDescansoTotalMs || 0)) + creditoDescansoFinalMs;
                     this._registrarHistoricoRoundPomodoro(

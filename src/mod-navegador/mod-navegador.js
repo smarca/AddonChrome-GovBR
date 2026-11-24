@@ -86,6 +86,7 @@
         inicializarMapaAbas: async () => { },
         processarNovaAba: async () => ({ duplicada: false }),
         processarAbaAtualizada: async () => ({ duplicada: false }),
+        verificarDuplicacaoOnline: async () => ({ duplicada: false }),
         processarAbaRemovida: () => { },
         marcarPaginaModificada: () => { },
         obterMapaAbasUrls: () => new Map(),
@@ -288,7 +289,13 @@
         async tratarNovaJanela(janela, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
             if (this._p_janelaUnica && typeof this._p_janelaUnica.processarNovaJanela === 'function') {
                 await this._p_janelaUnica.processarNovaJanela(janela, chromeApi, this._p_configuracoes, async (abaMovida, openerFallbackId) => {
-                    if (!abaMovida || !abaMovida.id || !this._p_ordenacao) return;
+                    if (!abaMovida || !abaMovida.id) return;
+                    /* 1º: Sempre verificar anti-duplicação online ANTES de qualquer ordenação/árvore */
+                    if (this._p_antiDuplicacao && typeof this._p_antiDuplicacao.verificarDuplicacaoOnline === 'function') {
+                        const resDup = await this._p_antiDuplicacao.verificarDuplicacaoOnline(abaMovida, chromeApi, this._p_configuracoes);
+                        if (resDup && resDup.duplicada) return;
+                    }
+                    if (!this._p_ordenacao) return;
                     const urlAba = abaMovida.url || abaMovida.pendingUrl || '';
                     const ehAlienOuSistema = typeof this._p_ordenacao.ehUrlRaizAlienOuInterna === 'function' && this._p_ordenacao.ehUrlRaizAlienOuInterna(urlAba);
                     const paiEfetivo = (typeof abaMovida.openerTabId === 'number' && abaMovida.openerTabId !== abaMovida.id)
@@ -436,15 +443,22 @@
          * @param {Object} [chromeApi]
          */
         async tratarAbaAtivada(activeInfo, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
-            if (!activeInfo || !activeInfo.tabId || !this._p_ordenacao || typeof this._p_ordenacao.sincronizarAbaNoCriterio !== 'function') return;
-            const critAtual = typeof this._p_ordenacao.normalizarCriterio === 'function'
-                ? this._p_ordenacao.normalizarCriterio((this._p_configuracoes && this._p_configuracoes.criterioOrdenacaoGuias) || this._p_ordenacao.criterio)
-                : ((this._p_configuracoes && this._p_configuracoes.criterioOrdenacaoGuias) || this._p_ordenacao.criterio);
-            if (critAtual !== 'ultima_ativacao' && critAtual !== 'dominio_ativacao') return;
+            if (!activeInfo || !activeInfo.tabId) return;
             if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.get !== 'function') return;
             try {
                 const tab = await chromeApi.tabs.get(activeInfo.tabId);
-                if (!tab || tab.pinned) return;
+                if (!tab) return;
+                /* 1º: Sempre verificar anti-duplicação online ANTES de qualquer ordenação */
+                if (!tab.pinned && this._p_antiDuplicacao && typeof this._p_antiDuplicacao.verificarDuplicacaoOnline === 'function') {
+                    const resDup = await this._p_antiDuplicacao.verificarDuplicacaoOnline(tab, chromeApi, this._p_configuracoes);
+                    if (resDup && resDup.duplicada) return;
+                }
+                if (!this._p_ordenacao || typeof this._p_ordenacao.sincronizarAbaNoCriterio !== 'function') return;
+                const critAtual = typeof this._p_ordenacao.normalizarCriterio === 'function'
+                    ? this._p_ordenacao.normalizarCriterio((this._p_configuracoes && this._p_configuracoes.criterioOrdenacaoGuias) || this._p_ordenacao.criterio)
+                    : ((this._p_configuracoes && this._p_configuracoes.criterioOrdenacaoGuias) || this._p_ordenacao.criterio);
+                if (critAtual !== 'ultima_ativacao' && critAtual !== 'dominio_ativacao') return;
+                if (tab.pinned) return;
                 const mapa = this._p_antiDuplicacao.obterMapaAbasUrls ? this._p_antiDuplicacao.obterMapaAbasUrls() : null;
                 await this._p_ordenacao.sincronizarAbaNoCriterio(tab, 'ativada', this._p_configuracoes, chromeApi, mapa);
             } catch (_) { }
@@ -457,6 +471,16 @@
          * @param {Object} [chromeApi]
          */
         async tratarAbaMovida(tabId, moveInfo = {}, chromeApi = (typeof chrome !== 'undefined' ? chrome : null)) {
+            /* 1º: Sempre verificar anti-duplicação online ANTES de qualquer ordenação/reorganização */
+            if (tabId && chromeApi && chromeApi.tabs && typeof chromeApi.tabs.get === 'function' && this._p_antiDuplicacao && typeof this._p_antiDuplicacao.verificarDuplicacaoOnline === 'function') {
+                try {
+                    const tab = await chromeApi.tabs.get(tabId);
+                    if (tab && !tab.pinned) {
+                        const resDup = await this._p_antiDuplicacao.verificarDuplicacaoOnline(tab, chromeApi, this._p_configuracoes);
+                        if (resDup && resDup.duplicada) return;
+                    }
+                } catch (_) { }
+            }
             if (this._p_ordenacao && typeof this._p_ordenacao.tratarAbaMovidaManual === 'function') {
                 await this._p_ordenacao.tratarAbaMovidaManual(tabId, moveInfo, chromeApi, this._p_configuracoes);
             }

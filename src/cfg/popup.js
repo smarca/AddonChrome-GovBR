@@ -315,9 +315,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
             const sisMatch = matrizSistemas.find((s) => s.padrao.test(strHost));
             if (sisMatch || strHost.includes('.jus.br')) {
-                const nomeExibicao = sisMatch ? sisMatch.nome : 'Sistema Judicial';
-                if (tituloAmpuletas) tituloAmpuletas.textContent = `${nomeExibicao} Turbo`;
-                if (subtituloAmpuletas) subtituloAmpuletas.textContent = `Neutraliza bloqueios ("Aguarde...") no ${nomeExibicao}.`;
+                const sufixoSistema = sisMatch ? ` (${sisMatch.nome})` : '';
+                if (tituloAmpuletas) tituloAmpuletas.textContent = `Sistema Judicial Turbo${sufixoSistema}`;
+                if (subtituloAmpuletas) subtituloAmpuletas.textContent = 'Minimiza telas de bloqueios.';
                 containerAmpuletas.style.display = 'flex';
             } else {
                 containerAmpuletas.style.display = 'none';

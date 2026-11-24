@@ -50,6 +50,7 @@
         _p_acaoConteudo = 'manter'; // 'manter', 'recarregar', 'recarregar_se_nao_modificada'
         _p_mapaAbasUrls = new Map();
         _p_timerSalvarSessionAbas = null;
+        _p_abasFechando = new Set();
 
         /**
          * @param {Object} [opcoes={}]
@@ -454,6 +455,7 @@
 
                 if (changeInfo.status === 'complete') {
                     let regAtual = this._p_mapaAbasUrls.get(tabId);
+                    const eraIsenta = Boolean(regAtual && (regAtual.isentarContraAnteriores || regAtual.duplicacaoManualPermitida));
                     if (regAtual) {
                         const uEstabNova = this.normalizarUrlParaComparacao((tab && tab.url) || regAtual.urlAtual || '');
                         if (uEstabNova && uEstabNova !== 'about:blank' && !uEstabNova.startsWith('chrome://newtab') && !uEstabNova.startsWith('edge://newtab')) {
@@ -470,10 +472,115 @@
                         this._p_mapaAbasUrls.set(tabId, regAtual);
                         this.salvarMapaAbasSessionDebounced(chromeApi);
                     }
+                    if (!eraIsenta && tab && !this._p_abasFechando.has(tabId)) {
+                        const resOnline = await this.verificarDuplicacaoOnline(tab, chromeApi, config);
+                        if (resOnline && resOnline.duplicada) {
+                            return resOnline;
+                        }
+                    }
                 }
                 return { duplicada: false, duplicacaoManualPermitida };
             } catch (_) {
                 return { duplicada: false, duplicacaoManualPermitida };
+            }
+        }
+
+        /**
+         * Verifica online (em qualquer evento de aba/janela) se a aba informada é duplicata
+         * de outra aba já aberta, fechando/reutilizando ANTES de qualquer ordenação.
+         * @param {Object} tab
+         * @param {Object} [chromeApi]
+         * @param {Object} [config={}]
+         * @returns {Promise<{duplicada: boolean, abaExistente?: Object}>}
+         */
+        async verificarDuplicacaoOnline(tab, chromeApi = (typeof chrome !== 'undefined' ? chrome : null), config = {}) {
+            if (!tab || !tab.id || tab.pinned || !chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.query !== 'function') {
+                return { duplicada: false };
+            }
+            if (this._p_abasFechando.has(tab.id)) {
+                return { duplicada: true };
+            }
+            try {
+                const reutilizarAtivo = (typeof config.reutilizarAbasAbertas === 'boolean') ? config.reutilizarAbasAbertas : this._p_reutilizarAbasAbertas;
+                if (reutilizarAtivo === false) return { duplicada: false };
+
+                const uAtual = this.normalizarUrlParaComparacao(tab.url || tab.pendingUrl || '');
+                if (!uAtual || uAtual === 'about:blank' || uAtual.startsWith('chrome://') || uAtual.startsWith('edge://')) {
+                    return { duplicada: false };
+                }
+
+                const reg = this._p_mapaAbasUrls.get(tab.id);
+                if (reg && (reg.isentarContraAnteriores || reg.duplicacaoManualPermitida)) {
+                    return { duplicada: false };
+                }
+
+                const abasJanela = await chromeApi.tabs.query({});
+                const monOrig = (config.monitorarUrlOriginalAbertura !== undefined) ? Boolean(config.monitorarUrlOriginalAbertura) : this._p_monitorarUrlOriginal;
+                const monAtual = (config.monitorarUrlAtualPagina !== undefined) ? (config.monitorarUrlAtualPagina !== false) : this._p_monitorarUrlAtual;
+                const protegerModificadas = this._p_obterProtegerModificadasEfetivo(config);
+
+                const abaExistente = abasJanela.find((t) => {
+                    if (!t || t.id === tab.id || this._p_abasFechando.has(t.id)) return false;
+                    const regOutra = this._p_mapaAbasUrls.get(t.id);
+                    if (protegerModificadas && regOutra && regOutra.paginaModificada && reg && reg.paginaModificada) {
+                        return false;
+                    }
+                    const uOutra = this.normalizarUrlParaComparacao(t.url || t.pendingUrl || '');
+                    const uOrigOutra = (regOutra && regOutra.urlOriginal) ? regOutra.urlOriginal : uOutra;
+                    const uEstabOutra = (regOutra && regOutra.urlEstabilizada) ? regOutra.urlEstabilizada : '';
+                    if (monAtual && (uAtual === uOutra || (uEstabOutra && uAtual === uEstabOutra))) return true;
+                    if ((monOrig || (uOrigOutra && uOrigOutra !== uOutra)) && uAtual === uOrigOutra) return true;
+                    return false;
+                });
+
+                if (!abaExistente) return { duplicada: false };
+
+                const regExistente = this._p_mapaAbasUrls.get(abaExistente.id);
+
+                /* Se a aba atual for modificada e a existente não for, mantém a atual e fecha a existente */
+                if (protegerModificadas && reg && reg.paginaModificada && (!regExistente || !regExistente.paginaModificada)) {
+                    this._p_abasFechando.add(abaExistente.id);
+                    try {
+                        await chromeApi.tabs.remove(abaExistente.id);
+                    } finally {
+                        this._p_abasFechando.delete(abaExistente.id);
+                    }
+                    return { duplicada: true, abaExistente: tab };
+                }
+
+                const focarPrimeiroPlano = (config.reutilizarAbasFocoPrimeiroPlano !== undefined)
+                    ? (config.reutilizarAbasFocoPrimeiroPlano !== false)
+                    : this._p_focoPrimeiroPlano;
+
+                if (focarPrimeiroPlano) {
+                    try { await chromeApi.tabs.update(abaExistente.id, { active: true }); } catch (_) { }
+                    if (abaExistente.windowId && chromeApi.windows) {
+                        try { await chromeApi.windows.update(abaExistente.windowId, { focused: true }); } catch (_) { }
+                    }
+                }
+
+                const acao = config.reutilizarAbasAcaoConteudo || this._p_acaoConteudo;
+                if (acao === 'recarregar') {
+                    try { await chromeApi.tabs.reload(abaExistente.id); } catch (_) { }
+                } else if (acao === 'recarregar_se_modificada') {
+                    if (regExistente && regExistente.paginaModificada) {
+                        try { await chromeApi.tabs.reload(abaExistente.id); } catch (_) { }
+                    }
+                } else if (acao === 'recarregar_se_nao_modificada') {
+                    if (!regExistente || !regExistente.paginaModificada) {
+                        try { await chromeApi.tabs.reload(abaExistente.id); } catch (_) { }
+                    }
+                }
+
+                this._p_abasFechando.add(tab.id);
+                try {
+                    await chromeApi.tabs.remove(tab.id);
+                } finally {
+                    this._p_abasFechando.delete(tab.id);
+                }
+                return { duplicada: true, abaExistente };
+            } catch (_) {
+                return { duplicada: false };
             }
         }
 

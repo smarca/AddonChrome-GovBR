@@ -215,24 +215,27 @@
             }
             dialog.style.cssText = [
                 'position: fixed !important',
-                'inset: auto !important',
                 'right: auto !important',
                 'bottom: auto !important',
                 'margin: 0 !important',
+                'padding: 0 !important',
+                'transform: none !important',
                 'z-index: 2147483647 !important',
                 'isolation: isolate !important',
-                'width: 390px',
-                'background: #ffffff',
-                'border: 1px solid #94a3b8',
-                'border-radius: 8px',
-                'box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28)',
-                'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                'box-sizing: border-box',
-                'user-select: none',
-                'overflow: hidden',
-                'display: flex',
-                'flex-direction: column',
-                'transition: box-shadow 0.2s ease'
+                'width: 390px !important',
+                'max-width: calc(100vw - 20px) !important',
+                'height: auto !important',
+                'background: #ffffff !important',
+                'border: 1px solid #94a3b8 !important',
+                'border-radius: 8px !important',
+                'box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28) !important',
+                'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important',
+                'box-sizing: border-box !important',
+                'user-select: none !important',
+                'overflow: hidden !important',
+                'display: flex !important',
+                'flex-direction: column !important',
+                'transition: box-shadow 0.2s ease !important'
             ].join('; ');
 
             // 2. Barra de Título arrastável
@@ -444,8 +447,8 @@
             // 6. Arrastabilidade (Draggable) via Header
             this.#configurarArrastabilidade(header, dialog);
 
-            // 7. Inserir no DOM raiz e promover à Top Layer
-            docTop.body.appendChild(dialog);
+            // 7. Inserir no elemento raiz da tela toda (documentElement) e promover à Top Layer
+            (docTop.documentElement || docTop.body).appendChild(dialog);
             if (typeof dialog.showPopover === 'function') {
                 try {
                     if (dialog.matches && dialog.matches(':popover-open')) dialog.hidePopover();
@@ -479,8 +482,9 @@
             const docUi = ctxUi.docUi || document;
             const vw = Math.max(winUi.innerWidth || 0, docUi.documentElement ? docUi.documentElement.clientWidth : 0, 400);
             const vh = Math.max(winUi.innerHeight || 0, docUi.documentElement ? docUi.documentElement.clientHeight : 0, 300);
-            const largura = 390;
-            const altura = 160;
+            const rectReal = dialog.getBoundingClientRect ? dialog.getBoundingClientRect() : null;
+            const largura = Math.max(260, Math.round((rectReal && rectReal.width) || 390));
+            const altura = Math.max(120, Math.round((rectReal && rectReal.height) || 160));
 
             let targetX;
             let targetY;
@@ -492,21 +496,21 @@
                 targetX = posCustom.x + ctxUi.offsetX;
                 targetY = posCustom.y + ctxUi.offsetY;
             } else if (mouseXTop > 0 && mouseYTop > 0 && mouseXTop <= vw && mouseYTop <= vh) {
-                // Proxi-Mouse: logo abaixo do cursor
+                // Proxi-Mouse: na posição do cursor
                 targetX = mouseXTop - 20;
                 targetY = mouseYTop + 16;
             } else {
-                // Fallback: Centro da viewport
+                // Fallback: Centro da tela
                 targetX = Math.round((vw - largura) / 2);
                 targetY = Math.round((vh - altura) / 2);
             }
 
-            // Clamp lateral e vertical
+            // Clamp lateral e vertical na tela toda
             const finalX = Math.max(10, Math.min(targetX, vw - largura - 10));
             const finalY = Math.max(10, Math.min(targetY, vh - altura - 10));
 
-            dialog.style.left = `${Math.round(finalX)}px`;
-            dialog.style.top = `${Math.round(finalY)}px`;
+            dialog.style.setProperty('left', `${Math.round(finalX)}px`, 'important');
+            dialog.style.setProperty('top', `${Math.round(finalY)}px`, 'important');
         }
 
         /**
