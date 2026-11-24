@@ -152,10 +152,11 @@
                     if (stEfetivo.pomodoroDescansoPulado && saldoRestMs > 0) {
                         const ehPausaMaiorPausada = stEfetivo.pomodoroDescansoSaldoTipo === 'pausa_maior';
                         const rotuloPausadoBase = ehPausaMaiorPausada ? 'Descanso' : 'Alívio';
-                        const metaPausadoMin = ehPausaMaiorPausada ? resumo.pausaMaiorMin : resumo.alivioMin;
+                        const metaPadraoPausadoMin = ehPausaMaiorPausada ? resumo.pausaMaiorMin : resumo.alivioMin;
+                        const restanteMin = Math.ceil(saldoRestMs / 60000);
+                        const metaPausadoMin = Math.max(metaPadraoPausadoMin, restanteMin);
                         const pausadoAjustado = compDescMin !== 0;
                         const rotuloPausado = pausadoAjustado ? `${rotuloPausadoBase} Ajustado` : rotuloPausadoBase;
-                        const restanteMin = Math.ceil(saldoRestMs / 60000);
                         const feitoPausadoMin = Math.max(0, metaPausadoMin - restanteMin);
                         segmentosPomodoro.push({
                             texto: `${rotuloPausado} ${fmtParBanco(feitoPausadoMin, metaPausadoMin, origemDesc, compDescMin)}`,

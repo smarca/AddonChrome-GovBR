@@ -557,6 +557,10 @@
                     const focoInicialCompMs = Math.min(Math.max(0, focoMetaRetMs - 60000), focoSalvoEfetivoMs);
                     if (estado.pomodoroFase === 'pausa_maior') {
                         estado.pomodoroCicloAtual = 0;
+                        estado.pausaMaiorSaldoMs = 0;
+                        estado.pausaMaiorDeslocamentos = 0;
+                    } else if (excessoDescMs > 0 && typeof this._aplicarProtecaoEDeslocamentoPausaMaior === 'function') {
+                        this._aplicarProtecaoEDeslocamentoPausaMaior(estado, excessoDescMs, config);
                     }
                     const creditoDescansoFinalMs = Math.max(60000, creditoRealMs);
                     estado.pomodoroDescansoTotalMs = Math.max(0, Number(estado.pomodoroDescansoTotalMs || 0)) + creditoDescansoFinalMs;

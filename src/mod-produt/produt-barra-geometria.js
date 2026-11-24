@@ -166,7 +166,7 @@
             const est = this.normalizarEstadoGlobalBarraPomodoro(estadoBarra);
             const metaMs = Math.max(1, Number(d.metaFaseMin || 1)) * 60000;
             const concluido = Boolean(d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
-            if (d.emDescanso && (concluido || !d.descansoRealizado)) {
+            if (d.emDescanso) {
                 if (!concluido && d.descansoEmAviso) {
                     if (d.descansoUltimoTipoInteracao === 'movimento') {
                         return {

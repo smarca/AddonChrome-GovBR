@@ -312,7 +312,10 @@
             const minInativo = Math.floor(msInativo / 60000);
             const nivelAnterior = (estado._ultimoIdleAutoCreditadoTs === ultimaAtivTs) ? (estado._nivelAutoCreditado || '') : '';
 
-            if (minInativo >= pausaMaiorMin && nivelAnterior !== 'pausa_maior') {
+            const jaEmPausaMaiorAtiva = (estado.pomodoroFase === 'pausa_maior' && !estado.pomodoroDescansoMinCumprido);
+            const jaEmDescansoOficial = (estado.pomodoroFase === 'pausa_maior' || (estado.pomodoroFase === 'alivio' && !estado.pomodoroDescansoMinCumprido));
+
+            if (!jaEmPausaMaiorAtiva && minInativo >= pausaMaiorMin && nivelAnterior !== 'pausa_maior') {
                 /* FEAT-38: Descanso detectado automaticamente exibe o popup de Descanso Maior contando continuamente até voltar a interagir */
                 estado.pomodoroFase = 'pausa_maior';
                 estado.pomodoroMinutosNaFase = minInativo;
@@ -340,7 +343,7 @@
                 return { creditado: true, tipo: 'pausa_maior' };
             }
 
-            if (minInativo >= alivioMin && minInativo < pausaMaiorMin && nivelAnterior !== 'alivio' && nivelAnterior !== 'pausa_maior') {
+            if (!jaEmDescansoOficial && minInativo >= alivioMin && minInativo < pausaMaiorMin && nivelAnterior !== 'alivio' && nivelAnterior !== 'pausa_maior') {
                 /* FEAT-38: Alívio detectado automaticamente exibe o popup de Alívio contando continuamente até pausaMaiorMin ou retorno */
                 estado.pomodoroFase = 'alivio';
                 estado.pomodoroMinutosNaFase = minInativo;

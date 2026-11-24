@@ -63,9 +63,9 @@
                                 const st = document.createElement('style');
                                 st.id = idBackdropStyle;
                                 st.textContent = [
-                                    '@keyframes jusgov-descanso-fade-lento{0%,100%{background:rgba(2,18,38,0.14);box-shadow:inset 0 0 40px rgba(56,189,248,0.08)}50%{background:rgba(2,24,52,0.44);box-shadow:inset 0 0 90px rgba(56,189,248,0.22)}}',
-                                    '@keyframes jusgov-retorno-blink-tela{0%,100%{background:rgba(22,163,74,0.06);box-shadow:inset 0 0 28px rgba(74,222,128,0.25)}50%{background:rgba(34,197,94,0.34);box-shadow:inset 0 0 110px rgba(74,222,128,0.82)}}',
-                                    '@keyframes jusgov-retorno-rajada{0%,100%{background:rgba(22,163,74,0.10);box-shadow:inset 0 0 40px rgba(74,222,128,0.35)}45%{background:rgba(134,239,172,0.48);box-shadow:inset 0 0 140px rgba(255,255,255,0.88)}70%{background:rgba(34,197,94,0.42);box-shadow:inset 0 0 120px rgba(74,222,128,0.92)}}'
+                                    '@keyframes jusgov-descanso-fade-lento{0%,100%{opacity:0.14;backdrop-filter:blur(0.5px)}50%{opacity:0.94;backdrop-filter:blur(3px)}}',
+                                    '@keyframes jusgov-retorno-blink-tela{0%,100%{opacity:0.18;background:rgba(22,163,74,0.10);box-shadow:inset 0 0 28px rgba(74,222,128,0.28)}50%{opacity:1;background:rgba(34,197,94,0.36);box-shadow:inset 0 0 115px rgba(74,222,128,0.85)}}',
+                                    '@keyframes jusgov-retorno-rajada{0%,100%{opacity:0.25;background:rgba(22,163,74,0.12);box-shadow:inset 0 0 40px rgba(74,222,128,0.35)}45%{opacity:1;background:rgba(134,239,172,0.50);box-shadow:inset 0 0 145px rgba(255,255,255,0.90)}70%{opacity:0.92;background:rgba(34,197,94,0.44);box-shadow:inset 0 0 120px rgba(74,222,128,0.92)}}'
                                 ].join('');
                                 (document.head || document.documentElement).appendChild(st);
                             };
@@ -80,16 +80,20 @@
                                     bd = document.createElement('div');
                                     bd.id = idBackdrop;
                                     bd.setAttribute('data-jusgov-ignore', 'true');
-                                    bd.style.cssText = 'position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;pointer-events:none !important;z-index:2147483646 !important;margin:0 !important;padding:0 !important;border:0 !important;';
-                                    (document.body || document.documentElement).appendChild(bd);
+                                    bd.style.cssText = 'position:fixed !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;width:100vw !important;height:100vh !important;pointer-events:none !important;z-index:2147483646 !important;margin:0 !important;padding:0 !important;border:0 !important;transform:none !important;will-change:opacity !important;';
+                                    (document.documentElement || document.body).appendChild(bd);
                                 }
                                 if (bd.getAttribute('data-modo') === modo) return;
                                 bd.setAttribute('data-modo', modo);
                                 if (modo === 'descanso_calmo') {
-                                    bd.style.setProperty('animation', 'jusgov-descanso-fade-lento 8s ease-in-out infinite', 'important');
+                                    bd.style.setProperty('background', 'radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.30) 0%, rgba(2, 18, 42, 0.62) 100%)', 'important');
+                                    bd.style.setProperty('box-shadow', 'inset 0 0 95px rgba(56, 189, 248, 0.24)', 'important');
+                                    bd.style.setProperty('animation', 'jusgov-descanso-fade-lento 6.5s ease-in-out infinite', 'important');
                                 } else if (modo === 'retorno_rajada') {
+                                    bd.style.setProperty('backdrop-filter', 'none', 'important');
                                     bd.style.setProperty('animation', 'jusgov-retorno-rajada 0.55s ease-in-out infinite', 'important');
                                 } else if (modo === 'retorno_trabalho') {
+                                    bd.style.setProperty('backdrop-filter', 'none', 'important');
                                     bd.style.setProperty('animation', 'jusgov-retorno-blink-tela 1.8s ease-in-out infinite', 'important');
                                 }
                             };
@@ -203,7 +207,7 @@
                                     if (!concluido && !d.aguardandoOciosidade && semScreensaverAte > 0 && agoraNow < semScreensaverAte) {
                                         return 'aviso_topo_centro';
                                     }
-                                    if (!d.aguardandoOciosidade && (concluido || (!d.descansoRealizado && agoraNow >= Math.max(ativAte, semScreensaverAte)))) return 'idle_centro_tela';
+                                    if (!d.aguardandoOciosidade && (concluido || agoraNow >= Math.max(ativAte, semScreensaverAte))) return 'idle_centro_tela';
                                 }
                                 return 'padrao';
                             };
@@ -339,52 +343,6 @@
                                     } else {
                                         p.setAttribute('fill', cor);
                                     }
-                                    svg.appendChild(p);
-                                }
-                                return svg;
-                            };
-
-                            const criarIconeSvgDiscreto = (tipo, cor) => {
-                                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                                svg.setAttribute('width', '12');
-                                svg.setAttribute('height', '12');
-                                svg.setAttribute('viewBox', '0 0 16 16');
-                                svg.setAttribute('fill', 'none');
-                                svg.style.display = 'block';
-                                svg.style.pointerEvents = 'none';
-                                if (tipo === 'cadeado') {
-                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    p.setAttribute('d', 'M5 7V5a3 3 0 0 1 6 0v2h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1zm1.5 0h3V5a1.5 1.5 0 0 0-3 0v2z');
-                                    p.setAttribute('fill', cor);
-                                    svg.appendChild(p);
-                                } else if (tipo === 'mini') {
-                                    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                                    c.setAttribute('cx', '8');
-                                    c.setAttribute('cy', '8');
-                                    c.setAttribute('r', '5.5');
-                                    c.setAttribute('stroke', cor);
-                                    c.setAttribute('stroke-width', '1.8');
-                                    const pt = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    pt.setAttribute('d', 'M8 4.8V8l2.2 1.4');
-                                    pt.setAttribute('stroke', cor);
-                                    pt.setAttribute('stroke-width', '1.6');
-                                    pt.setAttribute('stroke-linecap', 'round');
-                                    svg.appendChild(c);
-                                    svg.appendChild(pt);
-                                } else if (tipo === 'minimizar') {
-                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    p.setAttribute('d', 'M3 10.6h10v2H3z');
-                                    p.setAttribute('fill', cor);
-                                    svg.appendChild(p);
-                                } else if (tipo === 'expandir') {
-                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    p.setAttribute('d', 'M3 8.2V3h5.2v1.6H4.6v3.6H3zm10-.4V13H7.8v-1.6h3.6V7.8H13z');
-                                    p.setAttribute('fill', cor);
-                                    svg.appendChild(p);
-                                } else {
-                                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    p.setAttribute('d', 'M9.8 2.2 13.8 6.2l-1.1 1.1-1-.3-2.5 2.5.4 2.1-1.1 1.1-2.2-2.2-3.1 3.1-.8-.8 3.1-3.1-2.2-2.2 1.1-1.1 2.1.4 2.5-2.5-.3-1 1.1-1.1z');
-                                    p.setAttribute('fill', cor);
                                     svg.appendChild(p);
                                 }
                                 return svg;
@@ -619,34 +577,6 @@
                                     return true;
                                 };
 
-                                const enviarAcaoFlexivel = (acaoNome) => {
-                                    if (!contextoHostVivo()) return;
-                                    try {
-                                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                                            chrome.runtime.sendMessage({ acao: acaoNome }).then((resp) => {
-                                                if (!host.isConnected || host.__jusgovHostDestruido) return;
-                                                if (resp && resp.ok && resp.resumoPomodoro && resp.cfgExib) {
-                                                    host.__jusgovBannerVisivelAgora = false;
-                                                    host.__jusgovPropCardIdx = -1;
-                                                    const cfgComTs = Object.assign({}, resp.cfgExib, { agoraServidor: resp.agoraServidor || Date.now() });
-                                                    aplicarSnapshotExterno(cfgComTs, resp.resumoPomodoro, resp.estadoBarra || host.__jusgovEstadoBarra);
-                                                    if (typeof host.__jusgovRotacionarPropaganda === 'function') {
-                                                        host.__jusgovRotacionarPropaganda(true, true);
-                                                    }
-                                                } else if (resp && resp.motivo) {
-                                                    exibirFeedbackGovernanca(resp.motivo);
-                                                }
-                                            }).catch((err) => {
-                                                if (iniciouComChromeRuntime && (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id || /context invalidated/i.test(String(err || '')))) {
-                                                    destruirHost(host);
-                                                }
-                                            });
-                                        }
-                                    } catch (_) {
-                                        contextoHostVivo();
-                                    }
-                                };
-
                                 boxBannerOculto.addEventListener('mouseenter', () => {
                                     if (!host.__jusgovHoverPill) {
                                         host.__jusgovHoverInicioTs = Date.now();
@@ -725,15 +655,27 @@
                                     }, 250);
                                 });
 
-                                /* Clique único sem arrastar: abre imediatamente os detalhes (ou restaura de micro) */
+                                /* Clique único sem arrastar: em FOCO_NORMAL cicla os 4 estilos (Micro -> Mini -> Normal -> Expandido -> Micro) sincronizando com Opções; nos demais estados apenas abre preview temporário sem sobrescrever o estilo salvo (FEAT-106) */
                                 const alternarModoPorCliqueUnico = () => {
                                     const agoraClk = Date.now();
                                     const estAtual = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
+                                    const dClk = host.__jusgovDados || dadosResumo;
+                                    const segDecClk = Math.max(0, Number(dClk && dClk.segundosDecorridos || 0));
+                                    const metaFocoSegClk = Math.max(1, Number((dClk && (dClk.metaFaseMin || dClk.focoMin)) || 45)) * 60;
+                                    const segRestClk = metaFocoSegClk - segDecClk;
+                                    const necAtivClk = Number(dClk && dClk.necessidadeAtividadeMs || 0);
+                                    const emFocoNormal = Boolean(
+                                        dClk &&
+                                        !dClk.emDescanso &&
+                                        !dClk.descansoPendente &&
+                                        !dClk.descansoPulado &&
+                                        !dClk.descansoEmAviso &&
+                                        !dClk.emPausa &&
+                                        !dClk.forcarMicroPorEmprestimoFoco &&
+                                        necAtivClk >= -60000 &&
+                                        segRestClk > 30
+                                    );
                                     host.__jusgovLocalBarraAlteradaAteTs = agoraClk + 1800;
-                                    host.__jusgovAguardandoSairPosMin = false;
-                                    host.__jusgovSuprimirHoverMicroAteTs = 0;
-                                    host.__jusgovHoverPill = true;
-                                    host.__jusgovHoverAcoesDesbloqueadas = true;
                                     if (host.__jusgovHoverAcoesTimer) {
                                         clearTimeout(host.__jusgovHoverAcoesTimer);
                                         host.__jusgovHoverAcoesTimer = 0;
@@ -771,17 +713,53 @@
                                         }
                                     };
 
-                                    if (estAtual.minimizadoMicro) {
-                                        estAtual.minimizadoMicro = false;
-                                        estAtual.minimizadoDescansoAdiadoTs = 0;
-                                        if (typeof host.__jusgovPararPatrulhaBorda === 'function') host.__jusgovPararPatrulhaBorda();
-                                        host.__jusgovEstadoBarra = estAtual;
+                                    if (!emFocoNormal) {
+                                        host.__jusgovAguardandoSairPosMin = false;
+                                        host.__jusgovSuprimirHoverMicroAteTs = 0;
+                                        host.__jusgovHoverPill = true;
+                                        host.__jusgovHoverAcoesDesbloqueadas = true;
                                         garantirVisivelSemSnap();
-                                        enviarEstadoGlobal({ minimizadoMicro: false, minimizadoDescansoAdiadoTs: 0 });
                                         return;
                                     }
 
-                                    garantirVisivelSemSnap();
+                                    if (estAtual.minimizadoMicro) {
+                                        estAtual.minimizadoMicro = false;
+                                        estAtual.nivelDetalhe = 0;
+                                        estAtual.minimizadoDescansoAdiadoTs = 0;
+                                        host.__jusgovAguardandoSairPosMin = false;
+                                        host.__jusgovSuprimirHoverMicroAteTs = 0;
+                                        host.__jusgovHoverPill = true;
+                                        if (typeof host.__jusgovPararPatrulhaBorda === 'function') host.__jusgovPararPatrulhaBorda();
+                                        host.__jusgovEstadoBarra = estAtual;
+                                        garantirVisivelSemSnap();
+                                        enviarEstadoGlobal({ minimizadoMicro: false, nivelDetalhe: 0, minimizadoDescansoAdiadoTs: 0 });
+                                        return;
+                                    }
+
+                                    const nivAtual = Math.floor(Number(estAtual.nivelDetalhe) || 0);
+                                    if (nivAtual === 0) {
+                                        estAtual.nivelDetalhe = 1;
+                                        host.__jusgovEstadoBarra = estAtual;
+                                        garantirVisivelSemSnap();
+                                        enviarEstadoGlobal({ minimizadoMicro: false, nivelDetalhe: 1 });
+                                        return;
+                                    }
+                                    if (nivAtual === 1) {
+                                        estAtual.nivelDetalhe = 2;
+                                        host.__jusgovEstadoBarra = estAtual;
+                                        garantirVisivelSemSnap();
+                                        enviarEstadoGlobal({ minimizadoMicro: false, nivelDetalhe: 2 });
+                                        return;
+                                    }
+
+                                    estAtual.minimizadoMicro = true;
+                                    estAtual.nivelDetalhe = 0;
+                                    host.__jusgovEstadoBarra = estAtual;
+                                    host.__jusgovHoverPill = false;
+                                    host.__jusgovAguardandoSairPosMin = true;
+                                    host.__jusgovSuprimirHoverMicroAteTs = agoraClk + 1600;
+                                    if (typeof host.__jusgovAtualizarRelogio === 'function') host.__jusgovAtualizarRelogio();
+                                    enviarEstadoGlobal({ minimizadoMicro: true, nivelDetalhe: 0 });
                                 };
 
                                 /* Arraste fluido via Pointer Events (setPointerCapture evita travar sobre iframes) em pill e micro-ícone; clique sem arraste alterna o modo */
@@ -1677,13 +1655,13 @@
                                     const dPos = host.__jusgovDados || dadosResumo;
                                     const estPos = host.__jusgovEstadoBarra || normalizarEstadoBarra(estadoBarra);
                                     const modoEsp = obterModoPosicaoEspecial(dPos, agoraPos);
-                                    removerBackdropBlur();
                                     if (modoEsp === 'idle_centro_tela') {
                                         pararPatrulhaBorda();
                                         host.__jusgovEstavaNoTopoAviso = false;
                                         iniciarScreensaver();
                                         return;
                                     }
+                                    removerBackdropBlur();
                                     pararScreensaver();
                                     if (modoEsp === 'aviso_topo_centro' || modoEsp === 'aviso_movimento_centro_blur') {
                                         pararPatrulhaBorda();
@@ -2166,6 +2144,8 @@
                                             ? Number(d.metaFaseMs)
                                             : (Math.max(1, Number(d.metaFaseMin || 1)) * 60000);
                                         const cumpridoAoVivo = Boolean(d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs);
+                                        const modoEspRelogio = obterModoPosicaoEspecial(d, agoraNow);
+                                        const emIdleDescansoReal = (modoEspRelogio === 'idle_centro_tela' && !host.__jusgovModoOculto);
 
                                         if (d.aguardandoOciosidade) {
                                             const mmParado = String(Math.max(0, Number(d.metaFaseMin || 0))).padStart(2, '0');
@@ -2185,10 +2165,10 @@
                                             }
                                         }
 
-                                        if (cumpridoAoVivo && !d.aguardandoOciosidade) {
+                                        if (emIdleDescansoReal && cumpridoAoVivo) {
                                             const emRajadaVisual = Boolean(host.__jusgovRajadaVisualAteTs && agoraNow < host.__jusgovRajadaVisualAteTs);
                                             atualizarBackdropTelaCheia(emRajadaVisual ? 'retorno_rajada' : 'retorno_trabalho');
-                                        } else if (!d.aguardandoOciosidade && !host.__jusgovModoOculto) {
+                                        } else if (emIdleDescansoReal) {
                                             atualizarBackdropTelaCheia('descanso_calmo');
                                         } else {
                                             atualizarBackdropTelaCheia('nenhum');
@@ -2348,13 +2328,16 @@
                                         const agoraSyncReq = Date.now();
                                         const dSync = host.__jusgovDados;
                                         const semFocoJanela = (typeof document.hasFocus === 'function') ? !document.hasFocus() : false;
-                                        const intervaloMinSync = (dSync && dSync.emDescanso) ? 1000 : (semFocoJanela ? 3500 : 2000);
+                                        const intervaloMinSync = (dSync && dSync.emDescanso) ? 820 : (semFocoJanela ? 3500 : 2000);
                                         if (host.__jusgovUltSyncIpcTs && (agoraSyncReq - host.__jusgovUltSyncIpcTs) < intervaloMinSync) {
                                             if (host.__jusgovSnapshotAgoraSrvMs) {
                                                 host.__jusgovSnapshotAgoraSrvMs += 1000;
                                             }
                                             if (dSync && !dSync.emPausa && typeof dSync.segundosDecorridos === 'number') {
                                                 dSync.segundosDecorridos += 1;
+                                            }
+                                            if (dSync && dSync.emDescanso && !dSync.aguardandoOciosidade && !dSync.descansoEmAviso) {
+                                                dSync.descansoAcumuladoMs = Number(dSync.descansoAcumuladoMs || 0) + 1000;
                                             }
                                             atualizarRelogio();
                                             return;
