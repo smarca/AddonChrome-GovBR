@@ -1551,8 +1551,8 @@
                     }
                     const virouPausaMaiorOk = (st70.pomodoroFase === 'pausa_maior' && st70.pomodoroCicloAtual === 0 && st70.pomodoroMinutosNaFase === 25);
 
-                    const rMov = mp70.aplicarAtividadeEmEstadoTrabalho(st70, t0 + 130000 + 25 * 60000, 'movimento');
-                    const movIniciouFocoOk = (rMov.iniciouFocoPosDescanso === true && st70.pomodoroFase === 'foco' && rMov.iniciouBadgeVerde === true && st70.pomodoroBadgeVerdeAteTs === (t0 + 130000 + 25 * 60000 + 15000));
+                    const rMov = mp70.aplicarAtividadeEmEstadoTrabalho(st70, t0 + 130000 + 25 * 60000, 'click_ou_tecla');
+                    const movIniciouFocoOk = (rMov.iniciouFocoPosDescanso === true && st70.pomodoroFase === 'foco' && rMov.iniciouBadgeVerde === false && st70.pomodoroBadgeVerdeAteTs === 1);
 
                     const st70Clk = mp70.criarEstadoTrabalhoZerado('2026-11-16', t0);
                     st70Clk.pomodoroFase = 'pausa_maior';
@@ -2297,13 +2297,13 @@
 
                         /* Usuario volta a interagir por movimento apos pausa cumprida -> inicia foco sem exibir badge verde */
                         const tRet = t50 + 8 * 60000;
-                        const retMov = mp50.aplicarAtividadeEmEstadoTrabalho(stAuto, tRet, 'movimento');
+                        const retMov = mp50.aplicarAtividadeEmEstadoTrabalho(stAuto, tRet, 'click_ou_tecla');
                         const rAutoInteragindo = mp50.calcularResumoPomodoro(stAuto, cfg50, tRet + 8000);
                         const okDurante15s = (
                             retMov.iniciouFocoPosDescanso === true &&
                             stAuto.pomodoroFase === 'foco' &&
-                            retMov.iniciouBadgeVerde === true &&
-                            rAutoInteragindo.badgeVerdeAteTs === (tRet + 15000) &&
+                            retMov.iniciouBadgeVerde === false &&
+                            rAutoInteragindo.badgeVerdeAteTs === 1 &&
                             mp50.deveExibirBadgeVerdeMinipopup(rAutoInteragindo, tRet + 8000, false) === false
                         );
 
@@ -3032,13 +3032,13 @@
                         st61.pomodoroDescansoMinCumprido = false;
                         st61.pomodoroDescansoSyncTs = t61;
                         st61.pomodoroDescansoAcumuladoMs = 360000;
-                        const rMovCumprido = mp61.aplicarAtividadeEmEstadoTrabalho(st61, t61 + 25000, 'movimento', cfg61);
+                        const rMovCumprido = mp61.aplicarAtividadeEmEstadoTrabalho(st61, t61 + 25000, 'click_ou_tecla', cfg61);
                         const retFocoVivoOk = (
                             rMovCumprido.iniciouFocoPosDescanso === true &&
                             st61.pomodoroFase === 'foco' &&
                             st61.pomodoroMinutosNaFase === 0 &&
                             st61.pomodoroDescansoAcumuladoMs === 0 &&
-                            st61.pomodoroBadgeVerdeAteTs === (t61 + 25000 + 15000)
+                            st61.pomodoroBadgeVerdeAteTs === 1
                         );
 
                         feat61Ok = beepOk && visOk && retFocoVivoOk;

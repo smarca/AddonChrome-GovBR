@@ -220,12 +220,12 @@
             if (estado.pomodoroCicloAtual >= ciclosMax && Number(estado.pausaMaiorDeslocamentos || 0) > 0) {
                 estado.pausaMaiorDeslocamentos = Math.max(0, Number(estado.pausaMaiorDeslocamentos || 0) - 1);
             }
-            const basePausaMs = temDebitoPausaAnterior
-                ? Math.max(Number(estado.pomodoroDescansoSaldoRestanteMs || 0), Number(estado.necessidadePausaMs || 0), alivioMinCfg * 60000)
-                : ((ehPausaMaiorProx ? pausaMaiorMinCfg : alivioMinCfg) * 60000);
-            const excessoTrabalhoMs = temDebitoPausaAnterior
-                ? Math.max(0, focoRodadaAtualMs)
-                : Math.max(0, focoRodadaAtualMs - (focoMinCfg * 60000));
+            const saldoPendenteAntMs = temDebitoPausaAnterior
+                ? Math.max(0, Number(estado.pomodoroDescansoSaldoRestanteMs || 0), Number(estado.necessidadePausaMs || 0))
+                : 0;
+            const pausaCicloAtualMs = (ehPausaMaiorProx ? pausaMaiorMinCfg : alivioMinCfg) * 60000;
+            const basePausaMs = Math.min(pausaMaiorMinCfg * 60000, pausaCicloAtualMs + saldoPendenteAntMs);
+            const excessoTrabalhoMs = Math.max(0, focoRodadaAtualMs - (focoMinCfg * 60000));
             const calcExc = this._calcularAcrescimoExcessoTrabalhoMs(excessoTrabalhoMs, config, basePausaMs);
             const ehPausaMaiorFinal = ehPausaMaiorProx || calcExc.atingiuDescanso;
             estado.necessidadeAtividadeMs = 0;

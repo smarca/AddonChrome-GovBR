@@ -535,7 +535,10 @@
 
             if (estado.pomodoroFase === 'alivio' || estado.pomodoroFase === 'pausa_maior') {
                 if (estado.pomodoroDescansoMinCumprido) {
-                    /* Qualquer interacao sensivel (mouse move, click ou tecla) apos concluir o descanso inicia o Foco, contabilizando inclusive todo o tempo extra passado */
+                    if (tipoInteracao === 'movimento') {
+                        return { resetouDescanso: false, iniciouFocoPosDescanso: false, iniciouBadgeVerde: false, ocultouBadgeVerde: false, alterouDescanso: false };
+                    }
+                    /* Somente clique ou tecla apos concluir o descanso inicia o Foco (nunca apenas movimento do mouse) */
                     const ehMovimento = (tipoInteracao === 'movimento');
                     const progConclReal = this.calcularProgressoDescanso(estado, agora, config, { mutar: false });
                     const creditoRealMs = Math.max(
@@ -551,10 +554,9 @@
                     const excessoDescMs = Math.max(0, creditoRealMs - metaDescConclMs);
                     const focoMinCfgRet = Math.max(25, Number((config && config.pomodoroFocoMinutos) || 45));
                     const focoMetaRetMs = focoMinCfgRet * 60000;
-                    /* Excesso de descanso (ex.: folga longa de 2h) jamais avança o cronômetro do próximo Foco;
-                     * preserva apenas eventual foco salvo antes de pausa flexível no meio do ciclo (RN-07). */
-                    const focoSalvoEfetivoMs = (estado.pomodoroFase === 'pausa_maior') ? 0 : focoSalvoMs;
-                    const focoInicialCompMs = Math.min(Math.max(0, focoMetaRetMs - 60000), focoSalvoEfetivoMs);
+                    /* Alívio/Descanso completo (ou maior) sempre inicia o próximo Foco no máximo do ciclo (0/focoMin),
+                     * enquanto eventual excesso de descanso abate apenas o alívio/descanso seguinte dentro do limite. */
+                    const focoInicialCompMs = 0;
                     if (estado.pomodoroFase === 'pausa_maior') {
                         estado.pomodoroCicloAtual = 0;
                         estado.pausaMaiorSaldoMs = 0;

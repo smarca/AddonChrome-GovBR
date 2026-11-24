@@ -382,7 +382,7 @@
                                 host.style.cssText = 'position:fixed !important;top:0px !important;bottom:auto !important;left:0px !important;right:auto !important;transform:none !important;margin:0 !important;padding:0 !important;border:0 !important;line-height:1 !important;width:auto !important;height:auto !important;z-index:2147483647 !important;pointer-events:none !important;font-family:"Segoe UI",system-ui,-apple-system,sans-serif !important;transition:none !important;';
                                 const shadow = host.attachShadow({ mode: 'closed' });
                                 const styleAnim = document.createElement('style');
-                                styleAnim.textContent = '@keyframes jusgov-piscar-crono{0%,49%{opacity:1}50%,100%{opacity:0.22}}@keyframes jusgov-piscar-icone{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.42;transform:scale(1.12)}}@keyframes jusgov-pill-retorno{0%,100%{background:#065f46;border-color:#4ade80;box-shadow:0 0 22px rgba(74,222,128,0.85),0 6px 18px rgba(0,0,0,0.45)}50%{background:#15803d;border-color:#fef08a;box-shadow:0 0 36px rgba(134,239,172,1),0 6px 22px rgba(0,0,0,0.5)}}.jg-piscar{animation:jusgov-piscar-icone 0.9s ease-in-out infinite;transform-origin:center;}';
+                                styleAnim.textContent = '@keyframes jusgov-piscar-crono{0%,49%{opacity:1}50%,100%{opacity:0.22}}@keyframes jusgov-pill-alerta-30s{0%,49%{border-color:#eab308;box-shadow:0 0 12px rgba(250,204,21,0.75),0 4px 14px rgba(15,23,42,0.34)}50%,100%{border-color:#ca8a04;box-shadow:0 0 2px rgba(250,204,21,0.18),0 4px 14px rgba(15,23,42,0.34)}}@keyframes jusgov-piscar-icone{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.42;transform:scale(1.12)}}@keyframes jusgov-pill-retorno{0%,100%{background:#065f46;border-color:#4ade80;box-shadow:0 0 22px rgba(74,222,128,0.85),0 6px 18px rgba(0,0,0,0.45)}50%{background:#15803d;border-color:#fef08a;box-shadow:0 0 36px rgba(134,239,172,1),0 6px 22px rgba(0,0,0,0.5)}}.jg-piscar{animation:jusgov-piscar-icone 0.9s ease-in-out infinite;transform-origin:center;}';
                                 shadow.appendChild(styleAnim);
                                 const pill = document.createElement('div');
                                 pill.style.cssText = 'pointer-events:auto;display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:1px 6px;border-radius:7px;background:#0f172a;color:#f8fafc;font-size:11px;line-height:1.1;font-weight:600;box-shadow:0 4px 14px rgba(15,23,42,0.34);border:1px solid #0d9488;white-space:nowrap;cursor:grab;user-select:none;touch-action:none;margin:0;';
@@ -1752,7 +1752,16 @@
                                         : (Math.max(1, Number((d && d.metaFaseMin) || 1)) * 60000);
                                     const cumpridoAoVivo = Boolean(d && d.emDescanso && (d.descansoMinCumprido || Number(d.descansoAcumuladoMs || 0) >= metaMs));
 
-                                    if (d.emDescanso && d.alertaEmprestimoTexto) {
+                                    spanStatus.style.opacity = '1';
+                                    if (d.emDescanso && !cumpridoAoVivo && d.descansoEmAviso && d.descansoAvisoTexto) {
+                                        spanStatus.style.display = 'block';
+                                        spanStatus.textContent = d.descansoAvisoTexto;
+                                        spanStatus.style.background = '#f59e0b';
+                                        spanStatus.style.color = '#111827';
+                                        spanStatus.style.fontWeight = '700';
+                                        return;
+                                    }
+                                    if (d.emDescanso && !cumpridoAoVivo && d.alertaEmprestimoTexto) {
                                         spanStatus.style.display = 'block';
                                         spanStatus.textContent = d.alertaEmprestimoTexto;
                                         if (d.alertaEmprestimoCritico) {
@@ -1769,15 +1778,6 @@
                                             spanStatus.style.opacity = '1';
                                             pill.style.borderColor = '#f59e0b';
                                         }
-                                        return;
-                                    }
-                                    spanStatus.style.opacity = '1';
-                                    if (d.emDescanso && !cumpridoAoVivo && d.descansoEmAviso && d.descansoAvisoTexto) {
-                                        spanStatus.style.display = 'block';
-                                        spanStatus.textContent = d.descansoAvisoTexto;
-                                        spanStatus.style.background = '#f59e0b';
-                                        spanStatus.style.color = '#111827';
-                                        spanStatus.style.fontWeight = '700';
                                         return;
                                     }
                                     const restaurarVisualPadraoPillRetorno = () => {
@@ -2237,7 +2237,7 @@
                                     const ss = String(segFoco % 60).padStart(2, '0');
                                     const metaFocoSeg = Math.max(1, Number(d.metaFaseMin || d.focoMin || 45)) * 60;
                                     const segRestFoco = metaFocoSeg - segFoco;
-                                    const emAlerta30s = Boolean(!d.descansoPendente && !d.emPausa && segRestFoco > 0 && segRestFoco <= 30);
+                                    const emAlerta30s = Boolean(!d.emPausa && segRestFoco > 0 && segRestFoco <= 30);
                                     const exibirSinalTrabalho = Boolean(
                                         host.__jusgovHoverPill ||
                                         d.descansoPulado ||
@@ -2249,6 +2249,13 @@
                                     spanTempo.textContent = exibirSinalTrabalho ? `+${mm}:${ss}` : `${mm}:${ss}`;
                                     spanTempo.style.color = emAlerta30s ? '#facc15' : '';
                                     spanTempo.style.animation = emAlerta30s ? 'jusgov-piscar-crono 1s steps(1,end) infinite' : 'none';
+                                    if (emAlerta30s) {
+                                        pill.style.animation = 'jusgov-pill-alerta-30s 1s steps(1,end) infinite';
+                                        microIconeBox.style.animation = 'jusgov-pill-alerta-30s 1s steps(1,end) infinite';
+                                    } else {
+                                        if (pill.getAttribute('data-retorno-ativo') !== 'true') pill.style.animation = 'none';
+                                        microIconeBox.style.animation = 'none';
+                                    }
                                     atualizarModoVisualPill();
                                     atualizarPosicaoEfetivaPill(agoraNow);
                                 };
