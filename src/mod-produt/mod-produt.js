@@ -184,29 +184,27 @@
                 const estado = await this.obterOuIniciarEstadoTrabalhoHoje();
                 const agora = Date.now();
 
-                /* BUG-129: Consultar estado nativo de ociosidade do SO (chrome.idle.queryState)
-                 * para reconhecer atividade real mesmo quando o usuário trabalha fora das abas web
-                 * (VS Code, Word, PDFs, opções ou outras janelas do Windows), evitando falsas pausas
-                 * e perda de minutos no Tempo Ativo. */
+                /* Paridade fora de foco: se o navegador NÃO estiver em foco (minimizado/outro app),
+                 * não renova ultimaAtividadeTs (trata exatamente como mouse parado -> pausa/alívio/ocioso).
+                 * Apenas se uma janela do Chrome ESTIVER em foco e houver atividade em páginas internas
+                 * sem content script, renova atividade durante Foco preservando pomodoroFocoPausadoMs. */
                 try {
-                    if (typeof chrome !== 'undefined' && chrome.idle && typeof chrome.idle.queryState === 'function') {
-                        const consultarIdle = (seg) => new Promise((resolve) => {
-                            try {
-                                chrome.idle.queryState(seg, (st) => resolve(st || ''));
-                            } catch (_) {
-                                resolve('');
-                            }
-                        });
-                        const estadoIdle60 = await consultarIdle(60);
-                        if (estadoIdle60 === 'active') {
-                            estado.ultimaAtividadeTs = agora;
-                            estado.emPausa = false;
-                            estado.minutosInativosPendentes = 0;
-                        } else {
-                            const estadoIdle5m = await consultarIdle(295);
-                            if (estadoIdle5m === 'active' && (agora - Number(estado.ultimaAtividadeTs || 0)) >= (5 * 60 * 1000)) {
-                                estado.ultimaAtividadeTs = agora - (60 * 1000);
+                    if (typeof chrome !== 'undefined' && chrome.windows && typeof chrome.windows.getLastFocused === 'function'
+                        && chrome.idle && typeof chrome.idle.queryState === 'function'
+                        && estado.pomodoroFase === 'foco') {
+                        const winFocada = await chrome.windows.getLastFocused().catch(() => null);
+                        if (winFocada && winFocada.focused) {
+                            const estadoIdle60 = await new Promise((resolve) => {
+                                try { chrome.idle.queryState(60, (st) => resolve(st || '')); } catch (_) { resolve(''); }
+                            });
+                            if (estadoIdle60 === 'active') {
+                                if (estado.emPausa && Number(estado.pomodoroPausaInicioTs || 0) > 0) {
+                                    estado.pomodoroFocoPausadoMs = Number(estado.pomodoroFocoPausadoMs || 0) + Math.max(0, agora - Number(estado.pomodoroPausaInicioTs));
+                                    estado.pomodoroPausaInicioTs = 0;
+                                }
+                                estado.ultimaAtividadeTs = agora;
                                 estado.emPausa = false;
+                                estado.minutosInativosPendentes = 0;
                             }
                         }
                     }

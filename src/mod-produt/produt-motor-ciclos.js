@@ -91,7 +91,10 @@
                     estado.pausasConfirmadas = Number(estado.pausasConfirmadas || 0) + 1;
                 }
                 estado.emPausa = true;
-                estado.pomodoroPausaInicioTs = agora;
+                estado.pomodoroPausaInicioTs = Number(estado.ultimaAtividadeTs || agora);
+                if (estado.pomodoroFase === 'foco' && pendentes > 0) {
+                    estado.pomodoroMinutosNaFase = Math.max(0, Number(estado.pomodoroMinutosNaFase || 0) - pendentes);
+                }
                 estado.minutosInativosPendentes = 0;
             } else {
                 estado.pausasMinutos = Number(estado.pausasMinutos || 0) + incrementoMin;
@@ -469,12 +472,19 @@
                         estado.pomodoroMinutosAtivoEmDescanso = 0;
                         return { evento: 'auto_retomou_descanso_incompleto', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                     }
-                } else if (origemDescAtual !== 'posterior' && govAuto.temMeritoAutoPausa && Number(estado.pomodoroMinutosNaFase || 0) > 0 && typeof this.pausarOuAdiantarDescansoPomodoro === 'function') {
-                    const retProx = this.pausarOuAdiantarDescansoPomodoro(estado, agora, config);
+                } else if (origemDescAtual !== 'posterior' && govAuto.temMeritoAutoPausa && Number(estado.pomodoroMinutosNaFase || 0) > 0 && typeof this.alternarPausaOuAdiantarDescanso === 'function') {
+                    const ultimaAtivAntesProx = Number(estado.ultimaAtividadeTs || agora);
+                    const retProx = this.alternarPausaOuAdiantarDescanso(estado, agora, config);
                     if (retProx && retProx.ok) {
+                        const msDesdeParadaProx = Math.max(limiarIdleFocoMs, agora - ultimaAtivAntesProx);
                         estado.pomodoroBancoOrigemDescanso = 'posterior';
-                        estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), limiarIdleFocoMs);
-                        estado.pomodoroMinutosNaFase = Math.floor(estado.pomodoroDescansoAcumuladoMs / 60000);
+                        estado.ultimaAtividadeTs = ultimaAtivAntesProx;
+                        estado.pomodoroFaseInicioTs = ultimaAtivAntesProx;
+                        estado.pomodoroDescansoAcumuladoMs = msDesdeParadaProx;
+                        estado.pomodoroDescansoSyncTs = agora;
+                        estado.pomodoroDescansoAtividadeAteTs = 0;
+                        estado.pomodoroSemScreensaverAteTs = 0;
+                        estado.pomodoroMinutosNaFase = Math.floor(msDesdeParadaProx / 60000);
                         estado.pomodoroMinutosAtivoEmDescanso = 0;
                         return { evento: 'auto_iniciou_proximo_descanso', descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                     }
@@ -490,7 +500,7 @@
                 const focoSalvoMs = Number(estado.pomodoroFocoAcumuladoAntesPausaMs || 0);
                 const temFocoAnteriorIncompleto = (focoSalvoMs >= 60000 && focoSalvoMs < Math.max(60000, focoMin * 60000 - 5000));
                 const retFoco = this.pularDescansoEIniciarFoco(estado, agora, config);
-                if (retFoco && retFoco.ok) {
+                if (retFoco && estado.pomodoroFase === 'foco') {
                     estado.pomodoroBancoOrigemFoco = temFocoAnteriorIncompleto ? 'anterior' : 'posterior';
                     estado.pomodoroFaseInicioTs = Math.max(0, Number(estado.pomodoroFaseInicioTs || agora) - limiarAtivoDescMs);
                     estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + limiarAtivoDescMin;
@@ -547,6 +557,12 @@
                     estado.pomodoroMinutosNaFase = Number(estado.pomodoroMinutosNaFase || 0) + 1;
                     estado.pomodoroDescansoAcumuladoMs = Math.max(Number(estado.pomodoroDescansoAcumuladoMs || 0), estado.pomodoroMinutosNaFase * 60000);
                 }
+                const metaCustomMinTick = Number(estado.pomodoroMetaCustomMs || 0) > 0
+                    ? Math.max(1, Math.ceil(Number(estado.pomodoroMetaCustomMs) / 60000))
+                    : 0;
+                const metaAlivioEfetivaMin = metaCustomMinTick > 0 ? metaCustomMinTick : alivioMin;
+                const metaPausaMaiorEfetivaMin = metaCustomMinTick > 0 ? metaCustomMinTick : pausaMaiorMin;
+
                 if (estado.pomodoroFase === 'alivio') {
                     if (estado.pomodoroMinutosNaFase >= pausaMaiorMin) {
                         /* Alívio prolongado virou Descanso Maior e segue contando indefinidamente até o usuário voltar a interagir */
@@ -566,7 +582,7 @@
                         if (acabouDeCumprir) estado.pomodoroBadgeVerdeAteTs = 0;
                         return { evento: 'promovido_pausa_maior', descansouNoPeriodo: true, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                     }
-                    if (estado.pomodoroMinutosNaFase >= alivioMin) {
+                    if (estado.pomodoroMinutosNaFase >= metaAlivioEfetivaMin) {
                         const acabouDeCumprir = !estado.pomodoroDescansoMinCumprido;
                         estado.pomodoroDescansoMinCumprido = true;
                         estado.pomodoroDescansoRealizadoNoCiclo = true;
@@ -576,7 +592,7 @@
                         estado.pomodoroUltimoDescansoTipo = 'alivio';
                         estado.pomodoroUltimoDescansoFimTs = agora;
                         estado.pomodoroUltimoDescansoDuracaoMin = this.arredondarMinutosDescansoExato(
-                            Number(estado.pomodoroDescansoAcumuladoMs || 0) || (Number(estado.pomodoroMinutosNaFase || alivioMin) * 60000)
+                            Number(estado.pomodoroDescansoAcumuladoMs || 0) || (Number(estado.pomodoroMinutosNaFase || metaAlivioEfetivaMin) * 60000)
                         );
                         if (acabouDeCumprir) estado.pomodoroBadgeVerdeAteTs = 0;
                         return { evento: acabouDeCumprir ? 'alivio_cumprido_continuo' : null, descansouNoPeriodo: true, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
@@ -584,8 +600,8 @@
                     return { evento: null, descansouNoPeriodo: false, ciclosMax, focoMin, alivioMin, pausaMaiorMin, proporcao };
                 }
 
-                /* Fase 'pausa_maior': após atingir pausaMaiorMin, continua contando indefinidamente até clique/tecla */
-                if (estado.pomodoroMinutosNaFase >= pausaMaiorMin) {
+                /* Fase 'pausa_maior': após atingir metaPausaMaiorEfetivaMin, continua contando indefinidamente até clique/tecla */
+                if (estado.pomodoroMinutosNaFase >= metaPausaMaiorEfetivaMin) {
                     const acabouDeCumprir = !estado.pomodoroDescansoMinCumprido;
                     estado.pomodoroCicloAtual = 0;
                     estado.pomodoroDescansoMinCumprido = true;

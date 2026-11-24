@@ -92,6 +92,10 @@
                 estado.necessidadePausaMs = 0;
             }
             estado.pomodoroFase = 'foco';
+            if (focoSalvoMs === 0) {
+                estado.saldoPausaRecebido = false;
+                estado.saldoAtividadeRecebido = true;
+            }
             estado.pomodoroMinutosNaFase = focoSalvoMs > 0 ? Math.floor(focoSalvoMs / 60000) : 0;
             estado.pomodoroFaseInicioTs = focoSalvoMs > 0 ? (agora - focoSalvoMs) : agora;
             estado.pomodoroFocoPausadoMs = 0;
@@ -316,6 +320,14 @@
                 estado.pomodoroDescansoRealizadoNoCiclo = true;
                 estado.pomodoroDescansoPendente = false;
                 estado.pomodoroDescansoMinCumprido = true;
+                estado.pomodoroDescansoPulado = false;
+                estado.pomodoroDescansoSaldoRestanteMs = 0;
+                estado.pomodoroDescansoSaldoTipo = '';
+                estado.necessidadePausaMs = 0;
+                estado.pomodoroMetaCustomMs = 0;
+                estado.pomodoroDescansoAcumuladoMs = msInativo;
+                estado.pomodoroDescansoSyncTs = agora;
+                estado.pomodoroDescansoAtividadeAteTs = 0;
                 estado.pomodoroUltimoDescansoTipo = 'pausa_maior';
                 estado.pomodoroUltimoDescansoFimTs = agora;
                 estado.pomodoroUltimoDescansoDuracaoMin = Math.max(1, minInativo);
@@ -335,6 +347,14 @@
                 estado.pomodoroDescansoRealizadoNoCiclo = true;
                 estado.pomodoroDescansoPendente = false;
                 estado.pomodoroDescansoMinCumprido = true;
+                estado.pomodoroDescansoPulado = false;
+                estado.pomodoroDescansoSaldoRestanteMs = 0;
+                estado.pomodoroDescansoSaldoTipo = '';
+                estado.necessidadePausaMs = 0;
+                estado.pomodoroMetaCustomMs = 0;
+                estado.pomodoroDescansoAcumuladoMs = msInativo;
+                estado.pomodoroDescansoSyncTs = agora;
+                estado.pomodoroDescansoAtividadeAteTs = 0;
                 estado.pomodoroUltimoDescansoTipo = 'alivio';
                 estado.pomodoroUltimoDescansoFimTs = agora;
                 estado.pomodoroUltimoDescansoDuracaoMin = Math.max(1, minInativo);

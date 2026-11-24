@@ -173,7 +173,8 @@
                         });
                     }
                     const rotuloDescBase = (resumo.fase === 'pausa_maior') ? 'Descanso' : 'Alívio';
-                    const metaDescMin = (resumo.fase === 'pausa_maior') ? resumo.pausaMaiorMin : resumo.alivioMin;
+                    const metaDescPadraoMin = (resumo.fase === 'pausa_maior') ? resumo.pausaMaiorMin : resumo.alivioMin;
+                    const metaDescMin = (Number(resumo.metaFaseMin || 0) > 0) ? resumo.metaFaseMin : metaDescPadraoMin;
                     const descAjustado = compDescMin !== 0;
                     const rotuloDesc = descAjustado ? `${rotuloDescBase} Ajustado` : rotuloDescBase;
                     segmentosPomodoro.push({
